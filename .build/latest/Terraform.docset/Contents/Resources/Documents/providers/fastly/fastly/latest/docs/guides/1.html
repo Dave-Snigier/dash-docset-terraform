@@ -1,0 +1,86 @@
+<html><!-- Online page at https://registry.terraform.io/providers/fastly/fastly/latest/docs/guides/1 --><head>
+                <title>Upgrading to version 1</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrading%20to%20version%201"></a><h2 id="upgrading-to-version-1">Upgrading to version 1</h2>
+
+<p><strong>Resources omit <code>_v1</code> suffix</strong>:</p>
+
+<p>All resources now have a consistent naming convention which omit the previous v1 suffix.</p>
+
+<ul>
+<li><code>fastly_service_v1</code> -&gt; <code>fastly_service_vcl</code> (Fastly has two service types; this resource has always described the VCL one)</li>
+<li><code>fastly_service_acl_entries_v1</code> -&gt; <code>fastly_service_acl_entries</code></li>
+<li><code>fastly_service_dictionary_items_v1</code> -&gt; <code>fastly_service_dictionary_items</code></li>
+<li><code>fastly_service_dynamic_snippet_content_v1</code> -&gt; <code>fastly_service_dynamic_snippet_content</code></li>
+<li><code>fastly_user_v1</code> -&gt; <code>fastly_user</code></li>
+</ul>
+
+<p>After upgrading, some existing projects might see an error such as:</p>
+
+<pre><code>Error: no schema available for module.fastly.&lt;...&gt; while reading state; this is a bug in Terraform and should be reported
+</code></pre>
+
+<p>This error occurs because the Terraform state file contains a different resource name to what's now exposed via the updated provider. To resolve this issue, remove the old resource from the state file and reimport the data using the new resource name.</p>
+
+<p>As an example, if you had defined an <code>fastly_service_acl_entries_v1</code> resource, then you could remove and reimport using the following commands (any brackets <code>&lt;...&gt;</code> should be replaced with actual values):</p>
+
+<div class="codehilite"><pre><span></span><code>terraform state rm <span class="s1">'fastly_service_acl_entries_v1.&lt;your_resource_name&gt;["&lt;your_acl_name&gt;"]'</span>
+terraform import <span class="s1">'fastly_service_acl_entries.&lt;your_resource_name&gt;["&lt;your_acl_name&gt;"]'</span> &lt;service_id&gt;/&lt;acl_id&gt;
+
+terraform state rm <span class="s1">'fastly_service_v1.&lt;your_resource_name&gt;'</span>
+terraform import <span class="s1">'fastly_service_vcl.&lt;your_resource_name&gt;'</span> &lt;service_id&gt;
+</code></pre></div>
+
+<p>We recommend that you keep a backup of your state file so you can use it to reference any resource IDs necessary.</p>
+
+<p><strong>Logging resources have consistent naming format</strong>:</p>
+
+<p>All logging resources now have a consistent naming convention based on the name of the logging provider, prefixed with <code>logging_</code>.</p>
+
+<ul>
+<li><code>bigquerylogging</code> -&gt; <code>logging_bigquery</code></li>
+<li><code>blobstoragelogging</code> -&gt; <code>logging_blobstorage</code></li>
+<li><code>gcslogging</code> -&gt; <code>logging_gcs</code></li>
+<li><code>httpslogging</code> -&gt; <code>logging_https</code></li>
+<li><code>logentries</code> -&gt; <code>logging_logentries</code></li>
+<li><code>papertrail</code> -&gt; <code>logging_papertrail</code></li>
+<li><code>s3logging</code> -&gt; <code>logging_s3</code></li>
+<li><code>splunk</code> -&gt; <code>logging_splunk</code></li>
+<li><code>sumologic</code> -&gt; <code>logging_sumologic</code></li>
+<li><code>syslog</code> -&gt; <code>logging_syslog</code></li>
+</ul>
+
+<p><strong>Director <code>capacity</code> removed</strong>:</p>
+
+<p>The Fastly API never supported the <code>capacity</code> field for a <code>director</code> resource (this was added to the Terraform provider by mistake). Load balancing of director backends is managed by the <code>weight</code> field on each associated <code>backend</code> resource.</p>
+
+<p><strong>GCS Logging field <code>email</code> renamed</strong>:</p>
+
+<p>The Fastly API was updated with a new <a href="https://developer.fastly.com/reference/api/logging/gcs/"><code>user</code></a> field to replace <code>email</code>.</p>
+
+<p><strong>Logging <code>format</code> and <code>format_version</code> defaults changed</strong>:</p>
+
+<p>Pre-1.0.0 the default values for <code>format</code> and <code>format_version</code> were incorrectly set to an older version <code>1</code>. All new logging endpoints use the version <code>2</code> custom log format by default.</p>
+
+<p><strong>Backend <code>auto_loadbalance</code> default changed</strong>:</p>
+
+<p>The Fastly web interface sets "Auto load balance" to "No" by default. The most common reason for having multiple backends in a single service is to route different paths to different backends, rather than load balance traffic between the backends. Conversely, pre-1.0.0, the terraform provider set<code>auto_loadbalance</code> to <code>true</code> by default, which was inconsistent and often unexpected. The default is now <code>false</code>.</p>
+
+<p><strong>Gzip <code>content_types</code> and <code>extensions</code> type changed</strong>:</p>
+
+<p>The <code>content_types</code> and <code>extensions</code> fields for a <code>gzip</code> resource, pre-1.0.0, were implemented as a <a href="https://www.terraform.io/plugin/sdkv2/schemas/schema-types#typeset"><code>TypeSet</code></a> (an <strong>unordered</strong> collection of items whose state index is calculated by the hash of the attributes of the set). This would result in confusing and unexpected diffs. Now they are implemented as a <a href="https://www.terraform.io/plugin/sdkv2/schemas/schema-types#typelist"><code>TypeList</code></a> (an <strong>ordered</strong> collection of items).</p>
+
+<p><strong>Automatically opt-in to <code>ignore_changes</code> behaviour for versionless resources</strong>:</p>
+
+<p>The versionless resources (ACL entries, Dictionary items and Dynamic VCL Snippets) are sometimes used in a way whereby they are "seeded" via Terraform and then updated/managed externally via the API or web interface. For this, the documentation suggests using <code>ignore_changes</code>, a built-in Terraform meta-argument, that allows the user to specify fields to ignore and from which to allow the state to drift.</p>
+
+<p>However, sometimes this isn't obvious or the user doesn't understand this suggestion until it is too late, and data ends up getting lost. This happens because the user makes changes elsewhere and doesn't use <code>ignore_changes</code>, so Terraform takes action to remove the state drift and deletes their changes. This data is then unrecoverable.</p>
+
+<p>Starting from version 1.0.0, Terraform now ignores any changes, and only allows the "dangerous" behaviour by explicitly opting in with a <code>manage_*</code> option (e.g. <code>manage_entries</code>, <code>manage_items</code>, <code>manage_snippets</code> depending on the versionless resource).</p>
+
+            
+        
+    </body></html>

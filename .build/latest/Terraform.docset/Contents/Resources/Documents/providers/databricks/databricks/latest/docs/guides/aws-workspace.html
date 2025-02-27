@@ -1,0 +1,368 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/aws-workspace --><head>
+                <title>Provisioning AWS Databricks workspace</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="provisioning-aws-databricks-workspace">Provisioning AWS Databricks workspace</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Refer to the <a href="https://registry.terraform.io/modules/databricks/examples/databricks/latest">Databricks Terraform Registry modules</a> for Terraform modules and examples to deploy Azure Databricks resources.</p>
+</aside>
+
+<p>You can provision multiple Databricks workspaces with Terraform.</p>
+
+<p><img alt="Simplest multiworkspace" src="https://raw.githubusercontent.com/databricks/terraform-provider-databricks/main/docs/simplest-multiworkspace.png"/></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20initialization%20for%20AWS%20workspaces"></a><h2 id="provider-initialization-for-aws-workspaces">Provider initialization for AWS workspaces</h2>
+
+<p>This guide assumes you have the <code>client_id</code>, which is the <code>application_id</code> of the <a href="../resources/service_principal.md">Service Principal</a>, <code>client_secret</code>, which is its secret, and <code>databricks_account_id</code>, which can be found in the top right corner of the <a href="https://accounts.cloud.databricks.com">Account Console</a>. (see <a href="https://docs.databricks.com/dev-tools/authentication-oauth.html#step-2-create-an-oauth-secret-for-a-service-principal">instruction</a>). This guide is provided as is and assumes you will use it as the basis for your setup.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"client_id"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"client_secret"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"tags"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"cidr_block"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.4.0.0/16"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"region"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eu-west-1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"random_string"</span><span class="w"> </span><span class="nv">"naming"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">special</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">upper</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">length</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="m">6</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"demo${random_string.naming.result}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Before <a href="workspace-management.md">managing workspace</a>, you have to create:</p>
+
+<ul>
+<li><a href="#vpc">VPC</a></li>
+<li><a href="#root-bucket">Root bucket</a></li>
+<li><a href="#cross-account-iam-role">Cross-account role</a></li>
+<li><a href="#databricks-workspace">Databricks workspace</a></li>
+<li><a href="#provider-configuration">Host and Token outputs</a></li>
+</ul>
+
+<blockquote>
+  <p>Initialize provider with <code>alias = "mws"</code> and use <code>provider = databricks.mws</code> for all <code>databricks_mws_*</code> resources. We require all <code>databricks_mws_*</code> resources to be created within a dedicated terraform module of your environment. Usually, this module creates VPC and IAM roles as well.</p>
+</blockquote>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">databricks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"databricks/databricks"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 4.15.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// initialize provider in "MWS" mode to provision new workspace</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"mws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://accounts.cloud.databricks.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.client_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.client_secret</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Cross-account%20IAM%20Role"></a><h2 id="cross-account-iam-role">Cross-account IAM Role</h2>
+
+<p>Cross-account IAM role is registered with <a href="../resources/mws_credentials.md">databricks_mws_credentials</a> resource.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_aws_assume_role_policy"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">external_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"cross_account_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-crossaccount"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_aws_assume_role_policy.this.json</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tags</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_aws_crossaccount_policy"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"customer"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role_policy"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.cross_account_role.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_aws_crossaccount_policy.this.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_credentials"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_arn</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.cross_account_role.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">credentials_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-creds"</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_iam_role_policy.this</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/VPC"></a><h2 id="vpc">VPC</h2>
+
+<p>The very first step is VPC creation with necessary firewall rules. Please consult <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/customer-managed-vpc.html">main documentation page</a> for <strong>the most complete and up-to-date details on networking</strong>. AWS VPS is registered as <a href="../resources/mws_networks.md">databricks_mws_networks</a> resource. For STS, S3, and Kinesis, you can create VPC gateway or interface endpoints such that the relevant in-region traffic from clusters could transit over the secure AWS backbone rather than the public network for more direct connections and reduced cost compared to AWS global endpoints. For more information, see <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/customer-managed-vpc.html#regional-endpoints-1">Regional endpoints</a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_availability_zones"</span><span class="w"> </span><span class="nv">"available"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">module</span><span class="w"> </span><span class="nv">"vpc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-aws-modules/vpc/aws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3.2.0"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.prefix</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.cidr_block</span><span class="w"></span>
+<span class="w">  </span><span class="na">azs</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_availability_zones.available.names</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tags</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">enable_dns_hostnames</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">enable_nat_gateway</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">single_nat_gateway</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">create_igw</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">public_subnets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">var.cidr_block</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">0</span><span class="p">)]</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_subnets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">var.cidr_block</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">1</span><span class="p">),</span><span class="w"></span>
+<span class="w">  </span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">var.cidr_block</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">)]</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">manage_default_security_group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_security_group_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-sg"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">default_security_group_egress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[{</span><span class="w"></span>
+<span class="w">    </span><span class="na">cidr_blocks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.0.0.0/0"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}]</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">default_security_group_ingress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[{</span><span class="w"></span>
+<span class="w">    </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow all internal TCP and UDP"</span><span class="w"></span>
+<span class="w">    </span><span class="na">self</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">module</span><span class="w"> </span><span class="nv">"vpc_endpoints"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-aws-modules/vpc/aws//modules/vpc-endpoints"</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3.2.0"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.vpc_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_group_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">module.vpc.default_security_group_id</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">endpoints</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">s3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">service</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"s3"</span><span class="w"></span>
+<span class="w">      </span><span class="na">service_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Gateway"</span><span class="w"></span>
+<span class="w">      </span><span class="na">route_table_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">flatten</span><span class="p">([</span><span class="w"></span>
+<span class="w">        </span><span class="nv">module.vpc.private_route_table_ids</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">module.vpc.public_route_table_ids</span><span class="p">])</span><span class="w"></span>
+<span class="w">      </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-s3-vpc-endpoint"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="nb">sts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">service</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"sts"</span><span class="w"></span>
+<span class="w">      </span><span class="na">private_dns_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">      </span><span class="na">subnet_ids</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.private_subnets</span><span class="w"></span>
+<span class="w">      </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-sts-vpc-endpoint"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="nb">kinesis-streams</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">service</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"kinesis-streams"</span><span class="w"></span>
+<span class="w">      </span><span class="na">private_dns_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">      </span><span class="na">subnet_ids</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.private_subnets</span><span class="w"></span>
+<span class="w">      </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-kinesis-vpc-endpoint"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tags</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_networks"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_group_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">module.vpc.default_security_group_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_ids</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.private_subnets</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.vpc_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Root%20bucket"></a><h2 id="root-bucket">Root bucket</h2>
+
+<p>Once <a href="#vpc">VPC</a> is ready, create an AWS S3 bucket for DBFS workspace storage, commonly called <strong>root bucket</strong>. This provider has <a href="../data-sources/aws_bucket_policy.md">databricks_aws_bucket_policy</a> with the necessary IAM policy template. The AWS S3 bucket has to be registered through <a href="../resources/mws_storage_configurations.md">databricks_mws_storage_configurations</a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"root_storage_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-rootbucket"</span><span class="w"></span>
+<span class="w">  </span><span class="na">acl</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"private"</span><span class="w"></span>
+<span class="w">  </span><span class="na">force_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="nv">var.tags</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-rootbucket"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_server_side_encryption_configuration"</span><span class="w"> </span><span class="nv">"root_storage_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.root_storage_bucket.bucket</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">apply_server_side_encryption_by_default</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">sse_algorithm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AES256"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_public_access_block"</span><span class="w"> </span><span class="nv">"root_storage_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.root_storage_bucket.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">block_public_acls</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">block_public_policy</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">ignore_public_acls</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">restrict_public_buckets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_s3_bucket.root_storage_bucket</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_aws_bucket_policy"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.root_storage_bucket.bucket</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_policy"</span><span class="w"> </span><span class="nv">"root_bucket_policy"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.root_storage_bucket.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_aws_bucket_policy.this.json</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_s3_bucket_public_access_block.root_storage_bucket</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_versioning"</span><span class="w"> </span><span class="nv">"root_bucket_versioning"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.root_storage_bucket.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">versioning_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Disabled"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_storage_configurations"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.root_storage_bucket.bucket</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_configuration_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-storage"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Databricks%20Workspace"></a><h2 id="databricks-workspace">Databricks Workspace</h2>
+
+<p>Once  <a href="#vpc">VPC</a>, <a href="#cross-account-iam-role">cross-account role</a>, and <a href="#root-bucket">root bucket</a> are set up, you can create Databricks AWS workspace through <a href="../resources/mws_workspaces.md">databricks_mws_workspaces</a> resource.</p>
+
+<p>Code that creates workspaces and code that <a href="workspace-management.md">manages workspaces</a> must be in separate terraform modules to avoid common confusion between <code>provider = databricks.mws</code> and <code>provider = databricks.created_workspace</code>. We specify <code>databricks_host</code> and <code>databricks_token</code> outputs, which must be used in the latter modules.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you experience technical difficulties with rolling out resources in this example, please make sure that <a href="../index.md#environment-variables">environment variables</a> don't <a href="../index.md#empty-provider-block">conflict with other</a> provider block attributes. When in doubt, please run <code>TF_LOG=DEBUG terraform apply</code> to enable <a href="https://www.terraform.io/docs/internals/debugging.html">debug mode</a> through the <a href="https://www.terraform.io/docs/cli/config/environment-variables.html#tf_log"><code>TF_LOG</code></a> environment variable. Look specifically for <code>Explicit and implicit attributes</code> lines, which should indicate authentication attributes used. The other common reason for technical difficulties might be related to missing <code>alias</code> attribute in <code>provider "databricks" {}</code> blocks or <code>provider</code> attribute in <code>resource "databricks_..." {}</code> blocks. Please make sure to read <a href="https://www.terraform.io/docs/language/providers/configuration.html#alias-multiple-provider-configurations"><code>alias</code>: Multiple Provider Configurations</a> documentation article.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_workspaces"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">aws_region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.prefix</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">credentials_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_credentials.this.credentials_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_configuration_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_storage_configurations.this.storage_configuration_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_id</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_networks.this.network_id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">token</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">comment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Terraform"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"databricks_host"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_workspaces.this.workspace_url</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"databricks_token"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_workspaces.this.token[0].token_value</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20resources%20and%20Authentication%20is%20not%20configured%20errors"></a><h3 id="data-resources-and-authentication-is-not-configured-errors">Data resources and Authentication is not configured errors</h3>
+
+<p><em>In Terraform 0.13 and later</em>, data resources have the same dependency resolution behavior <a href="https://www.terraform.io/docs/language/resources/behavior.html#resource-dependencies">as defined for managed resources</a>. Most data resources make an API call to a workspace. If a workspace doesn't exist yet, <code>default auth: cannot configure default credentials</code> error is raised. To work around this issue and guarantee proper lazy authentication with data resources, you should add <code>depends_on = [databricks_mws_workspaces.this]</code> to the body. This issue doesn't occur if a workspace is created <em>in one module</em> and resources <a href="workspace-management.md">within the workspace</a> are created <em>in another</em>. We do not recommend using Terraform 0.12 and earlier if your usage involves data resources.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_current_user"</span><span class="w"> </span><span class="nv">"me"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">databricks_mws_workspaces.this</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20configuration"></a><h2 id="provider-configuration">Provider configuration</h2>
+
+<p>In <a href="workspace-management.md">the next step</a>, please use the following configuration for the provider:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">module.e2.workspace_url</span><span class="w"></span>
+<span class="w">  </span><span class="na">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">module.e2.token_value</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>We assume that you have a terraform module in your project that creates a workspace (using <a href="#databricks-workspace">Databricks Workspace</a> section) and you named it as <code>e2</code> while calling it in the <strong>main.tf</strong> file of your terraform project. And <code>workspace_url</code> and <code>token_value</code> are the output attributes of that module. This provider configuration will allow you to use the generated token to authenticate to the created workspace during workspace creation.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Credentials%20validation%20checks%20errors"></a><h3 id="credentials-validation-checks-errors">Credentials validation checks errors</h3>
+
+<p>Due to a bug in the Terraform AWS provider (spotted in v3.28) the Databricks AWS cross-account policy creation and attachment to the IAM role takes longer than the AWS request confirmation to Terraform. As Terraform continues creating the Workspace, validation checks for the credentials fail, as the policy isn’t applied more quickly. Showing the error:</p>
+
+<div class="codehilite"><pre><span></span><code>Error: MALFORMED_REQUEST: Failed credentials validation checks: Spot Cancellation, Create Placement Group, Delete Tags, Describe Availability Zones, Describe instances, Describe Instance Status, Describe Placement Group, Describe Route Tables, Describe Security Groups, Describe Spot Instances, Describe Spot Price History, Describe Subnets, Describe Volumes, Describe Vpcs, Request Spot Instances
+<span class="o">(</span><span class="m">400</span> on /api/2.0/accounts/<span class="o">{</span>UUID<span class="o">}</span>/workspaces<span class="o">)</span>
+</code></pre></div>
+
+<p>As a workaround, give the <code>aws_iam_role</code> more time to be created with a <code>time_sleep</code> resource, which you need to add as a dependency to the <code>databricks_mws_workspaces</code> resource.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"time_sleep"</span><span class="w"> </span><span class="nv">"wait"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">  </span><span class="nv">aws_iam_role.cross_account_role</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">create_duration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10s"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/IAM%20policy%20error"></a><h3 id="iam-policy-error">IAM policy error</h3>
+
+<p>If you notice the below error:</p>
+
+<div class="codehilite"><pre><span></span><code>Error: MALFORMED_REQUEST: Failed credentials validation checks: Spot Cancellation, Create Placement Group, Delete Tags, Describe Availability Zones, Describe instances, Describe Instance Status, Describe Placement Group, Describe Route Tables, Describe Security Groups, Describe Spot Instances, Describe Spot Price History, Describe Subnets, Describe Volumes, Describe Vpcs, Request Spot Instances
+</code></pre></div>
+
+<ul>
+<li>Try creating workspace from UI:</li>
+</ul>
+
+<p><img alt="create_workspace_error" src="https://raw.githubusercontent.com/databricks/terraform-provider-databricks/main/docs/images/create_workspace_error.png"/></p>
+
+<ul>
+<li>Verify if the role and policy exist (assume role should allow external ID)</li>
+</ul>
+
+<p><img alt="iam_role_trust_error" src="https://raw.githubusercontent.com/databricks/terraform-provider-databricks/main/docs/images/iam_role_trust_error.png"/></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/More%20than%20one%20authorization%20method%20configured%20error"></a><h3 id="more-than-one-authorization-method-configured-error">More than one authorization method configured error</h3>
+
+<p>See the <a href="https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/troubleshooting#more-than-one-authorization-method-configured">troubleshooting guide</a></p>
+
+            
+        
+    </body></html>

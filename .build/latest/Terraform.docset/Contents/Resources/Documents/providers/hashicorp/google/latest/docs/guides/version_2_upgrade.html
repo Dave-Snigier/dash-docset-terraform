@@ -1,0 +1,774 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/version_2_upgrade --><head>
+                <title>Terraform provider for Google Cloud 2.0.0 Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-provider-for-google-cloud-200-upgrade-guide">Terraform provider for Google Cloud 2.0.0 Upgrade Guide</h1>
+
+<p>Version <code>2.0.0</code> of the Terraform provider for Google Cloud is a major release and
+includes some changes that you will need to consider when upgrading. This guide
+is intended to help with that process and focuses only on the changes necessary
+to upgrade from version <code>1.20.0</code> to <code>2.0.0</code>.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The "Google provider" refers to both <code>google</code> and <code>google-beta</code>; each will have released <code>2.0.0</code> at around the same time, and this guide is for both variants of the Google provider. See <a href="https://terraform.io/docs/providers/google/guides/provider_versions.html">Provider Versions</a> for details if you're new to using <code>google-beta</code>.</p>
+</aside>
+
+<p>Most of the changes outlined in this guide have been previously marked as
+deprecated in the Terraform <code>plan</code>/<code>apply</code> output throughout previous provider
+releases, up to and including 1.20.0. These changes, such as deprecation notices,
+can always be found in the <a href="https://github.com/hashicorp/terraform-provider-google/blob/main/CHANGELOG.md">CHANGELOG</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Why%20version%202.0.0%3F"></a><h2 id="why-version-200">Why version 2.0.0?</h2>
+
+<p>We introduced version <code>2.0.0</code> of the Google provider in order to split the
+provider into 2 distinct variants; <code>google</code>, the provider for the generally
+available (GA) GCP APIs, and <code>google-beta</code>, the provider for Beta GCP APIs.</p>
+
+<p>In addition, we made small breaking changes across the provider to enable import
+for older resources, enable some new use cases, align field naming / formats
+with your expectations based on other GCP tooling, and to facilitate generating
+more resources with <a href="https://github.com/GoogleCloudPlatform/magic-modules">Magic Modules</a>.</p>
+
+<p>While you should see some small changes in your configurations as a result of
+these changes, we don't expect you'll need to make any major refactorings. As we
+develop the provider, we hope to continue to use Magic Modules to provide a
+consistent experience across the provider including features like configurable
+timeouts, import, and more.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/I%20accidentally%20upgraded%20to%202.0.0%2C%20how%20do%20I%20downgrade%20to%201.X%3F"></a><h2 id="i-accidentally-upgraded-to-200-how-do-i-downgrade-to-1x">I accidentally upgraded to 2.0.0, how do I downgrade to <code>1.X</code>?</h2>
+
+<p>If you've inadvertently upgraded to <code>2.0.0</code>, first see the
+<a href="#provider-version-configuration">Provider Version Configuration Guide</a> to lock
+your provider version; if you've constrained the provider to a lower version
+such as shown in the previous version example in that guide, Terraform will pull
+in a <code>1.X</code> series release on <code>terraform init</code>.</p>
+
+<p>If you've only ran <code>terraform init</code> or <code>terraform plan</code>, your state will not
+have been modified and downgrading your provider is sufficient.</p>
+
+<p>If you've ran <code>terraform refresh</code> or <code>terraform apply</code>, Terraform may have made
+state changes in the meantime.</p>
+
+<ul>
+<li><p>If you're using a <em>local</em> state, <code>terraform refresh</code> with a downgraded
+provider is likely sufficient to revert your state. The Google provider
+generally refreshes most state information from the API, and the properties
+necessary to do so have been left unchanged.</p></li>
+<li><p>If you're using a <em>remote</em> state backend</p>
+
+<ul>
+<li><p>That does not support versioning, see the local state instructions above</p></li>
+<li><p>That supports <em>versioning</em> such as <a href="https://www.terraform.io/docs/backends/types/gcs.html">Google Cloud Storage</a>
+you can revert the Terraform state file to a previous version by hand. If you do
+so and Terraform created resources as part of a <code>terraform apply</code>, you'll need
+to either <code>terraform import</code> them or delete them by hand.</p></li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrade%20Topics"></a><h2 id="upgrade-topics">Upgrade Topics</h2>
+
+<!-- TOC depthFrom:2 depthTo:2 -->
+
+<ul>
+<li><a href="#provider-version-configuration">Provider Version Configuration</a></li>
+<li><a href="#google-beta-provider"><code>google-beta</code> provider</a></li>
+<li><a href="#data-sources">Data Sources</a></li>
+<li><a href="#resource-google_bigquery_dataset">Resource: <code>google_bigquery_dataset</code></a></li>
+<li><a href="#resource-google_bigtable_instance">Resource: <code>google_bigtable_instance</code></a></li>
+<li><a href="#resource-google_binary_authorization_attestor">Resource: <code>google_binary_authorization_attestor</code></a></li>
+<li><a href="#resource-google_binary_authorization_policy">Resource: <code>google_binary_authorization_policy</code></a></li>
+<li><a href="#resource-google_cloudbuild_trigger">Resource: <code>google_cloudbuild_trigger</code></a></li>
+<li><a href="#resource-google_cloudfunctions_function">Resource: <code>google_cloudfunctions_function</code></a></li>
+<li><a href="#resource-google_compute_backend_service">Resource: <code>google_compute_backend_service</code></a></li>
+<li><a href="#resource-google_compute_disk">Resource: <code>google_compute_disk</code></a></li>
+<li><a href="#resource-google_compute_global_forwarding_rule">Resource: <code>google_compute_global_forwarding_rule</code></a></li>
+<li><a href="#resource-google_compute_image">Resource: <code>google_compute_image</code></a></li>
+<li><a href="#resource-google_compute_instance">Resource: <code>google_compute_instance</code></a></li>
+<li><a href="#resource-google_compute_instance_from_template">Resource: <code>google_compute_instance_from_template</code></a></li>
+<li><a href="#resource-google_compute_instance_group_manager">Resource: <code>google_compute_instance_group_manager</code></a></li>
+<li><a href="#resource-google_compute_instance_template">Resource: <code>google_compute_instance_template</code></a></li>
+<li><a href="#resource-google_compute_project_metadata">Resource: <code>google_compute_project_metadata</code></a></li>
+<li><a href="#resource-google_compute_region_instance_group_manager">Resource: <code>google_compute_region_instance_group_manager</code></a></li>
+<li><a href="#resource-google_compute_snapshot">Resource: <code>google_compute_snapshot</code></a></li>
+<li><a href="#resource-google_compute_subnetwork_iam_*">Resource: <code>google_compute_subnetwork_iam_*</code></a></li>
+<li><a href="#resource-google_compute_target_pool">Resource: <code>google_compute_target_pool</code></a></li>
+<li><a href="#resource-google_compute_url_map">Resource: <code>google_compute_url_map</code></a></li>
+<li><a href="#resource-google_container_analysis_note">Resource: <code>google_container_analysis_note</code></a></li>
+<li><a href="#resource-google_container_cluster">Resource: <code>google_container_cluster</code></a></li>
+<li><a href="#resource-google_container_node_pool">Resource: <code>google_container_node_pool</code></a></li>
+<li><a href="#resource-google_dataproc_cluster">Resource: <code>google_dataproc_cluster</code></a></li>
+<li><a href="#resource-google_endpoints_service">Resource: <code>google_endpoints_service</code></a></li>
+<li><a href="#resource-google_filestore_instance">Resource: <code>google_filestore_instance</code></a></li>
+<li><a href="#resource-google_organization_custom_role">Resource: <code>google_organization_custom_role</code></a></li>
+<li><a href="#resource-google_project">Resource: <code>google_project</code></a></li>
+<li><a href="#resource-google_project_custom_role">Resource: <code>google_project_custom_role</code></a></li>
+<li><a href="#resource-google_project_iam_policy">Resource: <code>google_project_iam_policy</code></a></li>
+<li><a href="#resource-google_service_account">Resource: <code>google_service_account</code></a></li>
+<li><a href="#resource-google_sql_database_instance">Resource: <code>google_sql_database_instance</code></a></li>
+<li><a href="#resource-google_storage_default_object_acl">Resource: <code>google_storage_default_object_acl</code></a></li>
+<li><a href="#resource-google_storage_object_acl">Resource: <code>google_storage_object_acl</code></a></li>
+<li><a href="#google_*_iam_binding">Resource: <code>google_*_iam_binding</code></a></li>
+</ul>
+
+<!-- /TOC -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Version%20Configuration"></a><h2 id="provider-version-configuration">Provider Version Configuration</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Before upgrading to version 2.0.0, it is recommended to upgrade to the most recent version of the provider (1.20.0) and ensure that your environment successfully runs <a href="https://www.terraform.io/docs/commands/plan.html"><code>terraform plan</code></a> without unexpected changes or deprecation notices.</p>
+</aside>
+
+<p>It is recommended to use <a href="https://www.terraform.io/docs/configuration/providers.html#provider-versions">version constraints</a>
+when configuring Terraform providers. If you are following that recommendation,
+update the version constraints in your Terraform configuration and run
+<a href="https://www.terraform.io/docs/commands/init.html"><code>terraform init</code></a> to download
+the new version.</p>
+
+<p>If you aren't using version constraints, you can use <code>terraform init -upgrade</code>
+in order to upgrade your provider to the latest released version.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.20.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 2.0.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/The%20google-beta%20provider"></a><h2 id="the-google-beta-provider">The <code>google-beta</code> provider</h2>
+
+<p>The <code>google-beta</code> variant of the Google provider is now necessary to be able to
+configure products and features that are in beta. The <code>google-beta</code> provider
+enables full import support of beta features and gives users who wish to use
+only the most stable APIs and features more confidence that they are doing so
+by continuing to use the <code>google</code> provider, which now exclusively uses generally
+available (GA) products and features.</p>
+
+<p>Beta GCP features have no deprecation policy and no SLA, but are otherwise considered to be feature-complete
+with only minor outstanding issues after their Alpha period. Beta is when GCP
+features are publicly announced, and is when they generally become publicly
+available. For more information see <a href="https://cloud.google.com/terms/launch-stages">the official documentation on GCP launch stages</a>.</p>
+
+<p>Because the API for beta features can change before their GA launch, there may
+be breaking changes in the <code>google-beta</code> provider in minor release versions.
+These changes will be announced in the <a href="https://github.com/hashicorp/terraform-provider-google-beta/blob/main/CHANGELOG.md"><code>google-beta</code> CHANGELOG</a>.</p>
+
+<p>To have resources at different API versions, set up provider blocks for each version:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-project-id"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"google-beta"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-project-id"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In each resource, explicitly state which provider that resource should be used
+with:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance"</span><span class="w"> </span><span class="nv">"ga-instance"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"google"</span><span class="c1"></span>
+
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance"</span><span class="w"> </span><span class="nv">"beta-instance"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"google-beta"</span><span class="c1"></span>
+
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>See <a href="https://terraform.io/docs/providers/google/guides/provider_versions.html">Provider Versions</a>
+for more details on how to use <code>google-beta</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Sources"></a><h2 id="data-sources">Data Sources</h2>
+
+<p>See the <code>Resource</code> sections in this document for properties that may have been
+removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_bigquery_dataset"></a><h2 id="resource-google_bigquery_dataset">Resource: <code>google_bigquery_dataset</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/access%20is%20now%20a%20Set"></a><h3 id="access-is-now-a-set"><code>access</code> is now a Set</h3>
+
+<p>The order of entries in <code>access</code> no longer matters. Any configurations that
+interpolate based on an item at a specific index will need to be updated, as items
+may have been reordered.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_bigtable_instance"></a><h2 id="resource-google_bigtable_instance">Resource: <code>google_bigtable_instance</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cluster_id%2C%20zone%2C%20num_nodes%2C%20and%20storage_type%20have%20moved%20into%20a%20cluster%20block"></a><h3 id="cluster_id-zone-num_nodes-and-storage_type-have-moved-into-a-cluster-block"><code>cluster_id</code>, <code>zone</code>, <code>num_nodes</code>, and <code>storage_type</code> have moved into a <code>cluster</code> block</h3>
+
+<p>Example previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_bigtable_instance"</span><span class="w"> </span><span class="nv">"instance"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-instance"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-instance-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-b"</span><span class="w"></span>
+<span class="w">  </span><span class="na">num_nodes</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"HDD"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Example updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_bigtable_instance"</span><span class="w"> </span><span class="nv">"instance"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-instance"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">cluster</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">cluster_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-instance-cluster"</span><span class="w"></span>
+<span class="w">    </span><span class="na">zone</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-b"</span><span class="w"></span>
+<span class="w">    </span><span class="na">num_nodes</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"HDD"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/zone%20is%20no%20longer%20inferred%20from%20the%20provider"></a><h3 id="zone-is-no-longer-inferred-from-the-provider"><code>zone</code> is no longer inferred from the provider</h3>
+
+<p><code>cluster.zone</code> is now required, even if the provider block has a zone set.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cluster_family%20has%20a%20diff"></a><h3 id="cluster_family-has-a-diff"><code>cluster_family</code> has a diff</h3>
+
+<p>If you see</p>
+
+<pre><code>-/+ google_bigtable_table.my_table (new resource required)
+      id:                              "foo" =&gt; &lt;computed&gt; (forces new resource)
+      column_family.#:                 "1" =&gt; "0" (forces new resource)
+      column_family.123456789.family:  "my-family" =&gt; ""
+      instance_name:                   "bar" =&gt; "bar"
+      name:                            "foo" =&gt; "foo"
+      project:                         "my-project" =&gt; &lt;computed&gt;
+</code></pre>
+
+<p>Add an appropriate <code>column_family</code> block to your config, eg:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gi">+ column_family {</span><span class="w"></span>
+<span class="gi">+   family = "my-family"</span><span class="w"></span>
+<span class="gi">+ }</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_binary_authorization_attestor"></a><h2 id="resource-google_binary_authorization_attestor">Resource: <code>google_binary_authorization_attestor</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/binary%20authorization%20resources%20have%20been%20removed%20from%20the%20GA%20provider"></a><h3 id="binary-authorization-resources-have-been-removed-from-the-ga-provider">binary authorization resources have been removed from the GA provider</h3>
+
+<p>Use the <a href="#google-beta-provider"><code>google-beta</code> provider</a> to use these resources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_binary_authorization_policy"></a><h2 id="resource-google_binary_authorization_policy">Resource: <code>google_binary_authorization_policy</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/binary%20authorization%20resources%20have%20been%20removed%20from%20the%20GA%20provider"></a><h3 id="binary-authorization-resources-have-been-removed-from-the-ga-provider-2">binary authorization resources have been removed from the GA provider</h3>
+
+<p>Use the <a href="#google-beta-provider"><code>google-beta</code> provider</a> to use these resources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_cloudbuild_trigger"></a><h2 id="resource-google_cloudbuild_trigger">Resource: <code>google_cloudbuild_trigger</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/build.step.args%20is%20now%20a%20list%20instead%20of%20space%20separated%20strings."></a><h3 id="buildstepargs-is-now-a-list-instead-of-space-separated-strings"><code>build.step.args</code> is now a list instead of space separated strings.</h3>
+
+<p>Example updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_cloudbuild_trigger"</span><span class="w"> </span><span class="nv">"build_trigger"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">trigger_template</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">branch_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"main-updated"</span><span class="w"></span>
+<span class="w">    </span><span class="na">repo_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"some-repo-updated"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">build</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">images</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"gcr.io/$PROJECT_ID/$REPO_NAME:$SHORT_SHA"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">tags</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"team-a", "service-b", "updated"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">step</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gcr.io/cloud-builders/gsutil"</span><span class="w"></span>
+<span class="w">      </span><span class="na">args</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"cp", "gs://mybucket/remotefile.zip", "localfile-updated.zip"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">step</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gcr.io/cloud-builders/go"</span><span class="w"></span>
+<span class="w">      </span><span class="na">args</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"build", "my_package_updated"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">step</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gcr.io/cloud-builders/docker"</span><span class="w"></span>
+<span class="w">      </span><span class="na">args</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"build", "-t", "gcr.io/$PROJECT_ID/$REPO_NAME:$SHORT_SHA", "-f", "Dockerfile", "."</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">step</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gcr.io/$PROJECT_ID/$REPO_NAME:$SHORT_SHA"</span><span class="w"></span>
+<span class="w">      </span><span class="na">args</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"test"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_cloudfunctions_function"></a><h2 id="resource-google_cloudfunctions_function">Resource: <code>google_cloudfunctions_function</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/trigger_bucket%2C%20trigger_topic%2C%20and%20retry_on_failure%20have%20been%20removed"></a><h3 id="trigger_bucket-trigger_topic-and-retry_on_failure-have-been-removed"><code>trigger_bucket</code>, <code>trigger_topic</code>, and <code>retry_on_failure</code> have been removed</h3>
+
+<p>Use the <code>event_trigger</code> block instead.</p>
+
+<p>Example updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_cloudfunctions_function"</span><span class="w"> </span><span class="nv">"function"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-function"</span><span class="w"></span>
+<span class="w">  </span><span class="na">available_memory_mb</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">128</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_archive_bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${google_storage_bucket.bucket.name}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_archive_object</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${google_storage_bucket_object.archive.name}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="m">61</span><span class="w"></span>
+<span class="w">  </span><span class="na">entry_point</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"helloGCS"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">event_trigger</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">event_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"providers/cloud.storage/eventTypes/object.change"</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"${google_storage_bucket.bucket.name}"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">failure_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">retry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_storage_bucket"</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-bucket"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_storage_bucket_object"</span><span class="w"> </span><span class="nv">"archive"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"index.zip"</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${google_storage_bucket.bucket.name}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"path/to/source.zip"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>See the documentation at
+<a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/cloudfunctions_function"><code>google_cloudfunctions_function</code></a>
+for more details.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_backend_service"></a><h2 id="resource-google_compute_backend_service">Resource: <code>google_compute_backend_service</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/custom_request_headers%20has%20been%20removed%20from%20the%20GA%20provider"></a><h3 id="custom_request_headers-has-been-removed-from-the-ga-provider"><code>custom_request_headers</code> has been removed from the GA provider</h3>
+
+<p>Use the <a href="#google-beta-provider"><code>google-beta</code> provider</a> to set this field.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/iap%20may%20cause%20spurious%20updates"></a><h3 id="iap-may-cause-spurious-updates"><code>iap</code> may cause spurious updates</h3>
+
+<p>Due to technical limitations around how Terraform can diff fields, you may see a
+spurious update where the client secret in your config replaces an incorrect
+value that was recorded in state, the SHA256 hash of the secret's value.</p>
+
+<p>You may also encounter the same behaviour on import.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_disk"></a><h2 id="resource-google_compute_disk">Resource: <code>google_compute_disk</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/disk_encryption_key_raw%20and%20disk_encryption_key_sha256%20have%20been%20removed."></a><h3 id="disk_encryption_key_raw-and-disk_encryption_key_sha256-have-been-removed"><code>disk_encryption_key_raw</code> and <code>disk_encryption_key_sha256</code> have been removed.</h3>
+
+<p>Use the <code>disk_encryption_key</code> block instead:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"google_compute_image"</span><span class="w"> </span><span class="nv">"my_image"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">family</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-11"</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_disk"</span><span class="w"> </span><span class="nv">"foobar"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-disk"</span><span class="w"></span>
+<span class="w">  </span><span class="na">image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.google_compute_image.my_image.self_link}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">size</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="m">50</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"pd-ssd"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">disk_encryption_key</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">raw_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SGVsbG8gZnJvbSBHb29nbGUgQ2xvdWQgUGxhdGZvcm0="</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_global_forwarding_rule"></a><h2 id="resource-google_compute_global_forwarding_rule">Resource: <code>google_compute_global_forwarding_rule</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/labels%20has%20been%20removed%20from%20the%20GA%20provider"></a><h3 id="labels-has-been-removed-from-the-ga-provider"><code>labels</code> has been removed from the GA provider</h3>
+
+<p>Use the <a href="#google-beta-provider"><code>google-beta</code> provider</a> to set this field.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_image"></a><h2 id="resource-google_compute_image">Resource: <code>google_compute_image</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/create_timeout%20has%20been%20removed"></a><h3 id="create_timeout-has-been-removed"><code>create_timeout</code> has been removed</h3>
+
+<p>Use the standard <a href="https://www.terraform.io/docs/configuration/resources.html#timeouts">timeouts</a>
+block instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_instance"></a><h2 id="resource-google_compute_instance">Resource: <code>google_compute_instance</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/create_timeout%20has%20been%20removed"></a><h3 id="create_timeout-has-been-removed-2"><code>create_timeout</code> has been removed</h3>
+
+<p>Use the standard <a href="https://www.terraform.io/docs/configuration/resources.html#timeouts">timeouts</a>
+block instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/metadata%20is%20now%20authoritative"></a><h3 id="metadata-is-now-authoritative"><code>metadata</code> is now authoritative</h3>
+
+<p>Terraform will remove values not explicitly set in this field. Any <code>metadata</code> values
+that were added outside of Terraform should be added to the config.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/network%20has%20been%20removed"></a><h3 id="network-has-been-removed"><code>network</code> has been removed</h3>
+
+<p>Use <code>network_interface</code> instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/network_interface.%2A.address%20has%20been%20removed"></a><h3 id="network_interfaceaddress-has-been-removed"><code>network_interface.*.address</code> has been removed</h3>
+
+<p>Use <code>network_interface.*.network_ip</code> instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_instance_from_template"></a><h2 id="resource-google_compute_instance_from_template">Resource: <code>google_compute_instance_from_template</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/metadata%20is%20now%20authoritative"></a><h3 id="metadata-is-now-authoritative-2"><code>metadata</code> is now authoritative</h3>
+
+<p>Terraform will remove values not explicitly set in this field. Any <code>metadata</code> values
+that were added outside of Terraform should be added to the config.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/network_interface.%2A.address%20has%20been%20removed"></a><h3 id="network_interfaceaddress-has-been-removed-2"><code>network_interface.*.address</code> has been removed</h3>
+
+<p>Use <code>network_interface.*.network_ip</code> instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_instance_group_manager"></a><h2 id="resource-google_compute_instance_group_manager">Resource: <code>google_compute_instance_group_manager</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/version%2C%20auto_healing_policies%2C%20rolling_update_policy%20have%20been%20removed%20from%20the%20GA%20provider"></a><h3 id="version-auto_healing_policies-rolling_update_policy-have-been-removed-from-the-ga-provider"><code>version</code>, <code>auto_healing_policies</code>, <code>rolling_update_policy</code> have been removed from the GA provider</h3>
+
+<p>Use the <a href="#google-beta-provider"><code>google-beta</code> provider</a> to use these fields.
+<code>rolling_update_policy</code> has been renamed to <code>update_policy</code> in <code>google-beta</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_instance_template"></a><h2 id="resource-google_compute_instance_template">Resource: <code>google_compute_instance_template</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/network_interface.%2A.address%20has%20been%20removed"></a><h3 id="network_interfaceaddress-has-been-removed-3"><code>network_interface.*.address</code> has been removed</h3>
+
+<p>Use <code>network_interface.*.network_ip</code> instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_project_metadata"></a><h2 id="resource-google_compute_project_metadata">Resource: <code>google_compute_project_metadata</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/metadata%20is%20now%20authoritative"></a><h3 id="metadata-is-now-authoritative-3"><code>metadata</code> is now authoritative</h3>
+
+<p>Terraform will remove values not explicitly set in this field. Any <code>metadata</code> values
+that were added outside of Terraform should be added to the config.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_region_instance_group_manager"></a><h2 id="resource-google_compute_region_instance_group_manager">Resource: <code>google_compute_region_instance_group_manager</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/version%2C%20auto_healing_policies%2C%20rolling_update_policy%20have%20been%20removed%20from%20the%20GA%20provider"></a><h3 id="version-auto_healing_policies-rolling_update_policy-have-been-removed-from-the-ga-provider-2"><code>version</code>, <code>auto_healing_policies</code>, <code>rolling_update_policy</code> have been removed from the GA provider</h3>
+
+<p>Use the <a href="#google-beta-provider"><code>google-beta</code> provider</a> to use these fields.
+<code>rolling_update_policy</code> has been renamed to <code>update_policy</code> in <code>google-beta</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/update_strategy%20no%20longer%20has%20any%20effect%20and%20is%20removed"></a><h3 id="update_strategy-no-longer-has-any-effect-and-is-removed"><code>update_strategy</code> no longer has any effect and is removed</h3>
+
+<p>With <code>rolling_update_policy</code> removed, <code>update_strategy</code> has no effect anymore.
+Before updating, remove it from your config.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_snapshot"></a><h2 id="resource-google_compute_snapshot">Resource: <code>google_compute_snapshot</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/snapshot_encryption_key_raw%20and%20snapshot_encryption_key_sha256%20have%20been%20removed."></a><h3 id="snapshot_encryption_key_raw-and-snapshot_encryption_key_sha256-have-been-removed"><code>snapshot_encryption_key_raw</code> and <code>snapshot_encryption_key_sha256</code> have been removed.</h3>
+
+<p>Use the <code>snapshot_encryption_key</code> block instead:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"google_compute_image"</span><span class="w"> </span><span class="nv">"my_image"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">family</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-11"</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_disk"</span><span class="w"> </span><span class="nv">"my_disk"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-disk"</span><span class="w"></span>
+<span class="w">  </span><span class="na">image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.google_compute_image.my_image.self_link}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">size</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"pd-ssd"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_snapshot"</span><span class="w"> </span><span class="nv">"my_snapshot"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-snapshot"</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_disk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${google_compute_disk.my_disk.name}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">snapshot_encryption_key</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">raw_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SGVsbG8gZnJvbSBHb29nbGUgQ2xvdWQgUGxhdGZvcm0="</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/source_disk_encryption_key_raw%20and%20source_disk_encryption_key_sha256%20have%20been%20removed."></a><h3 id="source_disk_encryption_key_raw-and-source_disk_encryption_key_sha256-have-been-removed"><code>source_disk_encryption_key_raw</code> and <code>source_disk_encryption_key_sha256</code> have been removed.</h3>
+
+<p>Use the <code>source_disk_encryption_key</code> block instead:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"google_compute_image"</span><span class="w"> </span><span class="nv">"my_image"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">family</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-11"</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_disk"</span><span class="w"> </span><span class="nv">"my_disk"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-disk"</span><span class="w"></span>
+<span class="w">  </span><span class="na">image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.google_compute_image.my_image.self_link}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">size</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"pd-ssd"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">disk_encryption_key</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">raw_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SGVsbG8gZnJvbSBHb29nbGUgQ2xvdWQgUGxhdGZvcm0="</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_snapshot"</span><span class="w"> </span><span class="nv">"my_snapshot"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-snapshot"</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_disk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${google_compute_disk.my_disk.name}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">source_disk_encryption_key</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">raw_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SGVsbG8gZnJvbSBHb29nbGUgQ2xvdWQgUGxhdGZvcm0="</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_subnetwork_iam_%2A"></a><h2 id="resource-google_compute_subnetwork_iam_">Resource: <code>google_compute_subnetwork_iam_*</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/subnetwork%20IAM%20resources%20have%20been%20removed%20from%20the%20GA%20provider"></a><h3 id="subnetwork-iam-resources-have-been-removed-from-the-ga-provider">subnetwork IAM resources have been removed from the GA provider</h3>
+
+<p>Use the <a href="#google-beta-provider"><code>google-beta</code> provider</a> to use these resources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_target_pool"></a><h2 id="resource-google_compute_target_pool">Resource: <code>google_compute_target_pool</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/instances%20is%20now%20a%20Set"></a><h3 id="instances-is-now-a-set"><code>instances</code> is now a Set</h3>
+
+<p>The order of entries in <code>instances</code> no longer matters. Any configurations that
+interpolate based on an item at a specific index will need to be updated, as items
+may have been reordered.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_url_map"></a><h2 id="resource-google_compute_url_map">Resource: <code>google_compute_url_map</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/host_rule%2C%20path_matcher%2C%20and%20test%20are%20now%20authoritative"></a><h3 id="host_rule-path_matcher-and-test-are-now-authoritative"><code>host_rule</code>, <code>path_matcher</code>, and <code>test</code> are now authoritative</h3>
+
+<p>Terraform will remove values not explicitly set in these fields. Any <code>host_rule</code>, <code>path_matcher</code>, or <code>test</code>
+values that were added outside of Terraform should be added to the config.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_container_analysis_note"></a><h2 id="resource-google_container_analysis_note">Resource: <code>google_container_analysis_note</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/container%20analysis%20resources%20have%20been%20removed%20from%20the%20GA%20provider"></a><h3 id="container-analysis-resources-have-been-removed-from-the-ga-provider">container analysis resources have been removed from the GA provider</h3>
+
+<p>Use the <a href="#google-beta-provider"><code>google-beta</code> provider</a> to use these resources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_container_cluster"></a><h2 id="resource-google_container_cluster">Resource: <code>google_container_cluster</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/enable_binary_authorization%2C%20enable_tpu%2C%20pod_security_policy_config%2C%20node_config.taints%2C%20node_config.workload_metadata_config%20have%20been%20removed%20from%20the%20GA%20provider"></a><h3 id="enable_binary_authorization-enable_tpu-pod_security_policy_config-node_configtaints-node_configworkload_metadata_config-have-been-removed-from-the-ga-provider"><code>enable_binary_authorization</code>, <code>enable_tpu</code>, <code>pod_security_policy_config</code>, <code>node_config.taints</code>, <code>node_config.workload_metadata_config</code> have been removed from the GA provider</h3>
+
+<p>Use the <a href="#google-beta-provider"><code>google-beta</code> provider</a> to set these fields.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/private_cluster%2C%20master_ipv4_cidr_block%20are%20removed."></a><h3 id="private_cluster-master_ipv4_cidr_block-are-removed"><code>private_cluster</code>, <code>master_ipv4_cidr_block</code> are removed.</h3>
+
+<p>Use <code>private_cluster_config</code> and <code>private_cluster_config.master_ipv4_cidr_block</code> instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_container_node_pool"></a><h2 id="resource-google_container_node_pool">Resource: <code>google_container_node_pool</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/max_pods_per_node%2C%20node_config.taints%2C%20node_config.workload_metadata_config%20have%20been%20removed%20from%20the%20GA%20provider"></a><h3 id="max_pods_per_node-node_configtaints-node_configworkload_metadata_config-have-been-removed-from-the-ga-provider"><code>max_pods_per_node</code>, <code>node_config.taints</code>, <code>node_config.workload_metadata_config</code> have been removed from the GA provider</h3>
+
+<p>Use the <a href="#google-beta-provider"><code>google-beta</code> provider</a> to set these fields.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/name_prefix%20has%20been%20removed"></a><h3 id="name_prefix-has-been-removed"><code>name_prefix</code> has been removed</h3>
+
+<p>Use the <code>name</code> field along with the <code>random</code> provider instead.</p>
+
+<p>Sample config:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"machine_type"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+<span class="w">  </span><span class="na">initial_node_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">remove_default_node_pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"random_id"</span><span class="w"> </span><span class="nv">"np"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">byte_length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">11</span><span class="w"></span>
+<span class="w">  </span><span class="na">prefix</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-np-"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">keepers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.machine_type}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_node_pool"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"${random_id.np.dec}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"${google_container_cluster.example.name}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">node_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.machine_type}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create_before_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The <code>keepers</code> parameter in <code>random_id</code> takes a map of values that cause the random id to be regenerated.
+By tying it to attributes that might change, it makes sure the random id changes too.</p>
+
+<p>To make sure the node pool keeps its old name, figure out what the suffix was by running <code>terraform show</code>:</p>
+
+<pre><code>google_container_node_pool.example:
+  ...
+  name = example-np-20180329213336514500000001
+</code></pre>
+
+<p>Determine the base64 encoding of that value by running <a href="https://play.golang.org/p/9KrkDoxRTOw">this script</a>.
+Then, import that suffix as the value of <code>random_id</code>:</p>
+
+<pre><code>terraform import random_id.np example-np-,ELFZ1rbrAThoeQE
+</code></pre>
+
+<p>For more details, see <a href="https://github.com/hashicorp/terraform-provider-google/issues/1054">terraform-provider-google#1054</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_endpoints_service"></a><h2 id="resource-google_endpoints_service">Resource: <code>google_endpoints_service</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/protoc_output%20has%20been%20removed"></a><h3 id="protoc_output-has-been-removed"><code>protoc_output</code> has been removed</h3>
+
+<p>Use <code>protoc_output_base64</code> instead.</p>
+
+<p>Example previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_endpoints_service"</span><span class="w"> </span><span class="nv">"grpc_service"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"api-name.endpoints.project-id.cloud.goog"</span><span class="w"></span>
+<span class="w">  </span><span class="na">grpc_config</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"${file("service_spec.yml")}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protoc_output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${file("compiled_descriptor_file.pb")}"</span><span class="w"></span>
+</code></pre></div>
+
+<p>Example updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_endpoints_service"</span><span class="w"> </span><span class="nv">"grpc_service"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"api-name.endpoints.project-id.cloud.goog"</span><span class="w"></span>
+<span class="w">  </span><span class="na">grpc_config</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"${file("service_spec.yml")}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protoc_output_base64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${base64encode(file("compiled_descriptor_file.pb"))}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_dataproc_cluster"></a><h2 id="resource-google_dataproc_cluster">Resource: <code>google_dataproc_cluster</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cluster_config.0.delete_autogen_bucket%20has%20been%20removed"></a><h3 id="cluster_config0delete_autogen_bucket-has-been-removed"><code>cluster_config.0.delete_autogen_bucket</code> has been removed</h3>
+
+<p>Autogenerated buckets are shared by all clusters in the same region, so deleting
+this bucket could adversely harm other dataproc clusters. If you need a bucket
+that can be deleted, please create a new one and set the <code>staging_bucket</code> field.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cluster_config.0.gce_cluster_config.0.tags%20is%20now%20a%20Set"></a><h3 id="cluster_config0gce_cluster_config0tags-is-now-a-set"><code>cluster_config.0.gce_cluster_config.0.tags</code> is now a Set</h3>
+
+<p>The order of entries in <code>tags</code> no longer matters. Any configurations that
+interpolate based on an item at a specific index will need to be updated, as items
+may have been reordered.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_filestore_instance"></a><h2 id="resource-google_filestore_instance">Resource: <code>google_filestore_instance</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/filestore%20resources%20have%20been%20removed%20from%20the%20GA%20provider"></a><h3 id="filestore-resources-have-been-removed-from-the-ga-provider">filestore resources have been removed from the GA provider</h3>
+
+<p>Use the <a href="#google-beta-provider"><code>google-beta</code> provider</a> to use these resources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_organization_custom_role"></a><h2 id="resource-google_organization_custom_role">Resource: <code>google_organization_custom_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/deleted%20field%20is%20now%20an%20output-only%20attribute"></a><h3 id="deleted-field-is-now-an-output-only-attribute"><code>deleted</code> field is now an output-only attribute</h3>
+
+<p>Use <code>terraform destroy</code>, or remove the resource from your config instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_project"></a><h2 id="resource-google_project">Resource: <code>google_project</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/app_engine%20has%20been%20removed"></a><h3 id="app_engine-has-been-removed"><code>app_engine</code> has been removed</h3>
+
+<p>Use the
+<a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/app_engine_application"><code>google_app_engine_application</code> resource</a> instead.</p>
+
+<p>To avoid errors trying to recreate the resource, import it into your state first by running:</p>
+
+<pre><code>terraform import google_app_engine_application.app your-project-id
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_project_custom_role"></a><h2 id="resource-google_project_custom_role">Resource: <code>google_project_custom_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/deleted%20field%20is%20now%20an%20output-only%20attribute"></a><h3 id="deleted-field-is-now-an-output-only-attribute-2"><code>deleted</code> field is now an output-only attribute</h3>
+
+<p>Use <code>terraform destroy</code>, or remove the resource from your config instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_project_iam_policy"></a><h2 id="resource-google_project_iam_policy">Resource: <code>google_project_iam_policy</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/policy_data%20is%20now%20authoritative"></a><h3 id="policy_data-is-now-authoritative"><code>policy_data</code> is now authoritative</h3>
+
+<p>Terraform will remove values not explicitly set in this field. Any <code>policy_data</code>
+values that were added outside of Terraform should be added to the config.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/authoritative%2C%20restore_policy%2C%20and%20disable_project%20have%20been%20removed"></a><h3 id="authoritative-restore_policy-and-disable_project-have-been-removed"><code>authoritative</code>, <code>restore_policy</code>, and <code>disable_project</code> have been removed</h3>
+
+<p>Remove these fields from your config. Ensure that <code>policy_data</code> contains all
+policy values that exist on the project.</p>
+
+<p>This resource is very dangerous. Consider using <code>google_project_iam_binding</code> or
+<code>google_project_iam_member</code> instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_service_account"></a><h2 id="resource-google_service_account">Resource: <code>google_service_account</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/policy_data%20has%20been%20removed"></a><h3 id="policy_data-has-been-removed"><code>policy_data</code> has been removed</h3>
+
+<p>Use one of the other
+<a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/google_service_account_iam">service account IAM resources</a> instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_sql_database_instance"></a><h2 id="resource-google_sql_database_instance">Resource: <code>google_sql_database_instance</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/settings%20is%20now%20authoritative"></a><h3 id="settings-is-now-authoritative"><code>settings</code> is now authoritative</h3>
+
+<p>Terraform will remove values not explicitly set in this field. Any settings
+values that were added outside of Terraform should be added to the config.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_storage_default_object_acl"></a><h2 id="resource-google_storage_default_object_acl">Resource: <code>google_storage_default_object_acl</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/role_entity%20is%20now%20authoritative"></a><h3 id="role_entity-is-now-authoritative"><code>role_entity</code> is now authoritative</h3>
+
+<p>Terraform will remove values not explicitly set in this field. Any <code>role_entity</code>
+values that were added outside of Terraform should be added to the config.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_storage_object_acl"></a><h2 id="resource-google_storage_object_acl">Resource: <code>google_storage_object_acl</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/role_entity%20is%20now%20authoritative"></a><h3 id="role_entity-is-now-authoritative-2"><code>role_entity</code> is now authoritative</h3>
+
+<p>Terraform will remove values not explicitly set in this field. Any <code>role_entity</code>
+values that were added outside of Terraform should be added to the config.
+For fine-grained management, use <code>google_storage_object_access_control</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_%2A_iam_binding"></a><h2 id="resource-google__iam_binding">Resource: <code>google_*_iam_binding</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Create%20is%20now%20authoritative"></a><h3 id="create-is-now-authoritative">Create is now authoritative</h3>
+
+<p>Every <code>iam_binding</code> resource will overwrite the existing member list for a given
+role on Create. Running <code>terraform plan</code> for the first time will not show members
+that have been added via other tools. <em>To ensure existing <code>members</code> are preserved
+use <code>terraform import</code> instead of creating the resource.</em></p>
+
+<p>Previous versions of <code>google_*_iam_binding</code> resources would merge the existing
+members of a role with the members defined in the terraform config. If there was
+a difference between the members defined in the config and the existing members
+defined for an existing role it would show a diff if <code>terraform plan</code> was run
+immediately after create had succeeded.</p>
+
+<p>Affected resources:</p>
+
+<ul>
+<li><code>google_billing_account_iam_binding</code></li>
+<li><code>google_folder_iam_binding</code></li>
+<li><code>google_kms_key_ring_iam_binding</code></li>
+<li><code>google_kms_crypto_key_iam_binding</code></li>
+<li><code>google_spanner_instance_iam_binding</code></li>
+<li><code>google_spanner_database_iam_binding</code></li>
+<li><code>google_organization_iam_binding</code></li>
+<li><code>google_project_iam_binding</code></li>
+<li><code>google_pubsub_topic_iam_binding</code></li>
+<li><code>google_pubsub_subscription_iam_binding</code></li>
+<li><code>google_service_account_iam_binding</code></li>
+</ul>
+
+            
+        
+    </body></html>

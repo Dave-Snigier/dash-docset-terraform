@@ -1,0 +1,237 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/eks_addon --><head>
+                <title>awscc_eks_addon</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="awscc_eks_addon-resource">awscc_eks_addon (Resource)</h1>
+
+<p>Resource Schema for AWS::EKS::Addon</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Basic%20usage%20to%20create%20coredns%20and%20kube_proxy%20addons"></a><h3 id="basic-usage-to-create-coredns-and-kube_proxy-addons">Basic usage to create coredns and kube_proxy addons</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"awscc_eks_addon"</span><span class="w"> </span><span class="nv">"coredns"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.cluster_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">addon_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"coredns"</span><span class="c1"></span>
+<span class="c1">  # Optional: addon_version = "v1.8.4-eksbuild.1"</span>
+<span class="c1">  # Optional: resolve_conflicts = "OVERWRITE"</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"awscc_eks_addon"</span><span class="w"> </span><span class="nv">"kube_proxy"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.cluster_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">addon_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"kube-proxy"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"cluster_name"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Create%20EBS%20CSI%20addon"></a><h3 id="create-ebs-csi-addon">Create EBS CSI addon</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Create custom policy for KMS support. It's optional, but recommended.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"awscc_iam_managed_policy"</span><span class="w"> </span><span class="nv">"ebs_csi_kms_policy"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">managed_policy_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AmazonEKS_EBS_CSI_KMS_Policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_document</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="na">Version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2012-10-17"</span><span class="w"></span>
+<span class="w">    </span><span class="na">Statement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">        </span><span class="na">Action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"kms:CreateGrant"</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"kms:ListGrants"</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"kms:RevokeGrant"</span><span class="w"></span>
+<span class="w">        </span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="na">Resource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">awscc_kms_key.example.arn</span><span class="w"></span>
+<span class="w">        </span><span class="nb">Condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="nb">Bool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"kms:GrantIsForAWSResource"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"true"</span><span class="w"></span>
+<span class="w">          </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">},</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">        </span><span class="na">Action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"kms:Encrypt"</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"kms:Decrypt"</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"kms:ReEncrypt*"</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"kms:GenerateDataKey*"</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"kms:DescribeKey"</span><span class="w"></span>
+<span class="w">        </span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="na">Resource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">awscc_kms_key.example.arn</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create IAM role for EBS CSI Driver</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"awscc_iam_role"</span><span class="w"> </span><span class="nv">"ebs_csi_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AmazonEKS_EBS_CSI_DriverRole"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy_document</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="na">Version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2012-10-17"</span><span class="w"></span>
+<span class="w">    </span><span class="na">Statement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[{</span><span class="w"></span>
+<span class="w">      </span><span class="na">Effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">Principal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Federated</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">awscc_iam_oidc_provider.eks.arn</span><span class="c1"></span>
+<span class="c1">        # Example: "arn:aws:iam::111122223333:oidc-provider/oidc.eks.region-code.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE"</span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="na">Action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sts:AssumeRoleWithWebIdentity"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">Condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nb">StringEquals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"${local.oidc_provider}:aud"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sts.amazonaws.com"</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"${local.oidc_provider}:sub"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"system:serviceaccount:kube-system:ebs-csi-controller-sa"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}]</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="w">  </span><span class="na">managed_policy_arns</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nv">awscc_iam_managed_policy.ebs_csi_kms_policy.policy_arn</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Now that the IAM role is ready, create EBS CSI addon</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"awscc_eks_addon"</span><span class="w"> </span><span class="nv">"ebs_csi"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">awscc_eks_cluster.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">addon_name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws-ebs-csi-driver"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_account_role_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">awscc_iam_role.ebs_csi_role.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">resolve_conflicts</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"OVERWRITE"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Create%20VPC%20CNI%20addon"></a><h3 id="create-vpc-cni-addon">Create VPC CNI addon</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># AWS IAM expects the OIDC provider URL without the `https://` prefix in the condition block. </span>
+<span class="c1"># This creates a local variable for it:</span>
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">oidc_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">replace</span><span class="p">(</span><span class="nv">awscc_eks_cluster.eks_cluster.open_id_connect_issuer_url</span><span class="p">,</span><span class="w"> </span><span class="s2">"https://", ""</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create an IAM policy for EKS VPC CNI IPv6 support</span>
+<span class="c1"># https://docs.aws.amazon.com/eks/latest/userguide/cni-iam-role.html</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"awscc_iam_managed_policy"</span><span class="w"> </span><span class="nv">"eks_vpc_cni_ipv6_policy"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">managed_policy_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AmazonEKS_CNI_IPv6_Policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_document</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="na">Version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2012-10-17"</span><span class="w"></span>
+<span class="w">    </span><span class="na">Statement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">        </span><span class="na">Action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"ec2:AssignIpv6Addresses"</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"ec2:DescribeInstances"</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"ec2:DescribeTags"</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"ec2:DescribeNetworkInterfaces"</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"ec2:DescribeInstanceTypes"</span><span class="w"></span>
+<span class="w">        </span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="na">Resource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"*"</span><span class="w"></span>
+<span class="w">      </span><span class="p">},</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Effect</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">        </span><span class="na">Action</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"ec2:CreateTags"</span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="na">Resource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:ec2:*:*:network-interface/*"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"awscc_iam_role"</span><span class="w"> </span><span class="nv">"eks_vpc_cni_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AmazonEKSVPCCNIRole"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy_document</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="na">Version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2012-10-17"</span><span class="w"></span>
+<span class="w">    </span><span class="na">Statement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Effect</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">        </span><span class="nb">Principal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="na">Federated</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">awscc_iam_oidc_provider.eks.arn</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="na">Action</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"sts:AssumeRoleWithWebIdentity"</span><span class="w"></span>
+<span class="w">        </span><span class="nb">Condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="nb">StringEquals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"${local.oidc_provider}:aud"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sts.amazonaws.com"</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"${local.oidc_provider}:sub"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"system:serviceaccount:kube-system:aws-node"</span><span class="w"></span>
+<span class="w">          </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="w">  </span><span class="na">managed_policy_arns</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nv">awscc_iam_managed_policy.eks_vpc_cni_ipv6_policy.policy_arn</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Now that the IAM role is ready, create the VPC CNI plugin:</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"awscc_eks_addon"</span><span class="w"> </span><span class="nv">"vpc_cni"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">var.cluster_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">addon_name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"vpc-cni"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_account_role_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">awscc_iam_role.eks_vpc_cni_role.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">resolve_conflicts</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"OVERWRITE"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"cluster_name"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<!-- schema generated by tfplugindocs -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Schema"></a><h2 id="schema">Schema</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Required"></a><h3 id="required">Required</h3>
+
+<ul>
+<li><code>addon_name</code> (String) Name of Addon</li>
+<li><code>cluster_name</code> (String) Name of Cluster</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Optional"></a><h3 id="optional">Optional</h3>
+
+<ul>
+<li><code>addon_version</code> (String) Version of Addon</li>
+<li><code>configuration_values</code> (String) The configuration values to use with the add-on</li>
+<li><code>pod_identity_associations</code> (Attributes Set) An array of pod identities to apply to this add-on. (see <a href="#nestedatt--pod_identity_associations">below for nested schema</a>)</li>
+<li><code>preserve_on_delete</code> (Boolean) PreserveOnDelete parameter value</li>
+<li><code>resolve_conflicts</code> (String) Resolve parameter value conflicts</li>
+<li><code>service_account_role_arn</code> (String) IAM role to bind to the add-on's service account</li>
+<li><code>tags</code> (Attributes Set) An array of key-value pairs to apply to this resource. (see <a href="#nestedatt--tags">below for nested schema</a>)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Read-Only"></a><h3 id="read-only">Read-Only</h3>
+
+<ul>
+<li><code>arn</code> (String) Amazon Resource Name (ARN) of the add-on</li>
+<li><code>id</code> (String) Uniquely identifies the resource.</li>
+</ul>
+
+<p><a id="nestedatt--pod_identity_associations"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Nested%20Schema%20for%20pod_identity_associations"></a><h3 id="nested-schema-for-pod_identity_associations">Nested Schema for <code>pod_identity_associations</code></h3>
+
+<p>Optional:</p>
+
+<ul>
+<li><code>role_arn</code> (String) The IAM role ARN that the pod identity association is created for.</li>
+<li><code>service_account</code> (String) The Kubernetes service account that the pod identity association is created for.</li>
+</ul>
+
+<p><a id="nestedatt--tags"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Nested%20Schema%20for%20tags"></a><h3 id="nested-schema-for-tags">Nested Schema for <code>tags</code></h3>
+
+<p>Optional:</p>
+
+<ul>
+<li><code>key</code> (String) The key name of the tag. You can specify a value that is 1 to 127 Unicode characters in length and cannot be prefixed with aws:. You can use any of the following characters: the set of Unicode letters, digits, whitespace, _, ., /, =, +, and -.</li>
+<li><code>value</code> (String) The value for the tag. You can specify a value that is 1 to 255 Unicode characters in length and cannot be prefixed with aws:. You can use any of the following characters: the set of Unicode letters, digits, whitespace, _, ., /, =, +, and -.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Import is supported using the following syntax:</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform import awscc_eks_addon.example <span class="s2">"cluster_name|addon_name"</span>
+</code></pre></div>
+
+            
+        
+    </body></html>

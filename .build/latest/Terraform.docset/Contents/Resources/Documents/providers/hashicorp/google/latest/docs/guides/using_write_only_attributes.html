@@ -1,0 +1,128 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/using_write_only_attributes --><head>
+                <title>Write-only attributes in the Google Cloud provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="write-only-attributes-in-the-google-cloud-provider">Write-only attributes in the Google Cloud provider</h1>
+
+<p>The Google Cloud provider has introduced new write-only attributes for a more secure way to manage data. The new <code>WriteOnly</code> attribute accepts values from configuration and will not be stored in plan or state providing an additional layer of security and control over data access.</p>
+
+<p>For more information, see the <a href="https://developer.hashicorp.com/terraform/plugin/sdkv2/resources/write-only-arguments">official HashiCorp documentation for Write-only Attributes</a>.</p>
+
+<p>The Google Cloud provider has added the following write-only attributes:</p>
+
+<ul>
+<li><a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/sql_user#password-1"><code>google_sql_user: password_wo</code></a></li>
+<li><a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version#secret_data_wo"><code>google_secret_manager_secret_version: secret_data_wo</code></a></li>
+<li><a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/bigquery_data_transfer_config#secret_access_key_wo"><code>google_bigquery_data_transfer_config: sensitive_params.secret_access_key_wo</code></a></li>
+</ul>
+
+<p>These were chosen due to them being marked as sensitive already in the provider. Although sensitive attributes do not appear in <code>terraform plan</code>, they are still stored in the Terraform state. Write-only attributes allow users to access and use data in their configurations without that data being stored in Terraform state.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Use%20the%20Google%20Cloud%20provider%27s%20new%20write-only%20attributes"></a><h2 id="use-the-google-cloud-providers-new-write-only-attributes">Use the Google Cloud provider's new write-only attributes</h2>
+
+<p>The following sections show how to use the new write-only attributes in the Google Cloud provider.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Applying%20a%20write-only%20attribute"></a><h3 id="applying-a-write-only-attribute">Applying a write-only attribute</h3>
+
+<p>The following example shows how to apply a write-only attribute. All write-only attributes are marked with the <code>wo</code> suffix and can not be used with the attribute that it's mirroring. For example, <code>secret_data_wo</code> can not be used with <code>secret_data</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_sql_database_instance"</span><span class="w"> </span><span class="nv">"instance"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"main-instance"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">database_version</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"MYSQL_5_7"</span><span class="w"></span>
+<span class="w">  </span><span class="na">deletion_protection</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="nb">settings</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">tier</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"db-f1-micro"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_sql_user"</span><span class="w"> </span><span class="nv">"user1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"admin"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_sql_database_instance.instance.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"gmail.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">password_wo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"test_password"</span><span class="w"></span>
+<span class="w">  </span><span class="na">password_wo_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>During <code>terraform plan</code> you will see that the write-only attribute is marked appropriately:</p>
+
+<pre><code>  # google_sql_user.user1 will be created
+  + resource "google_sql_user" "user1" {
+      + host                    = "gmail.com"
+      + id                      = (known after apply)
+      + instance                = "main-instance"
+      + name                    = "admin"
+      + password_wo             = (write-only attribute)
+      + password_wo_version     = 1
+      + project                 = "hc-terraform-testing"
+      + sql_server_user_details = (known after apply)
+    }
+</code></pre>
+
+<p>Upon <code>terrform apply</code> you will see in <code>terraform.tfstate</code> that the write-only attribute from the configuration is not reflected in the state:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">...</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"mode"</span><span class="o">:</span><span class="w"> </span><span class="s2">"managed"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"type"</span><span class="o">:</span><span class="w"> </span><span class="s2">"google_sql_user"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"name"</span><span class="o">:</span><span class="w"> </span><span class="s2">"user1"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"provider"</span><span class="o">:</span><span class="w"> </span><span class="s2">"provider[\"registry.terraform.io/hashicorp/google\"]"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"instances"</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">        </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"schema_version"</span><span class="o">:</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"attributes"</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"deletion_policy"</span><span class="o">:</span><span class="w"> </span><span class="kt">null</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"host"</span><span class="o">:</span><span class="w"> </span><span class="s2">"gmail.com"</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"id"</span><span class="o">:</span><span class="w"> </span><span class="s2">"admin/gmail.com/main-instance"</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"instance"</span><span class="o">:</span><span class="w"> </span><span class="s2">"main-instance"</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"name"</span><span class="o">:</span><span class="w"> </span><span class="s2">"admin"</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"password"</span><span class="o">:</span><span class="w"> </span><span class="kt">null</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"password_policy"</span><span class="o">:</span><span class="w"> </span><span class="p">[],</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"password_wo"</span><span class="o">:</span><span class="w"> </span><span class="kt">null</span><span class="p">,</span><span class="c1"> // write-only attribute is not stored in state</span>
+<span class="w">            </span><span class="s2">"password_wo_version"</span><span class="o">:</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"project"</span><span class="o">:</span><span class="w"> </span><span class="s2">"hc-terraform-testing"</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"sql_server_user_details"</span><span class="o">:</span><span class="w"> </span><span class="p">[],</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"timeouts"</span><span class="o">:</span><span class="w"> </span><span class="kt">null</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"type"</span><span class="o">:</span><span class="w"> </span><span class="s2">""</span><span class="w"></span>
+<span class="w">          </span><span class="p">},</span><span class="w"></span>
+</code></pre></div>
+
+<p>Any value that is set for a write-only attribute is nulled out before the RPC response is sent to Terraform.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Updating%20write-only%20attributes"></a><h3 id="updating-write-only-attributes">Updating write-only attributes</h3>
+
+<p>Since write-only attributes are not stored in the Terraform state, they cannot be updated by just changing the value in the configuration due to the attribute being nulled out.</p>
+
+<p>In order to update a write-only attribute we must change the write-only attribute's version.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_sql_user"</span><span class="w"> </span><span class="nv">"user1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"admin"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_sql_database_instance.instance.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"gmail.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">password_wo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"updated_password"</span><span class="c1"> // updated password</span>
+<span class="w">  </span><span class="na">password_wo_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="c1"> // updated version</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>A <code>terraform apply</code> of this configuration will allow you to update the write-only attribute despite the new value not being shown in the plan.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">Terraform</span><span class="w"> </span><span class="err">used</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">selected</span><span class="w"> </span><span class="err">providers</span><span class="w"> </span><span class="err">to</span><span class="w"> </span><span class="err">generate</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">following</span><span class="w"> </span><span class="err">execution</span><span class="w"> </span><span class="err">plan</span><span class="p">.</span><span class="w"> </span><span class="err">Resource</span><span class="w"> </span><span class="err">actions</span><span class="w"> </span><span class="err">are</span><span class="w"> </span><span class="err">indicated</span><span class="w"> </span><span class="err">with</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">following</span><span class="w"> </span><span class="err">symbols</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="err">~</span><span class="w"> </span><span class="err">update</span><span class="w"> </span><span class="err">in-place</span><span class="w"></span>
+
+<span class="err">Terraform</span><span class="w"> </span><span class="err">will</span><span class="w"> </span><span class="err">perform</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">following</span><span class="w"> </span><span class="err">actions</span><span class="p">:</span><span class="c1"></span>
+
+<span class="c1">  # google_sql_user.user1 will be updated in-place</span>
+<span class="w">  </span><span class="err">~</span><span class="w"> </span><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_sql_user"</span><span class="w"> </span><span class="nv">"user1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">id</span><span class="w">                      </span><span class="o">=</span><span class="w"> </span><span class="s2">"admin/gmail.com/main-instance"</span><span class="w"></span>
+<span class="w">        </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"admin"</span><span class="w"></span>
+<span class="w">      </span><span class="err">~</span><span class="w"> </span><span class="na">password_wo_version</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="err">-&gt;</span><span class="w"> </span><span class="m">2</span><span class="c1"></span>
+<span class="c1">        # (6 unchanged attributes hidden)</span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="err">Plan</span><span class="p">:</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="err">to</span><span class="w"> </span><span class="err">add</span><span class="p">,</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="err">to</span><span class="w"> </span><span class="err">change</span><span class="p">,</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="err">to</span><span class="w"> </span><span class="err">destroy</span><span class="p">.</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

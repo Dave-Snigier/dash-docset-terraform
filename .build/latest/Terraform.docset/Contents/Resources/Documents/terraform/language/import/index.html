@@ -1,0 +1,219 @@
+<html><!-- Online page at https://www.terraform.io/language/import --><head>
+                <title>Import</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="import">Import</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Import blocks are only available in Terraform v1.5.0 and later.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Experimental</em>
+    <p>While we do not expect to make backwards-incompatible changes to syntax, the <code>-generate-config-out</code> flag and how Terraform processes imports during the plan stage and generates configuration may change in future releases.</p>
+</aside>
+
+<p>Use the <code>import</code> block to import existing infrastructure resources into Terraform, bringing them under Terraform's management. Unlike the <code>terraform import</code> command, configuration-driven import using <code>import</code> blocks is predictable, works with CICD pipelines, and lets you preview an import operation before modifying state.</p>
+
+<p>Once imported, Terraform tracks the resource in your state file. You can then manage the imported resource like any other, updating its attributes and destroying it as part of a standard resource lifecycle.</p>
+
+<p>The <code>import</code> block records that Terraform imported the resource and did not create it. After importing, you can optionally remove import blocks from your configuration or leave them as a record of the resource's origin.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Syntax"></a><h2 id="syntax">Syntax</h2>
+
+<p>You can add an <code>import</code> block to any Terraform configuration file. A common pattern is to create an <code>imports.tf</code> file, or to place each <code>import</code> block beside the <code>resource</code> block it imports into.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.example</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"i-abcd1234"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashi"</span><span class="c1"></span>
+<span class="c1">  # (other resource arguments...)</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The above <code>import</code> block defines an import of the AWS instance with the ID "i-abcd1234" into the <code>aws_instance.example</code> resource in the root module.</p>
+
+<p>The <code>import</code> block has the following arguments:</p>
+
+<ul>
+<li><code>to</code> - The instance address this resource will have in your state file.</li>
+<li><code>id</code> - A string with the <a href="#import-id">import ID</a> of the resource, or an expression that evaluates to a string.</li>
+<li><code>provider</code> (optional) - An optional custom resource provider, see <a href="../../terraform/language/meta-arguments/resource-provider.html">The Resource provider Meta-Argument</a> for details.</li>
+</ul>
+
+<p>If you do not set the <code>provider</code> argument, Terraform attempts to import from the default provider. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import%20ID"></a><h3 id="import-id">Import ID</h3>
+
+<p>The import block's <code>id</code> argument can be a literal string of your resource's import ID, or an expression that evaluates to a string, such as <code>var.instance_id</code>. Terraform needs this import ID to locate the resource you want to import.</p>
+
+<p>The import ID must be known at plan time for planning to succeed. If the value of <code>id</code> is only known after apply, <code>terraform plan</code> will fail with an error.</p>
+
+<p>The identifier you use for a resource's import ID is resource-specific. You can find the required ID in the <a href="https://registry.terraform.io/browse/providers">provider documentation</a> for the resource you wish to import.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import%20multiple%20instances%20with%20for_each"></a><h3 id="import-multiple-instances-with-for_each">Import multiple instances with <code>for_each</code></h3>
+
+<p>Multiple resource instances can be imported via a single <code>import</code> block using the <code>for_each</code> argument. The <code>for_each</code> argument accepts a collection to iterate over, and results in an <code>each</code> iterator in the same manner as it does for <a href="../../terraform/language/expressions/dynamic-blocks.html"><code>dynamic</code> blocks</a>. The <code>for_each</code> argument must be entirely known for the import plan to succeed, and <code>for_each</code> cannot be used when <a href="../../terraform/language/import/generating-configuration.html">generating configuration</a>.</p>
+
+<p>The resulting <code>each.key</code> and <code>each.value</code> values can be used both in the <code>id</code> expression, and within index expressions in the <code>to</code> argument. This allows the mapping of multiple instances to expanded resources:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">buckets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"staging"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"bucket1"</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"uat"</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"bucket2"</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"prod"</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"bucket3"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.buckets</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.this[each.key</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.buckets</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The same process can also be used to expand the imports across multiple module instances:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">buckets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span>
+<span class="w">      </span><span class="na">group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"one"</span><span class="w"></span>
+<span class="w">      </span><span class="na">key</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"bucket1"</span><span class="w"></span>
+<span class="w">      </span><span class="na">id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"one_1"</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"one"</span><span class="w"></span>
+<span class="w">      </span><span class="na">key</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"bucket2"</span><span class="w"></span>
+<span class="w">      </span><span class="na">id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"one_2"</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"two"</span><span class="w"></span>
+<span class="w">      </span><span class="na">key</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"bucket1"</span><span class="w"></span>
+<span class="w">      </span><span class="na">id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"two_1"</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"one"</span><span class="w"></span>
+<span class="w">      </span><span class="na">key</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"bucket2"</span><span class="w"></span>
+<span class="w">      </span><span class="na">id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"two_2"</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.buckets</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">module.group[each.value.group].aws_s3_bucket.this[each.value.key</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Plan%20and%20apply%20an%20import"></a><h2 id="plan-and-apply-an-import">Plan and apply an import</h2>
+
+<p>Terraform processes the <code>import</code> block during the plan stage. Once a plan is approved, Terraform imports the resource into its state during the subsequent apply stage.</p>
+
+<p>To import a resource using <code>import</code> blocks, you must:</p>
+
+<ol>
+<li>Define an <code>import</code> block for the resource(s).</li>
+<li>Add a corresponding <code>resource</code> block to your configuration , or <a href="../../terraform/language/import/generating-configuration.html">generate configuration</a> for that resource.</li>
+<li>Run <code>terraform plan</code> to review how Terraform will import the resource(s).</li>
+<li>Apply the configuration to import the resources and update your Terraform state.</li>
+</ol>
+
+<blockquote>
+  <p><strong>Hands-on:</strong> Try the <a href="../../terraform/tutorials/state/state-import?utm_source=WEBSITE&amp;utm_medium=WEB_IO&amp;utm_offer=ARTICLE_PAGE&amp;utm_content=DOCS.html">State Import</a> tutorial.</p>
+</blockquote>
+
+<p>The <code>import</code> block is <a href="https://en.wikipedia.org/wiki/Idempotence"><em>idempotent</em></a>, meaning that applying an import action and running another plan will not generate another import action as long as that resource remains in your state.</p>
+
+<p>Terraform only needs to import a given resource once. Attempting to import a resource into the same address again is a harmless no-op. You can remove <code>import</code> blocks after completing the import or safely leave them in your configuration as a record of the resource's origin for future module maintainers. For more information on maintaining configurations over time, see <a href="../../terraform/language/modules/develop/refactoring.html">Refactoring</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%20configuration"></a><h2 id="resource-configuration">Resource configuration</h2>
+
+<p>Before importing, you must add configuration for every resource you want Terraform to import. Otherwise, Terraform throws an error during planning, insisting you add resource configuration before it can successfully import. You can create resource configuration manually or <a href="../../terraform/language/import/generating-configuration.html">generate it using Terraform</a>. </p>
+
+<p>We recommend writing a <code>resource</code> block if you know what most of the <a href="../../terraform/language/resources/syntax.html#resource-arguments">resource's arguments</a> will be. For example, your configuration may already contain a similar resource whose configuration you can copy and modify.</p>
+
+<p>We recommend <a href="../../terraform/language/import/generating-configuration.html">generating configuration</a> when importing multiple resources or a single complex resource that you do not already have the configuration for.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Add%20a%20resource%20block"></a><h3 id="add-a-resource-block">Add a <code>resource</code> block</h3>
+
+<p>Add a <code>resource</code> block for the resource to import. The resource address must match the import block's <code>to</code> argument. </p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.example</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"i-abcd1234"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"renderer"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Generate%20configuration"></a><h3 id="generate-configuration">Generate configuration</h3>
+
+<p>Terraform can generate HCL for resources that do not already exist in configuration. 
+For more details, see <a href="../../terraform/language/import/generating-configuration.html">Generating Configuration</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Examples"></a><h2 id="examples">Examples</h2>
+
+<p>The following example demonstrates how to import into a module.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">module.instances.aws_instance.example</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"i-abcd1234"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The below example shows how to use the value of a variable as the import ID.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.example</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.instance_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The below example shows how to import a resource that includes <a href="../../terraform/language/meta-arguments/count.html"><code>count</code></a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.example[0</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"i-abcd1234"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The below example shows how to import a resource that includes <a href="../../terraform/language/meta-arguments/for_each.html"><code>for_each</code></a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.example</span><span class="p">[</span><span class="s2">"foo"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"i-abcd1234"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Finally, the below example demonstrates how to import from a custom resource provider.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"europe"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eu-west-1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.europe</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.example</span><span class="p">[</span><span class="s2">"foo"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"i-abcd1234"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

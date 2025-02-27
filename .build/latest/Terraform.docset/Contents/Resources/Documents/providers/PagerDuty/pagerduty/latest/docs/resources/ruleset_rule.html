@@ -1,0 +1,217 @@
+<html><!-- Online page at https://registry.terraform.io/providers/PagerDuty/pagerduty/latest/docs/resources/ruleset_rule --><head>
+                <title>pagerduty_ruleset_rule</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="pagerduty_ruleset_rule">pagerduty_ruleset_rule</h1>
+
+<p>An <a href="https://support.pagerduty.com/docs/rulesets#section-create-event-rules">event rule</a> allows you to set actions that should be taken on events that meet your designated rule criteria.</p>
+
+<div class="alert alert-warning" role="alert">
+  <div class="alert-title"><i class="fa fa-warning"></i>End-of-Life</div>
+  <p>
+    Rulesets and Event Rules will end-of-life soon. We highly recommend that you
+    <a href="https://support.pagerduty.com/docs/migrate-to-event-orchestration" rel="noopener noreferrer" target="_blank">migrate to Event Orchestration</a>
+    as soon as possible so you can take advantage of the new functionality, such
+    as improved UI, rule creation, REST APIs and Terraform support, advanced
+    conditions, and rule nesting.
+  </p>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"pagerduty_team"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering (Seattle)"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"pagerduty_ruleset"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Primary Ruleset"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">team</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">pagerduty_team.foo.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># The pagerduty_ruleset_rule.foo rule defined below</span>
+<span class="c1"># repeats daily from 9:30am - 11:30am using the America/New_York timezone.</span>
+<span class="c1"># Thus it requires a time_static instance to represent 9:30am on an arbitrary date in that timezone.</span>
+<span class="c1"># April 11th, 2019 was EDT (UTC-4) https://www.timeanddate.com/worldclock/converter.html?iso=20190411T133000&amp;p1=179</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"time_static"</span><span class="w"> </span><span class="nv">"eastern_time_at_0930"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">rfc3339</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2019-04-11T09:30:00-04:00"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"pagerduty_ruleset_rule"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">ruleset</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">pagerduty_ruleset.foo.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">  </span><span class="na">disabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"false"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">time_frame</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">scheduled_weekly</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">      # Every Tuesday, Thursday, &amp; Saturday</span>
+<span class="w">      </span><span class="na">weekdays</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="m">2</span><span class="p">,</span><span class="w"> </span><span class="m">4</span><span class="p">,</span><span class="w"> </span><span class="m">6</span><span class="p">]</span><span class="c1"></span>
+<span class="c1">      # Starting at 9:30am</span>
+<span class="w">      </span><span class="na">start_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">time_static.eastern_time_at_0930.unix</span><span class="w"> </span><span class="err">*</span><span class="w"> </span><span class="m">1000</span><span class="c1"></span>
+<span class="c1">      # Until 11:30am (2 hours later)</span>
+<span class="w">      </span><span class="na">duration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="err">*</span><span class="w"> </span><span class="m">60</span><span class="w"> </span><span class="err">*</span><span class="w"> </span><span class="m">60</span><span class="w"> </span><span class="err">*</span><span class="w"> </span><span class="m">1000</span><span class="c1"></span>
+<span class="c1">      # in this timezone</span>
+<span class="c1">      # (either EST or EDT depending on when your event arrives)</span>
+<span class="w">      </span><span class="na">timezone</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"America/New_York"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">conditions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">operator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"and"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">subconditions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">operator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"contains"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">parameter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"disk space"</span><span class="w"></span>
+<span class="w">        </span><span class="na">path</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"payload.summary"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">subconditions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">operator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"contains"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">parameter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"db"</span><span class="w"></span>
+<span class="w">        </span><span class="na">path</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"payload.source"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">variable</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"regex"</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Src"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">parameters</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"(.*)"</span><span class="w"></span>
+<span class="w">      </span><span class="na">path</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"payload.source"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">actions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">route</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">pagerduty_service.foo.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">severity</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"warning"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">annotate</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"From Terraform"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">extractions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"dedup_key"</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"details.host"</span><span class="w"></span>
+<span class="w">      </span><span class="na">regex</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"(.*)"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">extractions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">target</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"summary"</span><span class="w"></span>
+<span class="w">      </span><span class="na">template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Warning: Disk Space Low on {{Src}}"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"pagerduty_ruleset_rule"</span><span class="w"> </span><span class="nv">"catch_all"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">ruleset</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">pagerduty_ruleset.foo.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">position</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="na">catch_all</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="nb">actions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">annotate</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"From Terraform"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">suppress</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>ruleset</code> - (Required) The ID of the ruleset that the rule belongs to.</li>
+<li><code>conditions</code> - (Required) Conditions evaluated to check if an event matches this event rule. Is always empty for the catch-all rule, though.</li>
+<li><code>position</code> - (Optional) Position/index of the rule within the ruleset.</li>
+<li><code>catch_all</code> - (Optional) Indicates whether the Event Rule is the last Event Rule of the Ruleset that serves as a catch-all. It has limited functionality compared to other rules and always matches.</li>
+<li><code>disabled</code> - (Optional) Indicates whether the rule is disabled and would therefore not be evaluated.</li>
+<li><code>time_frame</code> - (Optional) Settings for <a href="https://support.pagerduty.com/docs/rulesets#section-scheduled-event-rules">scheduling the rule</a>.</li>
+<li><code>actions</code> - (Optional) Actions to apply to an event if the conditions match.</li>
+<li><code>variable</code> - (Optional) Populate variables from event payloads and use those variables in other event actions. <em>NOTE: A rule can have multiple <code>variable</code> objects.</em></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Conditions%20%28conditions%29%20supports%20the%20following%3A"></a><h3 id="conditions-conditions-supports-the-following">Conditions (<code>conditions</code>) supports the following:</h3>
+
+<ul>
+<li><code>operator</code> - Operator to combine sub-conditions. Can be <code>and</code> or <code>or</code>.</li>
+<li><code>subconditions</code> - List of sub-conditions that define the condition.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Sub-Conditions%20%28subconditions%29%20supports%20the%20following%3A"></a><h3 id="sub-conditions-subconditions-supports-the-following">Sub-Conditions (<code>subconditions</code>) supports the following:</h3>
+
+<ul>
+<li><code>operator</code> - Type of operator to apply to the sub-condition. Can be <code>exists</code>,<code>nexists</code>,<code>equals</code>,<code>nequals</code>,<code>contains</code>,<code>ncontains</code>,<code>matches</code>, or <code>nmatches</code>.</li>
+<li><code>parameter</code> - Parameter for the sub-condition. It requires both a <code>path</code> and <code>value</code> to be set.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Action%20%28actions%29%20supports%20the%20following%3A"></a><h3 id="action-actions-supports-the-following">Action (<code>actions</code>) supports the following:</h3>
+
+<ul>
+<li><code>route</code> (Optional) - The ID of the service where the event will be routed.</li>
+<li><code>priority</code> (Optional) - The ID of the priority applied to the event.</li>
+<li><code>severity</code> (Optional)  - The <a href="https://support.pagerduty.com/docs/rulesets#section-set-severity-with-event-rules">severity level</a> of the event. Can be either <code>info</code>,<code>warning</code>,<code>error</code>, or <code>critical</code>.</li>
+<li><code>annotate</code> (Optional) - Note added to the event.</li>
+<li><p><code>extractions</code> (Optional) - Allows you to copy important data from one event field to another. Extraction objects may use <em>either</em> of the following field structures:</p>
+
+<ul>
+<li><code>source</code> - Field where the data is being copied from. Must be a <a href="https://support.pagerduty.com/docs/pd-cef">PagerDuty Common Event Format (PD-CEF)</a> field.</li>
+<li><code>target</code> - Field where the data is being copied to. Must be a <a href="https://support.pagerduty.com/docs/pd-cef">PagerDuty Common Event Format (PD-CEF)</a> field.</li>
+<li><code>regex</code> - The conditions that need to be met for the extraction to happen. Must use valid <a href="https://github.com/google/re2/wiki/Syntax">RE2 regular expression syntax</a>.</li>
+</ul>
+
+<p><em>- <strong>OR</strong> -</em></p>
+
+<ul>
+<li><code>template</code> - A customized field message. This can also include variables extracted from the payload by using string interpolation.</li>
+<li><code>target</code> - Field where the data is being copied to. Must be a <a href="https://support.pagerduty.com/docs/pd-cef">PagerDuty Common Event Format (PD-CEF)</a> field.</li>
+</ul>
+
+<p><em>NOTE: A rule can have multiple <code>extraction</code> objects attributed to it.</em></p></li>
+<li><p><code>suppress</code> (Optional) - Controls whether an alert is <a href="https://support.pagerduty.com/docs/rulesets#section-suppress-but-create-triggering-thresholds-with-event-rules">suppressed</a> (does not create an incident). Note: If a threshold is set, the rule must also have a <code>route</code> action.</p>
+
+<ul>
+<li><code>value</code> - Boolean value that indicates if the alert should be suppressed before the indicated threshold values are met.</li>
+<li><code>threshold_value</code> (Optional) - The number of alerts that should be suppressed. Must be greater than 0.</li>
+<li><code>threshold_time_amount</code> (Optional) - The number value of the <code>threshold_time_unit</code> before an incident is created. Must be greater than 0.</li>
+<li><code>threshold_time_unit</code> (Optional)  - The <code>seconds</code>,<code>minutes</code>, or <code>hours</code> the <code>threshold_time_amount</code> should be measured.</li>
+</ul></li>
+<li><code>event_action</code> (Optional) - An object with a single <code>value</code> field. The value sets whether the resulting alert status is <code>trigger</code> or <code>resolve</code>.</li>
+<li><code>suspend</code> (Optional) - An object with a single <code>value</code> field. The value sets the length of time to suspend the resulting alert before triggering. Note: A rule with a <code>suspend</code> action must also have a <code>route</code> action.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Time%20Frame%20%28time_frame%29%20supports%20the%20following%3A"></a><h3 id="time-frame-time_frame-supports-the-following">Time Frame (<code>time_frame</code>) supports the following:</h3>
+
+<ul>
+<li><code>scheduled_weekly</code> (Optional) - Values for executing the rule on a recurring schedule.
+<ul>
+<li><code>weekdays</code> - An integer array representing which days during the week the rule executes. For example <code>weekdays = [1,3,7]</code> would execute on Monday, Wednesday and Sunday.</li>
+<li><code>timezone</code> - <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">The name of the timezone</a> for the given schedule, which will be used to determine UTC offset including adjustment for daylight saving time. For example: <code>timezone = "America/Toronto"</code></li>
+<li><code>start_time</code> - A Unix timestamp in milliseconds which is combined with the <code>timezone</code> to determine the time this rule will start on each specified <code>weekday</code>. Note that the _date_ of the timestamp you specify does <strong>not</strong> matter, except that it lets you determine whether daylight saving time is in effect so that you use the correct UTC offset for the timezone you specify. In practice, you may want to use <a href="https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/static">the <code>time_static</code> resource</a> to generate this value, as demonstrated in the <code>resource.pagerduty_ruleset_rule.foo</code> code example at the top of this page. To generate this timestamp manually, if you want your rule to apply starting at 9:30am in the <code>America/New_York</code> timezone, use your programing language of choice to determine a Unix timestamp that represents 9:30am in that timezone, like <a href="https://www.epochconverter.com/timezones?q=1554989400000&amp;tz=America%2FNew_York">1554989400000</a>.</li>
+<li><code>duration</code> - Length of time the schedule will be active in milliseconds. For example <code>duration = 2 * 60 * 60 * 1000</code> if you want your rule to apply for 2 hours, from the specified <code>start_time</code>.</li>
+</ul></li>
+<li><code>active_between</code> (Optional) - Values for executing the rule during a specific time period.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>The following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - The ID of the rule.</li>
+<li><code>catch_all</code> - Indicates whether the rule is the last rule of the ruleset that serves as a catch-all. It has limited functionality compared to other rules.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Ruleset rules can be imported using the related <code>ruleset</code> ID and the <code>ruleset_rule</code> ID separated by a dot, e.g.</p>
+
+<pre><code>$ terraform import pagerduty_ruleset_rule.main a19cdca1-3d5e-4b52-bfea-8c8de04da243.19acac92-027a-4ea0-b06c-bbf516519601
+</code></pre>
+
+            
+        
+    </body></html>

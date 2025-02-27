@@ -1,0 +1,118 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/availability_zone --><head>
+                <title>aws_availability_zone</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="data-source-aws_availability_zone">Data Source: aws_availability_zone</h1>
+
+<p><code>aws_availability_zone</code> provides details about a specific availability zone (AZ)
+in the current region.</p>
+
+<p>This can be used both to validate an availability zone given in a variable
+and to split the AZ name into its component parts of an AWS region and an
+AZ identifier letter. The latter may be useful e.g., for implementing a
+consistent subnet numbering scheme across several regions by mapping both
+the region and the subnet letter to network numbers.</p>
+
+<p>This is different from the <code>aws_availability_zones</code> (plural) data source,
+which provides a list of the available zones.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>The following example shows how this data source might be used to derive
+VPC and subnet CIDR prefixes systematically for an availability zone.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"region_number"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # Arbitrary mapping of region name to number to use in</span>
+<span class="c1">  # a VPC's CIDR prefix.</span>
+<span class="w">  </span><span class="nb">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">us-east-1</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">    </span><span class="na">us-west-1</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">    </span><span class="na">us-west-2</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">    </span><span class="na">eu-central-1</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">4</span><span class="w"></span>
+<span class="w">    </span><span class="na">ap-northeast-1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"az_number"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # Assign a number to each AZ letter used in our configuration</span>
+<span class="w">  </span><span class="nb">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">    </span><span class="na">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">    </span><span class="na">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">    </span><span class="na">d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">4</span><span class="w"></span>
+<span class="w">    </span><span class="na">e</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="w"></span>
+<span class="w">    </span><span class="na">f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">6</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Retrieve the AZ where we want to create network resources</span>
+<span class="c1"># This must be in the region selected on the AWS provider.</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_availability_zone"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eu-central-1a"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create a VPC for the region associated with the AZ</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="s2">"10.0.0.0/8"</span><span class="p">,</span><span class="w"> </span><span class="m">4</span><span class="p">,</span><span class="w"> </span><span class="nv">var.region_number[data.aws_availability_zone.example.region</span><span class="p">])</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create a subnet for the AZ within the regional VPC</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_subnet"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">aws_vpc.example.cidr_block</span><span class="p">,</span><span class="w"> </span><span class="m">4</span><span class="p">,</span><span class="w"> </span><span class="nv">var.az_number[data.aws_availability_zone.example.name_suffix</span><span class="p">])</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The arguments of this data source act as filters for querying the available
+availability zones. The given filters must match exactly one availability
+zone whose data will be exported as attributes.</p>
+
+<ul>
+<li><code>all_availability_zones</code> - (Optional) Set to <code>true</code> to include all Availability Zones and Local Zones regardless of your opt in status.</li>
+<li><code>filter</code> - (Optional) Configuration block(s) for filtering. Detailed below.</li>
+<li><code>name</code> - (Optional) Full name of the availability zone to select.</li>
+<li><code>state</code> - (Optional) Specific availability zone state to require. May be any of <code>"available"</code>, <code>"information"</code> or <code>"impaired"</code>.</li>
+<li><code>zone_id</code> - (Optional) Zone ID of the availability zone to select.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/filter%20Configuration%20Block"></a><h3 id="filter-configuration-block">filter Configuration Block</h3>
+
+<p>The <code>filter</code> configuration block supports the following arguments:</p>
+
+<ul>
+<li><code>name</code> - (Required) Name of the filter field. Valid values can be found in the <a href="https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeAvailabilityZones.html">EC2 DescribeAvailabilityZones API Reference</a>.</li>
+<li><code>values</code> - (Required) Set of values that are accepted for the given filter field. Results will be selected if any given value matches.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This data source exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>group_name</code> - For Availability Zones, this is the same value as the Region name. For Local Zones, the name of the associated group, for example <code>us-west-2-lax-1</code>.</li>
+<li><code>name_suffix</code> - Part of the AZ name that appears after the region name, uniquely identifying the AZ within its region.
+For Availability Zones this is usually a single letter, for example <code>a</code> for the <code>us-west-2a</code> zone.
+For Local and Wavelength Zones this is a longer string, for example <code>wl1-sfo-wlz-1</code> for the <code>us-west-2-wl1-sfo-wlz-1</code> zone.</li>
+<li><code>network_border_group</code> - The name of the location from which the address is advertised.</li>
+<li><code>opt_in_status</code> - For Availability Zones, this always has the value of <code>opt-in-not-required</code>. For Local Zones, this is the opt in status. The possible values are <code>opted-in</code> and <code>not-opted-in</code>.</li>
+<li><code>parent_zone_id</code> - ID of the zone that handles some of the Local Zone or Wavelength Zone control plane operations, such as API calls.</li>
+<li><code>parent_zone_name</code> - Name of the zone that handles some of the Local Zone or Wavelength Zone control plane operations, such as API calls.</li>
+<li><code>region</code> - Region where the selected availability zone resides. This is always the region selected on the provider, since this data source searches only within that region.</li>
+<li><code>zone_type</code> - Type of zone. Values are <code>availability-zone</code>, <code>local-zone</code>, and <code>wavelength-zone</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p><a href="https://developer.hashicorp.com/terraform/language/resources/syntax#operation-timeouts">Configuration options</a>:</p>
+
+<ul>
+<li><code>read</code> - (Default <code>20m</code>)</li>
+</ul>
+
+            
+        
+    </body></html>

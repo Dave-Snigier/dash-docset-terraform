@@ -1,0 +1,372 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_node_pool --><head>
+                <title>google_container_node_pool</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="google_container_node_pool">google_container_node_pool</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>See the <a href="../guides/using_gke_with_terraform.html">Using GKE with Terraform</a> guide for more information about using GKE with Terraform.</p>
+</aside>
+
+<p>Manages a node pool in a Google Kubernetes Engine (GKE) cluster separately from
+the cluster control plane. For more information see <a href="https://cloud.google.com/container-engine/docs/node-pools">the official documentation</a>
+and <a href="https://cloud.google.com/kubernetes-engine/docs/reference/rest/v1beta1/projects.locations.clusters.nodePools">the API reference</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20using%20a%20separately%20managed%20node%20pool%20%28recommended%29"></a><h3 id="example-usage-using-a-separately-managed-node-pool-recommended">Example Usage - using a separately managed node pool (recommended)</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_service_account"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"service-account-id"</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Service Account"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"primary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-gke-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="c1"></span>
+
+<span class="c1">  # We can't create a cluster with no node pool defined, but we want to only use</span>
+<span class="c1">  # separately managed node pools. So we create the smallest possible default</span>
+<span class="c1">  # node pool and immediately delete it.</span>
+<span class="w">  </span><span class="na">remove_default_node_pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">initial_node_count</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_node_pool"</span><span class="w"> </span><span class="nv">"primary_preemptible_nodes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-node-pool"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_container_cluster.primary.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">node_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">preemptible</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"e2-medium"</span><span class="c1"></span>
+
+<span class="c1">    # Google recommends custom service accounts that have cloud-platform scope and permissions granted via IAM Roles.</span>
+<span class="w">    </span><span class="na">service_account</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_service_account.default.email</span><span class="w"></span>
+<span class="w">    </span><span class="na">oauth_scopes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"https://www.googleapis.com/auth/cloud-platform"</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%202%20node%20pools%2C%201%20separately%20managed%20%2B%20the%20default%20node%20pool"></a><h3 id="example-usage-2-node-pools-1-separately-managed-the-default-node-pool">Example Usage - 2 node pools, 1 separately managed + the default node pool</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_service_account"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"service-account-id"</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Service Account"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_node_pool"</span><span class="w"> </span><span class="nv">"np"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-node-pool"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_container_cluster.primary.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">node_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"e2-medium"</span><span class="c1"></span>
+<span class="c1">    # Google recommends custom service accounts that have cloud-platform scope and permissions granted via IAM Roles.</span>
+<span class="w">    </span><span class="na">service_account</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_service_account.default.email</span><span class="w"></span>
+<span class="w">    </span><span class="na">oauth_scopes</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"https://www.googleapis.com/auth/cloud-platform"</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">timeouts</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"30m"</span><span class="w"></span>
+<span class="w">    </span><span class="na">update</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"20m"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"primary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"marcellus-wallace"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+<span class="w">  </span><span class="na">initial_node_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">node_locations</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"us-central1-c"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">node_config</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # Google recommends custom service accounts that have cloud-platform scope and permissions granted via IAM Roles.</span>
+<span class="w">    </span><span class="na">service_account</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_service_account.default.email</span><span class="w"></span>
+<span class="w">    </span><span class="na">oauth_scopes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"https://www.googleapis.com/auth/cloud-platform"</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="nb">guest_accelerator</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"nvidia-tesla-k80"</span><span class="w"></span>
+<span class="w">      </span><span class="na">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<ul>
+<li><code>cluster</code> - (Required) The cluster to create the node pool for. Cluster must be present in <code>location</code> provided for clusters. May be specified in the format <code>projects/{{project}}/locations/{{location}}/clusters/{{cluster}}</code> or as just the name of the cluster.</li>
+</ul>
+
+<hr/>
+
+<ul>
+<li><code>location</code> - (Optional) The location (region or zone) of the cluster.</li>
+</ul>
+
+<hr/>
+
+<ul>
+<li><p><code>autoscaling</code> - (Optional) Configuration required by cluster autoscaler to adjust
+the size of the node pool to the current cluster usage. Structure is <a href="#nested_autoscaling">documented below</a>.</p></li>
+<li><p><code>initial_node_count</code> - (Optional) The initial number of nodes for the pool. In
+regional or multi-zonal clusters, this is the number of nodes per zone. Changing
+this will force recreation of the resource. WARNING: Resizing your node pool manually
+may change this value in your existing cluster, which will trigger destruction
+and recreation on the next Terraform run (to rectify the discrepancy).  If you don't
+need this value, don't set it.  If you do need it, you can <a href="https://github.com/hashicorp/terraform-provider-google/issues/6901#issuecomment-667369691">use a lifecycle block to
+ignore subsequent changes to this field</a>.</p></li>
+<li><p><code>management</code> - (Optional) Node management configuration, wherein auto-repair and
+auto-upgrade is configured. Structure is <a href="#nested_management">documented below</a>.</p></li>
+<li><p><code>max_pods_per_node</code> - (Optional) The maximum number of pods per node in this node pool.
+Note that this does not work on node pools which are "route-based" - that is, node
+pools belonging to clusters that do not have IP Aliasing enabled.
+See the <a href="https://cloud.google.com/kubernetes-engine/docs/how-to/flexible-pod-cidr">official documentation</a>
+for more information.</p></li>
+<li><p><code>node_locations</code> - (Optional)
+The list of zones in which the node pool's nodes should be located. Nodes must
+be in the region of their regional cluster or in the same region as their
+cluster's zone for zonal clusters. If unspecified, the cluster-level
+<code>node_locations</code> will be used.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Note: <code>node_locations</code> will not revert to the cluster's default set of zones upon being unset. You must manually reconcile the list of zones with your cluster.</p>
+</aside>
+
+<ul>
+<li><p><code>name</code> - (Optional) The name of the node pool. If left blank, Terraform will
+auto-generate a unique name.</p></li>
+<li><p><code>name_prefix</code> - (Optional) Creates a unique name for the node pool beginning
+with the specified prefix. Conflicts with <code>name</code>.</p></li>
+<li><p><code>node_config</code> - (Optional) Parameters used in creating the node pool. See
+<a href="container_cluster.html#nested_node_config">google_container_cluster</a> for schema.</p></li>
+<li><p><code>network_config</code> - (Optional) The network configuration of the pool. Such as
+configuration for <a href="https://cloud.google.com/kubernetes-engine/docs/how-to/multi-pod-cidr">Adding Pod IP address ranges</a>) to the node pool. Or enabling private nodes. Structure is
+<a href="#nested_network_config">documented below</a></p></li>
+<li><p><code>node_count</code> - (Optional) The number of nodes per instance group. This field can be used to
+update the number of nodes per instance group but should not be used alongside <code>autoscaling</code>.</p></li>
+<li><p><code>project</code> - (Optional) The ID of the project in which to create the node pool. If blank,
+the provider-configured project will be used.</p></li>
+<li><p><code>upgrade_settings</code> (Optional) Specify node upgrade settings to change how GKE upgrades nodes.
+The maximum number of nodes upgraded simultaneously is limited to 20. Structure is <a href="#nested_upgrade_settings">documented below</a>.</p></li>
+<li><p><code>version</code> - (Optional) The Kubernetes version for the nodes in this pool. Note that if this field
+and <code>auto_upgrade</code> are both specified, they will fight each other for what the node version should
+be, so setting both is highly discouraged. While a fuzzy version can be specified, it's
+recommended that you specify explicit versions as Terraform will see spurious diffs
+when fuzzy versions are used. See the <code>google_container_engine_versions</code> data source's
+<code>version_prefix</code> field to approximate fuzzy versions in a Terraform-compatible way.</p></li>
+<li><p><code>placement_policy</code> - (Optional) Specifies a custom placement policy for the
+nodes.</p></li>
+<li><p><code>queued_provisioning</code> - (Optional) Specifies node pool-level settings of queued provisioning.
+Structure is <a href="#nested_queued_provisioning">documented below</a>.</p></li>
+<li><p><code>reservation_affinity</code> (Optional) The configuration of the desired reservation which instances could take capacity from.
+Structure is <a href="#nested_reservation_affinity">documented below</a>.</p></li>
+</ul>
+
+<p><a name="nested_autoscaling"></a>The <code>autoscaling</code> block supports (either total or per zone limits are required):</p>
+
+<ul>
+<li><p><code>min_node_count</code> - (Optional) Minimum number of nodes per zone in the NodePool.
+Must be &gt;=0 and &lt;= <code>max_node_count</code>. Cannot be used with total limits.</p></li>
+<li><p><code>max_node_count</code> - (Optional) Maximum number of nodes per zone in the NodePool.
+Must be &gt;= min_node_count. Cannot be used with total limits.</p></li>
+<li><p><code>total_min_node_count</code> - (Optional) Total minimum number of nodes in the NodePool.
+Must be &gt;=0 and &lt;= <code>total_max_node_count</code>. Cannot be used with per zone limits.
+Total size limits are supported only in 1.24.1+ clusters.</p></li>
+<li><p><code>total_max_node_count</code> - (Optional) Total maximum number of nodes in the NodePool.
+Must be &gt;= total_min_node_count. Cannot be used with per zone limits.
+Total size limits are supported only in 1.24.1+ clusters.</p></li>
+<li><p><code>location_policy</code> - (Optional) Location policy specifies the algorithm used when
+scaling-up the node pool. Location policy is supported only in 1.24.1+ clusters.</p>
+
+<ul>
+<li>"BALANCED" - Is a best effort policy that aims to balance the sizes of available zones.</li>
+<li>"ANY" - Instructs the cluster autoscaler to prioritize utilization of unused reservations,
+and reduce preemption risk for Spot VMs.</li>
+</ul></li>
+</ul>
+
+<p><a name="nested_management"></a>The <code>management</code> block supports:</p>
+
+<ul>
+<li><p><code>auto_repair</code> - (Optional) Whether the nodes will be automatically repaired. Enabled by default.</p></li>
+<li><p><code>auto_upgrade</code> - (Optional) Whether the nodes will be automatically upgraded. Enabled by default.</p></li>
+</ul>
+
+<p><a name="nested_network_config"></a>The <code>network_config</code> block supports:</p>
+
+<ul>
+<li><p><code>create_pod_range</code> - (Optional) Whether to create a new range for pod IPs in this node pool. Defaults are provided for <code>pod_range</code> and <code>pod_ipv4_cidr_block</code> if they are not specified.</p></li>
+<li><p><code>enable_private_nodes</code> - (Optional) Whether nodes have internal IP addresses only.</p></li>
+<li><p><code>pod_ipv4_cidr_block</code> - (Optional) The IP address range for pod IPs in this node pool. Only applicable if createPodRange is true. Set to blank to have a range chosen with the default size. Set to /netmask (e.g. /14) to have a range chosen with a specific netmask. Set to a CIDR notation (e.g. 10.96.0.0/14) to pick a specific range to use.</p></li>
+<li><p><code>pod_range</code> - (Optional) The ID of the secondary range for pod IPs. If <code>create_pod_range</code> is true, this ID is used for the new range. If <code>create_pod_range</code> is false, uses an existing secondary range with this ID.</p></li>
+<li><p><code>additional_node_network_configs</code> - (Optional) We specify the additional node networks for this node pool using this list. Each node network corresponds to an additional interface.
+Structure is <a href="#nested_additional_node_network_configs">documented below</a></p></li>
+<li><p><code>additional_pod_network_configs</code> - (Optional) We specify the additional pod networks for this node pool using this list. Each pod network corresponds to an additional alias IP range for the node.
+Structure is <a href="#nested_additional_pod_network_configs">documented below</a></p></li>
+<li><p><code>pod_cidr_overprovision_config</code> - (Optional) Configuration for node-pool level pod cidr overprovision. If not set, the cluster level setting will be inherited. Structure is <a href="#pod_cidr_overprovision_config">documented below</a>.</p></li>
+<li><p><code>network_performance_config</code> - (Optional) Network bandwidth tier configuration. Structure is <a href="#network_performance_config">documented below</a>.</p></li>
+</ul>
+
+<p><a name="nested_additional_node_network_configs"></a>The <code>additional_node_network_configs</code> block supports:</p>
+
+<ul>
+<li><p><code>network</code> - Name of the VPC where the additional interface belongs.</p></li>
+<li><p><code>subnetwork</code> - Name of the subnetwork where the additional interface belongs.</p></li>
+</ul>
+
+<p><a name="nested_additional_pod_network_configs"></a>The <code>additional_pod_network_configs</code> block supports:</p>
+
+<ul>
+<li><p><code>subnetwork</code> - Name of the subnetwork where the additional pod network belongs.</p></li>
+<li><p><code>secondary_pod_range</code> - The name of the secondary range on the subnet which provides IP address for this pod range.</p></li>
+<li><p><code>max_pods_per_node</code> - The maximum number of pods per node which use this pod network.</p></li>
+</ul>
+
+<p><a name="network_performance_config"></a>The <code>network_performance_config</code> block supports:</p>
+
+<ul>
+<li><code>total_egress_bandwidth_tier</code> (Required) - Specifies the total network bandwidth tier for the NodePool.</li>
+</ul>
+
+<p><a name="pod_cidr_overprovision_config"></a>The <code>pod_cidr_overprovision_config</code> block supports:</p>
+
+<ul>
+<li><code>disabled</code> (Required) - Whether pod cidr overprovision is disabled.</li>
+</ul>
+
+<p><a name="nested_upgrade_settings"></a>The <code>upgrade_settings</code> block supports:</p>
+
+<ul>
+<li><p><code>max_surge</code> - (Optional) The number of additional nodes that can be added to the node pool during
+an upgrade. Increasing <code>max_surge</code> raises the number of nodes that can be upgraded simultaneously.
+Can be set to 0 or greater.</p></li>
+<li><p><code>max_unavailable</code> - (Optional) The number of nodes that can be simultaneously unavailable during
+an upgrade. Increasing <code>max_unavailable</code> raises the number of nodes that can be upgraded in
+parallel. Can be set to 0 or greater.</p></li>
+</ul>
+
+<p><code>max_surge</code> and <code>max_unavailable</code> must not be negative and at least one of them must be greater than zero.</p>
+
+<ul>
+<li><p><code>strategy</code> - (Default <code>SURGE</code>) The upgrade strategy to be used for upgrading the nodes.</p></li>
+<li><p><code>blue_green_settings</code> - (Optional) The settings to adjust <a href="https://cloud.google.com/kubernetes-engine/docs/concepts/node-pool-upgrade-strategies#blue-green-upgrade-strategy">blue green upgrades</a>.
+Structure is <a href="#nested_blue_green_settings">documented below</a></p></li>
+</ul>
+
+<p><a name="nested_blue_green_settings"></a>The <code>blue_green_settings</code> block supports:</p>
+
+<ul>
+<li><p><code>standard_rollout_policy</code> - (Required) Specifies the standard policy settings for blue-green upgrades.</p>
+
+<ul>
+<li><code>batch_percentage</code> - (Optional) Percentage of the blue pool nodes to drain in a batch.</li>
+<li><code>batch_node_count</code> - (Optional) Number of blue nodes to drain in a batch.</li>
+<li><code>batch_soak_duration</code> - (Optionial) Soak time after each batch gets drained.</li>
+</ul></li>
+<li><p><code>local_ssd_encryption_mode</code> - (Optional) Possible Local SSD encryption modes:
+Accepted values are:</p>
+
+<ul>
+<li><code>STANDARD_ENCRYPTION</code>: The given node will be encrypted using keys managed by Google infrastructure and the keys wll be deleted when the node is deleted.</li>
+<li><code>EPHEMERAL_KEY_ENCRYPTION</code>: The given node will opt-in for using ephemeral key for encrypting Local SSDs. The Local SSDs will not be able to recover data in case of node crash.</li>
+</ul></li>
+<li><p><code>node_pool_soak_duration</code> - (Optional) Time needed after draining the entire blue pool.
+After this period, the blue pool will be cleaned up.</p></li>
+</ul>
+
+<p><a name="nested_placement_policy"></a>The <code>placement_policy</code> block supports:</p>
+
+<ul>
+<li><p><code>type</code> - (Required) The type of the policy. Supports a single value: COMPACT.
+Specifying COMPACT placement policy type places node pool's nodes in a closer
+physical proximity in order to reduce network latency between nodes.</p></li>
+<li><p><code>policy_name</code> - (Optional) If set, refers to the name of a custom resource policy supplied by the user.
+The resource policy must be in the same project and region as the node pool.
+If not found, InvalidArgument error is returned.</p></li>
+<li><p><code>tpu_topology</code> - (Optional) The <a href="https://cloud.google.com/tpu/docs/types-topologies#tpu_topologies">TPU placement topology</a> for pod slice node pool.</p></li>
+</ul>
+
+<p><a name="nested_queued_provisioning"></a> The <code>queued_provisioning</code> block supports:</p>
+
+<ul>
+<li><code>enabled</code> (Required) - Makes nodes obtainable through the <a href="https://cloud.google.com/kubernetes-engine/docs/how-to/provisioningrequest">ProvisioningRequest API</a> exclusively.</li>
+</ul>
+
+<p><a name="nested_reservation_affinity"></a>The <code>reservation_affinity</code> block supports:</p>
+
+<ul>
+<li><p><code>consume_reservation_type</code> (Required) The type of reservation consumption
+Accepted values are:</p>
+
+<ul>
+<li><code>"UNSPECIFIED"</code>: Default value. This should not be used.</li>
+<li><code>"NO_RESERVATION"</code>: Do not consume from any reserved capacity.</li>
+<li><code>"ANY_RESERVATION"</code>: Consume any reservation available.</li>
+<li><code>"SPECIFIC_RESERVATION"</code>: Must consume from a specific reservation. Must specify key value fields for specifying the reservations.</li>
+</ul></li>
+<li><code>key</code> (Optional) The label key of a reservation resource. To target a SPECIFIC_RESERVATION by name, specify "compute.googleapis.com/reservation-name" as the key and specify the name of your reservation as its value.</li>
+<li><code>values</code> (Optional) The list of label values of reservation resources. For example: the name of the specific reservation when using a key of "compute.googleapis.com/reservation-name"</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to the arguments listed above, the following computed attributes are exported:</p>
+
+<ul>
+<li><p><code>id</code> - an identifier for the resource with format <code>{{project}}/{{location}}/{{cluster}}/{{name}}</code></p></li>
+<li><p><code>instance_group_urls</code> - The resource URLs of the managed instance groups associated with this node pool.</p></li>
+<li><p><code>managed_instance_group_urls</code> - List of instance group URLs which have been assigned to this node pool.</p></li>
+</ul>
+
+<p><a id="timeouts"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p><code>google_container_node_pool</code> provides the following
+<a href="https://developer.hashicorp.com/terraform/plugin/sdkv2/resources/retries-and-customizable-timeouts">Timeouts</a> configuration options: configuration options:</p>
+
+<ul>
+<li><code>create</code> - (Default <code>30 minutes</code>) Used for adding node pools</li>
+<li><code>update</code> - (Default <code>30 minutes</code>) Used for updates to node pools</li>
+<li><code>delete</code> - (Default <code>30 minutes</code>) Used for removing node pools.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Node pools can be imported using the <code>project</code>, <code>location</code>, <code>cluster</code> and <code>name</code>. If
+the project is omitted, the project value in the provider configuration will be used. Examples:</p>
+
+<ul>
+<li><code>{{project_id}}/{{location}}/{{cluster_id}}/{{pool_id}}</code></li>
+<li><code>{{location}}/{{cluster_id}}/{{pool_id}}</code></li>
+</ul>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import node pools using one of the formats above. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"{{project_id}}/{{location}}/{{cluster_id}}/{{pool_id}}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_container_node_pool.default</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When using the <a href="https://developer.hashicorp.com/terraform/cli/commands/import"><code>terraform import</code> command</a>, node pools can be imported using one of the formats above. For example:</p>
+
+<pre><code>$ terraform import google_container_node_pool.default {{project_id}}/{{location}}/{{cluster_id}}/{{pool_id}}
+
+$ terraform import google_container_node_pool.default {{location}}/{{cluster_id}}/{{pool_id}}
+</code></pre>
+
+            
+        
+    </body></html>

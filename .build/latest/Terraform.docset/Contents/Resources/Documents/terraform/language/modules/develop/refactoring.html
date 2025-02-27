@@ -1,0 +1,449 @@
+<html><!-- Online page at https://www.terraform.io/language/modules/develop/refactoring --><head>
+                <title>Refactoring</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="refactoring">Refactoring</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Explicit refactoring declarations with <code>moved</code> blocks is available in Terraform v1.1 and later. For earlier Terraform versions or for refactoring actions too complex to express as <code>moved</code> blocks, you can use the <a href="../../../terraform/cli/commands/state/mv.html"><code>terraform state mv</code> CLI command</a> as a separate step.</p>
+</aside>
+
+<p>In shared modules and long-lived configurations, you may eventually outgrow
+your initial module structure and resource names. For example, you might decide
+that what was previously one child module makes more sense as two separate
+modules and move a subset of the existing resources to the new one.</p>
+
+<p>Terraform compares previous state with new configuration, correlating by
+each module or resource's unique address. Therefore <em>by default</em> Terraform
+understands moving or renaming an object as an intent to destroy the object
+at the old address and to create a new object at the new address.</p>
+
+<p>When you add <code>moved</code> blocks in your configuration to record where you've
+historically moved or renamed an object, Terraform treats an existing object at
+the old address as if it now belongs to the new address.</p>
+
+<blockquote>
+  <p><strong>Hands On:</strong> Try the <a href="../../../terraform/tutorials/configuration-language/move-config.html">Use Configuration to Move Resources</a> tutorial.</p>
+</blockquote>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/moved%20Block%20Syntax"></a><h2 id="moved-block-syntax"><code>moved</code> Block Syntax</h2>
+
+<p>A <code>moved</code> block expects no labels and contains only <code>from</code> and <code>to</code> arguments:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.a</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.b</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The example above records that the resource currently known as <code>aws_instance.b</code>
+was known as <code>aws_instance.a</code> in a previous version of this module.</p>
+
+<p>Before creating a new plan for <code>aws_instance.b</code>, Terraform first checks
+whether there is an existing object for <code>aws_instance.a</code> recorded in the state.
+If there is an existing object, Terraform renames that object to
+<code>aws_instance.b</code> and then proceeds with creating a plan. The resulting plan is
+as if the object had originally been created at <code>aws_instance.b</code>, avoiding any
+need to destroy it during apply.</p>
+
+<p>The <code>from</code> and <code>to</code> addresses both use a special addressing syntax that allows
+selecting modules, resources, and resources inside child modules. Below, we
+describe several refactoring use-cases and the appropriate addressing syntax
+for each situation.</p>
+
+<ul>
+<li><a href="#renaming-a-resource">Renaming a Resource</a></li>
+<li><a href="#enabling-count-or-for_each-for-a-resource">Enabling <code>count</code> or <code>for_each</code> For a Resource</a></li>
+<li><a href="#renaming-a-module-call">Renaming a Module Call</a></li>
+<li><a href="#enabling-count-or-for_each-for-a-module-call">Enabling <code>count</code> or <code>for_each</code> For a Module Call</a></li>
+<li><a href="#splitting-one-module-into-multiple">Splitting One Module into Multiple</a></li>
+<li><a href="#removing-moved-blocks">Removing <code>moved</code> blocks</a></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Renaming%20a%20Resource"></a><h2 id="renaming-a-resource">Renaming a Resource</h2>
+
+<p>Consider this example module with a resource configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"a"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="c1"></span>
+
+<span class="c1">  # (resource-type-specific configuration)</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Applying this configuration for the first time would cause Terraform to
+create <code>aws_instance.a[0]</code> and <code>aws_instance.a[1]</code>.</p>
+
+<p>If you later choose a different name for this resource, then you can change the
+name label in the <code>resource</code> block and record the old name inside a <code>moved</code> block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"b"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="c1"></span>
+
+<span class="c1">  # (resource-type-specific configuration)</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.a</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.b</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When creating the next plan for each configuration using this module, Terraform
+treats any existing objects belonging to <code>aws_instance.a</code> as if they had
+been created for <code>aws_instance.b</code>: <code>aws_instance.a[0]</code> will be treated as
+<code>aws_instance.b[0]</code>, and <code>aws_instance.a[1]</code> as <code>aws_instance.b[1]</code>.</p>
+
+<p>New instances of the module, which <em>never</em> had an
+<code>aws_instance.a</code>, will ignore the <code>moved</code> block and propose to create
+<code>aws_instance.b[0]</code> and <code>aws_instance.b[1]</code> as normal.</p>
+
+<p>Both of the addresses in this example referred to a resource as a whole, and
+so Terraform recognizes the move for all instances of the resource. That is,
+it covers both <code>aws_instance.a[0]</code> and <code>aws_instance.a[1]</code> without the need
+to identify each one separately.</p>
+
+<p>Each resource type has a separate schema so objects of different types
+are not typically compatible. You can always use the <code>moved</code> block to change 
+the name of a resource, but some providers also let you change an object from
+one resource type to another. Refer to the provider documentation for details
+on which resources can move between types. You <em>cannot</em> use the <code>moved</code> 
+block to change a managed resource (a <code>resource</code> block) into a data 
+resource (a <code>data</code> block).</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Enabling%20count%20or%20for_each%20For%20a%20Resource"></a><h2 id="enabling-count-or-for_each-for-a-resource">Enabling <code>count</code> or <code>for_each</code> For a Resource</h2>
+
+<p>Consider this example module containing a single-instance resource:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"a"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # (resource-type-specific configuration)</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Applying this configuration would lead to Terraform creating an object
+bound to the address <code>aws_instance.a</code>.</p>
+
+<p>Later, you use <a href="../../../terraform/language/meta-arguments/for_each.html"><code>for_each</code></a> with this
+resource to systematically declare multiple instances. To preserve an object
+that was previously associated with <code>aws_instance.a</code> alone, you must add a
+<code>moved</code> block to specify which instance key the object will take in the new
+configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">instances</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">tomap</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="nb">big</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"m3.large"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">small</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"t2.medium"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"a"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.instances</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value.instance_type</span><span class="c1"></span>
+<span class="c1">  # (other resource-type-specific configuration)</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.a</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.a</span><span class="p">[</span><span class="s2">"small"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The above will keep Terraform from planning to destroy any existing object at
+<code>aws_instance.a</code>, treating that object instead as if it were originally
+created as <code>aws_instance.a["small"]</code>.</p>
+
+<p>When at least one of the two addresses includes an instance key, like
+<code>["small"]</code> in the above example, Terraform understands both addresses as
+referring to specific <em>instances</em> of a resource rather than the resource as a
+whole. That means you can use <code>moved</code> to switch between keys and to add and
+remove keys as you switch between <code>count</code>, <code>for_each</code>, or neither.</p>
+
+<p>The following are some other examples of valid <code>moved</code> blocks that record
+changes to resource instance keys in a similar way:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Both old and new configuration used "for_each", but the</span>
+<span class="c1"># "small" element was renamed to "tiny".</span>
+<span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.b</span><span class="p">[</span><span class="s2">"small"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.b</span><span class="p">[</span><span class="s2">"tiny"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># The old configuration used "count" and the new configuration</span>
+<span class="c1"># uses "for_each", with the following mappings from</span>
+<span class="c1"># index to key:</span>
+<span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.c[0</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.c</span><span class="p">[</span><span class="s2">"small"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.c[1</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.c</span><span class="p">[</span><span class="s2">"tiny"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># The old configuration used "count", and the new configuration</span>
+<span class="c1"># uses neither "count" nor "for_each", and you want to keep</span>
+<span class="c1"># only the object at index 2.</span>
+<span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.d[2</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.d</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>When you add <code>count</code> to an existing resource that didn't use it, Terraform automatically proposes to move the original object to instance zero, unless you write an <code>moved</code> block explicitly mentioning that resource. However, we recommend still writing out the corresponding <code>moved</code> block explicitly, to make the change clearer to future readers of the module.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Renaming%20a%20Module%20Call"></a><h2 id="renaming-a-module-call">Renaming a Module Call</h2>
+
+<p>You can rename a call to a module in a similar way as renaming a resource.
+Consider the following original module version:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">module</span><span class="w"> </span><span class="nv">"a"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"../modules/example"</span><span class="c1"></span>
+
+<span class="c1">  # (module arguments)</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When applying this configuration, Terraform would prefix the addresses for
+any resources declared in this module with the module path <code>module.a</code>.
+For example, a resource <code>aws_instance.example</code> would have the full address
+<code>module.a.aws_instance.example</code>.</p>
+
+<p>If you later choose a better name for this module call, then you can change the
+name label in the <code>module</code> block and record the old name inside a <code>moved</code> block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">module</span><span class="w"> </span><span class="nv">"b"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"../modules/example"</span><span class="c1"></span>
+
+<span class="c1">  # (module arguments)</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">module.a</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">module.b</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When creating the next plan for each configuration using this module, Terraform
+will treat any existing object addresses beginning with <code>module.a</code> as if
+they had instead been created in <code>module.b</code>. <code>module.a.aws_instance.example</code>
+would be treated as <code>module.b.aws_instance.example</code>.</p>
+
+<p>Both of the addresses in this example referred to a module call as a whole, and
+so Terraform recognizes the move for all instances of the call. If this
+module call used <code>count</code> or <code>for_each</code> then it would apply to all of the
+instances, without the need to specify each one separately.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Enabling%20count%20or%20for_each%20For%20a%20Module%20Call"></a><h2 id="enabling-count-or-for_each-for-a-module-call">Enabling <code>count</code> or <code>for_each</code> For a Module Call</h2>
+
+<p>Consider this example of a single-instance module:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">module</span><span class="w"> </span><span class="nv">"a"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"../modules/example"</span><span class="c1"></span>
+
+<span class="c1">  # (module arguments)</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Applying this configuration would cause Terraform to create objects whose
+addresses begin with <code>module.a</code>.</p>
+
+<p>In later module versions, you may need to use
+<a href="../../../terraform/language/meta-arguments/count.html"><code>count</code></a> with this resource to systematically
+declare multiple instances. To preserve an object that was previously associated
+with <code>aws_instance.a</code> alone, you can add a <code>moved</code> block to specify which
+instance key that object will take in the new configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">module</span><span class="w"> </span><span class="nv">"a"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"../modules/example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="c1"></span>
+
+<span class="c1">  # (module arguments)</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">module.a</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">module.a[2</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The configuration above directs Terraform to treat all objects in <code>module.a</code> as
+if they were originally created in <code>module.a[2]</code>. As a result, Terraform plans
+to create new objects only for <code>module.a[0]</code> and <code>module.a[1]</code>.</p>
+
+<p>When at least one of the two addresses includes an instance key, like
+<code>[2]</code> in the above example, Terraform will understand both addresses as
+referring to specific <em>instances</em> of a module call rather than the module
+call as a whole. That means you can use <code>moved</code> to switch between keys and to
+add and remove keys as you switch between <code>count</code>, <code>for_each</code>, or neither.</p>
+
+<p>For more examples of recording moves associated with instances, refer to
+the similar section
+<a href="#enabling-count-or-for_each-for-a-resource">Enabling <code>count</code> and <code>for_each</code> For a Resource</a>.</p>
+
+<h1 id="splitting-one-module-into-multiple">Splitting One Module into Multiple</h1>
+
+<p>As a module grows to support new requirements, it might eventually grow big
+enough to warrant splitting into two separate modules.</p>
+
+<p>Consider this example module:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"a"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # (other resource-type-specific configuration)</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"b"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # (other resource-type-specific configuration)</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"c"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # (other resource-type-specific configuration)</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>You can split this into two modules as follows:</p>
+
+<ul>
+<li><code>aws_instance.a</code> now belongs to module "x".</li>
+<li><code>aws_instance.b</code> also belongs to module "x".</li>
+<li><code>aws_instance.c</code> belongs module "y".</li>
+</ul>
+
+<p>To achieve this refactoring without replacing existing objects bound to the
+old resource addresses, you must:</p>
+
+<ol>
+<li>Write module "x", copying over the two resources it should contain.</li>
+<li>Write module "y", copying over the one resource it should contain.</li>
+<li>Edit the original module to no longer include any of these resources, and
+instead to contain only shim configuration to migrate existing users.</li>
+</ol>
+
+<p>The new modules "x" and "y" should contain only <code>resource</code> blocks:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># module "x"</span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"a"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # (other resource-type-specific configuration)</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"b"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # (other resource-type-specific configuration)</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># module "y"</span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"c"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # (other resource-type-specific configuration)</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The original module, now only a shim for backward-compatibility, calls the
+two new modules and indicates that the resources moved into them:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">module</span><span class="w"> </span><span class="nv">"x"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"../modules/x"</span><span class="c1"></span>
+
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">module</span><span class="w"> </span><span class="nv">"y"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"../modules/y"</span><span class="c1"></span>
+
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.a</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">module.x.aws_instance.a</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.b</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">module.x.aws_instance.b</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.c</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">module.y.aws_instance.c</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When an existing user of the original module upgrades to the new "shim"
+version, Terraform notices these three <code>moved</code> blocks and behaves
+as if the objects associated with the three old resource addresses were
+originally created inside the two new modules.</p>
+
+<p>New users of this family of modules may use either the combined shim module
+<em>or</em> the two new modules separately. You may wish to communicate to your
+existing users that the old module is now deprecated and so they should use
+the two separate modules for any new needs.</p>
+
+<p>The multi-module refactoring situation is unusual in that it violates the
+typical rule that a parent module sees its child module as a "closed box",
+unaware of exactly which resources are declared inside it. This compromise
+assumes that all three of these modules are maintained by the same people
+and distributed together in a single
+<a href="../../../terraform/language/modules/sources.html#modules-in-package-sub-directories">module package</a>.</p>
+
+<p>Terraform resolves module references in <code>moved</code> blocks relative to the module
+instance they are defined in. For example, if the original module above were
+already a child module named <code>module.original</code>, the reference to
+<code>module.x.aws_instance.a</code> would resolve as
+<code>module.original.module.x.aws_instance.a</code>. A module may only make <code>moved</code>
+statements about its own objects and objects of its child modules.</p>
+
+<p>If you need to refer to resources within a module that was called using
+<code>count</code> or <code>for_each</code> meta-arguments, you must specify a specific instance
+key to use in order to match with the new location of the resource
+configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.example</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">module.new[2].aws_instance.example</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Removing%20moved%20Blocks"></a><h2 id="removing-moved-blocks">Removing <code>moved</code> Blocks</h2>
+
+<p>Over time, a long-lasting module may accumulate many <code>moved</code> blocks.</p>
+
+<p>Removing a <code>moved</code> block is a generally breaking change because any configurations that refer to the old address will plan to delete that existing object instead of move it. We strongly recommend that you retain all historical <code>moved</code> blocks from earlier versions of your modules to preserve the upgrade path for users of any previous version.</p>
+
+<p>If you do decide to remove <code>moved</code> blocks, proceed with caution. It can be safe to remove <code>moved</code> blocks when you are maintaining private modules within an organization and you are certain that all users have successfully run <code>terraform apply</code> with your new module version.</p>
+
+<p>If you need to rename or move the same object twice, we recommend documenting the full history
+using <em>chained</em> <code>moved</code> blocks, where the new block refers to the existing block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.a</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.b</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.b</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.c</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Recording a sequence of moves in this way allows for successful upgrades for
+both configurations with objects at <code>aws_instance.a</code> <em>and</em> configurations with
+objects at <code>aws_instance.b</code>. In both cases, Terraform treats the existing
+object as if it had been originally created as <code>aws_instance.c</code>.</p>
+
+            
+        
+    </body></html>

@@ -1,0 +1,153 @@
+<html><!-- Online page at https://registry.terraform.io/providers/PagerDuty/pagerduty/latest/docs/resources/event_orchestration_router --><head>
+                <title>pagerduty_event_orchestration_router</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="pagerduty_event_orchestration_router">pagerduty_event_orchestration_router</h1>
+
+<p>An Orchestration Router allows users to create a set of Event Rules. The Router evaluates events sent to this Orchestration against each of its rules, one at a time, and routes the event to a specific Service based on the first rule that matches. If an event doesn't match any rules, it'll be sent to service specified in the <code>catch_all</code> or to the "Unrouted" Orchestration if no service is specified.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20of%20configuring%20Router%20rules%20for%20an%20Orchestration"></a><h2 id="example-of-configuring-router-rules-for-an-orchestration">Example of configuring Router rules for an Orchestration</h2>
+
+<p>In this example the user has defined the Router with three rules. The first rule configures a dynamic route: any event containing a value in its <code>pd_service_id</code> custom detail will be routed to the Service with the ID specified by that value. The other rules route events matching a condition to specific services.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"pagerduty_service"</span><span class="w"> </span><span class="nv">"database"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Primary Data Store"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"pagerduty_service"</span><span class="w"> </span><span class="nv">"www"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Web Server App"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"pagerduty_event_orchestration_router"</span><span class="w"> </span><span class="nv">"router"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">event_orchestration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">pagerduty_event_orchestration.my_monitor.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">set</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"start"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">label</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Dynamically route events related to specific PagerDuty services"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">actions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nb">dynamic_route_to</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">lookup_by</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"service_id"</span><span class="w"></span>
+<span class="w">          </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"event.custom_details.pd_service_id"</span><span class="w"></span>
+<span class="w">          </span><span class="na">regex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"(.*)"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">label</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Events relating to our relational database"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">expression</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"event.summary matches part 'database'"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">expression</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"event.source matches regex 'db[0-9]+-server'"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="nb">actions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">route_to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.pagerduty_service.database.id</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">expression</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"event.summary matches part 'www'"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="nb">actions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">route_to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.pagerduty_service.www.id</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">catch_all</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">actions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">route_to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"unrouted"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>event_orchestration</code> - (Required) ID of the Event Orchestration to which the Router belongs.</li>
+<li><code>set</code> - (Required) The Router contains a single set of rules  (the "start" set).</li>
+<li><code>catch_all</code> - (Required) When none of the rules match an event, the event will be routed according to the catch_all settings.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Set%20%28set%29%20supports%20the%20following%3A"></a><h3 id="set-set-supports-the-following">Set (<code>set</code>) supports the following:</h3>
+
+<ul>
+<li><code>id</code> - (Required) ID of the <code>start</code> set. Router supports only one set and it's id has to be <code>start</code></li>
+<li><code>rule</code> - (Optional) The Router evaluates Events against these Rules, one at a time, and routes each Event to a specific Service based on the first rule that matches. If no rules are provided as part of Terraform configuration, the API returns empty list of rules.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Rule%20%28rule%29%20supports%20the%20following%3A"></a><h3 id="rule-rule-supports-the-following">Rule (<code>rule</code>) supports the following:</h3>
+
+<ul>
+<li><code>label</code> - (Optional) A description of this rule's purpose.</li>
+<li><code>condition</code> - (Optional) Each of these conditions is evaluated to check if an event matches this rule. The rule is considered a match if any of these conditions match. If none are provided, the event will _always_ match against the rule.</li>
+<li><code>actions</code> - (Required) Actions that will be taken to change the resulting alert and incident, when an event matches this rule.</li>
+<li><code>disabled</code> - (Optional) Indicates whether the rule is disabled and would therefore not be evaluated.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Condition%20%28condition%29%20supports%20the%20following%3A"></a><h3 id="condition-condition-supports-the-following">Condition (<code>condition</code>) supports the following:</h3>
+
+<ul>
+<li><code>expression</code>- (Required) A <a href="https://developer.pagerduty.com/docs/ZG9jOjM1NTE0MDc0-pcl-overview">PCL condition</a> string.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Actions%20%28actions%29%20supports%20the%20following%3A"></a><h3 id="actions-actions-supports-the-following">Actions (<code>actions</code>) supports the following:</h3>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Dynamic%20Routing"></a><h4 id="dynamic-routing">Dynamic Routing</h4>
+
+<p>Use the contents of an event payload to dynamically route an event to the target service. Note these setting can only be used once in the Router, and only in the first rule. The dynamic routing rule cannot have <code>conditions</code> nor a <code>route_to</code> action defined.</p>
+
+<ul>
+<li><code>dynamic_route_to</code> - (Required) supports the following:
+<ul>
+<li><code>source</code> - (Required) The path to a field in an event.</li>
+<li><code>regex</code> - (Required) The regular expression, used to extract a value from the source field. Must use valid <a href="https://github.com/google/re2/wiki/Syntax">RE2 regular expression</a> syntax.</li>
+<li><code>lookup_by</code> - (Required) Indicates whether the extracted value from the source is a service's name or ID. Allowed values are: <code>service_name</code>, <code>service_id</code></li>
+</ul></li>
+</ul>
+
+<p>If an event has a value at the specified <code>source</code>, and if the <code>regex</code> successfully matches the value, and if the matching portion is valid Service ID or Name, then the event will be routed to that service. Otherwise the event will be checked against any subsequent router rules.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Service%20Route"></a><h4 id="service-route">Service Route</h4>
+
+<p>If an event matches this rule's conditions, then route it to the specified Service.</p>
+
+<ul>
+<li><code>route_to</code> - (Required) The ID of the target Service for the resulting alert.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Catch%20All%20%28catch_all%29%20supports%20the%20following%3A"></a><h3 id="catch-all-catch_all-supports-the-following">Catch All (<code>catch_all</code>) supports the following:</h3>
+
+<ul>
+<li><code>actions</code> - (Required) These are the actions that will be taken to change the resulting alert and incident.
+<ul>
+<li><code>route_to</code> - (Required) Defines where an alert will be sent if doesn't match any rules. Can either be the ID of a Service _or_ the string <code>"unrouted"</code> to send events to the Unrouted Orchestration.</li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>The following attributes are exported:</p>
+
+<ul>
+<li><code>self</code> - The URL at which the Router Orchestration is accessible.</li>
+<li><code>rule</code>
+<ul>
+<li><code>id</code> - The ID of the rule within the <code>start</code> set.</li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Router can be imported using the <code>id</code> of the Event Orchestration, e.g.</p>
+
+<pre><code>$ terraform import pagerduty_event_orchestration_router.router 1b49abe7-26db-4439-a715-c6d883acfb3e
+</code></pre>
+
+            
+        
+    </body></html>

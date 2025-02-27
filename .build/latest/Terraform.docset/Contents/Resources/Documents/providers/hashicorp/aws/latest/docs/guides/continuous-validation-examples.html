@@ -1,0 +1,157 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/guides/continuous-validation-examples --><head>
+                <title>Using HCP Terraform's Continuous Validation feature with the AWS Provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="using-hcp-terraforms-continuous-validation-feature-with-the-aws-provider">Using HCP Terraform's Continuous Validation feature with the AWS Provider</h1>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Continuous%20Validation%20in%20HCP%20Terraform"></a><h2 id="continuous-validation-in-hcp-terraform">Continuous Validation in HCP Terraform</h2>
+
+<p>The Continuous Validation feature in HCP Terraform allows users to make assertions about their infrastructure between applied runs. This helps users to identify issues at the time they first appear and avoid situations where a change is only identified once it causes a customer-facing problem.</p>
+
+<p>Users can add checks to their Terraform configuration using check blocks. Check blocks contain assertions that are defined with a custom condition expression and an error message. When the condition expression evaluates to true the check passes, but when the expression evaluates to false Terraform will show a warning message that includes the user-defined error message.</p>
+
+<p>Custom conditions can be created using data from Terraform providers’ resources and data sources. Data can also be combined from multiple sources; for example, you can use checks to monitor expirable resources by comparing a resource’s expiration date attribute to the current time returned by Terraform’s built-in time functions.</p>
+
+<p>Below, this guide shows examples of how data returned by the AWS provider can be used to define checks in your Terraform configuration.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20-%20Ensure%20your%20AWS%20account%20is%20within%20budget%20%28aws_budgets_budget%29"></a><h2 id="example-ensure-your-aws-account-is-within-budget-aws_budgets_budget">Example - Ensure your AWS account is within budget (aws_budgets_budget)</h2>
+
+<p>AWS Budgets allows you to track and take action on your AWS costs and usage. You can use AWS Budgets to monitor your aggregate utilization and coverage metrics for your Reserved Instances (RIs) or Savings Plans.</p>
+
+<ul>
+<li><p>You can use AWS Budgets to enable simple-to-complex cost and usage tracking. Some examples include:</p></li>
+<li><p>Setting a monthly cost budget with a fixed target amount to track all costs associated with your account.</p></li>
+<li><p>Setting a monthly cost budget with a variable target amount, with each subsequent month growing the budget target by 5 percent.</p></li>
+<li><p>Setting a monthly usage budget with a fixed usage amount and forecasted notifications to help ensure that you are staying within the service limits for a specific service.</p></li>
+<li><p>Setting a daily utilization or coverage budget to track your RI or Savings Plans.</p></li>
+</ul>
+
+<p>The example below shows how a check block can be used to assert that you remain in compliance for the budgets that have been established.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">check</span><span class="w"> </span><span class="s2">"check_budget_exceeded"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_budgets_budget"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_budgets_budget.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">!</span><span class="nv">data.aws_budgets_budget.example.budget_exceeded</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"AWS budget has been exceeded! Calculated spend: '%s' and budget limit: '%s'"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">data.aws_budgets_budget.example.calculated_spend[0].actual_spend[0].amount</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">data.aws_budgets_budget.example.budget_limit[0].amount</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>If the budget exceeds the set limit, the check block assertion will return a warning similar to the following:</p>
+
+<pre><code>│ Warning: Check block assertion failed
+│
+│   on main.tf line 43, in check "check_budget_exceeded":
+│   43:     condition = !data.aws_budgets_budget.example.budget_exceeded
+│     ├────────────────
+│     │ data.aws_budgets_budget.example.budget_exceeded is true
+│
+│ AWS budget has been exceeded! Calculated spend: '1550.0' and budget limit: '1200.0'
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20-%20Check%20GuardDuty%20for%20Threats%20%28aws_guardduty_finding_ids%29"></a><h2 id="example-check-guardduty-for-threats-aws_guardduty_finding_ids">Example - Check GuardDuty for Threats (aws_guardduty_finding_ids)</h2>
+
+<p>Amazon GuardDuty is a threat detection service that continuously monitors for malicious activity and unauthorized behavior to protect your Amazon Web Services accounts, workloads, and data stored in Amazon S3. With the cloud, the collection and aggregation of account and network activities is simplified, but it can be time consuming for security teams to continuously analyze event log data for potential threats. With GuardDuty, you now have an intelligent and cost-effective option for continuous threat detection in Amazon Web Services Cloud.</p>
+
+<p>The following example outlines how a check block can be utilized to assert that no threats have been identified from AWS GuardDuty.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_guardduty_detector"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="err">check</span><span class="w"> </span><span class="s2">"check_guardduty_findings"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_guardduty_finding_ids"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">detector_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_guardduty_detector.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">!</span><span class="nv">data.aws_guardduty_finding_ids.example.has_findings</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"AWS GuardDuty detector '%s' has %d open findings!"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">data.aws_guardduty_finding_ids.example.detector_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nf">length</span><span class="p">(</span><span class="nv">data.aws_guardduty_finding_ids.example.finding_ids</span><span class="p">),</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>If findings are present, the check block assertion will return a warning similar to the following:</p>
+
+<pre><code>│ Warning: Check block assertion failed
+│
+│   on main.tf line 24, in check "check_guardduty_findings":
+│   24:     condition = !data.aws_guardduty_finding_ids.example.has_findings
+│     ├────────────────
+│     │ data.aws_guardduty_finding_ids.example.has_findings is true
+│
+│ AWS GuardDuty detector 'abcdef123456' has 9 open findings!
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20-%20Check%20for%20unused%20IAM%20roles%20%28aws_iam_role%29"></a><h2 id="example-check-for-unused-iam-roles-aws_iam_role">Example - Check for unused IAM roles (aws_iam_role)</h2>
+
+<p>AWS IAM tracks role usage, including the <a href="https://docs.aws.amazon.com/IAM/latest/APIReference/API_RoleLastUsed.html">last used date and region</a>. This information is returned  with the <a href="../d/iam_role.html.markdown"><code>aws_iam_role</code></a> data source, and can be used in continuous validation to check for unused roles. AWS reports activity for the trailing 400 days. If a role is unused within that period, the <code>last_used_date</code> will be an empty string (<code>""</code>).</p>
+
+<p>In the example below, the <a href="https://developer.hashicorp.com/terraform/language/functions/timecmp"><code>timecmp</code></a> function checks for a <code>last_used_date</code> more recent than the <code>unused_limit</code> local variable (30 days ago). The <a href="https://developer.hashicorp.com/terraform/language/functions/coalesce"><code>coalesce</code></a> function handles empty (<code>""</code>) <code>last_used_date</code> values safely, falling back to the <code>unused_limit</code> local, and automatically triggering a failed condition.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">unused_limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">timeadd</span><span class="p">(</span><span class="nf">timestamp</span><span class="p">(),</span><span class="w"> </span><span class="s2">"-720h"</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">check</span><span class="w"> </span><span class="s2">"check_iam_role_unused"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="w"></span>
+<span class="w">      </span><span class="err">timecmp</span><span class="p">(</span><span class="w"></span>
+<span class="w">        </span><span class="nf">coalesce</span><span class="p">(</span><span class="nv">data.aws_iam_role.example.role_last_used[0].last_used_date</span><span class="p">,</span><span class="w"> </span><span class="nv">local.unused_limit</span><span class="p">),</span><span class="w"></span>
+<span class="w">        </span><span class="nv">local.unused_limit</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="p">)</span><span class="w"> </span><span class="err">&gt;</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"AWS IAM role '%s' is unused in the last 30 days!"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">data.aws_iam_role.example.name</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20-%20Check%20EKS%20Cluster%20Instance%20Health%20and%20Availability%20%28aws_eks_cluster%29"></a><h2 id="example-check-eks-cluster-instance-health-and-availability-aws_eks_cluster">Example - Check EKS Cluster Instance Health and Availability (<code>aws_eks_cluster</code>)</h2>
+
+<p>Amazon Elastic Kubernetes Service (Amazon EKS) is a managed Kubernetes service to run Kubernetes in the AWS cloud and on-premises data centers. In the cloud, Amazon EKS automatically manages the availability and scalability of the Kubernetes control plane nodes responsible for scheduling containers, managing application availability, storing cluster data, and other key tasks. With Amazon EKS, you can take advantage of all the performance, scale, reliability, and availability of AWS infrastructure, as well as integrations with AWS networking and security services.</p>
+
+<p>The example below shows how a check block can be used to assert that your cluster is in good health and available.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">check</span><span class="w"> </span><span class="s2">"aws_eks_cluster_default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_eks_cluster.default.status</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"ACTIVE"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"EKS cluster ${aws_eks_cluster.default.id} status is ${aws_eks_cluster.default.status}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20-%20Check%20for%20EC2%20Stopped%20Instances%20%28aws_instances%29"></a><h2 id="example-check-for-ec2-stopped-instances-aws_instances">Example - Check for EC2 Stopped Instances (<code>aws_instances</code>)</h2>
+
+<p>Amazon Elastic Compute Cloud (Amazon EC2) is a web service that provides secure, resizable compute capacity in the cloud. Access reliable, scalable infrastructure on demand. Scale capacity within minutes with SLA commitment of 99.99% availability.</p>
+
+<p>The example below shows how a check block can be used to assert that your EC2 instances are stopped.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">check</span><span class="w"> </span><span class="s2">"aws_instances_stopped"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_instances"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_state_names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"stopped"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="nv">data.aws_instances.example</span><span class="p">)</span><span class="w"> </span><span class="err">&gt;</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"Found Instances have stopped! Instance ID’s: %s"</span><span class="p">,</span><span class="w"> </span><span class="nv">data.aws_instances.example.ids</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

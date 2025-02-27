@@ -1,0 +1,329 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/azure-private-link-workspace-simplified --><head>
+                <title>Deploying pre-requisite resources and enabling Private Link connections - Simple deployment</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="deploying-pre-requisite-resources-and-enabling-private-link-connections-simple-deployment">Deploying pre-requisite resources and enabling Private Link connections - Simple deployment</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Refer to the <a href="https://registry.terraform.io/modules/databricks/examples/databricks/latest">Databricks Terraform Registry modules</a> for Terraform modules and examples to deploy Azure Databricks resources.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This guide assumes that connectivity from the on-premises user environment is already configured using ExpressRoute or a VPN gateway connection.</p>
+</aside>
+
+<p><a href="https://learn.microsoft.com/en-us/azure/private-link/private-link-overview">Azure Private Link</a> support enables private connectivity between users and their Databricks workspaces and between clusters on the data plane and core services on the control plane within the Databricks workspace infrastructure.</p>
+
+<p>You can use Terraform to deploy the underlying cloud resources and the private access settings resources automatically using a programmatic approach.</p>
+
+<p>This guide covers a <a href="https://learn.microsoft.com/en-us/azure/databricks/administration-guide/cloud-configurations/azure/private-link-simplified">simple deployment</a> to configure Azure Databricks with Private Link:</p>
+
+<ul>
+<li>No separate VNet separates user access from the VNet that you use for your compute resources in the Classic data plane</li>
+<li>A transit subnet in the data plane VNet is used for user access</li>
+<li>Only a single private endpoint is used for both front-end and back-end connectivity.</li>
+<li>A separate private endpoint is used for web authentication</li>
+<li>The same Databricks workspace is used for web authentication traffic. Databricks still strongly recommends creating a separate workspace called a private web auth workspace for each region to host the web auth private network settings.</li>
+</ul>
+
+<p><img alt="Azure Databricks with Private Link - Simple deployment" src="https://raw.githubusercontent.com/databricks/terraform-provider-databricks/main/docs/images/azure-private-link-simplified.png"/></p>
+
+<p>This guide uses the following variables:</p>
+
+<ul>
+<li><code>cidr</code>: The CIDR for the Azure Vnet</li>
+<li><code>rg_name</code>: The name of the existing resource group</li>
+<li><code>location</code>: The location for Azure resources</li>
+</ul>
+
+<p>This guide is provided as-is, and you can use it as the basis for your custom Terraform module.</p>
+
+<p>This guide takes you through the following high-level steps to set up a workspace with Azure Private Link:</p>
+
+<ul>
+<li>Initialize the required providers</li>
+<li>Configure Azure objects:
+<ul>
+<li>Deploy an Azure Vnet with the following subnets:</li>
+<li>Public and private subnets for Azure Databricks workspace</li>
+<li>Private Link subnet that will contain the following private endpoints:</li>
+<li>Frontend / Backend private endpoint</li>
+<li>Web_auth private endpoint</li>
+<li>Configure the private DNS zone to add:</li>
+<li>DNS A record to map connection for workspace access</li>
+<li>DNS A record(s) for web_auth</li>
+</ul></li>
+<li>Workspace Creation</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20initialization"></a><h2 id="provider-initialization">Provider initialization</h2>
+
+<p>Initialize provider</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">databricks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"databricks/databricks"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azurerm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azurerm"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&gt;=3.43.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Define the required variables</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"cidr"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"rg_name"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"location"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"azurerm_client_config"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"external"</span><span class="w"> </span><span class="nv">"me"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">program</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"az", "account", "show", "--query", "user"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"abd-pl"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Environment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Demo"</span><span class="w"></span>
+<span class="w">    </span><span class="na">Owner</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nf">lookup</span><span class="p">(</span><span class="nv">data.external.me.result</span><span class="p">,</span><span class="w"> </span><span class="s2">"name"</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configure%20network"></a><h2 id="configure-network">Configure network</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deploy%20Azure%20VNet%20and%20subnets"></a><h3 id="deploy-azure-vnet-and-subnets">Deploy Azure VNet and subnets</h3>
+
+<p>Create a new Azure VNet, the required subnets, and associated security groups:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_virtual_network"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-vnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">var.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.rg_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">address_space</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">var.cidr</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">local.tags</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_network_security_group"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-nsg"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">var.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.rg_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">local.tags</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_network_security_rule"</span><span class="w"> </span><span class="nv">"aad"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                        </span><span class="o">=</span><span class="w"> </span><span class="s2">"AllowAAD"</span><span class="w"></span>
+<span class="w">  </span><span class="na">priority</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="m">200</span><span class="w"></span>
+<span class="w">  </span><span class="na">direction</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Outbound"</span><span class="w"></span>
+<span class="w">  </span><span class="na">access</span><span class="w">                      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Tcp"</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_port_range</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"*"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_port_range</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"443"</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_address_prefix</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"VirtualNetwork"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_address_prefix</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"AzureActiveDirectory"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.rg_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_security_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_network_security_group.this.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_network_security_rule"</span><span class="w"> </span><span class="nv">"azfrontdoor"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                        </span><span class="o">=</span><span class="w"> </span><span class="s2">"AllowAzureFrontDoor"</span><span class="w"></span>
+<span class="w">  </span><span class="na">priority</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="m">201</span><span class="w"></span>
+<span class="w">  </span><span class="na">direction</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Outbound"</span><span class="w"></span>
+<span class="w">  </span><span class="na">access</span><span class="w">                      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Tcp"</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_port_range</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"*"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_port_range</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"443"</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_address_prefix</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"VirtualNetwork"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_address_prefix</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"AzureFrontDoor.Frontend"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.rg_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_security_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_network_security_group.this.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_subnet"</span><span class="w"> </span><span class="nv">"public"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-public"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">var.rg_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">virtual_network_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.this.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">address_prefixes</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">var.cidr</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">0</span><span class="p">)]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">delegation</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"databricks"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">service_delegation</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Databricks/workspaces"</span><span class="w"></span>
+<span class="w">      </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"Microsoft.Network/virtualNetworks/subnets/join/action"</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"Microsoft.Network/virtualNetworks/subnets/prepareNetworkPolicies/action"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"Microsoft.Network/virtualNetworks/subnets/unprepareNetworkPolicies/action"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_subnet_network_security_group_association"</span><span class="w"> </span><span class="nv">"public"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_subnet.public.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_security_group_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_network_security_group.this.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"private_subnet_endpoints"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_subnet"</span><span class="w"> </span><span class="nv">"private"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-private"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">var.rg_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">virtual_network_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.this.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">address_prefixes</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">var.cidr</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">1</span><span class="p">)]</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">private_endpoint_network_policies_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">delegation</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"databricks"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">service_delegation</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Databricks/workspaces"</span><span class="w"></span>
+<span class="w">      </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"Microsoft.Network/virtualNetworks/subnets/join/action"</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"Microsoft.Network/virtualNetworks/subnets/prepareNetworkPolicies/action"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"Microsoft.Network/virtualNetworks/subnets/unprepareNetworkPolicies/action"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">service_endpoints</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.private_subnet_endpoints</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_subnet_network_security_group_association"</span><span class="w"> </span><span class="nv">"private"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_subnet.private.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_security_group_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_network_security_group.this.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_subnet"</span><span class="w"> </span><span class="nv">"plsubnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                                      </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-privatelink"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="nv">var.rg_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">virtual_network_name</span><span class="w">                      </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.this.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">address_prefixes</span><span class="w">                          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">var.cidr</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">)]</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_endpoint_network_policies_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deploy%20Azure%20private%20endpoints"></a><h3 id="deploy-azure-private-endpoints">Deploy Azure private endpoints</h3>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Frontend%20/%20Backend%20private%20endpoint"></a><h4 id="frontend-backend-private-endpoint">Frontend / Backend private endpoint</h4>
+
+<p>Create a private endpoint with sub-resource <strong>databricks_ui_api</strong>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_private_endpoint"</span><span class="w"> </span><span class="nv">"uiapi"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"uiapipvtendpoint"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">var.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.rg_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_subnet.plsubnet.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">private_service_connection</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                           </span><span class="o">=</span><span class="w"> </span><span class="s2">"ple-${var.workspace_prefix}-uiapi"</span><span class="w"></span>
+<span class="w">    </span><span class="na">private_connection_resource_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_databricks_workspace.this.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">is_manual_connection</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="na">subresource_names</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"databricks_ui_api"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">private_dns_zone_group</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"private-dns-zone-uiapi"</span><span class="w"></span>
+<span class="w">    </span><span class="na">private_dns_zone_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">azurerm_private_dns_zone.dnsuiapi.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_private_dns_zone"</span><span class="w"> </span><span class="nv">"dnsuiapi"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"privatelink.azuredatabricks.net"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.rg_name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_private_dns_zone_virtual_network_link"</span><span class="w"> </span><span class="nv">"uiapidnszonevnetlink"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"uiapispokevnetconnection"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.rg_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_dns_zone_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_private_dns_zone.dnsuiapi.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">virtual_network_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.this.id</span><span class="c1"> // connect to spoke vnet</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Web%20auth%20private%20endpoint"></a><h4 id="web-auth-private-endpoint">Web auth private endpoint</h4>
+
+<p>Create a private endpoint with sub-resource <strong>browser_authentication</strong>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_private_endpoint"</span><span class="w"> </span><span class="nv">"auth"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"aadauthpvtendpoint"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">var.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.rg_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_subnet.plsubnet.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">private_service_connection</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                           </span><span class="o">=</span><span class="w"> </span><span class="s2">"ple-${var.workspace_prefix}-auth"</span><span class="w"></span>
+<span class="w">    </span><span class="na">private_connection_resource_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_databricks_workspace.this.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">is_manual_connection</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="na">subresource_names</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"browser_authentication"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">private_dns_zone_group</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"private-dns-zone-auth"</span><span class="w"></span>
+<span class="w">    </span><span class="na">private_dns_zone_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">azurerm_private_dns_zone.dnsuiapi.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configure%20workspace"></a><h2 id="configure-workspace">Configure workspace</h2>
+
+<p>Deploy an Azure Databricks workspace:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_databricks_workspace"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-workspace"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.rg_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">                              </span><span class="o">=</span><span class="w"> </span><span class="nv">var.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">sku</span><span class="w">                                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"premium"</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">                                  </span><span class="o">=</span><span class="w"> </span><span class="nv">local.tags</span><span class="w"></span>
+<span class="w">  </span><span class="na">public_network_access_enabled</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_security_group_rules_required</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"NoAzureDatabricksRules"</span><span class="w"></span>
+<span class="w">  </span><span class="na">customer_managed_key_enabled</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="nb">custom_parameters</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">no_public_ip</span><span class="w">                                         </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">virtual_network_id</span><span class="w">                                   </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.this.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">private_subnet_name</span><span class="w">                                  </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_subnet.private.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">public_subnet_name</span><span class="w">                                   </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_subnet.public.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">public_subnet_network_security_group_association_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_subnet_network_security_group_association.public.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">private_subnet_network_security_group_association_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_subnet_network_security_group_association.private.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w">                                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"dbfs"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">azurerm_subnet_network_security_group_association.public</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nv">azurerm_subnet_network_security_group_association.private</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The public network access to the workspace is disabled. You can access the workspace only through private connectivity to the on-premises user environment. For testing purposes, you can deploy an Azure VM in the same VNet to test the frontend connectivity.</p>
+</aside>
+
+            
+        
+    </body></html>

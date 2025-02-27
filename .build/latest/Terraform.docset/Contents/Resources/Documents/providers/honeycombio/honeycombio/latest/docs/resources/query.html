@@ -1,0 +1,99 @@
+<html><!-- Online page at https://registry.terraform.io/providers/honeycombio/honeycombio/latest/docs/resources/query --><head>
+                <title>honeycombio_query</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-honeycombio_query">Resource: honeycombio_query</h1>
+
+<p>Creates a Query scoped to a Dataset or Environment.</p>
+
+<p>Queries can be used by Triggers and Boards, or be executed via the <a href="https://docs.honeycomb.io/api/query-results/">Query Data API</a>.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Queries are immutable and can not be deleted -- only created or read. Any changes will result in a new query object being created.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"dataset"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"honeycombio_derived_column"</span><span class="w"> </span><span class="nv">"duration_ms_log10"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"duration_ms_log10"</span><span class="w"></span>
+<span class="w">  </span><span class="na">expression</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"LOG10($duration_ms)"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"LOG10 of duration_ms"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">dataset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.dataset</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"honeycombio_query_specification"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">calculation</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">op</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"P90"</span><span class="w"></span>
+<span class="w">    </span><span class="na">column</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"duration_ms"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">calculation</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">op</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"HEATMAP"</span><span class="w"></span>
+<span class="w">    </span><span class="na">column</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">$</span><span class="nv">honeycombio_derived_column.duration_ms_log10.alias</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">filter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">column</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"duration_ms"</span><span class="w"></span>
+<span class="w">    </span><span class="na">op</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"exists"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"honeycombio_query"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">dataset</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">var.dataset</span><span class="w"></span>
+<span class="w">  </span><span class="na">query_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.honeycombio_query_specification.example.json</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">replace_triggered_by</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="c1"></span>
+<span class="c1">      // re-create the query if the derived column is changed</span>
+<span class="c1">      // to ensure we're using the latest definition</span>
+<span class="w">      </span><span class="nv">honeycombio_derived_column.duration_ms_log10</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you are referencing a <a href="derived_column.md">Derived Column</a> in your query and want to ensure you are always using the latest definition of the derived column you should use the <a href="https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle#replace_triggered_by">replace_triggered_by</a> lifecycle argument as shown in the example above.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>dataset</code> - (Required) The dataset this query is scoped to.
+Use <code>__all__</code> for Environment-wide queries.</li>
+<li><code>query_json</code> - (Required) A JSON object describing the query according to the <a href="https://docs.honeycomb.io/api/query-specification/#fields-on-a-query-specification">Query Specification</a>.
+While the JSON can be constructed manually, using the <a href="../data-sources/query_specification.md"><code>honeycombio_query_specification</code></a> data source provides deeper validation.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - ID of the query. Useful for adding it to a board and/or creating a query annotation.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Querys can be imported using a combination of the dataset name and their ID, e.g.</p>
+
+<pre><code>$ terraform import honeycombio_query.my_query my-dataset/bj8BwOa1uRz
+</code></pre>
+
+            
+        
+    </body></html>

@@ -1,0 +1,91 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/salesforce/latest/docs --><head>
+                <title>Salesforce Provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="salesforce-provider">Salesforce Provider</h1>
+
+<p>The Salesforce provider provides resources to interact with a Salesforce organization.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"salesforce"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"ABCDEFG"</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/Users/mscott/priv.pem"</span><span class="w"></span>
+<span class="w">  </span><span class="na">api_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"53.0"</span><span class="w"></span>
+<span class="w">  </span><span class="na">username</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"user@example.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Setup"></a><h2 id="setup">Setup</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Authorization"></a><h3 id="authorization">Authorization</h3>
+
+<p>The provider performs actions on behalf of a user, the expectation is that the user has System Administrator level permissions. This is most easily accomplished by assigning the "System Administrator" premade profile to the user being used by Terraform. The profile chosen must also be assigned to the "connected app", which will be covered below.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Authentication"></a><h3 id="authentication">Authentication</h3>
+
+<p>A <a href="https://help.salesforce.com/s/articleView?id=sf.connected_app_overview.htm&amp;type=5">connected app</a> provides headless interaction with salesforce, it can perform authentication for the admin user account via OAuth. The following guide was adapted from this <a href="https://mannharleen.github.io/2020-03-03-salesforce-jwt/">blog post</a> and this <a href="https://github.com/heroku-examples/evergreen-function-circleci/blob/main/README.md">github guide</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Create%20a%20self-signed%20private%20key%20and%20x509%20certificate"></a><h4 id="create-a-self-signed-private-key-and-x509-certificate">Create a self-signed private key and x509 certificate</h4>
+
+<pre><code>$ openssl genrsa -out privatekey.pem 1024
+$ openssl req -new -x509 -key privatekey.pem -out publickey.cer -days 3650
+</code></pre>
+
+<p>You can enter filler data when prompted, this certificate is used exclusively for authentication of the provider and the Salesforce REST API and is not signed by a certificate authority.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Create%20a%20connected%20app"></a><h4 id="create-a-connected-app">Create a connected app</h4>
+
+<ol>
+<li>From the lightning experience UI, navigate to Setup &gt; App Manager &gt; New connected app</li>
+<li>Fill in required fields (name, email, etc)</li>
+<li>Enable OAuth settings</li>
+<li>Fill in a callback URL, this URL isn't needed but setting it to https://oauthdebugger.com/debug can be useful.</li>
+<li>Click use digital signatures</li>
+<li>Upload the publickey.cer file</li>
+<li>Add OAuth scopes: api refresh_token offline_access. This should be enough for the provider, more can be added as needed.</li>
+<li>Save</li>
+<li>Note down the Consumer Key, this corresponds to client_id in OAuth terms. You can also make note of the Consumer Secret, however it is not needed in the authentication process.</li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Manage%20connected%20app"></a><h4 id="manage-connected-app">Manage connected app</h4>
+
+<ol>
+<li>From the lightning experience UI, navigate to Setup &gt; App Manager &gt; click on the newly created connected app and click "manage" (not view/edit).</li>
+<li>Click Edit Policies</li>
+<li>Under OAuth Policies ensure "Permitted Users" is set to "Admin approved users are pre-authorized".</li>
+<li>Save</li>
+<li>Back at the manage page, under the Profiles section click "manage".</li>
+<li>Ensure that the "System Administrator" profile (or whichever profile is assigned to the user for terraform) is checked.</li>
+<li>Save</li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configure%20the%20provider"></a><h4 id="configure-the-provider">Configure the provider</h4>
+
+<p>The provider can be configured using the example provider block, or using the environment variables</p>
+
+<pre><code>SALESFORCE_CLIENT_ID
+SALESFORCE_PRIVATE_KEY
+SALESFORCE_API_VERSION
+SALESFORCE_USERNAME
+</code></pre>
+
+<!-- schema generated by tfplugindocs -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Schema"></a><h2 id="schema">Schema</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Optional"></a><h3 id="optional">Optional</h3>
+
+<ul>
+<li><strong>api_version</strong> (String) API version of the salesforce org in the format in the format: MAJOR.MINOR (please omit any leading 'v'). The provider requires at least version 53.0. Can be specified with the environment variable SALESFORCE_API_VERSION.</li>
+<li><strong>client_id</strong> (String) Client ID of the connected app. Corresponds to Consumer Key in the user interface. Can be specified with the environment variable SALESFORCE_CLIENT_ID.</li>
+<li><strong>login_url</strong> (String) Directs the authentication request, defaults to the production endpoint https://login.salesforce.com, should be set to https://test.salesforce.com for sandbox organizations. Can be specified with the environment variable SALESFORCE_LOGIN_URL.</li>
+<li><strong>private_key</strong> (String, Sensitive) Private Key associated to the public certificate that was uploaded to the connected app. This may point to a file location or be set directly. This should not be confused with the Consumer Secret in the user interface. Can be specified with the environment variable SALESFORCE_PRIVATE_KEY.</li>
+<li><strong>username</strong> (String) Salesforce Username of a System Administrator like user for the provider to authenticate as. Can be specified with the environment variable SALESFORCE_USERNAME.</li>
+</ul>
+
+            
+        
+    </body></html>

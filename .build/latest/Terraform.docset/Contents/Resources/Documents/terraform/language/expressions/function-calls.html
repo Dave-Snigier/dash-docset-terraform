@@ -1,0 +1,115 @@
+<html><!-- Online page at https://www.terraform.io/language/expressions/function-calls --><head>
+                <title>Function Calls</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="function-calls">Function Calls</h1>
+
+<blockquote>
+  <p><strong>Hands-on:</strong> Try the <a href="../../terraform/tutorials/configuration-language/functions?utm_source=WEBSITE&amp;utm_medium=WEB_IO&amp;utm_offer=ARTICLE_PAGE&amp;utm_content=DOCS.html">Perform Dynamic Operations with Functions</a> tutorial.</p>
+</blockquote>
+
+<p>The Terraform language has a number of
+<a href="../../terraform/language/functions.html">built-in functions</a> that can be used
+in expressions to transform and combine values. These
+are similar to the operators but all follow a common syntax:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">&lt;FUNCTION</span><span class="w"> </span><span class="err">NAME&gt;</span><span class="p">(</span><span class="err">&lt;ARGUMENT</span><span class="w"> </span><span class="m">1</span><span class="err">&gt;</span><span class="p">,</span><span class="w"> </span><span class="err">&lt;ARGUMENT</span><span class="w"> </span><span class="m">2</span><span class="err">&gt;</span><span class="p">)</span><span class="w"></span>
+</code></pre></div>
+
+<p>The function name specifies which function to call. Each defined function
+expects a specific number of arguments with specific value types, and returns a
+specific value type as a result.</p>
+
+<p>Some functions take an arbitrary number of arguments. For example, the <code>min</code>
+function takes any amount of number arguments and returns the one that is
+numerically smallest:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">min</span><span class="p">(</span><span class="m">55</span><span class="p">,</span><span class="w"> </span><span class="m">3453</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">)</span><span class="w"></span>
+</code></pre></div>
+
+<p>A function call expression evaluates to the function's return value.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Available%20Functions"></a><h2 id="available-functions">Available Functions</h2>
+
+<p>For a full list of available functions, see
+<a href="../../terraform/language/functions.html">the function reference</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Expanding%20Function%20Arguments"></a><h2 id="expanding-function-arguments">Expanding Function Arguments</h2>
+
+<p>If the arguments to pass to a function are available in a list or tuple value,
+that value can be <em>expanded</em> into separate arguments. Provide the list value as
+an argument and follow it with the <code>...</code> symbol:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">min</span><span class="p">([</span><span class="m">55</span><span class="p">,</span><span class="w"> </span><span class="m">2453</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">]...)</span><span class="w"></span>
+</code></pre></div>
+
+<p>The expansion symbol is three periods (<code>...</code>), not a Unicode ellipsis character
+(<code>…</code>). Expansion is a special syntax that is only available in function calls.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20Sensitive%20Data%20as%20Function%20Arguments"></a><h2 id="using-sensitive-data-as-function-arguments">Using Sensitive Data as Function Arguments</h2>
+
+<p>When using sensitive data, such as <a href="../../terraform/language/values/variables.html#suppressing-values-in-cli-output">an input variable</a>
+or <a href="../../terraform/language/values/outputs.html#sensitive-suppressing-values-in-cli-output">an output defined</a> as sensitive
+as function arguments, the result of the function call will be marked as sensitive.</p>
+
+<p>This is a conservative behavior that is true irrespective of the function being
+called. For example, passing an object containing a sensitive input variable to
+the <code>keys()</code> function will result in a list that is sensitive:</p>
+
+<div class="codehilite"><pre><span></span><code>&gt; local.baz
+<span class="o">{</span>
+  <span class="s2">"a"</span> <span class="o">=</span> <span class="o">(</span>sensitive value<span class="o">)</span>
+  <span class="s2">"b"</span> <span class="o">=</span> <span class="s2">"dog"</span>
+<span class="o">}</span>
+&gt; keys<span class="o">(</span>local.baz<span class="o">)</span>
+<span class="o">(</span>sensitive value<span class="o">)</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/When%20Terraform%20Calls%20Functions"></a><h2 id="when-terraform-calls-functions">When Terraform Calls Functions</h2>
+
+<p>Most of Terraform's built-in functions are, in programming language terms,
+<a href="https://en.wikipedia.org/wiki/Pure_function">pure functions</a>. This means that
+their result is based only on their arguments and so it doesn't make any
+practical difference when Terraform would call them.</p>
+
+<p>However, a small subset of functions interact with outside state and so for
+those it can be helpful to know when Terraform will call them in relation to
+other events that occur in a Terraform run.</p>
+
+<p>The small set of special functions includes
+<a href="../../terraform/language/functions/file.html"><code>file</code></a>,
+<a href="../../terraform/language/functions/templatefile.html"><code>templatefile</code></a>,
+<a href="../../terraform/language/functions/timestamp.html"><code>timestamp</code></a>,
+and <a href="../../terraform/language/functions/uuid.html"><code>uuid</code></a>.
+If you are not working with these functions then you don't need
+to read this section, although the information here may still be interesting
+background information.</p>
+
+<p>The <code>file</code> and <code>templatefile</code> functions are intended for reading files that
+are included as a static part of the configuration and so Terraform will
+execute these functions as part of initial configuration validation, before
+taking any other actions with the configuration. That means you cannot use
+either function to read files that your configuration might generate
+dynamically on disk as part of the plan or apply steps.</p>
+
+<p>The <code>timestamp</code> function returns a representation of the current system time
+at the point when Terraform calls it, and the <code>uuid</code> function returns a random
+result which differs on each call. Without any special behavior, these would
+both cause the final configuration during the apply step not to match the
+actions shown in the plan, which violates the Terraform execution model.</p>
+
+<p>For that reason, Terraform arranges for both of those functions to produce
+<a href="../../terraform/language/expressions/references.html#values-not-yet-known">unknown value</a> results during the
+plan step, with the real result being decided only during the apply step.
+For <code>timestamp</code> in particular, this means that the recorded time will be
+the instant when Terraform began applying the change, rather than when
+Terraform <em>planned</em> the change.</p>
+
+<p>For more details on the behavior of these functions, refer to their own
+documentation pages.</p>
+
+            
+        
+    </body></html>

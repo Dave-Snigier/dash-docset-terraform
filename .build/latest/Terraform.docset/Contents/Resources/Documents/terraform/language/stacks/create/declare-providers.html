@@ -1,0 +1,154 @@
+<html><!-- Online page at https://www.terraform.io/language/stacks/create/declare-providers --><head>
+                <title>Declare providers</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="declare-providers">Declare providers</h1>
+
+<p>Terraform relies on plugins called providers to interact with cloud providers, SaaS providers, and other APIs.</p>
+
+<p>Like traditional Terraform configurations, Terraform Stack configurations declare which providers they require at the top level so that Terraform can install and use them. </p>
+
+<p>Providers in Stack configurations differ from normal Terraform configurations in the following ways:</p>
+
+<ul>
+<li>Modules sourced by <code>component</code> blocks cannot declare their own providers. Instead, each <code>component</code> block accepts a top-level map of providers.  </li>
+<li>You must pass attributes to providers using a <code>config</code> block.  </li>
+<li>You define provider alias names in the header of its block.  </li>
+<li>Providers in Stack configurations support the <a href="../../../terraform/language/meta-arguments/for_each.html"><code>for_each</code></a> meta argument.</li>
+</ul>
+
+<p>After defining your providers, you must use the Terraform Stacks CLI to install the providers and create a provider lock file before you can use deploy your Stack.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Use%20a%20provider%20in%20a%20Stack"></a><h2 id="use-a-provider-in-a-stack">Use a provider in a Stack</h2>
+
+<p>Define your Stack’s <code>provider</code> blocks in a top-level <code>.tfstack.hcl</code> file. The following example file named <code>providers.tfstack.hcl</code> defines an AWS provider.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># providers.tfstack.hcl</span>
+
+<span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">        </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 5.7.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Setting "this" as the alias name</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nc">"aws"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+
+<span class="w">        </span><span class="nb">assume_role_with_web_identity</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="na">role_arn</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">var.role_arn</span><span class="w"></span>
+<span class="w">            </span><span class="na">web_identity_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.identity_token</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nb">default_tags</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.default_tags</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When you define a provider, you must also add that provider to a <code>required_providers</code> to ensure the Terraform Stacks CLI knows which provider version to download. For more details on Stack-specific provider syntax, refer to the <a href="../../../terraform/language/stacks/reference/tfstack.html">Stack configuration file reference</a>. </p>
+
+<p>You must authenticate that provider to ensure the provider can create your infrastructure. Refer to <a href="../../../terraform/language/stacks/deploy/authenticate.html">Authenticate a Stack</a> for details and examples. </p>
+
+<p>After you define your providers, you can pass them to your Stack’s <code>component</code> blocks. A <code>component</code> block accepts a mapping of provider names to the provider(s) on which your component’s module relies.</p>
+
+<p>After defining your Stack’s providers, pass each <code>component</code> block the provider(s) it requires. </p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># components.tfstack.hcl</span>
+
+<span class="err">component</span><span class="w"> </span><span class="s2">"s3"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./s3"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws_region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.aws_region</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">providers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">provider.aws.this</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After configuring your provider, you can use the Terraform Stacks CLI to <a href="../../../terraform/language/stacks/reference/tfstacks-cli.html#tfstack-providers-lock-command">generate a provider lock file</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Dynamic%20provider%20configurations"></a><h3 id="dynamic-provider-configurations">Dynamic provider configurations</h3>
+
+<p>Unlike traditional Terraform providers, Stack providers also support the <code>for_each</code> meta-argument. The <code>for_each</code> meta-argument lets you dynamically create provider configurations based on your inputs, which is beneficial for multi-region deployments. </p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># providers.tfstack.hcl</span>
+
+<span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">        </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 5.7.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+
+<span class="kr">provider</span><span class="w"> </span><span class="nc">"aws"</span><span class="w"> </span><span class="nv">"configurations"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1"># This provider configuration iterates through and creates a configuration</span>
+<span class="c1"># for each region.</span>
+<span class="w">    </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.regions</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+
+<span class="w">        </span><span class="nb">assume_role_with_web_identity</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="na">role_arn</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">var.role_arn</span><span class="w"></span>
+<span class="w">            </span><span class="na">web_identity_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.identity_token</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>This example lets your Stack’s deployments use a separate AWS provider configuration for each region you defined in a <code>regions</code> variable. </p>
+
+<p>In your component configuration, you could the <code>for_each</code> block to define configuration in with multiple AWS providers.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># components.tfstack.hcl</span>
+
+<span class="err">component</span><span class="w"> </span><span class="s2">"s3"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.regions</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./s3"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">providers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">provider.aws.configurations[each.value</span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="na">random</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">provider.random.this</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The components in this example use the <code>for_each</code> meta-argument to deploy their Terraform module in the region for the current deployment.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20support%20for%20Stack%20features"></a><h3 id="provider-support-for-stack-features">Provider support for Stack features</h3>
+
+<p>For most providers, the version you use does not affect your Stack’s functionality. However, only certain providers and versions support <a href="../../../terraform/cloud-docs/stacks/deploy/plans.html#deferred-changes">deferred changes</a>. For example, you must use version 2.32.0 or higher of the Kubernetes provider to take advantage of deferred changes. </p>
+
+<p>Check your provider in the <a href="https://registry.terraform.io/">Terraform registry</a> for more information on versions that support various Stack features. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20lock%20file"></a><h2 id="provider-lock-file">Provider lock file</h2>
+
+<p>A Stack cannot run without a lock file for its providers. After defining your providers, use the Terraform Stacks CLI to generate a <code>.terraform.lock.hcl</code> lock file. The <code>tfstacks providers lock</code> command creates and updates your <code>.terraform.lock.hcl</code> file.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">$ </span>tfstacks providers lock
+</code></pre></div>
+
+<p>The <code>tfstacks providers lock</code> command uses the <code>required_providers</code> block from your configuration to download the listed providers and compute the provider lock hashes. The <code>tfstacks providers lock</code> command only checks the <code>required_providers</code> block, so you must list all of the providers you use in that block to ensure that the <code>tfstacks</code> CLI can find them. </p>
+
+<p>If you update your Stack’s providers, you must rerun the <code>tfstacks providers lock</code> command to update your Stack’s providers lock file. For more details, refer to <a href="../../../terraform/language/stacks/reference/tfstacks-cli.html">Terraform Stacks CLI</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Next%20steps"></a><h2 id="next-steps">Next steps</h2>
+
+<p>After declaring your providers, you can either finish <a href="../../../terraform/language/stacks/create/config.html">defining the rest of your Stack configuration</a> or move on to <a href="../../../terraform/language/stacks/deploy/config.html">define your Stack’s deployment configuration</a>.</p>
+
+            
+        
+    </body></html>

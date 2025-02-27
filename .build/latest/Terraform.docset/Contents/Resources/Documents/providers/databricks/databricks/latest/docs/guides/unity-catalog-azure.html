@@ -1,0 +1,344 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/unity-catalog-azure --><head>
+                <title>Deploying pre-requisite resources and enabling Unity Catalog</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="deploying-pre-requisite-resources-and-enabling-unity-catalog">Deploying pre-requisite resources and enabling Unity Catalog</h1>
+
+<p><strong>Note</strong>
+If your workspace was enabled for Unity Catalog automatically, this guide does not apply to you. See <a href="unity-catalog-default.md">this guide</a> instead.</p>
+
+<p><strong>Note</strong>
+Except for metastore, metastore assignment and storage credential objects, Unity Catalog APIs are accessible via <strong>workspace-level APIs</strong>. This design may change in the future.</p>
+
+<p>Databricks Unity Catalog brings fine-grained governance and security to Lakehouse data using a familiar, open interface. You can use Terraform to deploy the underlying cloud resources and Unity Catalog objects automatically, using a programmatic approach.</p>
+
+<p>This guide creates a metastore without a storage root location or credential to maintain strict separation of storage across catalogs or environments.</p>
+
+<p>This guide uses the following variables in configurations:</p>
+
+<ul>
+<li><code>databricks_resource_id</code>: The Azure resource ID for the Databricks workspace where Unity Catalog will be deployed. It should be of the format <code>/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/group1/providers/Microsoft.Databricks/workspaces/workspace1</code>. To find the resource ID, navigate to your Databricks workspace in the Azure portal, select the JSON View link on the Overview page.</li>
+</ul>
+
+<p>This guide is provided as-is and you can use this guide as the basis for your custom Terraform module.</p>
+
+<p>To get started with Unity Catalog, this guide takes you through the following high-level steps:</p>
+
+<ul>
+<li><a href="#deploying-pre-requisite-resources-and-enabling-unity-catalog">Deploying pre-requisite resources and enabling Unity Catalog</a>
+<ul>
+<li><a href="#provider-initialization">Provider initialization</a></li>
+<li><a href="#create-a-unity-catalog-metastore-and-link-it-to-workspaces">Create a Unity Catalog metastore and link it to workspaces</a></li>
+<li><a href="#configure-external-locations-and-credentials">Configure external locations and credentials</a></li>
+<li><a href="#create-unity-catalog-objects-in-the-metastore">Create Unity Catalog objects in the metastore</a></li>
+<li><a href="#configure-unity-catalog-clusters">Configure Unity Catalog clusters</a></li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20initialization"></a><h2 id="provider-initialization">Provider initialization</h2>
+
+<p>Initialize the 3 providers to set up the required resources. See <a href="../index.md#authenticating-with-databricks-managed-service-principal">Databricks provider authentication</a>, <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs#authenticating-to-azure-active-directory">Azure AD provider authentication</a> and <a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs#authenticating-to-azure">Azure provider authentication</a> for more details.</p>
+
+<p>Define the required variables, and calculate the local values</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_resource_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The Azure resource ID for the databricks workspace deployment."</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_regex</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"(?i)subscriptions/(.+)/resourceGroups/(.+)/providers/Microsoft.Databricks/workspaces/(.+)"</span><span class="w"></span>
+<span class="w">  </span><span class="na">subscription_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nf">regex</span><span class="p">(</span><span class="nv">local.resource_regex</span><span class="p">,</span><span class="w"> </span><span class="nv">var.databricks_resource_id</span><span class="p">)[</span><span class="m">0</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nf">regex</span><span class="p">(</span><span class="nv">local.resource_regex</span><span class="p">,</span><span class="w"> </span><span class="nv">var.databricks_resource_id</span><span class="p">)[</span><span class="m">1</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">databricks_workspace_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">regex</span><span class="p">(</span><span class="nv">local.resource_regex</span><span class="p">,</span><span class="w"> </span><span class="nv">var.databricks_resource_id</span><span class="p">)[</span><span class="m">2</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">tenant_id</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_client_config.current.tenant_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">databricks_workspace_host</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_databricks_workspace.this.workspace_url</span><span class="w"></span>
+<span class="w">  </span><span class="na">databricks_workspace_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_databricks_workspace.this.workspace_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">prefix</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="nf">replace</span><span class="p">(</span><span class="nf">replace</span><span class="p">(</span><span class="nf">lower</span><span class="p">(</span><span class="nv">data.azurerm_resource_group.this.name</span><span class="p">),</span><span class="w"> </span><span class="s2">"rg", ""), "-", ""</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"azurerm_resource_group"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.resource_group</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"azurerm_client_config"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"azurerm_databricks_workspace"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">local.databricks_workspace_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.resource_group</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azurerm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azurerm"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">databricks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"databricks/databricks"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">subscription_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.subscription_id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.databricks_workspace_host</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"accounts"</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://accounts.azuredatabricks.net"</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Create%20a%20Unity%20Catalog%20metastore%20and%20link%20it%20to%20workspaces"></a><h2 id="create-a-unity-catalog-metastore-and-link-it-to-workspaces">Create a Unity Catalog metastore and link it to workspaces</h2>
+
+<p>A <a href="../resources/metastore.md">databricks_metastore</a> is the top level container for data in Unity Catalog. You can only create a single metastore for each region in which your organization operates, and attach workspaces to the metastore. Each workspace will have the same view of the data you manage in Unity Catalog.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_metastore"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.accounts</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"primary"</span><span class="w"></span>
+<span class="w">  </span><span class="na">force_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_resource_group.this.location</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_metastore_assignment"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.accounts</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">local.databricks_workspace_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">metastore_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_metastore.this.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configure%20external%20locations%20and%20credentials"></a><h2 id="configure-external-locations-and-credentials">Configure external locations and credentials</h2>
+
+<p>Unity Catalog introduces two new objects to access and work with external cloud storage:</p>
+
+<ul>
+<li><a href="../resources/storage_credential.md">databricks_storage_credential</a> represent authentication methods to access cloud storage (e.g. an IAM role for Amazon S3 or a managed identity for Azure Storage). Storage credentials are access-controlled to determine which users can use the credential.</li>
+<li><a href="../resources/external_location.md">databricks_external_location</a> are objects that combine a cloud storage path with a Storage Credential that can be used to access the location.</li>
+</ul>
+
+<p>First, create the required objects in Azure.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_databricks_access_connector"</span><span class="w"> </span><span class="nv">"ext_access_connector"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"ext-databricks-mi"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_resource_group.this.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_resource_group.this.location</span><span class="w"></span>
+<span class="w">  </span><span class="nb">identity</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SystemAssigned"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_storage_account"</span><span class="w"> </span><span class="nv">"ext_storage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}extstorage"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_resource_group.this.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_resource_group.this.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_resource_group.this.tags</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_tier</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"Standard"</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_replication_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"GRS"</span><span class="w"></span>
+<span class="w">  </span><span class="na">is_hns_enabled</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_storage_container"</span><span class="w"> </span><span class="nv">"ext_storage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-ext"</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_account_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_storage_account.ext_storage.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">container_access_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"private"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_role_assignment"</span><span class="w"> </span><span class="nv">"ext_storage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_storage_account.ext_storage.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_definition_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Storage Blob Data Contributor"</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_databricks_access_connector.ext_access_connector.identity[0].principal_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_role_assignment"</span><span class="w"> </span><span class="nv">"ext_storage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_storage_account.ext_storage.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_definition_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Storage Queue Data Contributor"</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_databricks_access_connector.ext_access_connector.identity[0].principal_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Then create the <a href="../resources/storage_credential.md">databricks_storage_credential</a> and <a href="../resources/external_location.md">databricks_external_location</a> in Unity Catalog.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_storage_credential"</span><span class="w"> </span><span class="nv">"external"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_databricks_access_connector.ext_access_connector.name</span><span class="w"></span>
+<span class="w">  </span><span class="nb">azure_managed_identity</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">access_connector_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_databricks_access_connector.ext_access_connector.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">comment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Managed by TF"</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">databricks_metastore_assignment.this</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_grants"</span><span class="w"> </span><span class="nv">"external_creds"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_credential</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_storage_credential.external.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">grant</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">principal</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"Data Engineers"</span><span class="w"></span>
+<span class="w">    </span><span class="na">privileges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"CREATE_EXTERNAL_TABLE"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_external_location"</span><span class="w"> </span><span class="nv">"some"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"external"</span><span class="w"></span>
+<span class="w">  </span><span class="na">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"abfss://%s@%s.dfs.core.windows.net"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nv">azurerm_storage_container.ext_storage.name</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nv">azurerm_storage_account.ext_storage.name</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">credential_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_storage_credential.external.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">comment</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"Managed by TF"</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">databricks_metastore_assignment.this</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_grants"</span><span class="w"> </span><span class="nv">"some"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">external_location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_external_location.some.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">grant</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">principal</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"Data Engineers"</span><span class="w"></span>
+<span class="w">    </span><span class="na">privileges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"CREATE_EXTERNAL_TABLE", "READ_FILES"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Create%20Unity%20Catalog%20objects%20in%20the%20metastore"></a><h2 id="create-unity-catalog-objects-in-the-metastore">Create Unity Catalog objects in the metastore</h2>
+
+<p>Each metastore exposes a 3-level namespace (catalog-schema-table) by which data can be organized.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_catalog"</span><span class="w"> </span><span class="nv">"sandbox"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sandbox"</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_root</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"abfss://%s@%s.dfs.core.windows.net"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nv">azurerm_storage_container.ext_storage.name</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nv">azurerm_storage_account.ext_storage.name</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">comment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"this catalog is managed by terraform"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">properties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">purpose</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"testing"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">databricks_metastore_assignment.default_metastore</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_grants"</span><span class="w"> </span><span class="nv">"sandbox"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">catalog</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_catalog.sandbox.name</span><span class="w"></span>
+<span class="w">  </span><span class="nb">grant</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">principal</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"Data Scientists"</span><span class="w"></span>
+<span class="w">    </span><span class="na">privileges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"USE_CATALOG", "CREATE"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">grant</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">principal</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"Data Engineers"</span><span class="w"></span>
+<span class="w">    </span><span class="na">privileges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"USE_CATALOG"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_schema"</span><span class="w"> </span><span class="nv">"things"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">catalog_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_catalog.sandbox.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"things"</span><span class="w"></span>
+<span class="w">  </span><span class="na">comment</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"this database is managed by terraform"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">properties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">kind</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"various"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_grants"</span><span class="w"> </span><span class="nv">"things"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">schema</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_schema.things.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">grant</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">principal</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"Data Engineers"</span><span class="w"></span>
+<span class="w">    </span><span class="na">privileges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"USE_SCHEMA"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configure%20Unity%20Catalog%20clusters"></a><h2 id="configure-unity-catalog-clusters">Configure Unity Catalog clusters</h2>
+
+<p>To ensure the integrity of ACLs, Unity Catalog data can be accessed only through compute resources configured with strong isolation guarantees and other security features. A Unity Catalog <a href="../resources/cluster.md">databricks_cluster</a> has the access mode set to either <strong>Shared</strong> or <strong>Single User</strong>.</p>
+
+<ul>
+<li><strong>Shared</strong> clusters can be shared by multiple users, but has certain <a href="https://docs.databricks.com/en/compute/access-mode-limitations.html#shared-access-mode-limitations-on-unity-catalog">limitations</a></li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_spark_version"</span><span class="w"> </span><span class="nv">"latest"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.workspace</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_node_type"</span><span class="w"> </span><span class="nv">"smallest"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.workspace</span><span class="w"></span>
+<span class="w">  </span><span class="na">local_disk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_cluster"</span><span class="w"> </span><span class="nv">"unity_shared"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.workspace</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"Shared clusters"</span><span class="w"></span>
+<span class="w">  </span><span class="na">spark_version</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_spark_version.latest.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_type_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_node_type.smallest.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">autotermination_minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">60</span><span class="w"></span>
+<span class="w">  </span><span class="na">num_workers</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">  </span><span class="nb">azure_attributes</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">availability</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SPOT"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">data_security_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"USER_ISOLATION"</span><span class="c1"></span>
+<span class="c1">  # need to wait until the metastore is assigned</span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">databricks_metastore_assignment.this</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<ul>
+<li>To use those advanced cluster features or languages like Machine Learning Runtime and R with Unity Catalog, one must choose <strong>Single User</strong> mode when launching the cluster. The cluster can only be used exclusively by a single user (by default the owner of the cluster); other users are not allowed to attach to the cluster.
+The below example will create a collection of single-user <a href="../resources/cluster.md">databricks_cluster</a> for each user in a group managed through SCIM provisioning. Individual user will be able to restart their cluster, but not anyone else. Terraform's <code>for_each</code> meta-attribute will help us achieve this.</li>
+</ul>
+
+<p>First we use <a href="../data-sources/group.md">databricks_group</a> and <a href="../data-sources/user.md">databricks_user</a> data resources to get the list of user names that belong to a group.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"dev"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.workspace</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"dev-clusters"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_user"</span><span class="w"> </span><span class="nv">"dev"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.workspace</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_group.dev.members</span><span class="w"></span>
+<span class="w">  </span><span class="na">user_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">each.key</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Once we have a specific list of user resources, we could proceed creating single-user clusters and provide permissions with <code>for_each = data.databricks_user.dev</code> to ensure it's done for each user:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_cluster"</span><span class="w"> </span><span class="nv">"dev"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_user.dev</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.workspace</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"${each.value.display_name} unity cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">spark_version</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_spark_version.latest.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_type_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_node_type.smallest.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">autotermination_minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="na">num_workers</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">  </span><span class="nb">azure_attributes</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">availability</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SPOT_WITH_FALLBACK_AZURE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">data_security_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SINGLE_USER"</span><span class="w"></span>
+<span class="w">  </span><span class="na">single_user_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value.user_name</span><span class="c1"></span>
+<span class="c1">  # need to wait until the metastore is assigned</span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">databricks_metastore_assignment.this</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"dev_restart"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_user.dev</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.workspace</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_cluster.dev[each.key].cluster_id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">user_name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value.user_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_RESTART"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

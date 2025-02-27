@@ -1,0 +1,88 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/dns_keys --><head>
+                <title>google_dns_keys</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="google_dns_keys">google_dns_keys</h1>
+
+<p>Get the DNSKEY and DS records of DNSSEC-signed managed zones.</p>
+
+<p>For more information see the
+<a href="https://cloud.google.com/dns/docs/dnskeys/">official documentation</a>
+and <a href="https://cloud.google.com/dns/docs/reference/v1/dnsKeys">API</a>.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>A google_dns_managed_zone resource must have DNSSEC enabled in order to contain any DNSKEYs. Queries to managed zones without this setting enabled will result in a 404 error as the collection of DNSKEYs does not exist in the DNS API.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_dns_managed_zone"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"foobar"</span><span class="w"></span>
+<span class="w">  </span><span class="na">dns_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"foo.bar."</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">dnssec_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">state</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"on"</span><span class="w"></span>
+<span class="w">    </span><span class="na">non_existence</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"nsec3"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"google_dns_keys"</span><span class="w"> </span><span class="nv">"foo_dns_keys"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">managed_zone</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_dns_managed_zone.foo.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"foo_dns_ds_record"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"DS record of the foo subdomain."</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">data.google_dns_keys.foo_dns_keys.key_signing_keys[0].ds_record</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>managed_zone</code> - (Required) The name or id of the Cloud DNS managed zone.</p></li>
+<li><p><code>project</code> - (Optional) The ID of the project in which the resource belongs. If <code>project</code> is not provided, the provider project is used.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>The following attributes are exported:</p>
+
+<ul>
+<li><p><code>key_signing_keys</code> - A list of Key-signing key (KSK) records. Structure is <a href="#nested_key_signing_keys">documented below</a>. Additionally, the DS record is provided:</p>
+
+<ul>
+<li><code>ds_record</code> - The DS record based on the KSK record. This is used when <a href="https://cloud.google.com/dns/docs/dnssec-advanced#subdelegation">delegating</a> DNSSEC-signed subdomains.</li>
+</ul></li>
+<li><p><code>zone_signing_keys</code> - A list of Zone-signing key (ZSK) records. Structure is documented below.</p></li>
+</ul>
+
+<hr/>
+
+<p><a name="nested_key_signing_keys"></a>The <code>key_signing_keys</code> and <code>zone_signing_keys</code> block supports:</p>
+
+<ul>
+<li><p><code>algorithm</code> - String mnemonic specifying the DNSSEC algorithm of this key. Immutable after creation time. Possible values are <code>ecdsap256sha256</code>, <code>ecdsap384sha384</code>, <code>rsasha1</code>, <code>rsasha256</code>, and <code>rsasha512</code>.</p></li>
+<li><p><code>creation_time</code> - The time that this resource was created in the control plane. This is in RFC3339 text format.</p></li>
+<li><p><code>description</code> - A mutable string of at most 1024 characters associated with this resource for the user's convenience.</p></li>
+<li><p><code>digests</code> - A list of cryptographic hashes of the DNSKEY resource record associated with this DnsKey. These digests are needed to construct a DS record that points at this DNS key. Each contains:</p>
+
+<ul>
+<li><code>digest</code> - The base-16 encoded bytes of this digest. Suitable for use in a DS resource record.</li>
+<li><code>type</code> - Specifies the algorithm used to calculate this digest. Possible values are <code>sha1</code>, <code>sha256</code> and <code>sha384</code></li>
+</ul></li>
+<li><p><code>id</code> - Unique identifier for the resource; defined by the server.</p></li>
+<li><p><code>is_active</code> - Active keys will be used to sign subsequent changes to the ManagedZone. Inactive keys will still be present as DNSKEY Resource Records for the use of resolvers validating existing signatures.</p></li>
+<li><p><code>key_length</code> - Length of the key in bits. Specified at creation time then immutable.</p></li>
+<li><p><code>key_tag</code> - The key tag is a non-cryptographic hash of the a DNSKEY resource record associated with this DnsKey. The key tag can be used to identify a DNSKEY more quickly (but it is not a unique identifier). In particular, the key tag is used in a parent zone's DS record to point at the DNSKEY in this child ManagedZone. The key tag is a number in the range [0, 65535] and the algorithm to calculate it is specified in RFC4034 Appendix B.</p></li>
+<li><p><code>public_key</code> - Base64 encoded public half of this key.</p></li>
+</ul>
+
+            
+        
+    </body></html>

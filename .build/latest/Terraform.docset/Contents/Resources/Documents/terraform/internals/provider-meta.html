@@ -1,0 +1,81 @@
+<html><!-- Online page at https://www.terraform.io/internals/provider-meta --><head>
+                <title>Collect Provider Metadata</title>
+                <meta charset="utf-8"/>
+                <link href="../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="collect-provider-metadata">Collect Provider Metadata</h1>
+
+<p>This topic describes how to create an inferface in the providers you develop that allows you to collect metadata that is unrelated to the resources in the module, such as usage statistics. This is an advanced topic and is not required to use Terraform. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Introduction"></a><h2 id="introduction">Introduction</h2>
+
+<p>In some situations it is beneficial for a provider to offer an interface
+through which modules can pass it information unrelated to the resources
+in the module, but scoped on a per-module basis.</p>
+
+<p>Provider metadata allows a provider to declare metadata fields it expects,
+which individual modules can then populate independently of any provider
+configuration. While provider configurations are often shared between modules,
+provider metadata is always module-specific.</p>
+
+<p>Provider metadata is intended primarily for the situation where an official
+module is developed by the same vendor that produced the provider it is
+intended to work with, to allow the vendor to indirectly obtain usage
+statistics for each module via the provider. For that reason, this
+documentation is presented from the perspective of the provider developer
+rather than the module developer.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Experimental Feature</em>
+    <p>This functionality is experimental. You should <a href="https://github.com/hashicorp/terraform/issues/new">coordinate with the Terraform team</a> so that they can understand how you are using this functionality. Doing so ensures that your use cases are taken into account as the feature evolves.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Defining%20the%20Schema"></a><h2 id="defining-the-schema">Defining the Schema</h2>
+
+<p>Before a provider can receive information from a module, the provider
+must strictly define the data it can accept. You can do this by setting
+the <code>ProviderMeta</code> property on your <code>schema.Provider</code> struct. Its value
+functions similarly to the provider config: a map of strings to the
+<code>schema.Schema</code> describing the values those strings accept.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20the%20Data"></a><h2 id="using-the-data">Using the Data</h2>
+
+<p>When Terraform calls your provider, you can use the <code>schema.ResourceData</code>
+that your <code>Create</code>, <code>Read</code>, and <code>Update</code> functions already use to get
+access to the provider metadata being passed. First define a struct
+that matches your schema, then call the <code>GetProviderSchema</code> method on
+your <code>schema.ResourceData</code>, passing a pointer to a variable of that type.
+The variable will be populated with the provider metadata, and will return
+an error if there was an issue with parsing the data into the struct.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Specifying%20Data%20in%20Modules"></a><h2 id="specifying-data-in-modules">Specifying Data in Modules</h2>
+
+<p>To include data in your modules, create a <code>provider_meta</code> nested block under
+your module's <code>terraform</code> block, with the name of the provider it's trying
+to pass information to:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="err">provider_meta</span><span class="w"> </span><span class="s2">"my-provider"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">hello</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"world"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The <code>provider_meta</code> block must match the schema the provider has defined.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Versioning%20Your%20Modules"></a><h2 id="versioning-your-modules">Versioning Your Modules</h2>
+
+<p>Any module taking advantage of this functionality must make sure that the
+provider metadata supplied matches the schema defined in the provider, and
+that the version of Terraform that is being run has support for the provider
+metadata functionality. It's therefore recommended that any module taking
+advantage of this functionality should specify a minimum Terraform version of
+0.13.0 or higher, and a minimum version of each of the providers it specifies
+metadata as the first version the schema being used was supported by the
+provider.</p>
+
+            
+        
+    </body></html>

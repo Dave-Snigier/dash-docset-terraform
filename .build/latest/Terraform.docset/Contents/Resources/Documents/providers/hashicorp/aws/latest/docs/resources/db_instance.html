@@ -1,0 +1,585 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_instance --><head>
+                <title>aws_db_instance</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_db_instance">Resource: aws_db_instance</h1>
+
+<p>Provides an RDS instance resource.  A DB instance is an isolated database
+environment in the cloud.  A DB instance can contain multiple user-created
+databases.</p>
+
+<p>Changes to a DB instance can occur when you manually change a parameter, such as
+<code>allocated_storage</code>, and are reflected in the next maintenance window. Because
+of this, Terraform may report a difference in its planning phase because a
+modification has not yet taken place. You can use the <code>apply_immediately</code> flag
+to instruct the service to apply the change immediately (see documentation
+below).</p>
+
+<p>When upgrading the major version of an engine, <code>allow_major_version_upgrade</code> must be set to <code>true</code>.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>using <code>apply_immediately</code> can result in a brief downtime as the server reboots. See the AWS Docs on [RDS Instance Maintenance][instance-maintenance] for more information.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>All arguments including the username and password will be stored in the raw state as plain-text. <a href="https://www.terraform.io/docs/state/sensitive-data.html">Read more about sensitive data instate</a>.</p>
+</aside>
+
+<blockquote>
+  <p><strong>Hands-on:</strong> Try the <a href="https://learn.hashicorp.com/tutorials/terraform/aws-rds">Manage AWS RDS Instances</a> tutorial on HashiCorp Learn.</p>
+</blockquote>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/RDS%20Instance%20Class%20Types"></a><h2 id="rds-instance-class-types">RDS Instance Class Types</h2>
+
+<p>Amazon RDS supports instance classes for the following use cases: General-purpose, Memory-optimized, Burstable Performance, and Optimized-reads.
+For more information please read the AWS RDS documentation about <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.DBInstanceClass.html">DB Instance Class Types</a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Low-Downtime%20Updates"></a><h2 id="low-downtime-updates">Low-Downtime Updates</h2>
+
+<p>By default, RDS applies updates to DB Instances in-place, which can lead to service interruptions.
+Low-downtime updates minimize service interruptions by performing the updates with an <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/blue-green-deployments.html">RDS Blue/Green deployment</a> and switching over the instances when complete.</p>
+
+<p>Low-downtime updates are only available for DB Instances using MySQL, MariaDB and PostgreSQL,
+as other engines are not supported by RDS Blue/Green deployments.
+They cannot be used with DB Instances with replicas.</p>
+
+<p>Backups must be enabled to use low-downtime updates.</p>
+
+<p>Enable low-downtime updates by setting <code>blue_green_update.enabled</code> to <code>true</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Basic%20Usage"></a><h3 id="basic-usage">Basic Usage</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_db_instance"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">allocated_storage</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="na">db_name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"mydb"</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"mysql"</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine_version</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"8.0"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_class</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"db.t3.micro"</span><span class="w"></span>
+<span class="w">  </span><span class="na">username</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"foo"</span><span class="w"></span>
+<span class="w">  </span><span class="na">password</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"foobarbaz"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parameter_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"default.mysql8.0"</span><span class="w"></span>
+<span class="w">  </span><span class="na">skip_final_snapshot</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/RDS%20Custom%20for%20Oracle%20Usage%20with%20Replica"></a><h3 id="rds-custom-for-oracle-usage-with-replica">RDS Custom for Oracle Usage with Replica</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Lookup the available instance classes for the custom engine for the region being operated in</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_rds_orderable_db_instance"</span><span class="w"> </span><span class="nv">"custom-oracle"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="s2">"custom-oracle-ee"</span><span class="c1"> # CEV engine to be used</span>
+<span class="w">  </span><span class="na">engine_version</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"19.c.ee.002"</span><span class="c1">      # CEV engine version to be used</span>
+<span class="w">  </span><span class="na">license_model</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"bring-your-own-license"</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_type</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"gp3"</span><span class="w"></span>
+<span class="w">  </span><span class="na">preferred_instance_classes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"db.r5.xlarge", "db.r5.2xlarge", "db.r5.4xlarge"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># The RDS instance resource requires an ARN. Look up the ARN of the KMS key associated with the CEV.</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_kms_key"</span><span class="w"> </span><span class="nv">"by_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">key_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-ef278353ceba4a5a97de6784565b9f78"</span><span class="c1"> # KMS key associated with the CEV</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_db_instance"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">allocated_storage</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="m">50</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_minor_version_upgrade</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="c1">                         # Custom for Oracle does not support minor version upgrades</span>
+<span class="w">  </span><span class="na">custom_iam_instance_profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWSRDSCustomInstanceProfile"</span><span class="c1"> # Instance profile is required for Custom for Oracle. See: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/custom-setup-orcl.html#custom-setup-orcl.iam-vpc</span>
+<span class="w">  </span><span class="na">backup_retention_period</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">7</span><span class="w"></span>
+<span class="w">  </span><span class="na">db_subnet_group_name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">local.db_subnet_group_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine</span><span class="w">                      </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_rds_orderable_db_instance.custom-oracle.engine</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine_version</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_rds_orderable_db_instance.custom-oracle.engine_version</span><span class="w"></span>
+<span class="w">  </span><span class="na">identifier</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"ee-instance-demo"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_class</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_rds_orderable_db_instance.custom-oracle.instance_class</span><span class="w"></span>
+<span class="w">  </span><span class="na">kms_key_id</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_kms_key.by_id.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">license_model</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_rds_orderable_db_instance.custom-oracle.license_model</span><span class="w"></span>
+<span class="w">  </span><span class="na">multi_az</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="c1"> # Custom for Oracle does not support multi-az</span>
+<span class="w">  </span><span class="na">password</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"avoid-plaintext-passwords"</span><span class="w"></span>
+<span class="w">  </span><span class="na">username</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"test"</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_encrypted</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">timeouts</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3h"</span><span class="w"></span>
+<span class="w">    </span><span class="na">delete</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3h"</span><span class="w"></span>
+<span class="w">    </span><span class="na">update</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3h"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_db_instance"</span><span class="w"> </span><span class="nv">"test-replica"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">replicate_source_db</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_db_instance.default.identifier</span><span class="w"></span>
+<span class="w">  </span><span class="na">replica_mode</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"mounted"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_minor_version_upgrade</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">custom_iam_instance_profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWSRDSCustomInstanceProfile"</span><span class="c1"> # Instance profile is required for Custom for Oracle. See: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/custom-setup-orcl.html#custom-setup-orcl.iam-vpc</span>
+<span class="w">  </span><span class="na">backup_retention_period</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">7</span><span class="w"></span>
+<span class="w">  </span><span class="na">identifier</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"ee-instance-replica"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_class</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_rds_orderable_db_instance.custom-oracle.instance_class</span><span class="w"></span>
+<span class="w">  </span><span class="na">kms_key_id</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_kms_key.by_id.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">multi_az</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="c1"> # Custom for Oracle does not support multi-az</span>
+<span class="w">  </span><span class="na">skip_final_snapshot</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_encrypted</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">timeouts</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3h"</span><span class="w"></span>
+<span class="w">    </span><span class="na">delete</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3h"</span><span class="w"></span>
+<span class="w">    </span><span class="na">update</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3h"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/RDS%20Custom%20for%20SQL%20Server"></a><h3 id="rds-custom-for-sql-server">RDS Custom for SQL Server</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Lookup the available instance classes for the custom engine for the region being operated in</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_rds_orderable_db_instance"</span><span class="w"> </span><span class="nv">"custom-sqlserver"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="s2">"custom-sqlserver-se"</span><span class="c1"> # CEV engine to be used</span>
+<span class="w">  </span><span class="na">engine_version</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"15.00.4249.2.v1"</span><span class="c1">     # CEV engine version to be used</span>
+<span class="w">  </span><span class="na">storage_type</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"gp3"</span><span class="w"></span>
+<span class="w">  </span><span class="na">preferred_instance_classes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"db.r5.xlarge", "db.r5.2xlarge", "db.r5.4xlarge"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># The RDS instance resource requires an ARN. Look up the ARN of the KMS key.</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_kms_key"</span><span class="w"> </span><span class="nv">"by_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">key_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-ef278353ceba4a5a97de6784565b9f78"</span><span class="c1"> # KMS key</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_db_instance"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">allocated_storage</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="m">500</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_minor_version_upgrade</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="c1">                                  # Custom for SQL Server does not support minor version upgrades</span>
+<span class="w">  </span><span class="na">custom_iam_instance_profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWSRDSCustomSQLServerInstanceProfile"</span><span class="c1"> # Instance profile is required for Custom for SQL Server. See: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/custom-setup-sqlserver.html#custom-setup-sqlserver.iam</span>
+<span class="w">  </span><span class="na">backup_retention_period</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">7</span><span class="w"></span>
+<span class="w">  </span><span class="na">db_subnet_group_name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">local.db_subnet_group_name</span><span class="c1"> # Copy the subnet group from the RDS Console</span>
+<span class="w">  </span><span class="na">engine</span><span class="w">                      </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_rds_orderable_db_instance.custom-sqlserver.engine</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine_version</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_rds_orderable_db_instance.custom-sqlserver.engine_version</span><span class="w"></span>
+<span class="w">  </span><span class="na">identifier</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"sql-instance-demo"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_class</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_rds_orderable_db_instance.custom-sqlserver.instance_class</span><span class="w"></span>
+<span class="w">  </span><span class="na">kms_key_id</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_kms_key.by_id.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">multi_az</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="c1"> # Custom for SQL Server does support multi-az</span>
+<span class="w">  </span><span class="na">password</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"avoid-plaintext-passwords"</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_encrypted</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">username</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"test"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">timeouts</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3h"</span><span class="w"></span>
+<span class="w">    </span><span class="na">delete</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3h"</span><span class="w"></span>
+<span class="w">    </span><span class="na">update</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3h"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/RDS%20Db2%20Usage"></a><h3 id="rds-db2-usage">RDS Db2 Usage</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Lookup the default version for the engine. Db2 Standard Edition is `db2-se`, Db2 Advanced Edition is `db2-ae`.</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_rds_engine_version"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"db2-se"</span><span class="c1"> #Standard Edition</span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Lookup the available instance classes for the engine in the region being operated in</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_rds_orderable_db_instance"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_rds_engine_version.default.engine</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine_version</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_rds_engine_version.default.version</span><span class="w"></span>
+<span class="w">  </span><span class="na">license_model</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"bring-your-own-license"</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_type</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"gp3"</span><span class="w"></span>
+<span class="w">  </span><span class="na">preferred_instance_classes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"db.t3.small", "db.r6i.large", "db.m6i.large"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># The RDS Db2 instance resource requires licensing information. Create a new parameter group using the default paramater group as a source, and set license information.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_db_parameter_group"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"db-db2-params"</span><span class="w"></span>
+<span class="w">  </span><span class="na">family</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_rds_engine_version.default.parameter_group_family</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">parameter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">apply_method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"immediate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"rds.ibm_customer_id"</span><span class="w"></span>
+<span class="w">    </span><span class="na">value</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">0000000000</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">parameter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">apply_method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"immediate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"rds.ibm_site_id"</span><span class="w"></span>
+<span class="w">    </span><span class="na">value</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">0000000000</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create the RDS Db2 instance, use the data sources defined to set attributes</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_db_instance"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">allocated_storage</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="w"></span>
+<span class="w">  </span><span class="na">backup_retention_period</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">7</span><span class="w"></span>
+<span class="w">  </span><span class="na">db_name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"test"</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_rds_orderable_db_instance.example.engine</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine_version</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_rds_orderable_db_instance.example.engine_version</span><span class="w"></span>
+<span class="w">  </span><span class="na">identifier</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"db2-instance-demo"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_class</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_rds_orderable_db_instance.example.instance_class</span><span class="w"></span>
+<span class="w">  </span><span class="na">parameter_group_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_db_parameter_group.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">password</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"avoid-plaintext-passwords"</span><span class="w"></span>
+<span class="w">  </span><span class="na">username</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"test"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Storage%20Autoscaling"></a><h3 id="storage-autoscaling">Storage Autoscaling</h3>
+
+<p>To enable Storage Autoscaling with instances that support the feature, define the <code>max_allocated_storage</code> argument higher than the <code>allocated_storage</code> argument. Terraform will automatically hide differences with the <code>allocated_storage</code> argument value if autoscaling occurs.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_db_instance"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">allocated_storage</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">50</span><span class="w"></span>
+<span class="w">  </span><span class="na">max_allocated_storage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Managed%20Master%20Passwords%20via%20Secrets%20Manager%2C%20default%20KMS%20Key"></a><h3 id="managed-master-passwords-via-secrets-manager-default-kms-key">Managed Master Passwords via Secrets Manager, default KMS Key</h3>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>More information about RDS/Aurora Aurora integrates with Secrets Manager to manage master user passwords for your DB clusters can be found in the <a href="https://aws.amazon.com/about-aws/whats-new/2022/12/amazon-rds-integration-aws-secrets-manager/">RDS User Guide</a> and <a href="https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-secrets-manager.html">Aurora User Guide</a>.</p>
+</aside>
+
+<p>You can specify the <code>manage_master_user_password</code> attribute to enable managing the master password with Secrets Manager. You can also update an existing cluster to use Secrets Manager by specify the <code>manage_master_user_password</code> attribute and removing the <code>password</code> attribute (removal is required).</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_db_instance"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">allocated_storage</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="na">db_name</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="s2">"mydb"</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine</span><span class="w">                      </span><span class="o">=</span><span class="w"> </span><span class="s2">"mysql"</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine_version</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"8.0"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_class</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"db.t3.micro"</span><span class="w"></span>
+<span class="w">  </span><span class="na">manage_master_user_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">username</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"foo"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parameter_group_name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"default.mysql8.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Managed%20Master%20Passwords%20via%20Secrets%20Manager%2C%20specific%20KMS%20Key"></a><h3 id="managed-master-passwords-via-secrets-manager-specific-kms-key">Managed Master Passwords via Secrets Manager, specific KMS Key</h3>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>More information about RDS/Aurora Aurora integrates with Secrets Manager to manage master user passwords for your DB clusters can be found in the <a href="https://aws.amazon.com/about-aws/whats-new/2022/12/amazon-rds-integration-aws-secrets-manager/">RDS User Guide</a> and <a href="https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-secrets-manager.html">Aurora User Guide</a>.</p>
+</aside>
+
+<p>You can specify the <code>master_user_secret_kms_key_id</code> attribute to specify a specific KMS Key.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_kms_key"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example KMS Key"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_db_instance"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">allocated_storage</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="na">db_name</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="s2">"mydb"</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine</span><span class="w">                        </span><span class="o">=</span><span class="w"> </span><span class="s2">"mysql"</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine_version</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"8.0"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_class</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"db.t3.micro"</span><span class="w"></span>
+<span class="w">  </span><span class="na">manage_master_user_password</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">master_user_secret_kms_key_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_kms_key.example.key_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">username</span><span class="w">                      </span><span class="o">=</span><span class="w"> </span><span class="s2">"foo"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parameter_group_name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"default.mysql8.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>For more detailed documentation about each argument, refer to the <a href="http://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_CreateDBInstance.html">AWS official
+documentation</a>.</p>
+
+<p>This resource supports the following arguments:</p>
+
+<ul>
+<li><code>allocated_storage</code> - (Required unless a <code>snapshot_identifier</code> or <code>replicate_source_db</code> is provided) The allocated storage in gibibytes. If <code>max_allocated_storage</code> is configured, this argument represents the initial storage allocation and differences from the configuration will be ignored automatically when Storage Autoscaling occurs. If <code>replicate_source_db</code> is set, the value is ignored during the creation of the instance.</li>
+<li><code>allow_major_version_upgrade</code> - (Optional) Indicates that major version
+upgrades are allowed. Changing this parameter does not result in an outage and
+the change is asynchronously applied as soon as possible.</li>
+<li><code>apply_immediately</code> - (Optional) Specifies whether any database modifications
+are applied immediately, or during the next maintenance window. Default is
+<code>false</code>. See <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.DBInstance.Modifying.html">Amazon RDS Documentation for more
+information.</a></li>
+<li><code>auto_minor_version_upgrade</code> - (Optional) Indicates that minor engine upgrades
+will be applied automatically to the DB instance during the maintenance window.
+Defaults to true.</li>
+<li><code>availability_zone</code> - (Optional) The AZ for the RDS instance.</li>
+<li><code>backup_retention_period</code> - (Optional) The days to retain backups for.
+Must be between <code>0</code> and <code>35</code>.
+Default is <code>0</code>.
+Must be greater than <code>0</code> if the database is used as a source for a <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Replication.html">Read Replica</a>,
+uses <a href="#low-downtime-updates">low-downtime updates</a>,
+or will use <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/blue-green-deployments.html">RDS Blue/Green deployments</a>.</li>
+<li><code>backup_target</code> - (Optional, Forces new resource) Specifies where automated backups and manual snapshots are stored. Possible values are <code>region</code> (default) and <code>outposts</code>. See <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-on-outposts.html">Working with Amazon RDS on AWS Outposts</a> for more information.</li>
+<li><code>backup_window</code> - (Optional) The daily time range (in UTC) during which automated backups are created if they are enabled.
+Example: "09:46-10:16". Must not overlap with <code>maintenance_window</code>.</li>
+<li><code>blue_green_update</code> - (Optional) Enables low-downtime updates using <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/blue-green-deployments.html">RDS Blue/Green deployments</a>.
+See <a href="#blue_green_update"><code>blue_green_update</code></a> below.</li>
+<li><code>ca_cert_identifier</code> - (Optional) The identifier of the CA certificate for the DB instance.</li>
+<li><code>character_set_name</code> - (Optional) The character set name to use for DB encoding in Oracle and Microsoft SQL instances (collation).
+This can't be changed.
+See <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.OracleCharacterSets.html">Oracle Character Sets Supported in Amazon RDS</a> or
+<a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.SQLServer.CommonDBATasks.Collation.html">Server-Level Collation for Microsoft SQL Server</a> for more information.
+Cannot be set  with <code>replicate_source_db</code>, <code>restore_to_point_in_time</code>, <code>s3_import</code>, or <code>snapshot_identifier</code>.</li>
+<li><code>copy_tags_to_snapshot</code> – (Optional, boolean) Copy all Instance <code>tags</code> to snapshots. Default is <code>false</code>.</li>
+<li><code>custom_iam_instance_profile</code> - (Optional) The instance profile associated with the underlying Amazon EC2 instance of an RDS Custom DB instance.</li>
+<li><code>db_name</code> - (Optional) The name of the database to create when the DB instance is created. If this parameter is not specified, no database is created in the DB instance. Note that this does not apply for Oracle or SQL Server engines. See the <a href="https://awscli.amazonaws.com/v2/documentation/api/latest/reference/rds/create-db-instance.html">AWS documentation</a> for more details on what applies for those engines. If you are providing an Oracle db name, it needs to be in all upper case. Cannot be specified for a replica.</li>
+<li><code>db_subnet_group_name</code> - (Optional) Name of <a href="../resources/db_subnet_group.html">DB subnet group</a>.
+DB instance will be created in the VPC associated with the DB subnet group.
+If unspecified, will be created in the <code>default</code> Subnet Group.
+When working with read replicas created in the same region, defaults to the Subnet Group Name of the source DB.
+When working with read replicas created in a different region, defaults to the <code>default</code> Subnet Group.
+See <a href="https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_CreateDBInstanceReadReplica.html">DBSubnetGroupName in API action CreateDBInstanceReadReplica</a> for additional read replica constraints.</li>
+<li><code>dedicated_log_volume</code> - (Optional, boolean) Use a dedicated log volume (DLV) for the DB instance. Requires Provisioned IOPS. See the <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PIOPS.StorageTypes.html#USER_PIOPS.dlv">AWS documentation</a> for more details.</li>
+<li><code>delete_automated_backups</code> - (Optional) Specifies whether to remove automated backups immediately after the DB instance is deleted. Default is <code>true</code>.</li>
+<li><code>deletion_protection</code> - (Optional) If the DB instance should have deletion protection enabled. The database can't be deleted when this value is set to <code>true</code>. The default is <code>false</code>.</li>
+<li><code>domain</code> - (Optional) The ID of the Directory Service Active Directory domain to create the instance in. Conflicts with <code>domain_fqdn</code>, <code>domain_ou</code>, <code>domain_auth_secret_arn</code> and a <code>domain_dns_ips</code>.</li>
+<li><code>domain_auth_secret_arn</code> - (Optional, but required if domain_fqdn is provided) The ARN for the Secrets Manager secret with the self managed Active Directory credentials for the user joining the domain. Conflicts with <code>domain</code> and <code>domain_iam_role_name</code>.</li>
+<li><code>domain_dns_ips</code> - (Optional, but required if domain_fqdn is provided)  The IPv4 DNS IP addresses of your primary and secondary self managed Active Directory domain controllers. Two IP addresses must be provided. If there isn't a secondary domain controller, use the IP address of the primary domain controller for both entries in the list. Conflicts with <code>domain</code> and <code>domain_iam_role_name</code>.</li>
+<li><code>domain_fqdn</code> - (Optional) The fully qualified domain name (FQDN) of the self managed Active Directory domain. Conflicts with <code>domain</code> and <code>domain_iam_role_name</code>.</li>
+<li><code>domain_iam_role_name</code> - (Optional, but required if domain is provided) The name of the IAM role to be used when making API calls to the Directory Service. Conflicts with <code>domain_fqdn</code>, <code>domain_ou</code>, <code>domain_auth_secret_arn</code> and a <code>domain_dns_ips</code>.</li>
+<li><code>domain_ou</code> - (Optional, but required if domain_fqdn is provided) The self managed Active Directory organizational unit for your DB instance to join. Conflicts with <code>domain</code> and <code>domain_iam_role_name</code>.</li>
+<li><code>enabled_cloudwatch_logs_exports</code> - (Optional) Set of log types to enable for exporting to CloudWatch logs. If omitted, no logs will be exported. For supported values, see the EnableCloudwatchLogsExports.member.N parameter in <a href="https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_CreateDBInstance.html">API action CreateDBInstance</a>.</li>
+<li><code>engine</code> - (Required unless a <code>snapshot_identifier</code> or <code>replicate_source_db</code> is provided) The database engine to use. For supported values, see the Engine parameter in <a href="https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_CreateDBInstance.html">API action CreateDBInstance</a>. Note that for Amazon Aurora instances the engine must match the <a href="../resources/rds_cluster.html">DB cluster</a>'s engine'. For information on the difference between the available Aurora MySQL engines see <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/AuroraMySQL.Updates.20180206.html">Comparison between Aurora MySQL 1 and Aurora MySQL 2</a> in the Amazon RDS User Guide.</li>
+<li><code>engine_version</code> - (Optional) The engine version to use. If <code>auto_minor_version_upgrade</code> is enabled, you can provide a prefix of the version such as <code>8.0</code> (for <code>8.0.36</code>). The actual engine version used is returned in the attribute <code>engine_version_actual</code>, see <a href="#attribute-reference">Attribute Reference</a> below. For supported values, see the EngineVersion parameter in <a href="https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_CreateDBInstance.html">API action CreateDBInstance</a>. Note that for Amazon Aurora instances the engine version must match the <a href="../resources/rds_cluster.html">DB cluster</a>'s engine version'.</li>
+<li><code>engine_lifecycle_support</code> - (Optional) The life cycle type for this DB instance. This setting applies only to RDS for MySQL and RDS for PostgreSQL. Valid values are <code>open-source-rds-extended-support</code>, <code>open-source-rds-extended-support-disabled</code>. Default value is <code>open-source-rds-extended-support</code>. [Using Amazon RDS Extended Support]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/extended-support.html</li>
+<li><code>final_snapshot_identifier</code> - (Optional) The name of your final DB snapshot
+when this DB instance is deleted. Must be provided if <code>skip_final_snapshot</code> is
+set to <code>false</code>. The value must begin with a letter, only contain alphanumeric characters and hyphens, and not end with a hyphen or contain two consecutive hyphens. Must not be provided when deleting a read replica.</li>
+<li><code>iam_database_authentication_enabled</code> - (Optional) Specifies whether mappings of AWS Identity and Access Management (IAM) accounts to database
+accounts is enabled.</li>
+<li><code>identifier</code> - (Optional) The name of the RDS instance, if omitted, Terraform will assign a random, unique identifier. Required if <code>restore_to_point_in_time</code> is specified.</li>
+<li><code>identifier_prefix</code> - (Optional) Creates a unique identifier beginning with the specified prefix. Conflicts with <code>identifier</code>.</li>
+<li><code>instance_class</code> - (Required) The instance type of the RDS instance.</li>
+<li><code>iops</code> - (Optional) The amount of provisioned IOPS. Setting this implies a
+storage_type of "io1" or "io2". Can only be set when <code>storage_type</code> is <code>"io1"</code>, <code>"io2</code> or <code>"gp3"</code>.
+Cannot be specified for gp3 storage if the <code>allocated_storage</code> value is below a per-<code>engine</code> threshold.
+See the <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Storage.html#gp3-storage">RDS User Guide</a> for details.</li>
+<li><code>kms_key_id</code> - (Optional) The ARN for the KMS encryption key. If creating an
+encrypted replica, set this to the destination KMS ARN.</li>
+<li><code>license_model</code> - (Optional, but required for some DB engines, i.e., Oracle SE1) License model information for this DB instance. Valid values for this field are as follows:
+<ul>
+<li>RDS for MariaDB: <code>general-public-license</code></li>
+<li>RDS for Microsoft SQL Server: <code>license-included</code></li>
+<li>RDS for MySQL: <code>general-public-license</code></li>
+<li>RDS for Oracle: <code>bring-your-own-license | license-included</code></li>
+<li>RDS for PostgreSQL: <code>postgresql-license</code></li>
+</ul></li>
+<li><code>maintenance_window</code> - (Optional) The window to perform maintenance in.
+Syntax: "ddd:hh24:mi-ddd:hh24:mi". Eg: "Mon:00:00-Mon:03:00". See <a href="http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_UpgradeDBInstance.Maintenance.html#AdjustingTheMaintenanceWindow">RDS
+Maintenance Window
+docs</a>
+for more information.</li>
+<li><code>manage_master_user_password</code> - (Optional) Set to true to allow RDS to manage the master user password in Secrets Manager. Cannot be set if <code>password</code> or <code>password_wo</code> is provided.</li>
+<li><code>master_user_secret_kms_key_id</code> - (Optional) The Amazon Web Services KMS key identifier is the key ARN, key ID, alias ARN, or alias name for the KMS key. To use a KMS key in a different Amazon Web Services account, specify the key ARN or alias ARN. If not specified, the default KMS key for your Amazon Web Services account is used.</li>
+<li><code>max_allocated_storage</code> - (Optional) Specifies the maximum storage (in GiB) that Amazon RDS can automatically scale to for this DB instance. By default, Storage Autoscaling is disabled. To enable Storage Autoscaling, set <code>max_allocated_storage</code> to <strong>greater than or equal to</strong> <code>allocated_storage</code>. Setting <code>max_allocated_storage</code> to 0 explicitly disables Storage Autoscaling. When configured, changes to <code>allocated_storage</code> will be automatically ignored as the storage can dynamically scale.</li>
+<li><code>monitoring_interval</code> - (Optional) The interval, in seconds, between points
+when Enhanced Monitoring metrics are collected for the DB instance. To disable
+collecting Enhanced Monitoring metrics, specify 0. The default is 0. Valid
+Values: 0, 1, 5, 10, 15, 30, 60.</li>
+<li><code>monitoring_role_arn</code> - (Optional) The ARN for the IAM role that permits RDS
+to send enhanced monitoring metrics to CloudWatch Logs. You can find more
+information on the <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Monitoring.html">AWS
+Documentation</a>
+what IAM permissions are needed to allow Enhanced Monitoring for RDS Instances.</li>
+<li><code>multi_az</code> - (Optional) Specifies if the RDS instance is multi-AZ</li>
+<li><code>nchar_character_set_name</code> - (Optional, Forces new resource) The national character set is used in the NCHAR, NVARCHAR2, and NCLOB data types for Oracle instances. This can't be changed. See <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.OracleCharacterSets.html">Oracle Character Sets
+Supported in Amazon RDS</a>.</li>
+<li><code>network_type</code> - (Optional) The network type of the DB instance. Valid values: <code>IPV4</code>, <code>DUAL</code>.</li>
+<li><code>option_group_name</code> - (Optional) Name of the DB option group to associate.</li>
+<li><code>parameter_group_name</code> - (Optional) Name of the DB parameter group to associate.</li>
+<li><code>password</code> - (Optional required unless <code>manage_master_user_password</code> is set to true, <code>snapshot_identifier</code>, <code>replicate_source_db</code>, or <code>password_wo</code> is provided) Password for the master DB user. Note that this may show up in logs, and it will be stored in the state file. Cannot be set if <code>manage_master_user_password</code> is set to <code>true</code>.</li>
+<li><code>password_wo</code> - (Optional, Write-Only required unless <code>manage_master_user_password</code> is set to true, <code>snapshot_identifier</code>, <code>replicate_source_db</code>, or <code>password</code> is provided) Password for the master DB user. Note that this may show up in logs, and it will be stored in the state file. Cannot be set if <code>manage_master_user_password</code> is set to <code>true</code>.</li>
+<li><code>password_wo_version</code> - (Optional) Used together with <code>password_wo</code> to trigger an update. Increment this value when an update to <code>password_wo</code> is required.</li>
+<li><code>performance_insights_enabled</code> - (Optional) Specifies whether Performance Insights are enabled. Defaults to false.</li>
+<li><code>performance_insights_kms_key_id</code> - (Optional) The ARN for the KMS key to encrypt Performance Insights data. When specifying <code>performance_insights_kms_key_id</code>, <code>performance_insights_enabled</code> needs to be set to true. Once KMS key is set, it can never be changed.</li>
+<li><code>performance_insights_retention_period</code> - (Optional) Amount of time in days to retain Performance Insights data. Valid values are <code>7</code>, <code>731</code> (2 years) or a multiple of <code>31</code>. When specifying <code>performance_insights_retention_period</code>, <code>performance_insights_enabled</code> needs to be set to true. Defaults to '7'.</li>
+<li><code>port</code> - (Optional) The port on which the DB accepts connections.</li>
+<li><code>publicly_accessible</code> - (Optional) Bool to control if instance is publicly
+accessible. Default is <code>false</code>.</li>
+<li><code>replica_mode</code> - (Optional) Specifies whether the replica is in either <code>mounted</code> or <code>open-read-only</code> mode. This attribute
+is only supported by Oracle instances. Oracle replicas operate in <code>open-read-only</code> mode unless otherwise specified. See <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/oracle-read-replicas.html">Working with Oracle Read Replicas</a> for more information.</li>
+<li><code>replicate_source_db</code> - (Optional) Specifies that this resource is a Replica database, and to use this value as the source database.
+If replicating an Amazon RDS Database Instance in the same region, use the <code>identifier</code> of the source DB, unless also specifying the <code>db_subnet_group_name</code>.
+If specifying the <code>db_subnet_group_name</code> in the same region, use the <code>arn</code> of the source DB.
+If replicating an Instance in a different region, use the <code>arn</code> of the source DB.
+Note that if you are creating a cross-region replica of an encrypted database you will also need to specify a <code>kms_key_id</code>.
+See <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Replication.html">DB Instance Replication</a> and <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ReadRepl.html">Working with PostgreSQL and MySQL Read Replicas</a> for more information on using Replication.</li>
+<li><code>upgrade_storage_config</code> - (Optional) Whether to upgrade the storage file system configuration on the read replica.
+Can only be set with <code>replicate_source_db</code>.</li>
+<li><code>restore_to_point_in_time</code> - (Optional, Forces new resource) A configuration block for restoring a DB instance to an arbitrary point in time.
+Requires the <code>identifier</code> argument to be set with the name of the new DB instance to be created.
+See <a href="#restore-to-point-in-time">Restore To Point In Time</a> below for details.</li>
+<li><code>s3_import</code> - (Optional) Restore from a Percona Xtrabackup in S3.  See <a href="http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/MySQL.Procedural.Importing.html">Importing Data into an Amazon RDS MySQL DB Instance</a></li>
+<li><code>skip_final_snapshot</code> - (Optional) Determines whether a final DB snapshot is
+created before the DB instance is deleted. If true is specified, no DBSnapshot
+is created. If false is specified, a DB snapshot is created before the DB
+instance is deleted, using the value from <code>final_snapshot_identifier</code>. Default
+is <code>false</code>.</li>
+<li><code>snapshot_identifier</code> - (Optional) Specifies whether or not to create this database from a snapshot.
+This corresponds to the snapshot ID you'd find in the RDS console, e.g: rds:production-2015-06-26-06-05.</li>
+<li><code>storage_encrypted</code> - (Optional) Specifies whether the DB instance is
+encrypted. Note that if you are creating a cross-region read replica this field
+is ignored and you should instead declare <code>kms_key_id</code> with a valid ARN. The
+default is <code>false</code> if not specified.</li>
+<li><code>storage_type</code> - (Optional) One of "standard" (magnetic), "gp2" (general
+purpose SSD), "gp3" (general purpose SSD that needs <code>iops</code> independently)
+"io1" (provisioned IOPS SSD) or "io2" (block express storage provisioned IOPS
+SSD). The default is "io1" if <code>iops</code> is specified, "gp2" if not.</li>
+<li><code>storage_throughput</code> - (Optional) The storage throughput value for the DB instance. Can only be set when <code>storage_type</code> is <code>"gp3"</code>. Cannot be specified if the <code>allocated_storage</code> value is below a per-<code>engine</code> threshold. See the <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Storage.html#gp3-storage">RDS User Guide</a> for details.</li>
+<li><code>tags</code> - (Optional) A map of tags to assign to the resource. If configured with a provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a> present, tags with matching keys will overwrite those defined at the provider-level.</li>
+<li><code>timezone</code> - (Optional) Time zone of the DB instance. <code>timezone</code> is currently
+only supported by Microsoft SQL Server. The <code>timezone</code> can only be set on
+creation. See <a href="http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_SQLServer.html#SQLServer.Concepts.General.TimeZone">MSSQL User
+Guide</a>
+for more information.</li>
+<li><code>username</code> - (Required unless a <code>snapshot_identifier</code> or <code>replicate_source_db</code>
+is provided) Username for the master DB user. Cannot be specified for a replica.</li>
+<li><code>vpc_security_group_ids</code> - (Optional) List of VPC security groups to
+associate.</li>
+<li><code>customer_owned_ip_enabled</code> - (Optional) Indicates whether to enable a customer-owned IP address (CoIP) for an RDS on Outposts DB instance. See <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-on-outposts.html#rds-on-outposts.coip">CoIP for RDS on Outposts</a> for more information.</li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Removing the <code>replicate_source_db</code> attribute from an existing RDS Replicate database managed by Terraform will promote the database to a fully standalone database.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Restore%20To%20Point%20In%20Time"></a><h3 id="restore-to-point-in-time">Restore To Point In Time</h3>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>You can restore to any point in time before the source DB instance's <code>latest_restorable_time</code> or a point up to the number of days specified in the source DB instance's <code>backup_retention_period</code>. For more information, please refer to the <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PIT.html">Developer Guide</a>. This setting does not apply to <code>aurora-mysql</code> or <code>aurora-postgresql</code> DB engines. For Aurora, refer to the <a href="../resources/rds_cluster.html#restore_in_time"><code>aws_rds_cluster</code> resource documentation</a>.</p>
+</aside>
+
+<p>The <code>restore_to_point_in_time</code> block supports the following arguments:</p>
+
+<ul>
+<li><code>restore_time</code> - (Optional) The date and time to restore from. Value must be a time in Universal Coordinated Time (UTC) format and must be before the latest restorable time for the DB instance. Cannot be specified with <code>use_latest_restorable_time</code>.</li>
+<li><code>source_db_instance_identifier</code> - (Optional) The identifier of the source DB instance from which to restore. Must match the identifier of an existing DB instance. Required if <code>source_db_instance_automated_backups_arn</code> or <code>source_dbi_resource_id</code> is not specified.</li>
+<li><code>source_db_instance_automated_backups_arn</code> - (Optional) The ARN of the automated backup from which to restore. Required if <code>source_db_instance_identifier</code> or <code>source_dbi_resource_id</code> is not specified.</li>
+<li><code>source_dbi_resource_id</code> - (Optional) The resource ID of the source DB instance from which to restore. Required if <code>source_db_instance_identifier</code> or <code>source_db_instance_automated_backups_arn</code> is not specified.</li>
+<li><code>use_latest_restorable_time</code> - (Optional) A boolean value that indicates whether the DB instance is restored from the latest backup time. Defaults to <code>false</code>. Cannot be specified with <code>restore_time</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/S3%20Import%20Options"></a><h3 id="s3-import-options">S3 Import Options</h3>
+
+<p>Full details on the core parameters and impacts are in the API Docs: <a href="http://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_RestoreDBInstanceFromS3.html">RestoreDBInstanceFromS3</a>.  Sample</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_db_instance"</span><span class="w"> </span><span class="nv">"db"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">s3_import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source_engine</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"mysql"</span><span class="w"></span>
+<span class="w">    </span><span class="na">source_engine_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"5.6"</span><span class="w"></span>
+<span class="w">    </span><span class="na">bucket_name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"mybucket"</span><span class="w"></span>
+<span class="w">    </span><span class="na">bucket_prefix</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"backups"</span><span class="w"></span>
+<span class="w">    </span><span class="na">ingestion_role</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam::1234567890:role/role-xtrabackup-rds-restore"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<ul>
+<li><code>bucket_name</code> - (Required) The bucket name where your backup is stored</li>
+<li><code>bucket_prefix</code> - (Optional) Can be blank, but is the path to your backup</li>
+<li><code>ingestion_role</code> - (Required) Role applied to load the data.</li>
+<li><code>source_engine</code> - (Required, as of Feb 2018 only 'mysql' supported) Source engine for the backup</li>
+<li><code>source_engine_version</code> - (Required, as of Feb 2018 only '5.6' supported) Version of the source engine used to make the backup</li>
+</ul>
+
+<p>This will not recreate the resource if the S3 object changes in some way.  It's only used to initialize the database.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/blue_green_update"></a><h3 id="blue_green_update"><code>blue_green_update</code></h3>
+
+<ul>
+<li><code>enabled</code> - (Optional) Enables <a href="#low-downtime-updates">low-downtime updates</a> when <code>true</code>.
+Default is <code>false</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>address</code> - The hostname of the RDS instance. See also <code>endpoint</code> and <code>port</code>.</li>
+<li><code>arn</code> - The ARN of the RDS instance.</li>
+<li><code>allocated_storage</code> - The amount of allocated storage.</li>
+<li><code>availability_zone</code> - The availability zone of the instance.</li>
+<li><code>backup_retention_period</code> - The backup retention period.</li>
+<li><code>backup_window</code> - The backup window.</li>
+<li><code>ca_cert_identifier</code> - Identifier of the CA certificate for the
+DB instance.</li>
+<li><code>db_name</code> - The database name.</li>
+<li><code>domain</code> - The ID of the Directory Service Active Directory domain the instance is joined to</li>
+<li><code>domain_auth_secret_arn</code> - The ARN for the Secrets Manager secret with the self managed Active Directory credentials for the user joining the domain.</li>
+<li><code>domain_dns_ips</code> - The IPv4 DNS IP addresses of your primary and secondary self managed Active Directory domain controllers.</li>
+<li><code>domain_fqdn</code> - The fully qualified domain name (FQDN) of an self managed Active Directory domain.</li>
+<li><code>domain_iam_role_name</code> - The name of the IAM role to be used when making API calls to the Directory Service.</li>
+<li><code>domain_ou</code> - The self managed Active Directory organizational unit for your DB instance to join.</li>
+<li><code>endpoint</code> - The connection endpoint in <code>address:port</code> format.</li>
+<li><code>engine</code> - The database engine.</li>
+<li><code>engine_version_actual</code> - The running version of the database.</li>
+<li><code>hosted_zone_id</code> - The canonical hosted zone ID of the DB instance (to be used
+in a Route 53 Alias record).</li>
+<li><code>id</code> - RDS DBI resource ID.</li>
+<li><code>instance_class</code>- The RDS instance class.</li>
+<li><code>latest_restorable_time</code> - The latest time, in UTC <a href="https://tools.ietf.org/html/rfc3339#section-5.8">RFC3339 format</a>, to which a database can be restored with point-in-time restore.</li>
+<li><code>listener_endpoint</code> - Specifies the listener connection endpoint for SQL Server Always On. See <a href="#endpoint">endpoint</a> below.</li>
+<li><code>maintenance_window</code> - The instance maintenance window.</li>
+<li><code>master_user_secret</code> - A block that specifies the master user secret. Only available when <code>manage_master_user_password</code> is set to true. <a href="#master_user_secret">Documented below</a>.</li>
+<li><code>multi_az</code> - If the RDS instance is multi AZ enabled.</li>
+<li><code>port</code> - The database port.</li>
+<li><code>resource_id</code> - The RDS Resource ID of this instance.</li>
+<li><code>status</code> - The RDS instance status.</li>
+<li><code>storage_encrypted</code> - Whether the DB instance is encrypted.</li>
+<li><code>tags_all</code> - A map of tags assigned to the resource, including those inherited from the provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a>.</li>
+<li><code>username</code> - The master username for the database.</li>
+</ul>
+
+<p>On Oracle and Microsoft SQL instances the following is exported additionally:</p>
+
+<ul>
+<li><code>character_set_name</code> - The character set (collation) used on Oracle and Microsoft SQL instances.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Endpoint"></a><h3 id="endpoint">Endpoint</h3>
+
+<ul>
+<li><code>address</code> - Specifies the DNS address of the DB instance.</li>
+<li><code>hosted_zone_id</code> - Specifies the ID that Amazon Route 53 assigns when you create a hosted zone.</li>
+<li><code>port</code> - Specifies the port that the database engine is listening on.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/master_user_secret"></a><h3 id="master_user_secret">master_user_secret</h3>
+
+<p>The <code>master_user_secret</code> configuration block supports the following attributes:</p>
+
+<ul>
+<li><code>kms_key_id</code> - The Amazon Web Services KMS key identifier that is used to encrypt the secret.</li>
+<li><code>secret_arn</code> - The Amazon Resource Name (ARN) of the secret.</li>
+<li><code>secret_status</code> - The status of the secret. Valid Values: <code>creating</code> | <code>active</code> | <code>rotating</code> | <code>impaired</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p><a href="https://developer.hashicorp.com/terraform/language/resources/syntax#operation-timeouts">Configuration options</a>:</p>
+
+<ul>
+<li><code>create</code> - (Default <code>40m</code>)</li>
+<li><code>update</code> - (Default <code>80m</code>)</li>
+<li><code>delete</code> - (Default <code>60m</code>)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import DB Instances using the <code>identifier</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_db_instance.default</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mydb-rds-instance"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import DB Instances using the <code>identifier</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_db_instance.default mydb-rds-instance
+</code></pre></div>
+
+            
+        
+    </body></html>

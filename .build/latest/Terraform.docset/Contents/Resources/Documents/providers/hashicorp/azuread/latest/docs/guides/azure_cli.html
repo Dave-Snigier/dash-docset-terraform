@@ -1,0 +1,172 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/azure_cli --><head>
+                <title>Authenticating using the Azure CLI</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="authenticating-using-the-azure-cli">Authenticating using the Azure CLI</h1>
+
+<p>Terraform supports a number of different methods for authenticating to Azure:</p>
+
+<ul>
+<li>Authenticating to Azure using the Azure CLI (covered in this guide)</li>
+<li><a href="managed_service_identity.html">Authenticating to Azure using Managed Identity</a></li>
+<li><a href="service_principal_client_certificate.html">Authenticating to Azure using a Service Principal and a Client Certificate</a></li>
+<li><a href="service_principal_client_secret.html">Authenticating to Azure using a Service Principal and a Client Secret</a></li>
+<li><a href="service_principal_oidc.html">Authenticating to Azure using a Service Principal and OpenID Connect</a></li>
+</ul>
+
+<hr/>
+
+<p>We recommend using either a Service Principal or Managed Identity when running Terraform non-interactively (such as when running Terraform in a CI server) - and authenticating using the Azure CLI when running Terraform locally.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Important%20Notes%20about%20Authenticating%20using%20the%20Azure%20CLI"></a><h2 id="important-notes-about-authenticating-using-the-azure-cli">Important Notes about Authenticating using the Azure CLI</h2>
+
+<ul>
+<li>Terraform only supports authenticating using the <code>az</code> CLI (and this must be available on your PATH) - authenticating using the older <code>azure</code> CLI or PowerShell Az / AzureRM Cmdlets is not supported.</li>
+<li>Prior to version 2.35, authenticating via the Azure CLI was only supported when using a User Account. For example <code>az login --service-principal</code> was not supported and it was necessary to use either a <a href="service_principal_client_secret.html">Client Secret</a> or a <a href="service_principal_client_certificate.html">Client Certificate</a>. From 2.35 upwards, authenticating via the Azure CLI is supported when using a Service Principal or Managed Identity. However, we still recommend using native provider support for Service Principal or Managed Identity authentication wherever possible.</li>
+</ul>
+
+<hr/>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Logging%20into%20the%20Azure%20CLI"></a><h2 id="logging-into-the-azure-cli">Logging into the Azure CLI</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Using other clouds</em>
+    <p>If you're using the <strong>China</strong>, <strong>German</strong> or <strong>Government</strong> Azure Clouds - you'll need to first configure the Azure CLI to work with that Cloud, so that the correct authentication service is used.  You can do this by running: <br/><br/><code>$ az cloud set --name AzureChinaCloud|AzureGermanCloud|AzureUSGovernment</code></p>
+</aside>
+
+<hr/>
+
+<p>Firstly, login to the Azure CLI using a User, Service Principal or Managed Identity.</p>
+
+<p>User Account:</p>
+
+<div class="codehilite"><pre><span></span><code>az login --allow-no-subscriptions
+</code></pre></div>
+
+<p>Service Principal with a Secret:</p>
+
+<div class="codehilite"><pre><span></span><code>az login --service-principal <span class="se">\</span>
+         --username <span class="m">00000000</span>-0000-0000-0000-000000000000 <span class="se">\</span>
+         --password <span class="s2">"MyCl1eNtSeCr3t"</span> <span class="se">\</span>
+         --tenant <span class="m">10000000</span>-2000-3000-4000-500000000000 <span class="se">\</span>
+         --allow-no-subscriptions
+</code></pre></div>
+
+<p>Service Principal with a Certificate:</p>
+
+<div class="codehilite"><pre><span></span><code>az login --service-principal <span class="se">\</span>
+         --username <span class="m">00000000</span>-0000-0000-0000-000000000000 <span class="se">\</span>
+         --password /path/to/certificate <span class="se">\</span>
+         --tenant <span class="m">10000000</span>-2000-3000-4000-500000000000 <span class="se">\</span>
+         --allow-no-subscriptions
+</code></pre></div>
+
+<p>Service Principal with Open ID Connect (for use in CI / CD):</p>
+
+<div class="codehilite"><pre><span></span><code>az login --service-principal <span class="se">\</span>
+         --username <span class="m">00000000</span>-0000-0000-0000-000000000000 <span class="se">\</span>
+         --tenant <span class="m">10000000</span>-2000-3000-4000-500000000000 <span class="se">\</span>
+         --allow-no-subscriptions
+</code></pre></div>
+
+<p>Managed Identity:</p>
+
+<div class="codehilite"><pre><span></span><code>az login --identity --allow-no-subscriptions
+
+or
+
+az login --identity <span class="se">\</span>
+         --username <span class="m">00000000</span>-0000-0000-0000-000000000000 <span class="se">\</span>
+         --allow-no-subscriptions
+</code></pre></div>
+
+<p>The <code>--allow-no-subscriptions</code> argument enables access to tenants that have no linked subscriptions, in addition to tenants that do.</p>
+
+<hr/>
+
+<p>Once logged in - it's possible to list the Subscriptions and Tenants associated with the account via:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">$ </span>az account list -o table --all --query <span class="s2">"[].{TenantID: tenantId, Subscription: name, Default: isDefault}"</span>
+</code></pre></div>
+
+<p>The output (similar to below) will display one or more Tenants and/or Subscriptions.</p>
+
+<pre><code>TenantID                              Subscription                         Default
+------------------------------------  -----------------------------------  ---------
+00000000-0000-1111-1111-111111111111  N/A(tenant level account)            False
+00000000-0000-2222-2222-222222222222  N/A(tenant level account)            False
+00000000-0000-1111-1111-111111111111  My Subscription                      True
+00000000-0000-1111-1111-111111111111  My Other Subscription                False
+</code></pre>
+
+<p>Each entry shown is referred to as an <code>Azure CLI account</code>, which represents either a subscription with its linked tenant, or a tenant without any accessible subscriptions (Azure CLI does not show tenant names or domains). The provider will select the tenant ID from your default Azure CLI account. If you have more than one tenant listed in the output of <code>az account list</code>, for example if you are a guest user in other tenants, you can specify the tenant to use.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp"># </span>sh
+<span class="go">export ARM_TENANT_ID=00000000-0000-2222-2222-222222222222</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c"># PowerShell</span>
+<span class="nv">$env:ARM_TENANT_ID</span> <span class="p">=</span> <span class="n">00000000</span><span class="p">-</span><span class="n">0000</span><span class="p">-</span><span class="n">2222</span><span class="p">-</span><span class="n">2222</span><span class="p">-</span><span class="n">222222222222</span>
+</code></pre></div>
+
+<p>You can also configure the tenant ID from within the provider block.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azuread"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">tenant_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-2222-2222-222222222222"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Alternatively, you can configure the Azure CLI to default to the tenant you are managing with Terraform.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">$ </span>az login --allow-no-subscriptions --tenant <span class="s2">"TENANT_ID_OR_DOMAIN"</span>
+</code></pre></div>
+
+<p><br/></p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Tenants and Subscriptions</em>
+    <p>The AzureAD provider operates on tenants and not on subscriptions. We recommend always specifying <code>az login --allow-no-subscriptions</code> as it will force the Azure CLI to report tenants with no associated subscriptions, or where your user account does not have any roles assigned for a subscription.</p>
+</aside>
+
+<hr/>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20Azure%20CLI%20authentication%20in%20Terraform"></a><h2 id="configuring-azure-cli-authentication-in-terraform">Configuring Azure CLI authentication in Terraform</h2>
+
+<p>No specific configuration is required for the provider to use Azure CLI authentication. If you're looking to use Terraform across Tenants - it's possible to do this by configuring the <code>tenant_id</code> field in the Provider block, as shown below:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azuread"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">tenant_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-1111-1111-111111111111"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>More information on <a href="../index.html#argument-reference">the fields supported in the Provider block can be found here</a>.</p>
+
+<p>At this point running either <code>terraform plan</code> or <code>terraform apply</code> should allow Terraform to run using the Azure CLI to authenticate.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Disabling%20Azure%20CLI%20authentication"></a><h2 id="disabling-azure-cli-authentication">Disabling Azure CLI authentication</h2>
+
+<p>For compatibility reasons and to ensure a positive user experience when running Terraform interactively, Azure CLI authentication is enabled by default. It's possible to disable authentication using Azure CLI, which you may wish to do in automated environments such as CI/CD pipelines or when scripting operations with Terraform.</p>
+
+<p>To do so, add the <code>use_cli</code> configuration property in the Provider block.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azuread"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">use_cli</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Alternatively, you can set the <code>ARM_USE_CLI</code> environment variable.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># sh</span>
+<span class="nb">export</span> <span class="nv">ARM_USE_CLI</span><span class="o">=</span><span class="nb">false</span>
+
+<span class="c1"># PowerShell</span>
+<span class="nv">$env</span>:ARM_USE_CLI <span class="o">=</span> <span class="nb">false</span>
+</code></pre></div>
+
+            
+        
+    </body></html>

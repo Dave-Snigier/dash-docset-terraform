@@ -1,0 +1,71 @@
+<html><!-- Online page at https://registry.terraform.io/providers/gitlabhq/gitlab/latest/docs/guides/version-15 --><head>
+                <title>Upgrade to Terraform GitLab Provider Version 15.7</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="upgrade-to-terraform-gitlab-provider-version-157">Upgrade to Terraform GitLab Provider Version 15.7</h1>
+
+<p>Because the GitLab Provider has moved to <a href="https://gitlab.com/gitlab-org/terraform-provider-gitlab">GitLab.com</a>,
+the release cadence and versioning has been
+<a href="https://gitlab.com/gitlab-org/terraform-provider-gitlab/-/issues/1331">aligned</a> with the GitLab
+<a href="https://about.gitlab.com/handbook/engineering/releases/">monthly self-managed release cadence</a>
+starting with 15.7 (22nd Dec 2022).</p>
+
+<p>The version bump from <a href="https://registry.terraform.io/providers/gitlabhq/gitlab/3.20.0"><code>3.20.0</code></a> to
+<a href="https://registry.terraform.io/providers/gitlabhq/gitlab/15.7.0"><code>15.7.0</code></a> introduced a few breaking changes,
+which are described below.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Terraform%20version%201.0"></a><h2 id="terraform-version-10">Terraform version 1.0</h2>
+
+<p>The GitLab Provider upgraded to
+<a href="https://developer.hashicorp.com/terraform/plugin/how-terraform-works#protocol-version-6">Terraform Protocol v6</a>,
+which <strong>requires at least Terraform 1.0</strong>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20token%20is%20now%20sensitive"></a><h2 id="provider-token-is-now-sensitive">Provider token is now sensitive</h2>
+
+<p>The <code>token</code> Provider argument is now marked as
+<a href="https://developer.hashicorp.com/terraform/tutorials/configuration-language/sensitive-variables"><code>sensitive</code></a>.
+This affects current Provider configurations, which read the <code>token</code> value from another non-sensitive Terraform value,
+like an output attribute or variable.</p>
+
+<p>Because the <code>variable "gitlab_token"</code> declaration doesn't mark the variable as <code>sensitive</code>,
+code like the following will break:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"gitlab_token"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"gitlab"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.gitlab_token</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>There are two ways to resolve this issue:</p>
+
+<ul>
+<li><p>If you have control over the token value, mark it as
+<a href="https://developer.hashicorp.com/terraform/language/values/variables#suppressing-values-in-cli-output">sensitive</a>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"gitlab_token"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"gitlab"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.gitlab_token</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+<li><p>If you don't have control over the token value, use the
+<a href="https://developer.hashicorp.com/terraform/language/functions/sensitive"><code>sensitive()</code></a> function to create
+a <em>sensitive</em> copy of the value to use:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"gitlab"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">sensitive</span><span class="p">(</span><span class="nv">some_other_module.gitlab_token</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+            
+        
+    </body></html>

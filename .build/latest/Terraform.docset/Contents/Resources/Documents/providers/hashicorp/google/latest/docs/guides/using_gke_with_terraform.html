@@ -1,0 +1,299 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/using_gke_with_terraform --><head>
+                <title>Using GKE with Terraform</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="using-gke-with-terraform">Using GKE with Terraform</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Visit the <a href="https://learn.hashicorp.com/tutorials/terraform/gke?in=terraform/kubernetes&amp;utm_source=WEBSITE&amp;utm_medium=WEB_IO&amp;utm_offer=ARTICLE_PAGE&amp;utm_content=DOCS">Provision a GKE Cluster (Google Cloud)</a> tutorial to learn how to provision and interact with a GKE cluster.</p>
+</aside>
+
+<p>This page is a brief overview of GKE usage with Terraform, based on the content
+available in the <a href="https://cloud.google.com/kubernetes-engine/docs/how-to">How-to guides for GKE</a>.
+It's intended as a supplement for intermediate users, covering cases that are
+unintuitive or confusing when using Terraform instead of <code>gcloud</code>/the Cloud
+Console.</p>
+
+<p>Additionally, you may consider using Google's <a href="https://registry.terraform.io/modules/terraform-google-modules/kubernetes-engine/google"><code>kubernetes-engine</code></a>
+module, which implements many of these practices for you.</p>
+
+<p>If the information on this page conflicts with recommendations available on
+<code>cloud.google.com</code>, <code>cloud.google.com</code> should be considered the correct source.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Interacting%20with%20Kubernetes"></a><h2 id="interacting-with-kubernetes">Interacting with Kubernetes</h2>
+
+<p>After creating a <code>google_container_cluster</code> with Terraform, you can use <code>gcloud</code> to
+configure cluster access, <a href="https://cloud.google.com/kubernetes-engine/docs/how-to/cluster-access-for-kubectl#generate_kubeconfig_entry">generating a <code>kubeconfig</code> entry</a>:</p>
+
+<div class="codehilite"><pre><span></span><code>gcloud container clusters get-credentials cluster-name
+</code></pre></div>
+
+<p>Using this command, <code>gcloud</code> will generate a <code>kubeconfig</code> entry that uses
+<code>gcloud</code> as an authentication mechanism. However, sometimes performing
+authentication inline with Terraform or a static config without <code>gcloud</code> is more
+desirable.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20the%20Kubernetes%20and%20Helm%20Providers"></a><h3 id="using-the-kubernetes-and-helm-providers">Using the Kubernetes and Helm Providers</h3>
+
+<p>When using the <code>kubernetes</code> and <code>helm</code> providers,
+<a href="https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs#credentials-config">statically defined credentials</a>
+can allow you to connect to clusters defined in the same config or in a remote
+state. You can configure either using configuration such as the following:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Retrieve an access token as the Terraform runner</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"google_client_config"</span><span class="w"> </span><span class="nv">"provider"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"my_cluster"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"kubernetes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://${data.google_container_cluster.my_cluster.endpoint}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.google_client_config.provider.access_token</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_ca_certificate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">base64decode</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="nv">data.google_container_cluster.my_cluster.master_auth[0].cluster_ca_certificate</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Although the above can result in authentication errors, over time, as the token recorded in the google_client_cofig data resource is short lived (thus it expires) and it's stored in state.  Fortunately, the <a href="https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs#exec-plugins">kubernetes provider can accept valid credentials from an exec-based plugin</a> to fetch a new token before each Terraform operation (so long as you have the <a href="https://cloud.google.com/blog/products/containers-kubernetes/kubectl-auth-changes-in-gke">gke-cloud-auth-plugin for kubectl installed</a>), like so:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Retrieve an access token as the Terraform runner</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"google_client_config"</span><span class="w"> </span><span class="nv">"provider"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"my_cluster"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"kubernetes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://${data.google_container_cluster.my_cluster.endpoint}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.google_client_config.provider.access_token</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_ca_certificate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">base64decode</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="nv">data.google_container_cluster.my_cluster.master_auth[0].cluster_ca_certificate</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="nb">exec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">api_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"client.authentication.k8s.io/v1beta1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">command</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"gke-gcloud-auth-plugin"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Alternatively, you can authenticate as another service account on which your
+Terraform user has been granted the <code>roles/iam.serviceAccountTokenCreator</code>
+role:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"google_service_account_access_token"</span><span class="w"> </span><span class="nv">"my_kubernetes_sa"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_service_account</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"{{service_account}}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">scopes</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"userinfo-email", "cloud-platform"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">lifetime</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"3600s"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"my_cluster"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"kubernetes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://${data.google_container_cluster.my_cluster.endpoint}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.google_service_account_access_token.my_kubernetes_sa.access_token</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_ca_certificate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">base64decode</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="nv">data.google_container_cluster.my_cluster.master_auth[0].cluster_ca_certificate</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20kubectl%20/%20kubeconfig"></a><h3 id="using-kubectl-kubeconfig">Using kubectl / kubeconfig</h3>
+
+<p>It's possible to interface with <code>kubectl</code> or other <code>.kubeconfig</code>-based tools by
+providing them a <code>.kubeconfig</code> directly. For situations where <code>gcloud</code> can't be
+used as an authentication mechanism, you can generate a static <code>.kubeconfig</code>
+file instead.</p>
+
+<p>An authentication submodule, <code>auth</code>, is provided as part of Google's
+<a href="https://registry.terraform.io/modules/terraform-google-modules/kubernetes-engine/google"><code>kubernetes-engine</code></a>
+module. You can use it through the module registry, or <a href="https://github.com/terraform-google-modules/terraform-google-kubernetes-engine/tree/master/modules/auth">in the module source</a>.</p>
+
+<p>Authenticating using this method will use a Terraform-generated access token
+which persists for 1 hour. For longer-lasting sessions, or cases where a single
+persistent config is required, using <code>gcloud</code> is advised.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/VPC-native%20Clusters"></a><h2 id="vpc-native-clusters">VPC-native Clusters</h2>
+
+<p><a href="https://cloud.google.com/kubernetes-engine/docs/how-to/alias-ips">VPC-native clusters</a>
+are GKE clusters that use <a href="https://cloud.google.com/vpc/docs/alias-ip">alias IP ranges</a>.
+VPC-native clusters route traffic between pods using a VPC network, and are able
+to route to other VPCs across network peerings along with <a href="https://cloud.google.com/kubernetes-engine/docs/how-to/alias-ips">several other benefits</a>.</p>
+
+<p>In both <code>gcloud</code> and the Cloud Console, VPC-native is the default for new
+clusters and many managed products such as CloudSQL, Memorystore and others
+require VPC Native Clusters to work properly. In Terraform however, the default
+behaviour is to create a routes-based cluster for backwards compatibility.</p>
+
+<p>It's recommended that you create a VPC-native cluster, done by specifying the
+<code>ip_allocation_policy</code> block or using secondary ranges on existing subnet. Configuration will look like the following:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"custom"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"test-subnetwork"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.2.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.custom.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">secondary_ip_range</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">range_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"services-range"</span><span class="w"></span>
+<span class="w">    </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"192.168.1.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">secondary_ip_range</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">range_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"pod-ranges"</span><span class="w"></span>
+<span class="w">    </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"192.168.64.0/22"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"custom"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"test-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"my_vpc_native_cluster"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-vpc-native-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">initial_node_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">network</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.custom.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnetwork</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.custom.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">ip_allocation_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">cluster_secondary_range_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"pod-ranges"</span><span class="w"></span>
+<span class="w">    </span><span class="na">services_secondary_range_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.custom.secondary_ip_range.0.range_name</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # other settings...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Node%20Pool%20Management"></a><h2 id="node-pool-management">Node Pool Management</h2>
+
+<p>In Terraform, we recommend managing your node pools using the
+<code>google_container_node_pool</code> resource, separate from the
+<code>google_container_cluster</code> resource. This separates cluster-level configuration
+like networking and Kubernetes features from the configuration of your nodes.
+Additionally, it helps ensure your cluster isn't inadvertently deleted.
+Terraform struggles to handle complex changes to subresources, and may attempt
+to delete a cluster based on changes to inline node pools.</p>
+
+<p>However, the GKE API doesn't allow creating a cluster without nodes. It's common
+for Terraform users to define a block such as the following:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"my-gke-cluster"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-gke-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="c1"></span>
+
+<span class="c1">  # We can't create a cluster with no node pool defined, but we want to only use</span>
+<span class="c1">  # separately managed node pools. So we create the smallest possible default</span>
+<span class="c1">  # node pool and immediately delete it.</span>
+<span class="w">  </span><span class="na">remove_default_node_pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">initial_node_count</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="c1"></span>
+
+<span class="c1">  # other settings...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>This creates <code>initial_node_count</code> nodes per zone the cluster has nodes in,
+typically 1 zone if the cluster <code>location</code> is a zone, and 3 if it's a <code>region</code>.
+Your cluster's initial GKE masters will be sized based on the
+<code>initial_node_count</code> provided. If subsequent node pools add a large number of
+nodes to your cluster, GKE may cause a resizing event immediately after adding a
+node pool.</p>
+
+<p>The initial node pool will be created using the
+<a href="https://cloud.google.com/compute/docs/access/service-accounts#default_service_account">Compute Engine default service account</a>
+as the <a href="https://cloud.google.com/compute/docs/access/service-accounts#default_service_account"><code>service_account</code></a>.
+If you've disabled that service account, or want to use a
+<a href="https://cloud.google.com/kubernetes-engine/docs/how-to/hardening-your-cluster#use_least_privilege_sa">least privilege Google service account</a>
+for the temporary  node pool, you can add the following configuration to your
+<code>google_container_cluster</code> block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"my-gke-cluster"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # other settings...</span>
+
+<span class="w">  </span><span class="nb">node_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">service_account</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"{{service_account}}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">ignore_changes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"node_config"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # other settings...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Windows%20Node%20Pools"></a><h3 id="windows-node-pools">Windows Node Pools</h3>
+
+<p>You can add
+<a href="https://cloud.google.com/kubernetes-engine/docs/how-to/creating-a-cluster-windows">Windows Server node pools</a>
+to your GKE cluster by adding <code>google_container_node_pool</code> to your Terraform
+configuration with <code>image_type=WINDOWS_LTSC</code> or <code>WINDOWS_SAC</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"demo_cluster"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="c1"> # Replace with your Project ID, https://cloud.google.com/resource-manager/docs/creating-managing-projects#identifying_projects</span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"demo-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west1-a"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">min_master_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1.27"</span><span class="c1"></span>
+
+<span class="c1">  # Enable Alias IPs to allow Windows Server networking.</span>
+<span class="w">  </span><span class="nb">ip_allocation_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">cluster_ipv4_cidr_block</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"/14"</span><span class="w"></span>
+<span class="w">    </span><span class="na">services_ipv4_cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/20"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # Removes the implicit default node pool, recommended when using</span>
+<span class="c1">  # google_container_node_pool.</span>
+<span class="w">  </span><span class="na">remove_default_node_pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">initial_node_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Small Linux node pool to run some Linux-only Kubernetes Pods.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_node_pool"</span><span class="w"> </span><span class="nv">"linux_pool"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"linux-pool"</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">google_container_cluster.demo_cluster.project</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">google_container_cluster.demo_cluster.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">google_container_cluster.demo_cluster.location</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">node_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">image_type</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"COS_CONTAINERD"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Node pool of Windows Server machines.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_node_pool"</span><span class="w"> </span><span class="nv">"windows_pool"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"windows-pool"</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">google_container_cluster.demo_cluster.project</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">google_container_cluster.demo_cluster.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">google_container_cluster.demo_cluster.location</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">node_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"e2-standard-4"</span><span class="w"></span>
+<span class="w">    </span><span class="na">image_type</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"WINDOWS_LTSC"</span><span class="c1"> # Or WINDOWS_SAC for new features.</span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # The Linux node pool must be created before the Windows Server node pool.</span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_container_node_pool.linux_pool</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The example above creates a cluster with a small Linux node pool and a Windows
+Server node pool. The Linux node pool is necessary since some critical pods are
+not yet supported on Windows. Please see
+<a href="https://cloud.google.com/kubernetes-engine/docs/how-to/creating-a-cluster-windows#limitations">Limitations</a>
+for details on features that are not supported by Windows Server node pools.</p>
+
+            
+        
+    </body></html>

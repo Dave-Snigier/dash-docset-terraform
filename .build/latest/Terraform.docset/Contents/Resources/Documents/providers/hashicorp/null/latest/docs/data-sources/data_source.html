@@ -1,0 +1,88 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/null/latest/docs/data-sources/data_source --><head>
+                <title>null_data_source</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="null_data_source">null_data_source</h1>
+
+<p>The <code>null_data_source</code> data source implements the standard data source lifecycle but does not
+interact with any external APIs.</p>
+
+<p>Historically, the <code>null_data_source</code> was typically used to construct intermediate values to re-use elsewhere in configuration. The
+same can now be achieved using <a href="https://developer.hashicorp.com/terraform/language/values/locals">locals</a> or the <a href="https://developer.hashicorp.com/terraform/language/resources/terraform-data">terraform_data resource type</a> in Terraform 1.4 and later.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"green"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">  </span><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"ami-0dcc1e21636832c5d"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"m5.large"</span><span class="c1"></span>
+
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"blue"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">  </span><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"ami-0dcc1e21636832c5d"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"m5.large"</span><span class="c1"></span>
+
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"null_data_source"</span><span class="w"> </span><span class="nv">"values"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">all_server_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">concat</span><span class="p">(</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_instance.green</span><span class="p">[</span><span class="err">*</span><span class="p">].</span><span class="err">id</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_instance.blue</span><span class="p">[</span><span class="err">*</span><span class="p">].</span><span class="err">id</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="na">all_server_ips</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">concat</span><span class="p">(</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_instance.green</span><span class="p">[</span><span class="err">*</span><span class="p">].</span><span class="err">private_ip</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_instance.blue</span><span class="p">[</span><span class="err">*</span><span class="p">].</span><span class="err">private_ip</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_elb"</span><span class="w"> </span><span class="nv">"main"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">instances</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.null_data_source.values.outputs</span><span class="p">[</span><span class="s2">"all_server_ids"</span><span class="p">]</span><span class="c1"></span>
+
+<span class="c1">  # ...</span>
+<span class="w">  </span><span class="nb">listener</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_port</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">8000</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_protocol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"http"</span><span class="w"></span>
+<span class="w">    </span><span class="na">lb_port</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="m">80</span><span class="w"></span>
+<span class="w">    </span><span class="na">lb_protocol</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"http"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"all_server_ids"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.null_data_source.values.outputs</span><span class="p">[</span><span class="s2">"all_server_ids"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"all_server_ips"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.null_data_source.values.outputs</span><span class="p">[</span><span class="s2">"all_server_ips"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<!-- schema generated by tfplugindocs -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Schema"></a><h2 id="schema">Schema</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Optional"></a><h3 id="optional">Optional</h3>
+
+<ul>
+<li><code>has_computed_default</code> (String) If set, its literal value will be stored and returned. If not, its value defaults to <code>"default"</code>. This argument exists primarily for testing and has little practical use.</li>
+<li><code>inputs</code> (Map of String) A map of arbitrary strings that is copied into the <code>outputs</code> attribute, and accessible directly for interpolation.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Read-Only"></a><h3 id="read-only">Read-Only</h3>
+
+<ul>
+<li><code>id</code> (String, Deprecated) This attribute is only present for some legacy compatibility issues and should not be used. It will be removed in a future version.</li>
+<li><code>outputs</code> (Map of String) After the data source is "read", a copy of the <code>inputs</code> map.</li>
+<li><code>random</code> (String) A random value. This is primarily for testing and has little practical use; prefer the <a href="https://registry.terraform.io/providers/hashicorp/random">hashicorp/random provider</a> for more practical random number use-cases.</li>
+</ul>
+
+            
+        
+    </body></html>

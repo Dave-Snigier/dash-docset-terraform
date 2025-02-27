@@ -1,0 +1,225 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs --><head>
+                <title>Kubernetes Provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="kubernetes-provider">Kubernetes Provider</h1>
+
+<p>The Kubernetes (K8S) provider is used to interact with the resources supported by Kubernetes. The provider needs to be configured with the proper credentials before it can be used.</p>
+
+<p>Use the navigation to the left to read about the available resources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"kubernetes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">config_path</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"~/.kube/config"</span><span class="w"></span>
+<span class="w">  </span><span class="na">config_context</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-context"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"kubernetes_namespace"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">metadata</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-first-namespace"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Kubernetes%20versions"></a><h2 id="kubernetes-versions">Kubernetes versions</h2>
+
+<p>Both backward and forward compatibility with Kubernetes API is mostly defined by the <a href="https://github.com/kubernetes/kubernetes">official K8S Go library</a> (prior to <code>1.1</code> release) and <a href="https://github.com/kubernetes/client-go">client Go library</a> which we ship with Terraform. Below are versions of the library bundled with given versions of Terraform.</p>
+
+<ul>
+<li>Terraform <code>&lt;= 0.9.6</code> (prior to provider split) - Kubernetes <code>1.5.4</code></li>
+<li>Terraform <code>0.9.7</code> (prior to provider split) <code>&lt; 1.1</code> (provider version) - Kubernetes <code>1.6.1</code></li>
+<li><code>1.1+</code> - Kubernetes <code>1.7</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Stacking%20with%20managed%20Kubernetes%20cluster%20resources"></a><h2 id="stacking-with-managed-kubernetes-cluster-resources">Stacking with managed Kubernetes cluster resources</h2>
+
+<p>Terraform providers for various cloud providers feature resources to spin up managed Kubernetes clusters on services such as EKS, AKS and GKE. Such resources (or data-sources) will have attributes that expose the credentials needed for the Kubernetes provider to connect to these clusters.</p>
+
+<p>To use these credentials with the Kubernetes provider, they can be interpolated into the respective attributes of the Kubernetes provider configuration block.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>WARNING</em>
+    <p>When using interpolation to pass credentials to the Kubernetes provider from other resources, these resources SHOULD NOT be created in the same Terraform module where Kubernetes provider resources are also used. This will lead to intermittent and unpredictable errors which are hard to debug and diagnose. The root issue lies with the order in which Terraform itself evaluates the provider blocks vs. actual resources. Please refer to <a href="https://www.terraform.io/docs/configuration/providers.html#provider-configuration">this section of Terraform docs</a> for further explanation.</p>
+</aside>
+
+<p>The most reliable way to configure the Kubernetes provider is to ensure that the cluster itself and the Kubernetes provider resources can be managed with separate <code>apply</code> operations. Data-sources can be used to convey values between the two stages as needed.</p>
+
+<p>For specific usage examples, see the guides for <a href="https://github.com/hashicorp/terraform-provider-kubernetes/blob/main/_examples/aks/README.md">AKS</a>, <a href="https://github.com/hashicorp/terraform-provider-kubernetes/blob/main/_examples/eks/README.md">EKS</a>, and <a href="https://github.com/hashicorp/terraform-provider-kubernetes/blob/main/_examples/gke/README.md">GKE</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Authentication"></a><h2 id="authentication">Authentication</h2>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>NOTE: The provider does not use the <code>KUBECONFIG</code> environment variable by default. See the attribute reference below for the environment variables that map to provider block attributes.</p>
+</aside>
+
+<p>The Kubernetes provider can get its configuration in two ways:</p>
+
+<ol>
+<li><em>Explicitly</em> by supplying attributes to the provider block. This includes:
+<ul>
+<li><a href="#file-config">Using a kubeconfig file</a></li>
+<li><a href="#credentials-config">Supplying credentials</a></li>
+<li><a href="#exec-plugins">Exec plugins</a></li>
+</ul></li>
+<li><em>Implicitly</em> through environment variables. This includes:
+<ul>
+<li><a href="#in-cluster-config">Using the in-cluster config</a></li>
+</ul></li>
+</ol>
+
+<p>The provider always first tries to load <strong>a config file</strong> from a given location when <code>config_path</code> or <code>config_paths</code> (or their equivalent environment variables) are set. Depending on whether you have a current context set this <em>may</em> require <code>config_context_auth_info</code> and/or <code>config_context_cluster</code> and/or <code>config_context</code>.</p>
+
+<p>For a full list of supported provider authentication arguments and their corresponding environment variables, see the <a href="#argument-reference">argument reference</a> below.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/File%20config"></a><h3 id="file-config">File config</h3>
+
+<p>The easiest way is to supply a path to your kubeconfig file using the <code>config_path</code> attribute or using the <code>KUBE_CONFIG_PATH</code> environment variable. A kubeconfig file may have multiple contexts. If <code>config_context</code> is not specified, the provider will use the <code>default</code> context.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"kubernetes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">config_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~/.kube/config"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The provider also supports multiple paths in the same way that kubectl does using the <code>config_paths</code> attribute or <code>KUBE_CONFIG_PATHS</code> environment variable.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"kubernetes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">config_paths</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"/path/to/config_a.yaml"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"/path/to/config_b.yaml"</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Credentials%20config"></a><h3 id="credentials-config">Credentials config</h3>
+
+<p>You can also configure the host, basic auth credentials, and client certificate authentication explicitly or through environment variables.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"kubernetes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://cluster_endpoint:port"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">client_certificate</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="p">(</span><span class="s2">"~/.kube/client-cert.pem"</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_key</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="p">(</span><span class="s2">"~/.kube/client-key.pem"</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_ca_certificate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="p">(</span><span class="s2">"~/.kube/cluster-ca-cert.pem"</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/In-cluster%20Config"></a><h3 id="in-cluster-config">In-cluster Config</h3>
+
+<p>The provider uses the <code>KUBERNETES_SERVICE_HOST</code> and <code>KUBERNETES_SERVICE_PORT</code> environment variables to detect when it is running inside a cluster, so in this case you do not need to specify any attributes in the provider block if you want to connect to the local kubernetes cluster.</p>
+
+<p>If you want to connect to a different cluster than the one terraform is running inside, configure the provider as <a href="#credentials-config">above</a>.</p>
+
+<p>Find more comprehensive <code>in-cluster</code> config example <a href="https://github.com/hashicorp/terraform-provider-kubernetes/tree/main/_examples/in-cluster">here</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exec%20plugins"></a><h2 id="exec-plugins">Exec plugins</h2>
+
+<p>Some cloud providers have short-lived authentication tokens that can expire relatively quickly. To ensure the Kubernetes provider is receiving valid credentials, an exec-based plugin can be used to fetch a new token before each Terraform operation. For example, on EKS, the command <code>eks get-token</code> can be used:</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>IMPORTANT: DO NOT mix <code>exec</code> blocks with other credential attributes such as <code>token</code> or <code>client_certificate</code> in the provider configuration. This leads to undefined behaviour and there is no guarantee about which credential will actually be used.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"kubernetes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.cluster_endpoint</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_ca_certificate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">base64decode</span><span class="p">(</span><span class="nv">var.cluster_ca_cert</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="nb">exec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">api_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"client.authentication.k8s.io/v1beta1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">args</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"eks", "get-token", "--cluster-name"</span><span class="p">,</span><span class="w"> </span><span class="nv">var.cluster_name</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">command</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Examples"></a><h2 id="examples">Examples</h2>
+
+<p>For further reading, see these examples which demonstrate different approaches to keeping the cluster credentials up to date: <a href="https://github.com/hashicorp/terraform-provider-kubernetes/blob/main/_examples/aks/README.md">AKS</a>, <a href="https://github.com/hashicorp/terraform-provider-kubernetes/blob/main/_examples/eks/README.md">EKS</a>, and <a href="https://github.com/hashicorp/terraform-provider-kubernetes/blob/main/_examples/gke/README.md">GKE</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Ignore%20Kubernetes%20annotations%20and%20labels"></a><h2 id="ignore-kubernetes-annotations-and-labels">Ignore Kubernetes annotations and labels</h2>
+
+<p>In certain cases, external systems can add and modify resources annotations and labels for their own purposes. However, Terraform will remove them since they are not presented in the code. It also might be hard to update code accordingly to stay tuned with the changes that come outside. In order to address this <code>ignore_annotations</code> and <code>ignore_labels</code> attributes were introduced on the provider level. They allow Terraform to ignore certain annotations and labels across all resources.</p>
+
+<p>Both attributes support RegExp to match metadata objects more effectively.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>RegExp will only work on root metadata objects. It's currently not possible to use RegExp for ignoring annotations/labels in metadata objects that are nested such as <code>spec.template.metadata[0].annotations["..."]</code>.</p>
+</aside>
+
+<p>Please keep in mind that all data sources remain unaffected, and the provider always returns all labels and annotations, despite the <code>ignore_annotations</code> and <code>ignore_labels</code> settings. The same applies to the pod and job definitions that fall under templates. To ignore certain annotations and/or labels on the template level, please use the <code>ignore_changes</code> feature of the <a href="https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle">lifecycle</a> meta-argument.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Examples"></a><h3 id="examples-2">Examples</h3>
+
+<p>The following example demonstrates how to ignore changes related to the <code>kubectl.kubernetes.io/restartedAt</code> annotation that were made in the upstream Kubernetes object:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"kubernetes_deployment_v1"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  // omit the resource config</span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">ignore_changes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="nv">spec[0].template[0].metadata[0].annotations</span><span class="p">[</span><span class="s2">"kubectl.kubernetes.io/restartedAt"</span><span class="p">],</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The following example demonstrates how to ignore particular annotation keys:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"kubernetes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">ignore_annotations</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"cni\\.projectcalico\\.org\\/podIP"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"cni\\.projectcalico\\.org\\/podIPs"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Next example demonstrates how to ignore AWS load balancer annotations:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"kubernetes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">ignore_annotations</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"^service\\.beta\\.kubernetes\\.io\\/aws-load-balancer.*"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Since dot <code>.</code>, forward slash <code>/</code>, and some other symbols have special meaning in RegExp, they should be escaped by adding a double backslash in front of them if you want to use them as they are.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>host</code> - (Optional) The hostname (in form of URI) of the Kubernetes API. Can be sourced from <code>KUBE_HOST</code>.</li>
+<li><code>username</code> - (Optional) The username to use for HTTP basic authentication when accessing the Kubernetes API. Can be sourced from <code>KUBE_USER</code>.</li>
+<li><code>password</code> - (Optional) The password to use for HTTP basic authentication when accessing the Kubernetes API. Can be sourced from <code>KUBE_PASSWORD</code>.</li>
+<li><code>insecure</code> - (Optional) Whether the server should be accessed without verifying the TLS certificate. Can be sourced from <code>KUBE_INSECURE</code>. Defaults to <code>false</code>.</li>
+<li><code>tls_server_name</code> - (Optional) Server name passed to the server for SNI and is used in the client to check server certificates against. Can be sourced from <code>KUBE_TLS_SERVER_NAME</code>.</li>
+<li><code>client_certificate</code> - (Optional) PEM-encoded client certificate for TLS authentication. Can be sourced from <code>KUBE_CLIENT_CERT_DATA</code>.</li>
+<li><code>client_key</code> - (Optional) PEM-encoded client certificate key for TLS authentication. Can be sourced from <code>KUBE_CLIENT_KEY_DATA</code>.</li>
+<li><code>cluster_ca_certificate</code> - (Optional) PEM-encoded root certificates bundle for TLS authentication. Can be sourced from <code>KUBE_CLUSTER_CA_CERT_DATA</code>.</li>
+<li><code>config_path</code> - (Optional) A path to a kube config file. Can be sourced from <code>KUBE_CONFIG_PATH</code>.</li>
+<li><code>config_paths</code> - (Optional) A list of paths to the kube config files. Can be sourced from <code>KUBE_CONFIG_PATHS</code>.</li>
+<li><code>config_context</code> - (Optional) Context to choose from the config file. Can be sourced from <code>KUBE_CTX</code>.</li>
+<li><code>config_context_auth_info</code> - (Optional) Authentication info context of the kube config (name of the kubeconfig user, <code>--user</code> flag in <code>kubectl</code>). Can be sourced from <code>KUBE_CTX_AUTH_INFO</code>.</li>
+<li><code>config_context_cluster</code> - (Optional) Cluster context of the kube config (name of the kubeconfig cluster, <code>--cluster</code> flag in <code>kubectl</code>). Can be sourced from <code>KUBE_CTX_CLUSTER</code>.</li>
+<li><code>token</code> - (Optional) Token of your service account. Can be sourced from <code>KUBE_TOKEN</code>.</li>
+<li><code>proxy_url</code> - (Optional) URL to the proxy to be used for all API requests. URLs with "http", "https", and "socks5" schemes are supported. Can be sourced from <code>KUBE_PROXY_URL</code>.</li>
+<li><code>exec</code> - (Optional) Configuration block to use an [exec-based credential plugin] (https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins), e.g. call an external command to receive user credentials.</li>
+<li><code>api_version</code> - (Required) API version to use when decoding the ExecCredentials resource, e.g. <code>client.authentication.k8s.io/v1beta1</code>.</li>
+<li><code>command</code> - (Required) Command to execute.</li>
+<li><code>args</code> - (Optional) List of arguments to pass when executing the plugin.</li>
+<li><code>env</code> - (Optional) Map of environment variables to set when executing the plugin.</li>
+<li><code>ignore_annotations</code> - (Optional) List of Kubernetes metadata annotations to ignore across all resources handled by this provider for situations where external systems are managing certain resource annotations. This option does not affect annotations within a template block. Each item is a regular expression.</li>
+<li><code>ignore_labels</code> - (Optional) List of Kubernetes metadata labels to ignore across all resources handled by this provider for situations where external systems are managing certain resource labels. This option does not affect annotations within a template block. Each item is a regular expression.</li>
+</ul>
+
+            
+        
+    </body></html>

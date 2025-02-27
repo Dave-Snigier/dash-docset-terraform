@@ -1,0 +1,219 @@
+<html><!-- Online page at https://registry.terraform.io/providers/terraform-provider-openstack/openstack/latest/docs/guides/upgrade-guide-version-3 --><head>
+                <title>Terraform Openstack Provider Version 3.0 Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <p>Version 3.0.0 of the OpenStack provider for Terraform is a major release that includes several important changes. This guide is intended to assist you in managing the upgrade process.</p>
+
+<p>Most of the changes described in this guide were previously marked as deprecated in the <code>terraform plan/apply</code> output in earlier provider releases. You can review these changes, including deprecation notices, in the <a href="https://github.com/terraform-provider-openstack/terraform-provider-openstack/blob/main/CHANGELOG.md">Terraform OpenStack Provider CHANGELOG</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Table%20of%20Contents%3A"></a><h3 id="table-of-contents">Table of Contents:</h3>
+
+<ul>
+<li><a href="#provider-version-configuration">Provider Version Configuration</a></li>
+<li><a href="#compute-floating-ips-api-removal">Compute Floating IPs API Removal</a></li>
+<li><a href="#compute-security-groups-api-removal">Compute Security Groups API Removal</a></li>
+<li><a href="#compute-project-networks-api-removal">Compute Project Networks API Removal</a></li>
+<li><a href="#other-resource-and-data-source-removals">Other Resource and Data Source Removals</a></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Version%20Configuration"></a><h2 id="provider-version-configuration">Provider Version Configuration</h2>
+
+<p>When configuring Terraform providers, always use <a href="https://www.terraform.io/docs/configuration/providers.html#provider-versions">version constraints</a>. If you have implemented version constraints, update them accordingly in your configuration and run <a href="https://www.terraform.io/docs/commands/init.html"><code>terraform init -upgrade</code></a> to download the latest version.</p>
+
+<p>For example, if your previous configuration looked like this:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">openstack</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-provider-openstack/openstack"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 2.1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"openstack"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # Configuration options</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>You should update it to the following:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">openstack</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-provider-openstack/openstack"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 3.0.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"openstack"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # Configuration options</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Compute%20Floating%20IPs%20API%20Removal"></a><h2 id="compute-floating-ips-api-removal">Compute Floating IPs API Removal</h2>
+
+<p>The Compute Floating IPs API has been <a href="https://docs.openstack.org/api-ref/compute/#floating-ips-os-floating-ips-deprecated">deprecated</a> in the OpenStack Nova service and <a href="https://github.com/gophercloud/gophercloud/blob/master/docs/MIGRATING.md">removed</a> from the Gophercloud v2 SDK. This removal requires manual changes in your existing Terraform configuration.</p>
+
+<p>For example, the following configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"openstack_compute_floatingip_v2"</span><span class="w"> </span><span class="nv">"floatip_1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"public"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"openstack_compute_floatingip_associate_v2"</span><span class="w"> </span><span class="nv">"fip"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">openstack_compute_instance_v2.my_instance.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">floating_ip</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">openstack_compute_floatingip_v2.floatip_1.address</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>should be changed to:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"openstack_networking_floatingip_v2"</span><span class="w"> </span><span class="nv">"floatip_1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"public"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"openstack_networking_port_v2"</span><span class="w"> </span><span class="nv">"port"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">device_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">openstack_compute_instance_v2.my_instance.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">openstack_compute_instance_v2.my_instance.network.0.uuid</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"openstack_networking_floatingip_associate_v2"</span><span class="w"> </span><span class="nv">"fip_associate"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">floating_ip</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">openstack_networking_floatingip_v2.floatip_1.address</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">data.openstack_networking_port_v2.port.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Compute%20Security%20Groups%20API%20Removal"></a><h2 id="compute-security-groups-api-removal">Compute Security Groups API Removal</h2>
+
+<p>The Compute Security Groups API has been <a href="https://docs.openstack.org/api-ref/compute/#security-groups-os-security-groups-deprecated">deprecated</a> in the OpenStack Nova service and <a href="https://github.com/gophercloud/gophercloud/blob/master/docs/MIGRATING.md">removed</a> from the Gophercloud v2 SDK. This change is not transparent to users and requires updates to your configuration.</p>
+
+<p>For example, the following configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"openstack_compute_secgroup_v2"</span><span class="w"> </span><span class="nv">"secgroup_1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"secgroup_1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"a security group"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">from_port</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">22</span><span class="w"></span>
+<span class="w">    </span><span class="na">to_port</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">22</span><span class="w"></span>
+<span class="w">    </span><span class="na">ip_protocol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">    </span><span class="na">cidr</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.0.0.0/0"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>should be updated to:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"openstack_networking_secgroup_v2"</span><span class="w"> </span><span class="nv">"secgroup_1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"secgroup_1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"a security group"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"openstack_networking_secgroup_rule_v2"</span><span class="w"> </span><span class="nv">"secgroup_rule_1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">direction</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"ingress"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ethertype</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"IPv4"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_range_min</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">22</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_range_max</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">22</span><span class="w"></span>
+<span class="w">  </span><span class="na">remote_ip_prefix</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.0.0.0/0"</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_group_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">openstack_networking_secgroup_v2.secgroup_1.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Compute%20Project%20Networks%20API%20Removal"></a><h2 id="compute-project-networks-api-removal">Compute Project Networks API Removal</h2>
+
+<p>The Compute Project Networks API has been <a href="https://docs.openstack.org/api-ref/compute/#project-networks-os-tenant-networks-deprecated">deprecated</a> in the OpenStack Nova service and <a href="https://github.com/gophercloud/gophercloud/blob/master/docs/MIGRATING.md">removed</a> from the Gophercloud v2 SDK. This change is transparent to users, and no modifications to existing configurations are required.</p>
+
+<p>This API was used in the <code>openstack_compute_instance_v2</code> resource when the <code>OS_NOVA_NETWORK</code> environment variable was set. If you are using this variable, it should be removed from your configuration, and you should switch to using the Neutron API.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Other%20Resource%20and%20Data%20Source%20Removals"></a><h2 id="other-resource-and-data-source-removals">Other Resource and Data Source Removals</h2>
+
+<p>Several data sources have been removed in this version:</p>
+
+<table>
+<thead>
+<tr>
+  <th>Data Source</th>
+  <th>Replacement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>openstack_blockstorage_snapshot_v2</code></td>
+  <td><code>openstack_blockstorage_snapshot_v3</code></td>
+</tr>
+<tr>
+  <td><code>openstack_blockstorage_volume_v2</code></td>
+  <td><code>openstack_blockstorage_volume_v3</code></td>
+</tr>
+<tr>
+  <td><code>openstack_fw_policy_v1</code></td>
+  <td><code>openstack_fw_policy_v2</code></td>
+</tr>
+</tbody>
+</table>
+
+<p>In addition, the following resources have been removed:</p>
+
+<table>
+<thead>
+<tr>
+  <th>Resource</th>
+  <th>Replacement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>openstack_blockstorage_quotaset_v2</code></td>
+  <td><code>openstack_blockstorage_quotaset_v3</code></td>
+</tr>
+<tr>
+  <td><code>openstack_blockstorage_volume_v1</code></td>
+  <td><code>openstack_blockstorage_volume_v3</code></td>
+</tr>
+<tr>
+  <td><code>openstack_blockstorage_volume_v2</code></td>
+  <td><code>openstack_blockstorage_volume_v3</code></td>
+</tr>
+<tr>
+  <td><code>openstack_blockstorage_volume_attach_v2</code></td>
+  <td><code>openstack_blockstorage_volume_attach_v3</code></td>
+</tr>
+<tr>
+  <td><code>openstack_fw_firewall_v1</code></td>
+  <td><code>openstack_fw_group_v2</code></td>
+</tr>
+<tr>
+  <td><code>openstack_fw_policy_v1</code></td>
+  <td><code>openstack_fw_policy_v2</code></td>
+</tr>
+<tr>
+  <td><code>openstack_fw_rule_v1</code></td>
+  <td><code>openstack_fw_rule_v2</code></td>
+</tr>
+<tr>
+  <td><code>openstack_lb_member_v1</code></td>
+  <td><code>openstack_lb_member_v2</code></td>
+</tr>
+<tr>
+  <td><code>openstack_lb_monitor_v1</code></td>
+  <td><code>openstack_lb_monitor_v2</code></td>
+</tr>
+<tr>
+  <td><code>openstack_lb_pool_v1</code></td>
+  <td><code>openstack_lb_pool_v2</code></td>
+</tr>
+<tr>
+  <td><code>openstack_lb_vip_v1</code></td>
+  <td><code>openstack_lb_loadbalancer_v2</code>, <code>openstack_lb_listener_v2</code>, <code>openstack_networking_floatingip_associate_v2</code></td>
+</tr>
+</tbody>
+</table>
+
+            
+        
+    </body></html>

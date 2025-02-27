@@ -1,0 +1,191 @@
+<html><!-- Online page at https://registry.terraform.io/providers/confluentinc/confluent/latest/docs/guides/resource-importer --><head>
+                <title>Resource Importer for Confluent Terraform Provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-importer-for-confluent-terraform-provider">Resource Importer for Confluent Terraform Provider</h1>
+
+<p><a href="https://docs.confluent.io/cloud/current/api.html#section/Versioning/API-Lifecycle-Policy"><img alt="General Availability" src="https://img.shields.io/badge/Lifecycle%20Stage-General%20Availability-%2345c6e8"/></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Summary"></a><h2 id="summary">Summary</h2>
+
+<p><a href="https://asciinema.org/a/574292"><img alt="asciicast" src="https://asciinema.org/a/574292.svg"/></a></p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Running _Resource Importer for Confluent Terraform Provider_ is a read-only operation. It will not edit Confluent Cloud infrastructure. For additional safety, the _Resource Importer for Confluent Terraform Provider_ adds <code>lifecycle { prevent_destroy = true }</code> for every imported instance to prevent accidental instance deletion. This setting rejects plans that would destroy or recreate the instance, such as attempting to change uneditable attributes. For more information, see the <a href="https://www.terraform.io/language/meta-arguments/lifecycle#prevent_destroy">Terraform docs</a>.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>_Resource Importer for Confluent Terraform Provider_ is particularly useful when importing a lot of existing Confluent Cloud resources to Terraform when running <code>terraform import</code> for every resource is tedious. For example, it's useful if you want to migrate to TF Provider for Confluent from other TF Providers for managing Confluent Cloud resources. It's also super convenient if you have been using the Confluent Cloud Console or Confluent CLI to manage your Confluent Cloud resources but now need to import 1000s of ACLs and 100s of Service Accounts into Terraform.</p>
+</aside>
+
+<p>_Resource Importer for Confluent Terraform Provider_ enables importing your existing Confluent Cloud resources to Terraform Configuration (<code>main.tf</code>) and Terraform State (<code>terraform.tfstate</code>) files to a local directory named <code>imported_confluent_infrastructure</code>.</p>
+
+<p>These are the importable resources:</p>
+
+<ul>
+<li><a href="https://registry.terraform.io/providers/confluentinc/confluent/latest/docs/resources/confluent_service_account">Service Accounts</a></li>
+<li><a href="https://registry.terraform.io/providers/confluentinc/confluent/latest/docs/resources/confluent_environment">Environments</a></li>
+<li><a href="https://registry.terraform.io/providers/confluentinc/confluent/latest/docs/resources/confluent_connector">Connectors</a></li>
+<li><a href="https://registry.terraform.io/providers/confluentinc/confluent/latest/docs/resources/confluent_kafka_cluster">Kafka Clusters</a></li>
+<li><a href="https://registry.terraform.io/providers/confluentinc/confluent/latest/docs/resources/confluent_kafka_acl">Access Control Lists (ACLs)</a></li>
+<li><a href="https://registry.terraform.io/providers/confluentinc/confluent/latest/docs/resources/confluent_kafka_topic">Topics</a></li>
+<li><a href="https://registry.terraform.io/providers/confluentinc/confluent/latest/docs/resources/confluent_schema">Schemas</a></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p><a href="https://github.com/confluentinc/terraform-provider-confluent/issues">File an issue</a> to request a support for other resources.</p>
+</aside>
+
+<p>In this guide, you will:</p>
+
+<ol>
+<li><a href="#create-a-cloud-api-key">Create a Cloud API Key</a>
+<ul>
+<li>Create a <a href="https://docs.confluent.io/cloud/current/access-management/identity/service-accounts.html">service account</a> named <code>tf_runner</code> in Confluent Cloud</li>
+<li>Assign the <code>OrganizationAdmin</code> <a href="https://docs.confluent.io/cloud/current/access-management/access-control/cloud-rbac.html#organizationadmin">role</a> to the <code>tf_runner</code> service account</li>
+<li>Create a <a href="https://docs.confluent.io/cloud/current/access-management/authenticate/api-keys/api-keys.html#cloud-cloud-api-keys">Cloud API Key</a> for the <code>tf_runner</code> service account</li>
+</ul></li>
+<li><a href="#import-confluent-cloud-resources-via-terraform">Import Confluent Cloud Resources via Terraform</a>
+<ul>
+<li>Select the appropriate Terraform configuration from a list of example configurations</li>
+<li>Initialize and apply the selected Terraform configuration</li>
+</ul></li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Prerequisites"></a><h2 id="prerequisites">Prerequisites</h2>
+
+<ol>
+<li>A Confluent Cloud account. If you don't have a Confluent Cloud account, <a href="https://www.confluent.io/confluent-cloud/tryfree/">create one now</a>. </li>
+<li><p>Terraform (0.14+) installed:</p>
+
+<ul>
+<li>Install Terraform version manager <a href="https://github.com/tfutils/tfenv">tfutils/tfenv</a></li>
+<li>Alternatively, install the <a href="https://learn.hashicorp.com/tutorials/terraform/install-cli#install-terraform">Terraform CLI</a></li>
+<li><p>Run the following command to ensure that you're using a compatible version of Terraform.</p>
+
+<div class="codehilite"><pre><span></span><code>terraform version
+</code></pre></div>
+
+<p>Your output should resemble:</p>
+
+<div class="codehilite"><pre><span></span><code>Terraform v0.14.0 <span class="c1"># any version &gt;= v0.14.0 is OK</span>
+...
+</code></pre></div></li>
+</ul></li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Create%20a%20Cloud%20API%20Key"></a><h2 id="create-a-cloud-api-key">Create a Cloud API Key</h2>
+
+<ol>
+<li>Open the <a href="https://confluent.cloud/settings/api-keys/create">Confluent Cloud Console</a> and click the <strong>Granular access</strong> tab, and then click <strong>Next</strong>.</li>
+<li>Click <strong>Create a new one to create</strong> tab. Enter the new service account name (<code>tf_runner</code>), then click <strong>Next</strong>.</li>
+<li>The Cloud API key and secret are generated for the <code>tf_runner</code> service account. Save your Cloud API key and secret in a secure location. You will need this API key and secret <strong>to use the Confluent Terraform Provider</strong>.</li>
+<li><a href="https://confluent.cloud/settings/org/assignments">Assign</a> the <code>OrganizationAdmin</code> role to the <code>tf_runner</code> service account by following <a href="https://docs.confluent.io/cloud/current/access-management/access-control/cloud-rbac.html#add-a-role-binding-for-a-user-or-service-account">this guide</a>.</li>
+</ol>
+
+<p><img alt="Assigning the OrganizationAdmin role to tf_runner service account" src="https://github.com/confluentinc/terraform-provider-confluent/raw/master/docs/images/OrganizationAdmin.png"/></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import%20Confluent%20Cloud%20Resources%20via%20Terraform"></a><h2 id="import-confluent-cloud-resources-via-terraform">Import Confluent Cloud Resources via Terraform</h2>
+
+<ol>
+<li><p>Clone the <a href="https://github.com/confluentinc/terraform-provider-confluent">repository</a> containing the example configurations:</p>
+
+<div class="codehilite"><pre><span></span><code>git clone https://github.com/confluentinc/terraform-provider-confluent.git
+</code></pre></div></li>
+<li><p>Navigate into the <code>configurations</code> subdirectory:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">cd</span> terraform-provider-confluent/examples/configurations
+</code></pre></div></li>
+<li><p>The <code>configurations</code> directory has a subdirectory for each of the following configurations:</p>
+
+<ul>
+<li><a href="https://github.com/confluentinc/terraform-provider-confluent/tree/master/examples/configurations/cloud-importer"><code>cloud-importer</code></a>: Import _Cloud_ resources (for example, Service Accounts, Environments)</li>
+<li><a href="https://github.com/confluentinc/terraform-provider-confluent/tree/master/examples/configurations/kafka-importer"><code>kafka-importer</code></a>: Import _Kafka_ resources (for example, ACLs, Topics)</li>
+<li><a href="https://github.com/confluentinc/terraform-provider-confluent/tree/master/examples/configurations/schema-registry-importer"><code>schema-registry-importer</code></a>: Import _Schema Registry_ resources (for example, Schemas)</li>
+</ul></li>
+<li><p>Select the target configuration and navigate into its directory:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Using the example configuration #1 as an example </span>
+<span class="nb">cd</span> cloud-importer
+</code></pre></div></li>
+<li><p>Download and install the providers defined in the configuration:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform init
+</code></pre></div></li>
+<li><p>Use the saved Cloud API Key of the <code>tf_runner</code> service account to set values to the <code>confluent_cloud_api_key</code> and <code>confluent_cloud_api_secret</code> input variables <a href="https://www.terraform.io/language/values/variables#environment-variables">using environment variables</a>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span> <span class="nv">TF_VAR_confluent_cloud_api_key</span><span class="o">=</span><span class="s2">"&lt;cloud_api_key&gt;"</span>
+<span class="nb">export</span> <span class="nv">TF_VAR_confluent_cloud_api_secret</span><span class="o">=</span><span class="s2">"&lt;cloud_api_secret&gt;"</span>
+</code></pre></div></li>
+<li><p>Ensure the configuration is syntactically valid and internally consistent:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform validate
+</code></pre></div></li>
+<li><p>Apply the configuration:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform apply
+</code></pre></div></li>
+<li><p>You have now imported Confluent Cloud infrastructure using Terraform under <code>cloud-importer/imported_confluent_infrastructure</code>! The <code>terraform apply</code> command created a new folder called <code>cloud-importer/imported_confluent_infrastructure</code> that contains 2 files: Terraform Configuration (<code>main.tf</code>) and Terraform State (<code>terraform.tfstate</code>) files.</p></li>
+<li><p>Navigate into its directory:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Using the example configuration #1 as an example </span>
+<span class="nb">cd</span> imported_confluent_infrastructure
+</code></pre></div></li>
+<li><p>Download and install the providers defined in the configuration:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform init
+</code></pre></div>
+
+<p>Your output should resemble:</p>
+
+<div class="codehilite"><pre><span></span><code>...
+Terraform has been successfully initialized!
+
+You may now begin working with Terraform. Try running <span class="s2">"terraform plan"</span> to see
+any changes that are required <span class="k">for</span> your infrastructure. All Terraform commands
+should now work.
+
+If you ever <span class="nb">set</span> or change modules or backend configuration <span class="k">for</span> Terraform,
+rerun this <span class="nb">command</span> to reinitialize your working directory. If you forget, other
+commands will detect it and remind you to <span class="k">do</span> so <span class="k">if</span> necessary.
+</code></pre></div></li>
+<li><p>Refresh the configuration:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform refresh
+</code></pre></div>
+
+<p>Your output should resemble:</p>
+
+<div class="codehilite"><pre><span></span><code>...
+confluent_service_account.test_account: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>sa-oz5q19<span class="o">]</span>
+...
+</code></pre></div></li>
+<li><p>Ensure that import is successful by running <code>terraform plan</code>:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform plan
+</code></pre></div>
+
+<p>Your output should resemble:</p>
+
+<div class="codehilite"><pre><span></span><code>...
+confluent_service_account.test_account: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>sa-oz5q19<span class="o">]</span>
+
+No changes. Your infrastructure matches the configuration.
+
+Terraform has compared your real infrastructure against your configuration and found no differences, so no changes are needed.
+</code></pre></div></li>
+</ol>
+
+<p>You've successfully imported your Confluent Cloud infrastructure to Terraform. Terraform also compared your real infrastructure against your imported configuration and found no differences, so no changes are needed.</p>
+
+            
+        
+    </body></html>

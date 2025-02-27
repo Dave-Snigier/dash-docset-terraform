@@ -1,0 +1,324 @@
+<html><!-- Online page at https://registry.terraform.io/providers/gitlabhq/gitlab/latest/docs/resources/project --><head>
+                <title>gitlab_project</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="gitlab_project-resource">gitlab_project (Resource)</h1>
+
+<p>The <code>gitlab_project</code> resource allows to manage the lifecycle of a project.</p>
+
+<p>A project can either be created in a group or user namespace.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Default Branch Protection Workaround</em>
+    <p>Projects are created with default branch protection. Since this default branch protection is not currently managed via Terraform, to workaround this limitation, you can remove the default branch protection via the API and create your desired Terraform managed branch protection. In the <code>gitlab_project</code> resource, define a <code>local-exec</code> provisioner which invokes the <code>/projects/:id/protected_branches/:name</code> API via curl to delete the branch protection on the default branch using a <code>DELETE</code> request. Then define the desired branch protection using the <code>gitlab_branch_protection</code> resource.</p>
+</aside>
+
+<p><strong>Upstream API</strong>: <a href="https://docs.gitlab.com/ce/api/projects/">GitLab REST API docs</a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"gitlab_project"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"My awesome codebase"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">visibility_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"public"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Project with custom push rules</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"gitlab_project"</span><span class="w"> </span><span class="nv">"example-two"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-two"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">push_rules</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">author_email_regex</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"@example\\.com$"</span><span class="w"></span>
+<span class="w">    </span><span class="na">commit_committer_check</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">member_check</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">prevent_secrets</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create a project for a given user (requires admin access)</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"gitlab_user"</span><span class="w"> </span><span class="nv">"peter_parker"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"peter_parker"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"gitlab_project"</span><span class="w"> </span><span class="nv">"peters_repo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"peters-repo"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"This is a description"</span><span class="w"></span>
+<span class="w">  </span><span class="na">namespace_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.gitlab_user.peter_parker.namespace_id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Fork a project</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"gitlab_project"</span><span class="w"> </span><span class="nv">"fork"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-fork"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"This is a fork"</span><span class="w"></span>
+<span class="w">  </span><span class="na">forked_from_project_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">gitlab_project.example.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Fork a project and setup a pull mirror</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"gitlab_project"</span><span class="w"> </span><span class="nv">"fork"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-fork"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"This is a fork"</span><span class="w"></span>
+<span class="w">  </span><span class="na">forked_from_project_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">gitlab_project.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">import_url</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">gitlab_project.example.http_url_to_repo</span><span class="w"></span>
+<span class="w">  </span><span class="na">mirror</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create a project by importing it from a public project</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"gitlab_project"</span><span class="w"> </span><span class="nv">"import_public"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"import-from-public-project"</span><span class="w"></span>
+<span class="w">  </span><span class="na">import_url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://gitlab.example.com/repo.git"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create a project by importing it from a public project and setup the pull mirror</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"gitlab_project"</span><span class="w"> </span><span class="nv">"import_public_with_mirror"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"import-from-public-project"</span><span class="w"></span>
+<span class="w">  </span><span class="na">import_url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://gitlab.example.com/repo.git"</span><span class="w"></span>
+<span class="w">  </span><span class="na">mirror</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create a project by importing it from a private project</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"gitlab_project"</span><span class="w"> </span><span class="nv">"import_private"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"import-from-public-project"</span><span class="w"></span>
+<span class="w">  </span><span class="na">import_url</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://gitlab.example.com/repo.git"</span><span class="w"></span>
+<span class="w">  </span><span class="na">import_url_username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"user"</span><span class="w"></span>
+<span class="w">  </span><span class="na">import_url_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"pass"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create a project by importing it from a private project and setup the pull mirror</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"gitlab_project"</span><span class="w"> </span><span class="nv">"import_private_with_mirror"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"import-from-public-project"</span><span class="w"></span>
+<span class="w">  </span><span class="na">import_url</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://gitlab.example.com/repo.git"</span><span class="w"></span>
+<span class="w">  </span><span class="na">import_url_username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"user"</span><span class="w"></span>
+<span class="w">  </span><span class="na">import_url_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"pass"</span><span class="w"></span>
+<span class="w">  </span><span class="na">mirror</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create a project by importing it from a private project and provide credentials in `import_url`</span>
+<span class="c1"># NOTE: only use this if you really must, use `import_url_username` and `import_url_password` whenever possible</span>
+<span class="c1">#       GitLab API will always return the `import_url` without credentials, therefore you must ignore the `import_url` for changes:</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"gitlab_project"</span><span class="w"> </span><span class="nv">"import_private"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"import-from-public-project"</span><span class="w"></span>
+<span class="w">  </span><span class="na">import_url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://user:pass@gitlab.example.com/repo.git"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">ignore_changes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nb"></span>
+<span class="nb">      import_url</span>
+<span class="nb">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<!-- schema generated by tfplugindocs -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Schema"></a><h2 id="schema">Schema</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Required"></a><h3 id="required">Required</h3>
+
+<ul>
+<li><code>name</code> (String) The name of the project.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Optional"></a><h3 id="optional">Optional</h3>
+
+<ul>
+<li><code>allow_merge_on_skipped_pipeline</code> (Boolean) Set to true if you want to treat skipped pipelines as if they finished with success.</li>
+<li><code>allow_pipeline_trigger_approve_deployment</code> (Boolean) Set whether or not a pipeline triggerer is allowed to approve deployments. Premium and Ultimate only.</li>
+<li><code>analytics_access_level</code> (String) Set the analytics access level. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>approvals_before_merge</code> (Number) Number of merge request approvals required for merging. Default is 0.
+This field <strong>does not</strong> work well in combination with the <code>gitlab_project_approval_rule</code> resource
+and is most likely gonna be deprecated in a future GitLab version (see <a href="https://gitlab.com/groups/gitlab-org/-/epics/7572">this upstream epic</a>).
+In the meantime we recommend against using this attribute and use <code>gitlab_project_approval_rule</code> instead.</li>
+<li><code>archive_on_destroy</code> (Boolean) Set to <code>true</code> to archive the project instead of deleting on destroy. If set to <code>true</code> it will entire omit the <code>DELETE</code> operation.</li>
+<li><code>archived</code> (Boolean) Whether the project is in read-only mode (archived). Repositories can be archived/unarchived by toggling this parameter.</li>
+<li><code>auto_cancel_pending_pipelines</code> (String) Auto-cancel pending pipelines. This isn’t a boolean, but enabled/disabled.</li>
+<li><code>auto_devops_deploy_strategy</code> (String) Auto Deploy strategy. Valid values are <code>continuous</code>, <code>manual</code>, <code>timed_incremental</code>.</li>
+<li><code>auto_devops_enabled</code> (Boolean) Enable Auto DevOps for this project.</li>
+<li><code>autoclose_referenced_issues</code> (Boolean) Set whether auto-closing referenced issues on default branch.</li>
+<li><code>avatar</code> (String) A local path to the avatar image to upload. <strong>Note</strong>: not available for imported resources.</li>
+<li><code>avatar_hash</code> (String) The hash of the avatar image. Use <code>filesha256("path/to/avatar.png")</code> whenever possible. <strong>Note</strong>: this is used to trigger an update of the avatar. If it's not given, but an avatar is given, the avatar will be updated each time.</li>
+<li><code>build_coverage_regex</code> (String, Deprecated) Test coverage parsing for the project. This is deprecated feature in GitLab 15.0.</li>
+<li><code>build_git_strategy</code> (String) The Git strategy. Defaults to fetch. Valid values are <code>clone</code>, <code>fetch</code>.</li>
+<li><code>build_timeout</code> (Number) The maximum amount of time, in seconds, that a job can run.</li>
+<li><code>builds_access_level</code> (String) Set the builds access level. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>ci_config_path</code> (String) Custom Path to CI config file.</li>
+<li><code>ci_default_git_depth</code> (Number) Default number of revisions for shallow cloning.</li>
+<li><code>ci_forward_deployment_enabled</code> (Boolean) When a new deployment job starts, skip older deployment jobs that are still pending.</li>
+<li><code>ci_pipeline_variables_minimum_override_role</code> (String) The minimum role required to set variables when running pipelines and jobs. Introduced in GitLab 17.1. Valid values are <code>developer</code>, <code>maintainer</code>, <code>owner</code>, <code>no_one_allowed</code></li>
+<li><code>ci_restrict_pipeline_cancellation_role</code> (String) The role required to cancel a pipeline or job. Premium and Ultimate only. Valid values are <code>developer</code>, <code>maintainer</code>, <code>no one</code></li>
+<li><code>ci_separated_caches</code> (Boolean) Use separate caches for protected branches.</li>
+<li><code>container_expiration_policy</code> (Block List, Max: 1) Set the image cleanup policy for this project. <strong>Note</strong>: this field is sometimes named <code>container_expiration_policy_attributes</code> in the GitLab Upstream API. (see <a href="#nestedblock--container_expiration_policy">below for nested schema</a>)</li>
+<li><code>container_registry_access_level</code> (String) Set visibility of container registry, for this project. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>container_registry_enabled</code> (Boolean, Deprecated) Enable container registry for the project.</li>
+<li><code>default_branch</code> (String) The default branch for the project.</li>
+<li><code>description</code> (String) A description of the project.</li>
+<li><code>emails_enabled</code> (Boolean) Enable email notifications.</li>
+<li><code>environments_access_level</code> (String) Set the environments access level. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>external_authorization_classification_label</code> (String) The classification label for the project.</li>
+<li><code>feature_flags_access_level</code> (String) Set the feature flags access level. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>forked_from_project_id</code> (Number) The id of the project to fork. During create the project is forked and during an update the fork relation is changed.</li>
+<li><code>forking_access_level</code> (String) Set the forking access level. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>group_runners_enabled</code> (Boolean) Enable group runners for this project.</li>
+<li><code>group_with_project_templates_id</code> (Number) For group-level custom templates, specifies ID of group from which all the custom project templates are sourced. Leave empty for instance-level templates. Requires use_custom_template to be true (enterprise edition).</li>
+<li><code>import_url</code> (String) Git URL to a repository to be imported. Together with <code>mirror = true</code> it will setup a Pull Mirror. This can also be used together with <code>forked_from_project_id</code> to setup a Pull Mirror for a fork. The fork takes precedence over the import. Make sure to provide the credentials in <code>import_url_username</code> and <code>import_url_password</code>. GitLab never returns the credentials, thus the provider cannot detect configuration drift in the credentials. They can also not be imported using <code>terraform import</code>. See the examples section for how to properly use it.</li>
+<li><code>import_url_password</code> (String, Sensitive) The password for the <code>import_url</code>. The value of this field is used to construct a valid <code>import_url</code> and is only related to the provider. This field cannot be imported using <code>terraform import</code>. See the examples section for how to properly use it.</li>
+<li><code>import_url_username</code> (String) The username for the <code>import_url</code>. The value of this field is used to construct a valid <code>import_url</code> and is only related to the provider. This field cannot be imported using <code>terraform import</code>.  See the examples section for how to properly use it.</li>
+<li><code>infrastructure_access_level</code> (String) Set the infrastructure access level. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>initialize_with_readme</code> (Boolean) Create main branch with first commit containing a README.md file. Must be set to <code>true</code> if importing an uninitialized project with a different <code>default_branch</code>.</li>
+<li><code>issues_access_level</code> (String) Set the issues access level. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>issues_enabled</code> (Boolean) Enable issue tracking for the project.</li>
+<li><code>issues_template</code> (String) Sets the template for new issues in the project.</li>
+<li><code>keep_latest_artifact</code> (Boolean) Disable or enable the ability to keep the latest artifact for this project.</li>
+<li><code>lfs_enabled</code> (Boolean) Enable LFS for the project.</li>
+<li><code>merge_commit_template</code> (String) Template used to create merge commit message in merge requests.</li>
+<li><code>merge_method</code> (String) Set the merge method. Valid values are <code>merge</code>, <code>rebase_merge</code>, <code>ff</code>.</li>
+<li><code>merge_pipelines_enabled</code> (Boolean) Enable or disable merge pipelines.</li>
+<li><code>merge_requests_access_level</code> (String) Set the merge requests access level. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>merge_requests_enabled</code> (Boolean) Enable merge requests for the project.</li>
+<li><code>merge_requests_template</code> (String) Sets the template for new merge requests in the project.</li>
+<li><code>merge_trains_enabled</code> (Boolean) Enable or disable merge trains. Requires <code>merge_pipelines_enabled</code> to be set to <code>true</code> to take effect.</li>
+<li><code>mirror</code> (Boolean) Enable project pull mirror.</li>
+<li><code>mirror_overwrites_diverged_branches</code> (Boolean) Enable overwrite diverged branches for a mirrored project.</li>
+<li><code>mirror_trigger_builds</code> (Boolean) Enable trigger builds on pushes for a mirrored project.</li>
+<li><code>model_experiments_access_level</code> (String) Set visibility of machine learning model experiments. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>model_registry_access_level</code> (String) Set visibility of machine learning model registry. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>monitor_access_level</code> (String) Set the monitor access level. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>mr_default_target_self</code> (Boolean) For forked projects, target merge requests to this project. If false, the target will be the upstream project.</li>
+<li><code>namespace_id</code> (Number) The namespace (group or user) of the project. Defaults to your user.</li>
+<li><code>only_allow_merge_if_all_discussions_are_resolved</code> (Boolean) Set to true if you want allow merges only if all discussions are resolved.</li>
+<li><code>only_allow_merge_if_pipeline_succeeds</code> (Boolean) Set to true if you want allow merges only if a pipeline succeeds.</li>
+<li><code>only_mirror_protected_branches</code> (Boolean) Enable only mirror protected branches for a mirrored project.</li>
+<li><code>packages_enabled</code> (Boolean) Enable packages repository for the project.</li>
+<li><code>pages_access_level</code> (String) Enable pages access control. Valid values are <code>public</code>, <code>private</code>, <code>enabled</code>, <code>disabled</code>.</li>
+<li><code>path</code> (String) The path of the repository.</li>
+<li><code>pipelines_enabled</code> (Boolean, Deprecated) Enable pipelines for the project. The <code>pipelines_enabled</code> field is being sent as <code>jobs_enabled</code> in the GitLab API calls.</li>
+<li><code>pre_receive_secret_detection_enabled</code> (Boolean) Whether Secret Push Detection is enabled. Requires GitLab Ultimate and at least GitLab 17.3.</li>
+<li><code>prevent_merge_without_jira_issue</code> (Boolean) Set whether merge requests require an associated issue from Jira. Premium and Ultimate only.</li>
+<li><code>printing_merge_request_link_enabled</code> (Boolean) Show link to create/view merge request when pushing from the command line</li>
+<li><code>public_builds</code> (Boolean, Deprecated) If true, jobs can be viewed by non-project members.</li>
+<li><code>public_jobs</code> (Boolean) If true, jobs can be viewed by non-project members.</li>
+<li><code>push_rules</code> (Block List, Max: 1) Push rules for the project. (see <a href="#nestedblock--push_rules">below for nested schema</a>)</li>
+<li><code>releases_access_level</code> (String) Set the releases access level. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>remove_source_branch_after_merge</code> (Boolean) Enable <code>Delete source branch</code> option by default for all new merge requests.</li>
+<li><code>repository_access_level</code> (String) Set the repository access level. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>repository_storage</code> (String) Which storage shard the repository is on. (administrator only)</li>
+<li><code>request_access_enabled</code> (Boolean) Allow users to request member access.</li>
+<li><code>requirements_access_level</code> (String) Set the requirements access level. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>resolve_outdated_diff_discussions</code> (Boolean) Automatically resolve merge request diffs discussions on lines changed with a push.</li>
+<li><code>restrict_user_defined_variables</code> (Boolean) Allow only users with the Maintainer role to pass user-defined variables when triggering a pipeline.</li>
+<li><code>security_and_compliance_access_level</code> (String) Set the security and compliance access level. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>shared_runners_enabled</code> (Boolean) Enable shared runners for this project.</li>
+<li><code>skip_wait_for_default_branch_protection</code> (Boolean) If <code>true</code>, the default behavior to wait for the default branch protection to be created is skipped.
+This is necessary if the current user is not an admin and the default branch protection is disabled on an instance-level.
+There is currently no known way to determine if the default branch protection is disabled on an instance-level for non-admin users.
+This attribute is only used during resource creation, thus changes are suppressed and the attribute cannot be imported.</li>
+<li><code>snippets_access_level</code> (String) Set the snippets access level. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>snippets_enabled</code> (Boolean) Enable snippets for the project.</li>
+<li><code>squash_commit_template</code> (String) Template used to create squash commit message in merge requests.</li>
+<li><code>squash_option</code> (String) Squash commits when merge request. Valid values are <code>never</code>, <code>always</code>, <code>default_on</code>, or <code>default_off</code>. The default value is <code>default_off</code>.</li>
+<li><code>suggestion_commit_message</code> (String) The commit message used to apply merge request suggestions.</li>
+<li><code>tags</code> (Set of String) The list of tags for a project; put array of tags, that should be finally assigned to a project. Use topics instead.</li>
+<li><code>template_name</code> (String) When used without use_custom_template, name of a built-in project template. When used with use_custom_template, name of a custom project template. This option is mutually exclusive with <code>template_project_id</code>.</li>
+<li><code>template_project_id</code> (Number) When used with use_custom_template, project ID of a custom project template. This is preferable to using template_name since template_name may be ambiguous (enterprise edition). This option is mutually exclusive with <code>template_name</code>. See <code>gitlab_group_project_file_template</code> to set a project as a template project. If a project has not been set as a template, using it here will result in an error.</li>
+<li><code>timeouts</code> (Block, Optional) (see <a href="#nestedblock--timeouts">below for nested schema</a>)</li>
+<li><code>topics</code> (Set of String) The list of topics for the project.</li>
+<li><code>use_custom_template</code> (Boolean) Use either custom instance or group (with group_with_project_templates_id) project template (enterprise edition).
+    ~&gt; When using a custom template, <a href="https://docs.gitlab.com/15.7/ee/user/project/settings/import_export_troubleshooting/#import-using-the-rest-api-fails-when-using-a-group-access-token">Group Tokens won't work</a>. You must use a real user's Personal Access Token.</li>
+<li><code>visibility_level</code> (String) Set to <code>public</code> to create a public project. Valid values are <code>private</code>, <code>internal</code>, <code>public</code>.</li>
+<li><code>wiki_access_level</code> (String) Set the wiki access level. Valid values are <code>disabled</code>, <code>private</code>, <code>enabled</code>.</li>
+<li><code>wiki_enabled</code> (Boolean) Enable wiki for the project.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Read-Only"></a><h3 id="read-only">Read-Only</h3>
+
+<ul>
+<li><code>avatar_url</code> (String) The URL of the avatar image.</li>
+<li><code>empty_repo</code> (Boolean) Whether the project is empty.</li>
+<li><code>http_url_to_repo</code> (String) URL that can be provided to <code>git clone</code> to clone the</li>
+<li><code>id</code> (String) The ID of this resource.</li>
+<li><code>path_with_namespace</code> (String) The path of the repository with namespace.</li>
+<li><code>runners_token</code> (String, Sensitive) Registration token to use during runner setup.</li>
+<li><code>ssh_url_to_repo</code> (String) URL that can be provided to <code>git clone</code> to clone the</li>
+<li><code>web_url</code> (String) URL that can be used to find the project in a browser.</li>
+</ul>
+
+<p><a id="nestedblock--container_expiration_policy"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Nested%20Schema%20for%20container_expiration_policy"></a><h3 id="nested-schema-for-container_expiration_policy">Nested Schema for <code>container_expiration_policy</code></h3>
+
+<p>Optional:</p>
+
+<ul>
+<li><code>cadence</code> (String) The cadence of the policy. Valid values are: <code>1d</code>, <code>7d</code>, <code>14d</code>, <code>1month</code>, <code>3month</code>.</li>
+<li><code>enabled</code> (Boolean) If true, the policy is enabled.</li>
+<li><code>keep_n</code> (Number) The number of images to keep.</li>
+<li><code>name_regex</code> (String, Deprecated) The regular expression to match image names to delete.</li>
+<li><code>name_regex_delete</code> (String) The regular expression to match image names to delete.</li>
+<li><code>name_regex_keep</code> (String) The regular expression to match image names to keep.</li>
+<li><code>older_than</code> (String) The number of days to keep images.</li>
+</ul>
+
+<p>Read-Only:</p>
+
+<ul>
+<li><code>next_run_at</code> (String) The next time the policy will run.</li>
+</ul>
+
+<p><a id="nestedblock--push_rules"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Nested%20Schema%20for%20push_rules"></a><h3 id="nested-schema-for-push_rules">Nested Schema for <code>push_rules</code></h3>
+
+<p>Optional:</p>
+
+<ul>
+<li><code>author_email_regex</code> (String) All commit author emails must match this regex, e.g. <code>@my-company.com$</code>.</li>
+<li><code>branch_name_regex</code> (String) All branch names must match this regex, e.g. <code>(feature|hotfix)\/*</code>.</li>
+<li><code>commit_committer_check</code> (Boolean) Users can only push commits to this repository that were committed with one of their own verified emails.</li>
+<li><code>commit_committer_name_check</code> (Boolean) Users can only push commits to this repository if the commit author name is consistent with their GitLab account name.</li>
+<li><code>commit_message_negative_regex</code> (String) No commit message is allowed to match this regex, e.g. <code>ssh\:\/\/</code>.</li>
+<li><code>commit_message_regex</code> (String) All commit messages must match this regex, e.g. <code>Fixed \d+\..*</code>.</li>
+<li><code>deny_delete_tag</code> (Boolean) Deny deleting a tag.</li>
+<li><code>file_name_regex</code> (String) All committed filenames must not match this regex, e.g. <code>(jar|exe)$</code>.</li>
+<li><code>max_file_size</code> (Number) Maximum file size (MB).</li>
+<li><code>member_check</code> (Boolean) Restrict commits by author (email) to existing GitLab users.</li>
+<li><code>prevent_secrets</code> (Boolean) GitLab will reject any files that are likely to contain secrets.</li>
+<li><code>reject_non_dco_commits</code> (Boolean) Reject commit when it’s not DCO certified.</li>
+<li><code>reject_unsigned_commits</code> (Boolean) Reject commit when it’s not signed through GPG.</li>
+</ul>
+
+<p><a id="nestedblock--timeouts"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Nested%20Schema%20for%20timeouts"></a><h3 id="nested-schema-for-timeouts">Nested Schema for <code>timeouts</code></h3>
+
+<p>Optional:</p>
+
+<ul>
+<li><code>create</code> (String)</li>
+<li><code>delete</code> (String)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Starting in Terraform v1.5.0 you can use an <a href="https://developer.hashicorp.com/terraform/language/import">import block</a> to import <code>gitlab_project</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">gitlab_project.example</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"see CLI command below for ID"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Import using the CLI is supported using the following syntax:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># You can import a project state using `terraform import &lt;resource&gt; &lt;id&gt;`.  The</span>
+<span class="c1"># `id` can be whatever the [get single project api][get_single_project] takes for</span>
+<span class="c1"># its `:id` value, so for example:</span>
+terraform import gitlab_project.example richardc/example
+
+<span class="c1"># NOTE: the `import_url_username` and `import_url_password` cannot be imported.</span>
+</code></pre></div>
+
+            
+        
+    </body></html>

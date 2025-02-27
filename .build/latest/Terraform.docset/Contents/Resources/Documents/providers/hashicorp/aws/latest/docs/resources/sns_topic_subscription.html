@@ -1,0 +1,324 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/sns_topic_subscription --><head>
+                <title>aws_sns_topic_subscription</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_sns_topic_subscription">Resource: aws_sns_topic_subscription</h1>
+
+<p>Provides a resource for subscribing to SNS topics. Requires that an SNS topic exist for the subscription to attach to. This resource allows you to automatically place messages sent to SNS topics in SQS queues, send them as HTTP(S) POST requests to a given endpoint, send SMS messages, or notify devices / applications. The most likely use case for Terraform users will probably be SQS queues.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>If the SNS topic and SQS queue are in different AWS regions, the <code>aws_sns_topic_subscription</code> must use an AWS provider that is in the same region as the SNS topic. If the <code>aws_sns_topic_subscription</code> uses a provider with a different region than the SNS topic, Terraform will fail to create the subscription.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Setup of cross-account subscriptions from SNS topics to SQS queues requires Terraform to have access to BOTH accounts.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>If an SNS topic and SQS queue are in different AWS accounts but the same region, the <code>aws_sns_topic_subscription</code> must use the AWS provider for the account with the SQS queue. If <code>aws_sns_topic_subscription</code> uses a Provider with a different account than the SQS queue, Terraform creates the subscription but does not keep state and tries to re-create the subscription at every <code>apply</code>.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>If an SNS topic and SQS queue are in different AWS accounts and different AWS regions, the subscription needs to be initiated from the account with the SQS queue but in the region of the SNS topic.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>You cannot unsubscribe to a subscription that is pending confirmation. If you use <code>email</code>, <code>email-json</code>, or <code>http</code>/<code>https</code> (without auto-confirmation enabled), until the subscription is confirmed (e.g., outside of Terraform), AWS does not allow Terraform to delete / unsubscribe the subscription. If you <code>destroy</code> an unconfirmed subscription, Terraform will remove the subscription from its state but the subscription will still exist in AWS. However, if you delete an SNS topic, SNS <a href="https://docs.aws.amazon.com/sns/latest/dg/sns-delete-subscription-topic.html">deletes all the subscriptions</a> associated with the topic. Also, you can import a subscription after confirmation and then have the capability to delete it.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>You can directly supply a topic and ARN by hand in the <code>topic_arn</code> property along with the queue ARN:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_sns_topic_subscription"</span><span class="w"> </span><span class="nv">"user_updates_sqs_target"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">topic_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:sns:us-west-2:432981146916:user-updates-topic"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"sqs"</span><span class="w"></span>
+<span class="w">  </span><span class="na">endpoint</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:sqs:us-west-2:432981146916:terraform-queue-too"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Alternatively you can use the ARN properties of a managed SNS topic and SQS queue:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_sns_topic"</span><span class="w"> </span><span class="nv">"user_updates"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"user-updates-topic"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_sqs_queue"</span><span class="w"> </span><span class="nv">"user_updates_queue"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"user-updates-queue"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_sns_topic_subscription"</span><span class="w"> </span><span class="nv">"user_updates_sqs_target"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">topic_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_sns_topic.user_updates.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"sqs"</span><span class="w"></span>
+<span class="w">  </span><span class="na">endpoint</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_sqs_queue.user_updates_queue.arn</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>You can subscribe SNS topics to SQS queues in different Amazon accounts and regions:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"sns"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">account-id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"111111111111"</span><span class="w"></span>
+<span class="w">    </span><span class="na">role-name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"service/service-hashicorp-terraform"</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-sns-topic"</span><span class="w"></span>
+<span class="w">    </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">    </span><span class="na">region</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-1"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"sqs"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">account-id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"222222222222"</span><span class="w"></span>
+<span class="w">    </span><span class="na">role-name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"service/service-hashicorp-terraform"</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-sqs-queue"</span><span class="w"></span>
+<span class="w">    </span><span class="na">region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"sns-topic-policy"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"__default_policy_ID"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"SNS:Subscribe"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"SNS:SetTopicAttributes"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"SNS:RemovePermission"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"SNS:Publish"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"SNS:ListSubscriptionsByTopic"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"SNS:GetTopicAttributes"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"SNS:DeleteTopic"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"SNS:AddPermission"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">test</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"StringEquals"</span><span class="w"></span>
+<span class="w">      </span><span class="na">variable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS:SourceOwner"</span><span class="w"></span>
+
+<span class="w">      </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">        </span><span class="nv">var.sns</span><span class="p">[</span><span class="s2">"account-id"</span><span class="p">],</span><span class="w"></span>
+<span class="w">      </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">resources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"arn:aws:sns:${var.sns["region"]}:${var.sns["account-id"]}:${var.sns["name"]}"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">sid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"__default_statement_ID"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"SNS:Subscribe"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"SNS:Receive"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">test</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"StringLike"</span><span class="w"></span>
+<span class="w">      </span><span class="na">variable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SNS:Endpoint"</span><span class="w"></span>
+
+<span class="w">      </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"arn:aws:sqs:${var.sqs["region"]}:${var.sqs["account-id"]}:${var.sqs["name"]}"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">resources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"arn:aws:sns:${var.sns["region"]}:${var.sns["account-id"]}:${var.sns["name"]}"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">sid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"__console_sub_0"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"sqs-queue-policy"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:sqs:${var.sqs["region"]}:${var.sqs["account-id"]}:${var.sqs["name"]}/SQSDefaultPolicy"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">sid</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-sns-topic"</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"SQS:SendMessage"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">resources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"arn:aws:sqs:${var.sqs["region"]}:${var.sqs["account-id"]}:${var.sqs["name"]}"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">test</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"ArnEquals"</span><span class="w"></span>
+<span class="w">      </span><span class="na">variable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws:SourceArn"</span><span class="w"></span>
+
+<span class="w">      </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"arn:aws:sns:${var.sns["region"]}:${var.sns["account-id"]}:${var.sns["name"]}"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># provider to manage SNS topics</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"sns"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.sns</span><span class="p">[</span><span class="s2">"region"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assume_role</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">role_arn</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam::${var.sns["account-id"]}:role/${var.sns["role-name"]}"</span><span class="w"></span>
+<span class="w">    </span><span class="na">session_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sns-${var.sns["region"]}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># provider to manage SQS queues</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"sqs"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.sqs</span><span class="p">[</span><span class="s2">"region"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assume_role</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">role_arn</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam::${var.sqs["account-id"]}:role/${var.sqs["role-name"]}"</span><span class="w"></span>
+<span class="w">    </span><span class="na">session_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sqs-${var.sqs["region"]}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># provider to subscribe SQS to SNS (using the SQS account but the SNS region)</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"sns2sqs"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.sns</span><span class="p">[</span><span class="s2">"region"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assume_role</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">role_arn</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam::${var.sqs["account-id"]}:role/${var.sqs["role-name"]}"</span><span class="w"></span>
+<span class="w">    </span><span class="na">session_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sns2sqs-${var.sns["region"]}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_sns_topic"</span><span class="w"> </span><span class="nv">"sns-topic"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.sns</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.sns</span><span class="p">[</span><span class="s2">"name"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.sns</span><span class="p">[</span><span class="s2">"display_name"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.sns-topic-policy.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_sqs_queue"</span><span class="w"> </span><span class="nv">"sqs-queue"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.sqs</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.sqs</span><span class="p">[</span><span class="s2">"name"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.sqs-queue-policy.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_sns_topic_subscription"</span><span class="w"> </span><span class="nv">"sns-topic"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.sns2sqs</span><span class="w"></span>
+<span class="w">  </span><span class="na">topic_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_sns_topic.sns-topic.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"sqs"</span><span class="w"></span>
+<span class="w">  </span><span class="na">endpoint</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_sqs_queue.sqs-queue.arn</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>endpoint</code> - (Required) Endpoint to send data to. The contents vary with the protocol. See details below.</li>
+<li><code>protocol</code> - (Required) Protocol to use. Valid values are: <code>sqs</code>, <code>sms</code>, <code>lambda</code>, <code>firehose</code>, and <code>application</code>. Protocols <code>email</code>, <code>email-json</code>, <code>http</code> and <code>https</code> are also valid but partially supported. See details below.</li>
+<li><code>subscription_role_arn</code> - (Required if <code>protocol</code> is <code>firehose</code>) ARN of the IAM role to publish to Kinesis Data Firehose delivery stream. Refer to <a href="https://docs.aws.amazon.com/sns/latest/dg/sns-firehose-as-subscriber.html">SNS docs</a>.</li>
+<li><code>topic_arn</code> - (Required) ARN of the SNS topic to subscribe to.</li>
+</ul>
+
+<p>The following arguments are optional:</p>
+
+<ul>
+<li><code>confirmation_timeout_in_minutes</code> - (Optional) Integer indicating number of minutes to wait in retrying mode for fetching subscription arn before marking it as failure. Only applicable for http and https protocols. Default is <code>1</code>.</li>
+<li><code>delivery_policy</code> - (Optional) JSON String with the delivery policy (retries, backoff, etc.) that will be used in the subscription - this only applies to HTTP/S subscriptions. Refer to the <a href="https://docs.aws.amazon.com/sns/latest/dg/DeliveryPolicies.html">SNS docs</a> for more details.</li>
+<li><code>endpoint_auto_confirms</code> - (Optional) Whether the endpoint is capable of <a href="http://docs.aws.amazon.com/sns/latest/dg/SendMessageToHttp.html#SendMessageToHttp.prepare">auto confirming subscription</a> (e.g., PagerDuty). Default is <code>false</code>.</li>
+<li><code>filter_policy</code> - (Optional) JSON String with the filter policy that will be used in the subscription to filter messages seen by the target resource. Refer to the <a href="https://docs.aws.amazon.com/sns/latest/dg/message-filtering.html">SNS docs</a> for more details.</li>
+<li><code>filter_policy_scope</code> - (Optional) Whether the <code>filter_policy</code> applies to <code>MessageAttributes</code> (default) or <code>MessageBody</code>.</li>
+<li><code>raw_message_delivery</code> - (Optional) Whether to enable raw message delivery (the original message is directly passed, not wrapped in JSON with the original message in the message property). Default is <code>false</code>.</li>
+<li><code>redrive_policy</code> - (Optional) JSON String with the redrive policy that will be used in the subscription. Refer to the <a href="https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html#how-messages-moved-into-dead-letter-queue">SNS docs</a> for more details.</li>
+<li><code>replay_policy</code> - (Optional) JSON String with the archived message replay policy that will be used in the subscription. Refer to the <a href="https://docs.aws.amazon.com/sns/latest/dg/message-archiving-and-replay-subscriber.html">SNS docs</a> for more details.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Protocol%20support"></a><h3 id="protocol-support">Protocol support</h3>
+
+<p>Supported values for <code>protocol</code> include:</p>
+
+<ul>
+<li><code>application</code> - Delivers JSON-encoded messages. <code>endpoint</code> is the endpoint ARN of a mobile app and device.</li>
+<li><code>firehose</code> - Delivers JSON-encoded messages. <code>endpoint</code> is the ARN of an Amazon Kinesis Data Firehose delivery stream (e.g.,
+<code>arn:aws:firehose:us-east-1:123456789012:deliverystream/ticketUploadStream</code>).</li>
+<li><code>lambda</code> - Delivers JSON-encoded messages. <code>endpoint</code> is the ARN of an AWS Lambda function.</li>
+<li><code>sms</code> - Delivers text messages via SMS. <code>endpoint</code> is the phone number of an SMS-enabled device.</li>
+<li><code>sqs</code> - Delivers JSON-encoded messages. <code>endpoint</code> is the ARN of an Amazon SQS queue (e.g., <code>arn:aws:sqs:us-west-2:123456789012:terraform-queue-too</code>).</li>
+</ul>
+
+<p>Partially supported values for <code>protocol</code> include:</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>If an <code>aws_sns_topic_subscription</code> uses a partially-supported protocol and the subscription is not confirmed, either through automatic confirmation or means outside of Terraform (e.g., clicking on a "Confirm Subscription" link in an email), Terraform cannot delete / unsubscribe the subscription. Attempting to <code>destroy</code> an unconfirmed subscription will remove the <code>aws_sns_topic_subscription</code> from Terraform's state but <strong>_will not_</strong> remove the subscription from AWS. The <code>pending_confirmation</code> attribute provides confirmation status.</p>
+</aside>
+
+<ul>
+<li><code>email</code> - Delivers messages via SMTP. <code>endpoint</code> is an email address.</li>
+<li><code>email-json</code> - Delivers JSON-encoded messages via SMTP. <code>endpoint</code> is an email address.</li>
+<li><code>http</code> -- Delivers JSON-encoded messages via HTTP POST. <code>endpoint</code> is a URL beginning with <code>http://</code>.</li>
+<li><code>https</code> -- Delivers JSON-encoded messages via HTTPS POST. <code>endpoint</code> is a URL beginning with <code>https://</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>arn</code> - ARN of the subscription.</li>
+<li><code>confirmation_was_authenticated</code> - Whether the subscription confirmation request was authenticated.</li>
+<li><code>id</code> - ARN of the subscription.</li>
+<li><code>owner_id</code> - AWS account ID of the subscription's owner.</li>
+<li><code>pending_confirmation</code> - Whether the subscription has not been confirmed.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import SNS Topic Subscriptions using the subscription <code>arn</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_sns_topic_subscription.user_updates_sqs_target</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:sns:us-west-2:123456789012:my-topic:8a21d249-4329-4871-acc6-7be709c6ea7f"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import SNS Topic Subscriptions using the subscription <code>arn</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_sns_topic_subscription.user_updates_sqs_target arn:aws:sns:us-west-2:123456789012:my-topic:8a21d249-4329-4871-acc6-7be709c6ea7f
+</code></pre></div>
+
+            
+        
+    </body></html>

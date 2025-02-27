@@ -1,0 +1,143 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/3 --><head>
+                <title>Upgrade Guide for AzureAD Provider v3.0</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="upgrade-guide-for-azuread-provider-v30">Upgrade Guide for AzureAD Provider v3.0</h1>
+
+<p>The last major release for the AzureAD provider was in August 2021. At the last release, we moved from the legacy Azure AD Graph API to Microsoft Graph, and began using our own handwritten SDK. The provider now supports 56 Resources and 21 Data Sources. </p>
+
+<p>Over the past several months, we have been working to produce a more feature-complete <a href="https://github.com/hashicorp/go-azure-sdk/tree/main/microsoft-graph">Microsoft Graph SDK</a>, and now the AzureAD provider has migrated to this SDK. This opens up many possibilities for new resources, and improves performance and reliability across the entire provider.</p>
+
+<p>Due to the large nature of this change, we have elected to publish a new major version 3.0, whilst also removing some deprecated properties. This guide explains these changes.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Pinning%20your%20provider%20version"></a><h2 id="pinning-your-provider-version">Pinning your provider version</h2>
+
+<p>We recommend pinning the version of each provider you use in Terraform. You can do this using the <code>version</code> attribute in the <code>required_providers</code> block of your <code>terraform</code> configuration block.</p>
+
+<p>To pin to a specific version of the AzureAD provider:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azuread</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azuread"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"= 2.53.1"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>To pin to any 2.53.x release:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azuread</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azuread"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 2.53.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>To pin to any 2.x release:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azuread</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azuread"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 2.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>This will enable you to upgrade to version 3.0 at your convenience, by simply advancing the desired target version in your configuration. See the <a href="https://learn.hashicorp.com/tutorials/terraform/provider-versioning">Lock and Upgrade Provider Versions</a> guide on HashiCorp Learn for more details.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrading%20to%20version%203.0"></a><h2 id="upgrading-to-version-30">Upgrading to version 3.0</h2>
+
+<p>We recommend upgrading in a test environment prior to upgrading your production modules. Please be aware that there may be bugs in the initial releases of the new major version. As per the above instructions for pinning the provider version, you can upgrade to the latest 3.0 release by setting the following version constraint in your configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azuread</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azuread"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 3.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Please report any issues you may encounter on <a href="https://github.com/hashicorp/terraform-provider-azuread/issues">our bug tracker</a>. We appreciate feedback from our users!</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields"></a><h2 id="deprecated-fields">Deprecated fields</h2>
+
+<p>The following attributes/properties have been deprecated in version 3.0 of the AzureAD provider, and will be removed in a future release.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_application_certificate"></a><h3 id="resource-azuread_application_certificate">Resource: <code>azuread_application_certificate</code></h3>
+
+<p>The property <code>end_date_relative</code> has been deprecated and will be removed in a future release. Please use the <code>end_date</code> property instead. Note that you can make use of the Terraform <a href="https://developer.hashicorp.com/terraform/language/functions/timeadd"><code>timeadd()</code> function</a> to calculate a relative future date.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_application_password"></a><h3 id="resource-azuread_application_password">Resource: <code>azuread_application_password</code></h3>
+
+<p>The property <code>end_date_relative</code> has been deprecated and will be removed in a future release. Please use the <code>end_date</code> property instead. Note that you can make use of the Terraform <a href="https://developer.hashicorp.com/terraform/language/functions/timeadd"><code>timeadd()</code> function</a> to calculate a relative future date.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_service_principal_certificate"></a><h3 id="resource-azuread_service_principal_certificate">Resource: <code>azuread_service_principal_certificate</code></h3>
+
+<p>The property <code>end_date_relative</code> has been deprecated and will be removed in a future release. Please use the <code>end_date</code> property instead. Note that you can make use of the Terraform <a href="https://developer.hashicorp.com/terraform/language/functions/timeadd"><code>timeadd()</code> function</a> to calculate a relative future date.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_service_principal_password"></a><h3 id="resource-azuread_service_principal_password">Resource: <code>azuread_service_principal_password</code></h3>
+
+<p>The property <code>end_date_relative</code> has been deprecated and will be removed in a future release. Please use the <code>end_date</code> property instead. Note that you can make use of the Terraform <a href="https://developer.hashicorp.com/terraform/language/functions/timeadd"><code>timeadd()</code> function</a> to calculate a relative future date.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Removal%20of%20deprecated%20fields"></a><h2 id="removal-of-deprecated-fields">Removal of deprecated fields</h2>
+
+<p>The following attributes/properties were deprecated in 2.x versions of the AzureAD provider, and have now been removed in version 3.0.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20azuread_application"></a><h3 id="data-source-azuread_application">Data Source: <code>azuread_application</code></h3>
+
+<p>The property <code>application_id</code> has been replaced by the <code>client_id</code> property.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_application"></a><h3 id="resource-azuread_application">Resource: <code>azuread_application</code></h3>
+
+<p>The property <code>application_id</code> has been replaced by the <code>client_id</code> property.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_application_certificate"></a><h3 id="resource-azuread_application_certificate-2">Resource: <code>azuread_application_certificate</code></h3>
+
+<p>The property <code>application_object_id</code> has been replaced by the <code>application_id</code> property. Please refer to the <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/application_certificate">latest documentation for this resource</a> for example usage.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_application_federated_identity_credential"></a><h3 id="resource-azuread_application_federated_identity_credential">Resource: <code>azuread_application_federated_identity_credential</code></h3>
+
+<p>The property <code>application_object_id</code> has been replaced by the <code>application_id</code> property. Please refer to the <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/application_federated_identity_credential">latest documentation for this resource</a> for example usage.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_application_password"></a><h3 id="resource-azuread_application_password-2">Resource: <code>azuread_application_password</code></h3>
+
+<p>The property <code>application_object_id</code> has been replaced by the <code>application_id</code> property. Please refer to the <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/application_password">latest documentation for this resource</a> for example usage.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_application_pre_authorized"></a><h3 id="resource-azuread_application_pre_authorized">Resource: <code>azuread_application_pre_authorized</code></h3>
+
+<p>The property <code>application_object_id</code> has been replaced by the <code>application_id</code> property. Please refer to the <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/application_pre_authorized">latest documentation for this resource</a> for example usage.</p>
+
+<p>The property <code>authorized_app_id</code> has been replaced by the <code>authorized_client_id</code> property.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_directory_role_assignment"></a><h3 id="resource-azuread_directory_role_assignment">Resource: <code>azuread_directory_role_assignment</code></h3>
+
+<p>The property <code>app_scope_object_id</code> has been replaced by the <code>app_scope_id</code> property.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20azuread_service_principal"></a><h3 id="data-source-azuread_service_principal">Data Source: <code>azuread_service_principal</code></h3>
+
+<p>The property <code>application_id</code> has been replaced by the <code>client_id</code> property.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_service_principal"></a><h3 id="resource-azuread_service_principal">Resource: <code>azuread_service_principal</code></h3>
+
+<p>The property <code>application_id</code> has been replaced by the <code>client_id</code> property.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20azuread_service_principals"></a><h3 id="data-source-azuread_service_principals">Data Source: <code>azuread_service_principals</code></h3>
+
+<p>The property <code>application_ids</code> has been replaced by the <code>client_ids</code> property.</p>
+
+<p>The attribute <code>application_id</code> has been replaced by the <code>client_id</code> attribute.</p>
+
+            
+        
+    </body></html>

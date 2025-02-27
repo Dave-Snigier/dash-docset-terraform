@@ -1,0 +1,148 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/gcp-authenticate-with-oidc --><head>
+                <title>Authenticate with OpenID Connect</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="authenticate-with-openid-connect">Authenticate with OpenID Connect</h1>
+
+<p>OpenID Connect (OIDC) is an authentication protocol allowing users to authenticate to applications without managing long-lived credentials. The Terraform Provider for Databricks can leverage OIDC to authenticate to Databricks accounts and workspaces. For Databricks on Google Cloud, the provider can authenticate leveraging OIDC using workload identity pools. This guide will walk you through the steps to authenticate to Databricks using OIDC on GitHub Actions.</p>
+
+<p>This guide assumes that you have an existing GCP Databricks workspace.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/GitHub%20Actions"></a><h2 id="github-actions">GitHub Actions</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configure%20your%20service%20account%20and%20workload%20identity%20pool"></a><h3 id="configure-your-service-account-and-workload-identity-pool">Configure your service account and workload identity pool</h3>
+
+<p>First, you need to create a service account and a workload identity pool. The pool is configured to allow clients using OIDC to assume the identity of the service account. The service account will be used to authenticate to Databricks on GCP. You can create a service account using the <code>google</code> Terraform provider.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_service_account"</span><span class="w"> </span><span class="nv">"github_actions"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;project&gt;"</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"github-actions"</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"GitHub Actions Service Account"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Then, create the workload identity pool, and configure it to use the service account.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_iam_workload_identity_pool"</span><span class="w"> </span><span class="nv">"github_pool"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;project&gt;"</span><span class="w"></span>
+<span class="w">  </span><span class="na">workload_identity_pool_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"github-pool"</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"GitHub Actions Pool"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"Identity pool for GitHub Actions"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_iam_workload_identity_pool_provider"</span><span class="w"> </span><span class="nv">"github_provider"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">                            </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;project&gt;"</span><span class="w"></span>
+<span class="w">  </span><span class="na">workload_identity_pool_id</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">google_iam_workload_identity_pool.github_pool.workload_identity_pool_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">workload_identity_pool_provider_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"github-provider"</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="s2">"GitHub Actions Provider"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">attribute_mapping</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"google.subject"</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"assertion.sub"</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"attribute.actor"</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"assertion.actor"</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"attribute.repository"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"assertion.repository"</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"attribute.ref"</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"assertion.ref"</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"attribute.event_name"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"assertion.event_name"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">oidc</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">issuer_uri</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://token.actions.githubusercontent.com"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">attribute_condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"assertion.sub == 'repo:&lt;organization&gt;/&lt;repo&gt;:environment:&lt;environment&gt;'"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_service_account_iam_binding"</span><span class="w"> </span><span class="nv">"workload_identity_user"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_service_account.github_actions.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"roles/iam.workloadIdentityUser"</span><span class="w"></span>
+<span class="w">  </span><span class="na">members</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_pool.name}/attribute.repository/&lt;organization&gt;/&lt;repo&gt;"</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_project_iam_member"</span><span class="w"> </span><span class="nv">"token_creator_binding"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">module.defaults.google_project_isolated</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"roles/iam.serviceAccountTokenCreator"</span><span class="w"></span>
+<span class="w">  </span><span class="na">member</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"serviceAccount:${google_service_account.github_actions.email}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Finally, grant the service principal access to the workspace by following the instructions in the <a href="https://docs.gcp.databricks.com/en/dev-tools/google-id-auth.html#step-2-assign-your-google-cloud-service-account-to-your-databricks-account">Databricks documentation</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configure%20the%20Databricks%20provider%20to%20use%20the%20service%20principal"></a><h3 id="configure-the-databricks-provider-to-use-the-service-principal">Configure the Databricks provider to use the service principal</h3>
+
+<p>In your Terraform configuration, configure the Databricks provider to use the service principal.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># account-level provider</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://accounts.gcp.databricks.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;databricks-account-id&gt;"</span><span class="w"></span>
+<span class="w">  </span><span class="na">google_service_account</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_service_account.github_actions.email</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># workspace-level provider</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://&lt;workspace-url&gt;"</span><span class="w"></span>
+<span class="w">  </span><span class="na">google_service_account</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_service_account.github_actions.email</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Create%20a%20GitHub%20Action%20that%20authenticates%20to%20Databricks%20on%20Google%20Cloud"></a><h3 id="create-a-github-action-that-authenticates-to-databricks-on-google-cloud">Create a GitHub Action that authenticates to Databricks on Google Cloud</h3>
+
+<p>To create a GitHub Action, make a <code>.github/workflows/deploy.yml</code> file in your repository.</p>
+
+<p>To authenticate to Databricks using OIDC, ensure that your action has the <code>id-token: write</code> permission. You can then authenticate to Google using the <code>google-github-actions/auth</code> action. Finally, run <code>terraform apply</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deploy to Databricks on GCP</span><span class="w"></span>
+<span class="nt">jobs</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">deploy</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span><span class="w"></span>
+<span class="w">    </span><span class="nt">environments</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production</span><span class="w"></span>
+<span class="w">    </span><span class="nt">permissions</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="nt">id-token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span><span class="w"></span>
+<span class="w">      </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span><span class="w"></span>
+<span class="w">    </span><span class="nt">steps</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Checkout code</span><span class="w"></span>
+<span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v2</span><span class="w"></span>
+
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">"Authenticate</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">Google</span><span class="nv"> </span><span class="s">Cloud"</span><span class="w"></span>
+<span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="s">"google-github-actions/auth@v2"</span><span class="w"></span>
+<span class="w">        </span><span class="nt">with</span><span class="p">:</span><span class="w"></span>
+<span class="w">          </span><span class="nt">token_format</span><span class="p">:</span><span class="w"> </span><span class="s">"access_token"</span><span class="w"></span>
+<span class="w">          </span><span class="nt">workload_identity_provider</span><span class="p">:</span><span class="w"> </span><span class="s">"projects/&lt;project-id&gt;/locations/global/workloadIdentityPools/github-pool/providers/github-provider"</span><span class="w"></span>
+<span class="w">          </span><span class="nt">service_account</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;service-account-email&gt;"</span><span class="w"></span>
+
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Set up Terraform</span><span class="w"></span>
+<span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hashicorp/setup-terraform@v3</span><span class="w"></span>
+
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Terraform Init</span><span class="w"></span>
+<span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">terraform init</span><span class="w"></span>
+<span class="w">        </span><span class="nt">working-directory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">path/to/terraform/module</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/%28Optional%29%20GitHub%20Actions%20Details"></a><h3 id="optional-github-actions-details">(Optional) GitHub Actions Details</h3>
+
+<p>The <code>subject</code> field is used to scope the federated credentials to a specific GitHub Actions environment. The <code>subject</code> field is a string in the format <code>repo:&lt;organization&gt;/&lt;repo&gt;:environment:&lt;environment&gt;</code>. The <code>organization</code>, <code>repo</code>, and <code>environment</code> fields should be replaced with the appropriate values.</p>
+
+<p>If the action runs without an environment context, the <code>subject</code> field should be set to <code>repo:&lt;organization&gt;/&lt;repo&gt;:ref:refs/heads/&lt;BRANCH-NAME&gt;</code> if the workflow is triggered from a branch, or <code>repo:&lt;organization&gt;/&lt;repo&gt;:ref:refs/tags/&lt;TAG-NAME&gt;</code> when triggered from a tag.</p>
+
+<p>If needed, it is also possible to configure the <code>subject</code> field for your organization or repository. See the <a href="https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect">GitHub Actions OIDC documentation</a> for more information about how to configure the <code>subject</code> field.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/%28Optional%29%20Restrict%20access%20to%20the%20workload%20identity%20pool"></a><h3 id="optional-restrict-access-to-the-workload-identity-pool">(Optional) Restrict access to the workload identity pool</h3>
+
+<p>The workload identity pool provider can be configured to restrict access to specific repositories, branches, or tags. The <code>attribute_condition</code> field in the <code>google_iam_workload_identity_pool_provider</code> resource specifies the conditions under which the provider will issue tokens. See <a href="https://cloud.google.com/iam/docs/workload-identity-federation#conditions">the Google Cloud reference</a> for more information.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/References"></a><h2 id="references">References</h2>
+
+<p>For more information about OIDC and the above OIDC providers, see the following resources:</p>
+
+<ul>
+<li><a href="https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect">GitHub Actions OIDC documentation</a></li>
+<li><a href="https://cloud.google.com/iam/docs/workload-identity-federation">Google Cloud Workload Identity documentation</a></li>
+</ul>
+
+            
+        
+    </body></html>

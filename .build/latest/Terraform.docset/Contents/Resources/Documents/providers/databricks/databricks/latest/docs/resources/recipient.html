@@ -1,0 +1,144 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/recipient --><head>
+                <title>databricks_recipient</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_recipient-resource">databricks_recipient Resource</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This resource can only be used with a workspace-level provider!</p>
+</aside>
+
+<p>In Delta Sharing, a recipient is an entity that receives shares from a provider. In Unity Catalog, a share is a securable object that represents an organization and associates it with a credential or secure sharing identifier that allows that organization to access one or more shares.</p>
+
+<p>As a data provider (sharer), you can define multiple recipients for any given Unity Catalog metastore, but if you want to share data from multiple metastores with a particular user or group of users, you must define the recipient separately for each metastore. A recipient can have access to multiple shares.</p>
+
+<p>A <code>databricks_recipient</code> is contained within <a href="metastore.md">databricks_metastore</a> and can have permissions to <code>SELECT</code> from a list of shares.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Databricks%20Sharing%20with%20non%20databricks%20recipient"></a><h3 id="databricks-sharing-with-non-databricks-recipient">Databricks Sharing with non databricks recipient</h3>
+
+<p>Setting <code>authentication_type</code> type to <code>TOKEN</code> creates a temporary url to download a credentials file. This is used to
+authenticate to the sharing server to access data. This is for when the recipient is not using Databricks.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"random_password"</span><span class="w"> </span><span class="nv">"db2opensharecode"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">length</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="m">16</span><span class="w"></span>
+<span class="w">  </span><span class="na">special</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_current_user"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_recipient"</span><span class="w"> </span><span class="nv">"db2open"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.databricks_current_user.current.alphanumeric}-recipient"</span><span class="w"></span>
+<span class="w">  </span><span class="na">comment</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"made by terraform"</span><span class="w"></span>
+<span class="w">  </span><span class="na">authentication_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"TOKEN"</span><span class="w"></span>
+<span class="w">  </span><span class="na">sharing_code</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">random_password.db2opensharecode.result</span><span class="w"></span>
+<span class="w">  </span><span class="nb">ip_access_list</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">allowed_ip_addresses</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[]</span><span class="c1"> // .. fill in allowed IPv4 addresses (CIDR notation allowed)</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Databricks%20to%20Databricks%20Sharing"></a><h3 id="databricks-to-databricks-sharing">Databricks to Databricks Sharing</h3>
+
+<p>Setting <code>authentication_type</code> type to <code>DATABRICKS</code> allows you to automatically create a provider for a recipient who
+is using Databricks. To do this they would need to provide the global metastore id that you will be sharing with. The
+global metastore id follows the format: <code>&lt;cloud&gt;:&lt;region&gt;:&lt;guid&gt;</code></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_current_user"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_metastore"</span><span class="w"> </span><span class="nv">"recipient_metastore"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"recipient"</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_root</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"abfss://%s@%s.dfs.core.windows.net/"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nv">azurerm_storage_container.unity_catalog.name</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nv">azurerm_storage_account.unity_catalog.name</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">delta_sharing_scope</span><span class="w">                               </span><span class="o">=</span><span class="w"> </span><span class="s2">"INTERNAL"</span><span class="w"></span>
+<span class="w">  </span><span class="na">delta_sharing_recipient_token_lifetime_in_seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"60000000"</span><span class="w"></span>
+<span class="w">  </span><span class="na">force_destroy</span><span class="w">                                     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_recipient"</span><span class="w"> </span><span class="nv">"db2db"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                               </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.databricks_current_user.current.alphanumeric}-recipient"</span><span class="w"></span>
+<span class="w">  </span><span class="na">comment</span><span class="w">                            </span><span class="o">=</span><span class="w"> </span><span class="s2">"made by terraform"</span><span class="w"></span>
+<span class="w">  </span><span class="na">authentication_type</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"DATABRICKS"</span><span class="w"></span>
+<span class="w">  </span><span class="na">data_recipient_global_metastore_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_metastore.recipient_metastore.global_metastore_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>name</code> - Name of recipient. Change forces creation of a new resource.</li>
+<li><code>comment</code> - (Optional) Description about the recipient.</li>
+<li><code>sharing_code</code> - (Optional) The one-time sharing code provided by the data recipient.</li>
+<li><code>owner</code> - (Optional) Username/groupname/sp application_id of the recipient owner.</li>
+<li><code>authentication_type</code> - (Optional) The delta sharing authentication type. Valid values are <code>TOKEN</code> and <code>DATABRICKS</code>.</li>
+<li><code>data_recipient_global_metastore_id</code> - Required when <code>authentication_type</code> is <code>DATABRICKS</code>.</li>
+<li><code>ip_access_list</code> - (Optional) Recipient IP access list.</li>
+<li><code>properties_kvpairs</code> - (Optional) Recipient properties - object consisting of following fields:
+<ul>
+<li><code>properties</code> (Required) a map of string key-value pairs with recipient's properties.  Properties with name starting with <code>databricks.</code> are reserved.</li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Ip%20Access%20List%20Argument"></a><h3 id="ip-access-list-argument">Ip Access List Argument</h3>
+
+<p>Only one <code>ip_access_list</code> block is allowed in a recipient. It conflicts with authentication type <code>DATABRICKS</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">ip_access_list</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">allowed_ip_addresses</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"0.0.0.0/0"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Arguments for the <code>ip_access_list</code> block are:</p>
+
+<p>Exactly one of the below arguments is required:</p>
+
+<ul>
+<li><code>allowed_ip_addresses</code> - Allowed IP Addresses in CIDR notation. Limit of 100.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - the ID of the recipient - the same as the <code>name</code>.</li>
+<li><code>tokens</code> - List of Recipient Tokens. This field is only present when the authentication_type is TOKEN. Each list element is an object with following attributes:
+<ul>
+<li><code>id</code> - Unique ID of the recipient token.</li>
+<li><code>created_at</code> - Time at which this recipient Token was created, in epoch milliseconds.</li>
+<li><code>created_by</code> - Username of recipient token creator.</li>
+<li><code>activation_url</code> - Full activation URL to retrieve the access token. It will be empty if the token is already retrieved.</li>
+<li><code>expiration_time</code> - Expiration timestamp of the token in epoch milliseconds.</li>
+<li><code>updated_at</code> - Time at which this recipient Token was updated, in epoch milliseconds.</li>
+<li><code>updated_by</code> - Username of recipient Token updater.</li>
+</ul></li>
+<li><code>created_at</code> - Time at which this recipient was created, in epoch milliseconds.</li>
+<li><code>created_by</code> - Username of recipient creator.</li>
+<li><code>updated_at</code> - Time at which this recipient was updated, in epoch milliseconds.</li>
+<li><code>updated_by</code> - Username of recipient Token updater.</li>
+<li><code>metastore_id</code> - Unique identifier of recipient's Unity Catalog metastore. This field is only present when the authentication_type is <code>DATABRICKS</code>.</li>
+<li><code>cloud</code> - Cloud vendor of the recipient's Unity Catalog Metstore. This field is only present when the authentication_type is <code>DATABRICKS</code>.</li>
+<li><code>region</code> - Cloud region of the recipient's Unity Catalog Metstore. This field is only present when the authentication_type is <code>DATABRICKS</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are often used in the same context:</p>
+
+<ul>
+<li><a href="share.md">databricks_share</a> to create Delta Sharing shares.</li>
+<li><a href="grants.md">databricks_grants</a> to manage Delta Sharing permissions.</li>
+<li><a href="../data-sources/shares.md">databricks_shares</a> to read existing Delta Sharing shares.</li>
+</ul>
+
+            
+        
+    </body></html>

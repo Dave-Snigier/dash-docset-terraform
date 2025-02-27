@@ -1,0 +1,140 @@
+<html><!-- Online page at https://www.terraform.io/language/functions/flatten --><head>
+                <title>flatten</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="flatten-function"><code>flatten</code> Function</h1>
+
+<p><code>flatten</code> takes a list and replaces any elements that are lists with a
+flattened sequence of the list contents.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Examples"></a><h2 id="examples">Examples</h2>
+
+<pre><code>&gt; flatten([["a", "b"], [], ["c"]])
+["a", "b", "c"]
+</code></pre>
+
+<p>If any of the nested lists also contain directly-nested lists, these too are
+flattened recursively:</p>
+
+<pre><code>&gt; flatten([[["a", "b"], []], ["c"]])
+["a", "b", "c"]
+</code></pre>
+
+<p>Indirectly-nested lists, such as those in maps, are <em>not</em> flattened.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Flattening%20nested%20structures%20for%20for_each"></a><h2 id="flattening-nested-structures-for-for_each">Flattening nested structures for <code>for_each</code></h2>
+
+<p>The
+<a href="../../terraform/language/meta-arguments/for_each.html">resource <code>for_each</code></a>
+and
+<a href="../../terraform/language/expressions/dynamic-blocks.html"><code>dynamic</code> block</a>
+language features both require a collection value that has one element for
+each repetition.</p>
+
+<p>Sometimes your input data structure isn't naturally in a suitable shape for
+use in a <code>for_each</code> argument, and <code>flatten</code> can be a useful helper function
+when reducing a nested data structure into a flat one.</p>
+
+<p>For example, consider a module that declares a variable like the following:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"networks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span><span class="kt">object</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnets</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span><span class="kt">object</span><span class="p">({</span><span class="w"> </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="p">}))</span><span class="w"></span>
+<span class="w">  </span><span class="p">}))</span><span class="w"></span>
+<span class="w">  </span><span class="nb">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"private"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.0.0/16"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">subnets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"db1"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.0.1/16"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"db2"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.0.2/16"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"public"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.1.0/16"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">subnets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"webserver"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.1.1/16"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"email_server"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.1.2/16"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"dmz"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.2.0/16"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">subnets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"firewall"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.2.1/16"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The above is a reasonable way to model objects that naturally form a tree,
+such as top-level networks and their subnets. The repetition for the top-level
+networks can use this variable directly, because it's already in a form
+where the resulting instances match one-to-one with map elements:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.networks</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value.cidr_block</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>However, in order to declare all of the <em>subnets</em> with a single <code>resource</code>
+block, we must first flatten the structure to produce a collection where each
+top-level element represents a single subnet:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # flatten ensures that this local value is a flat list of objects, rather</span>
+<span class="c1">  # than a list of lists of objects.</span>
+<span class="w">  </span><span class="na">network_subnets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">flatten</span><span class="p">([</span><span class="w"></span>
+<span class="w">    </span><span class="err">for</span><span class="w"> </span><span class="err">network_key</span><span class="p">,</span><span class="w"> </span><span class="err">network</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">var.networks</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="err">for</span><span class="w"> </span><span class="err">subnet_key</span><span class="p">,</span><span class="w"> </span><span class="err">subnet</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">network.subnets</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">network_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">network_key</span><span class="w"></span>
+<span class="w">        </span><span class="na">subnet_key</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="err">subnet_key</span><span class="w"></span>
+<span class="w">        </span><span class="na">network_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.example[network_key].id</span><span class="w"></span>
+<span class="w">        </span><span class="na">cidr_block</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">subnet.cidr_block</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">])</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_subnet"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # local.network_subnets is a list, so we must now project it into a map</span>
+<span class="c1">  # where each key is unique. We'll combine the network and subnet keys to</span>
+<span class="c1">  # produce a single unique key per instance.</span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">tomap</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="err">for</span><span class="w"> </span><span class="err">subnet</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">local.network_subnets</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"${subnet.network_key}.${subnet.subnet_key}"</span><span class="w"> </span><span class="o">=</span><span class="err">&gt;</span><span class="w"> </span><span class="err">subnet</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value.network_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">availability_zone</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value.subnet_key</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value.cidr_block</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The above results in one subnet instance per subnet object, while retaining
+the associations between the subnets and their containing networks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Functions"></a><h2 id="related-functions">Related Functions</h2>
+
+<ul>
+<li><a href="../../terraform/language/functions/setproduct.html"><code>setproduct</code></a> finds all of the combinations of multiple
+lists or sets of values, which can also be useful when preparing collections
+for use with <code>for_each</code> constructs.</li>
+</ul>
+
+            
+        
+    </body></html>

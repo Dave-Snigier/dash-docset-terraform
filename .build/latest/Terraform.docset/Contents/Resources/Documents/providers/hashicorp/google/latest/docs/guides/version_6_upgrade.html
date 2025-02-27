@@ -1,0 +1,434 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/version_6_upgrade --><head>
+                <title>Terraform Google Provider 6.0.0 Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-google-provider-600-upgrade-guide">Terraform Google Provider 6.0.0 Upgrade Guide</h1>
+
+<p>The <code>6.0.0</code> release of the Google provider for Terraform is a major version and
+includes some changes that you will need to consider when upgrading. This guide
+is intended to help with that process and focuses only on the changes necessary
+to upgrade from the final <code>5.X</code> series release to <code>6.0.0</code>.</p>
+
+<p>Most of the changes outlined in this guide have been previously marked as
+deprecated in the Terraform <code>plan</code>/<code>apply</code> output throughout previous provider
+releases, up to and including the final <code>5.X</code> series release. These changes,
+such as deprecation notices, can always be found in the CHANGELOG of the
+affected providers. <a href="https://github.com/hashicorp/terraform-provider-google/blob/main/CHANGELOG.md">google</a>
+<a href="https://github.com/hashicorp/terraform-provider-google-beta/blob/main/CHANGELOG.md">google-beta</a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/I%20accidentally%20upgraded%20to%206.0.0%2C%20how%20do%20I%20downgrade%20to%205.X%3F"></a><h2 id="i-accidentally-upgraded-to-600-how-do-i-downgrade-to-5x">I accidentally upgraded to 6.0.0, how do I downgrade to <code>5.X</code>?</h2>
+
+<p>If you've inadvertently upgraded to <code>6.0.0</code>, first see the
+<a href="#provider-version-configuration">Provider Version Configuration Guide</a> to lock
+your provider version; if you've constrained the provider to a lower version
+such as shown in the previous version example in that guide, Terraform will pull
+in a <code>5.X</code> series release on <code>terraform init</code>.</p>
+
+<p>If you've only ran <code>terraform init</code> or <code>terraform plan</code>, your state will not
+have been modified and downgrading your provider is sufficient.</p>
+
+<p>If you've ran <code>terraform refresh</code> or <code>terraform apply</code>, Terraform may have made
+state changes in the meantime.</p>
+
+<ul>
+<li><p>If you're using a local state, or a remote state backend that does not support
+versioning, <code>terraform refresh</code> with a downgraded provider is likely sufficient
+to revert your state. The Google provider generally refreshes most state
+information from the API, and the properties necessary to do so have been left
+unchanged.</p></li>
+<li><p>If you're using a remote state backend that supports versioning such as
+<a href="https://developer.hashicorp.com/terraform/language/settings/backends/gcs">Google Cloud Storage</a>,
+you can revert the Terraform state file to a previous version. If you do
+so and Terraform had created resources as part of a <code>terraform apply</code> in the
+meantime, you'll need to either delete them by hand or <code>terraform import</code> them
+so Terraform knows to manage them.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Version%20Configuration"></a><h2 id="provider-version-configuration">Provider Version Configuration</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Before upgrading to version 6.0.0, it is recommended to upgrade to the most recent <code>5.X</code> series release of the provider, make the changes noted in this guide, and ensure that your environment successfully runs <a href="https://developer.hashicorp.com/terraform/cli/commands/plan"><code>terraform plan</code></a> without unexpected changes or deprecation notices.</p>
+</aside>
+
+<p>It is recommended to use <a href="https://developer.hashicorp.com/terraform/language/providers/requirements#requiring-providers">version constraints</a>
+when configuring Terraform providers. If you are following that recommendation,
+update the version constraints in your Terraform configuration and run
+<a href="https://developer.hashicorp.com/terraform/cli/commands/init"><code>terraform init</code></a> to download
+the new version.</p>
+
+<p>If you aren't using version constraints, you can use <code>terraform init -upgrade</code>
+in order to upgrade your provider to the latest released version.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">google</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 5.30.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">google</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 6.0.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%3A%20Terraform%20provider%20attribution%20label%20is%20added%20to%20new%20resources%20by%20default"></a><h2 id="provider-terraform-provider-attribution-label-is-added-to-new-resources-by-default">Provider: Terraform provider attribution label is added to new resources by default</h2>
+
+<p>Version 5.16.0 introduced the <code>goog-terraform-provisioned = true</code> label that could
+be automatically added to resources, making it easy to identify resources created
+by the provider when using other tools such as <code>gcloud</code> or the GCP web console. In
+5.16.0 the label needed to be enabled explicitly; in 6.0.0 the default is to add the
+label to all newly created resources. This behavior can be disabled in the provider
+configuration. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">add_terraform_attribution_label</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%3A%20name_prefix%20max%20length%20has%20been%20extended%20from%2037%20to%2054%20characters%20for%20multiple%20resources"></a><h2 id="provider-name_prefix-max-length-has-been-extended-from-37-to-54-characters-for-multiple-resources">Provider: <code>name_prefix</code> max length has been extended from 37 to 54 characters for multiple resources</h2>
+
+<p>Affected resources: <code>google_compute_instance_template</code>, <code>google_compute_region_instance_template</code>, <code>google_compute_ssl_certificate</code>,
+and <code>google_compute_region_ssl_certificate</code></p>
+
+<p>Previously, the max length of <code>name_prefix</code> was 37 characters since the autogenerated UUID suffix was 26 characters which combined to
+the total max length for names of 63 characters.
+In 6.0.0, providing a <code>name_prefix</code> larger than 37 characters will prompt the provider to use a shortened suffix of only 9 characters, leading to a new max of 54 characters for <code>name_prefix</code>. This shortened suffix is inevitably more prone to collisions, so use the longer max <code>name_prefix</code> length with caution.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%3A%20Opt-out%20deletion%20protection%20is%20added%20to%20several%20resources%2C%20including%20google_project"></a><h2 id="provider-opt-out-deletion-protection-is-added-to-several-resources-including-google_project">Provider: Opt-out deletion protection is added to several resources, including google_project</h2>
+
+<p>Affected resources: <code>google_cloud_run_v2_job</code>, <code>google_cloud_run_v2_service</code>, <code>google_domain</code>, <code>google_folder</code>, 
+<code>google_project</code></p>
+
+<p>Protection against Terraform deleting these resources has been added via a new field in each resource which is enabled by default. See the individual resource entries for the field names and other resource-specific details.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_alloydb_cluster"></a><h2 id="resource-google_alloydb_cluster">Resource: <code>google_alloydb_cluster</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/network%20is%20now%20removed"></a><h3 id="network-is-now-removed"><code>network</code> is now removed</h3>
+
+<p><code>network</code> has been removed in favor of <code>network_config.network</code></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_bigquery_reservation"></a><h2 id="resource-google_bigquery_reservation">Resource: <code>google_bigquery_reservation</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/multi_region_auxiliary%20is%20now%20removed"></a><h3 id="multi_region_auxiliary-is-now-removed"><code>multi_region_auxiliary</code> is now removed</h3>
+
+<p>This field is no longer supported by the BigQuery Reservation API.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_bigquery_table"></a><h2 id="resource-google_bigquery_table">Resource: <code>google_bigquery_table</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/View%20creation%20now%20validates%20schema"></a><h3 id="view-creation-now-validates-schema">View creation now validates <code>schema</code></h3>
+
+<p>A <code>view</code> can no longer be created when <code>schema</code> contains required fields</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/allow_resource_tags_on_deletion%20is%20now%20removed"></a><h3 id="allow_resource_tags_on_deletion-is-now-removed"><code>allow_resource_tags_on_deletion</code> is now removed</h3>
+
+<p>Resource tags are now always allowed on table deletion.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_cloud_run_v2_job"></a><h2 id="resource-google_cloud_run_v2_job">Resource: <code>google_cloud_run_v2_job</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Job%20deletion%20now%20prevented%20by%20default%20with%20deletion_protection"></a><h3 id="job-deletion-now-prevented-by-default-with-deletion_protection">Job deletion now prevented by default with <code>deletion_protection</code></h3>
+
+<p>The field <code>deletion_protection</code> has been added with a default value of <code>true</code>. This field prevents
+Terraform from destroying or recreating the Job. In 6.0.0, existing jobs will have
+<code>deletion_protection</code> set to <code>true</code> during the next refresh unless otherwise set in configuration.</p>
+
+<p><strong><code>deletion_protection</code> does NOT prevent deletion outside of Terraform.</strong></p>
+
+<p>To disable deletion protection, explicitly set this field to <code>false</code> in configuration
+and then run <code>terraform apply</code> to apply the change.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/retyped%20containers.env%20to%20SET%20from%20ARRAY"></a><h3 id="retyped-containersenv-to-set-from-array">retyped <code>containers.env</code> to SET from ARRAY</h3>
+
+<p>Previously, <code>containers.env</code> was a list, making it order-dependent. It is now a set.</p>
+
+<p>If you were relying on accessing an individual environment variable by index (for example, <code>google_cloud_run_v2_job.template.containers.0.env.0.name</code>), then that will now need to by hash (for example, <code>google_cloud_run_v2_job.template.containers.0.env.&lt;some-hash&gt;.name</code>).</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_cloud_run_v2_service"></a><h2 id="resource-google_cloud_run_v2_service">Resource: <code>google_cloud_run_v2_service</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Service%20deletion%20now%20prevented%20by%20default%20with%20deletion_protection"></a><h3 id="service-deletion-now-prevented-by-default-with-deletion_protection">Service deletion now prevented by default with <code>deletion_protection</code></h3>
+
+<p>The field <code>deletion_protection</code> has been added with a default value of <code>true</code>. This field prevents
+Terraform from destroying or recreating the Service. In 6.0.0, existing services will have
+<code>deletion_protection</code> set to <code>true</code> during the next refresh unless otherwise set in configuration.</p>
+
+<p><strong><code>deletion_protection</code> does NOT prevent deletion outside of Terraform.</strong></p>
+
+<p>To disable deletion protection, explicitly set this field to <code>false</code> in configuration
+and then run <code>terraform apply</code> to apply the change.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/liveness_probe%20no%20longer%20defaults%20from%20API"></a><h3 id="liveness_probe-no-longer-defaults-from-api"><code>liveness_probe</code> no longer defaults from API</h3>
+
+<p>Cloud Run does not provide a default value for liveness probe. Now removing this field
+will remove the liveness probe from the Cloud Run service.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/retyped%20containers.env%20to%20SET%20from%20ARRAY"></a><h3 id="retyped-containersenv-to-set-from-array-2">retyped <code>containers.env</code> to SET from ARRAY</h3>
+
+<p>Previously, <code>containers.env</code> was a list, making it order-dependent. It is now a set.</p>
+
+<p>If you were relying on accessing an individual environment variable by index (for example, <code>google_cloud_run_v2_service.template.containers.0.env.0.name</code>), then that will now need to by hash (for example, <code>google_cloud_run_v2_service.template.containers.0.env.&lt;some-hash&gt;.name</code>).</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_composer_environment"></a><h2 id="resource-google_composer_environment">Resource: <code>google_composer_environment</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ip_allocation_policy%20%3D%20%5B%5D%20is%20no%20longer%20valid%20configuration"></a><h3 id="ip_allocation_policy-is-no-longer-valid-configuration"><code>ip_allocation_policy = []</code> is no longer valid configuration</h3>
+
+<p>There was no functional difference between setting <code>ip_allocation_policy = []</code> and not setting <code>ip_allocation_policy</code> at all. Removing the field from configuration should not produce a diff.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resources%3A%20google_compute_backend_service%20and%20google_compute_region_backend_service"></a><h2 id="resources-google_compute_backend_service-and-google_compute_region_backend_service">Resources: <code>google_compute_backend_service</code> and <code>google_compute_region_backend_service</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/iap.enabled%20is%20now%20required%20in%20the%20iap%20block"></a><h3 id="iapenabled-is-now-required-in-the-iap-block"><code>iap.enabled</code> is now required in the <code>iap</code> block</h3>
+
+<p>To apply the IAP settings to the backend service, <code>true</code> needs to be set for <code>enabled</code> field.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/outlier_detection%20subfields%20default%20values%20removed"></a><h3 id="outlier_detection-subfields-default-values-removed"><code>outlier_detection</code> subfields default values removed</h3>
+
+<p>Empty values mean the setting should be cleared.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/connection_draining_timeout_sec%20default%20value%20changed"></a><h3 id="connection_draining_timeout_sec-default-value-changed"><code>connection_draining_timeout_sec</code> default value changed</h3>
+
+<p>An empty value now means 300.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/balancing_mode%20default%20value%20changed"></a><h3 id="balancing_mode-default-value-changed"><code>balancing_mode</code> default value changed</h3>
+
+<p>An empty value now means UTILIZATION.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resources%3A%20google_compute_instance%2C%20google_container_cluster%2C%20and%20google_container_node_pool"></a><h2 id="resources-google_compute_instance-google_container_cluster-and-google_container_node_pool">Resources: <code>google_compute_instance</code>, <code>google_container_cluster</code>, and <code>google_container_node_pool</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/guest_accelerator%20%3D%20%5B%5D%20is%20no%20longer%20valid%20configuration"></a><h3 id="guest_accelerator-is-no-longer-valid-configuration"><code>guest_accelerator = []</code> is no longer valid configuration</h3>
+
+<p><a href="https://developer.hashicorp.com/terraform/language/syntax/configuration#arguments">Argument syntax</a> is no longer supported for this field,
+in favor of <a href="https://developer.hashicorp.com/terraform/language/syntax/configuration#blocks">block syntax</a>.
+For configurations using argument syntax dynamically with variables, it is recommended to use
+<a href="https://developer.hashicorp.com/terraform/language/expressions/dynamic-blocks">dynamic blocks</a> instead.</p>
+
+<p>By default, omitting <code>guest_accelerator</code> will lead to Terraform defaulting to the API's value.
+To explicitly set an empty <code>guest_accelerator</code> list, define a <code>guest_accelerator</code> block with <code>guest_accelerator.count = 0</code>.
+This is necessary to mirror the previous behavior of <code>guest_accelerator = []</code> in 5.X.</p>
+
+<p>Argument syntax was previously enabled to maintain compatability in behavior between Terraform versions 0.11 and 0.12 using a special setting <a href="https://developer.hashicorp.com/terraform/language/attr-as-blocks">"attributes as blocks"</a>.
+This special setting causes other breakages so it is now removed, with setting <code>guest_accelerator.count = 0</code> available as an alternative form of empty <code>guest_accelerator</code> object.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/guest_accelerator.gpu_driver_installation_config%20%3D%20%5B%5D%20and%20guest_accelerator.gpu_sharing_config%20%3D%20%5B%5D%20are%20no%20longer%20valid%20configuration"></a><h3 id="guest_acceleratorgpu_driver_installation_config-and-guest_acceleratorgpu_sharing_config-are-no-longer-valid-configuration"><code>guest_accelerator.gpu_driver_installation_config = []</code> and <code>guest_accelerator.gpu_sharing_config = []</code> are no longer valid configuration</h3>
+
+<p>These were never intended to be set this way. Removing the fields from configuration should not produce a diff.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resources%3A%20google_compute_instance_from_template%20and%20google_compute_instance_from_machine_image"></a><h2 id="resources-google_compute_instance_from_template-and-google_compute_instance_from_machine_image">Resources: <code>google_compute_instance_from_template</code> and <code>google_compute_instance_from_machine_image</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/network_interface.alias_ip_range%2C%20network_interface.access_config%2C%20attached_disk%2C%20guest_accelerator%2C%20service_account%2C%20scratch_disk%20can%20no%20longer%20be%20set%20to%20an%20empty%20block%20%5B%5D"></a><h3 id="network_interfacealias_ip_range-network_interfaceaccess_config-attached_disk-guest_accelerator-service_account-scratch_disk-can-no-longer-be-set-to-an-empty-block"><code>network_interface.alias_ip_range, network_interface.access_config, attached_disk, guest_accelerator, service_account, scratch_disk</code> can no longer be set to an empty block <code>[]</code></h3>
+
+<p><code>field = []</code> is no longer valid configuration for these fields. Removing the fields from configuration should not produce a diff.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_subnetwork"></a><h2 id="resource-google_compute_subnetwork">Resource: <code>google_compute_subnetwork</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/secondary_ip_range%20%3D%20%5B%5D%20is%20no%20longer%20valid%20configuration"></a><h3 id="secondary_ip_range-is-no-longer-valid-configuration"><code>secondary_ip_range = []</code> is no longer valid configuration</h3>
+
+<p>To explicitly set an empty list of objects, use <code>send_secondary_ip_range_if_empty = true</code> and completely remove <code>secondary_ip_range</code> from config.</p>
+
+<p>Previously, to explicitly set <code>secondary_ip_range</code> as an empty list of objects, the specific configuration <code>secondary_ip_range = []</code> was necessary.
+This was to maintain compatability in behavior between Terraform versions 0.11 and 0.12 using a special setting <a href="https://developer.hashicorp.com/terraform/language/attr-as-blocks">"attributes as blocks"</a>.
+This special setting causes other breakages so it is now removed, with <code>send_secondary_ip_range_if_empty</code> available instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_container_cluster"></a><h2 id="resource-google_container_cluster">Resource: <code>google_container_cluster</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/advanced_datapath_observability_config.relay_mode%20is%20now%20removed"></a><h3 id="advanced_datapath_observability_configrelay_mode-is-now-removed"><code>advanced_datapath_observability_config.relay_mode</code> is now removed</h3>
+
+<p>Previously, through <code>relay_mode</code> field usage, users could both enable Dataplane V2
+Flow Observability feature (that deploys Hubble relay component) and configure
+managed load balancers. Due to users' needs to have better control over how
+Hubble relay components shall be exposed in their clusters, managed load
+balancer deployments are not supported anymore and users are expected to deploy
+their own load balancers.</p>
+
+<p>If <code>advanced_datapath_observability_config</code> is defined, <code>enable_relay</code> is now a
+required field instead and users are expected to use this field instead.</p>
+
+<p>Recommended migration from <code>relay_mode</code> to <code>enable_relay</code> depending on
+<code>relay_mode</code> value:</p>
+
+<ul>
+<li><code>DISABLED</code>: set <code>enable_relay</code> to <code>false</code></li>
+<li><code>INTERNAL_VPC_LB</code>: set <code>enable_relay</code> to <code>true</code> and define internal load
+balancer with VPC scope</li>
+<li><code>EXTERNAL_LB</code>: set <code>enable_relay</code> to <code>true</code> and define external load balancer
+with public access</li>
+</ul>
+
+<p>See exported endpoints for Dataplane V2 Observability feature to learn what
+target you might wish to expose with load balancers:
+https://cloud.google.com/kubernetes-engine/docs/concepts/about-dpv2-observability#gke-dataplane-v2-observability-endpoints</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Three%20label-related%20fields%20are%20now%20present"></a><h3 id="three-label-related-fields-are-now-present">Three label-related fields are now present</h3>
+
+<ul>
+<li><code>resource_labels</code> field is non-authoritative and only manages the labels defined by
+the users on the resource through Terraform.</li>
+<li>The new output-only <code>terraform_labels</code> field merges the labels defined by the users
+on the resource through Terraform and the default labels configured on the provider.</li>
+<li>The new output-only <code>effective_labels</code> field lists all of labels present on the resource
+in GCP, including the labels configured through Terraform, the system, and other clients.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20source%3A%20google_container_cluster"></a><h2 id="data-source-google_container_cluster">Data source: <code>google_container_cluster</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Three%20label-related%20fields%20are%20now%20present"></a><h3 id="three-label-related-fields-are-now-present-2">Three label-related fields are now present</h3>
+
+<p>All three of <code>resource_labels</code>, <code>effective_labels</code> and <code>terraform_labels</code> will now be present.
+All of these three fields include all of the labels present on the resource in GCP including
+the labels configured through Terraform, the system, and other clients, equivalent to
+<code>effective_labels</code> on the resource.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_datastore_index%20is%20now%20removed"></a><h2 id="resource-google_datastore_index-is-now-removed">Resource: <code>google_datastore_index</code> is now removed</h2>
+
+<p><code>google_datastore_index</code> is removed in favor of <code>google_firestore_index</code></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_domain"></a><h2 id="resource-google_domain">Resource: <code>google_domain</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Domain%20deletion%20now%20prevented%20by%20default%20with%20deletion_protection"></a><h3 id="domain-deletion-now-prevented-by-default-with-deletion_protection">Domain deletion now prevented by default with <code>deletion_protection</code></h3>
+
+<p>The field <code>deletion_protection</code> has been added with a default value of <code>true</code>. This field prevents
+Terraform from destroying or recreating the Domain. In 6.0.0, existing domains will have 
+<code>deletion_protection</code> set to <code>true</code> during the next refresh unless otherwise set in configuration.</p>
+
+<p><strong><code>deletion_protection</code> does NOT prevent deletion outside of Terraform.</strong></p>
+
+<p>To disable deletion protection, explicitly set this field to <code>false</code> in configuration
+and then run <code>terraform apply</code> to apply the change.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_edgenetwork_network"></a><h2 id="resource-google_edgenetwork_network">Resource: <code>google_edgenetwork_network</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Three%20label-related%20fields%20are%20now%20present"></a><h3 id="three-label-related-fields-are-now-present-3">Three label-related fields are now present</h3>
+
+<ul>
+<li><code>labels</code> field is non-authoritative and only manages the labels defined by
+the users on the resource through Terraform.</li>
+<li>The new output-only <code>terraform_labels</code> field merges the labels defined by the users
+on the resource through Terraform and the default labels configured on the provider.</li>
+<li>The new output-only <code>effective_labels</code> field lists all of labels present on the resource
+in GCP, including the labels configured through Terraform, the system, and other clients.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_edgenetwork_subnet"></a><h2 id="resource-google_edgenetwork_subnet">Resource: <code>google_edgenetwork_subnet</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Three%20label-related%20fields%20are%20now%20present"></a><h3 id="three-label-related-fields-are-now-present-4">Three label-related fields are now present</h3>
+
+<ul>
+<li><code>labels</code> field is non-authoritative and only manages the labels defined by
+the users on the resource through Terraform.</li>
+<li>The new output-only <code>terraform_labels</code> field merges the labels defined by the users
+on the resource through Terraform and the default labels configured on the provider.</li>
+<li>The new output-only <code>effective_labels</code> field lists all of labels present on the resource
+in GCP, including the labels configured through Terraform, the system, and other clients.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_folder"></a><h2 id="resource-google_folder">Resource: <code>google_folder</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Folder%20deletion%20now%20prevented%20by%20default%20with%20deletion_protection"></a><h3 id="folder-deletion-now-prevented-by-default-with-deletion_protection">Folder deletion now prevented by default with <code>deletion_protection</code></h3>
+
+<p>The field <code>deletion_protection</code> has been added with a default value of <code>true</code>. This field prevents
+Terraform from destroying or recreating the Folder. In 6.0.0, existing folders will have
+<code>deletion_protection</code> set to <code>true</code> during the next refresh unless otherwise set in configuration.</p>
+
+<p><strong><code>deletion_protection</code> does NOT prevent deletion outside of Terraform.</strong></p>
+
+<p>To disable deletion protection, explicitly set this field to <code>false</code> in configuration
+and then run <code>terraform apply</code> to apply the change.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_identity_platform_project_default_config%20is%20now%20removed"></a><h2 id="resource-google_identity_platform_project_default_config-is-now-removed">Resource: <code>google_identity_platform_project_default_config</code> is now removed</h2>
+
+<p><code>google_identity_platform_project_default_config</code> is removed in favor of <code>google_identity_platform_project_config</code></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_integrations_client"></a><h2 id="resource-google_integrations_client">Resource: <code>google_integrations_client</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/create_sample_workflows%20and%20provision_gmek%20is%20now%20removed"></a><h3 id="create_sample_workflows-and-provision_gmek-is-now-removed"><code>create_sample_workflows</code> and <code>provision_gmek</code> is now removed</h3>
+
+<p><code>create_sample_workflows</code> and <code>provision_gmek</code> is now removed in favor of <code>create_sample_integrations</code></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_project"></a><h2 id="resource-google_project">Resource: <code>google_project</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Project%20deletion%20now%20prevented%20by%20default%20with%20deletion_policy"></a><h3 id="project-deletion-now-prevented-by-default-with-deletion_policy">Project deletion now prevented by default with <code>deletion_policy</code></h3>
+
+<p>The default value for <code>deletion_policy</code> is now <code>PREVENT</code> instead of <code>DELETE</code>. The <code>PREVENT</code> value for <code>deletion_policy</code> stops Terraform
+from deleting or recreating your project. To remove deletion protection entirely,
+explicitly set this field to <code>DELETE</code> in your configuration and run <code>terraform apply</code>.
+Alternatively, setting this field to <code>ABANDON</code> allows Terraform to remove your project from state without destroying it.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/skip_delete%20is%20now%20removed"></a><h3 id="skip_delete-is-now-removed"><code>skip_delete</code> is now removed</h3>
+
+<p><code>skip_delete</code> has been removed in favor of <code>deletion_policy</code>. In order to get the same behavior as <code>skip_delete = true</code>, set <code>deletion_policy = ABANDON</code>. Be aware that <code>deletion_policy = ABANDON</code> will override the error-on-delete behaviour that the <code>PREVENT</code> policy applies.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_pubsub_topic"></a><h2 id="resource-google_pubsub_topic">Resource: <code>google_pubsub_topic</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/schema_settings%20no%20longer%20has%20a%20default%20value"></a><h3 id="schema_settings-no-longer-has-a-default-value"><code>schema_settings</code> no longer has a default value</h3>
+
+<p>An empty value means the setting should be cleared.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_redis_cluster"></a><h2 id="resource-google_redis_cluster">Resource: <code>google_redis_cluster</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/deletion_protection_enabled%20field%20with%20default%20value%20added"></a><h3 id="deletion_protection_enabled-field-with-default-value-added"><code>deletion_protection_enabled</code> field with default value added</h3>
+
+<p>Support for the deletionProtectionEnabled field has been added. Redis clusters will now be created with a <code>deletion_protection_enabled = true</code> value by default. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_sql_database_instance"></a><h2 id="resource-google_sql_database_instance">Resource: <code>google_sql_database_instance</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/settings.ip_configuration.require_ssl%20is%20now%20removed%20%28in%206.0.1%29"></a><h3 id="settingsip_configurationrequire_ssl-is-now-removed-in-601"><code>settings.ip_configuration.require_ssl</code> is now removed (in 6.0.1)</h3>
+
+<p>Removed in favor of field <code>settings.ip_configuration.ssl_mode</code>. <code>settings.ip_configuration.require_ssl</code> was intended to be removed in 6.0.0, but is removed in 6.0.1 instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_storage_bucket"></a><h2 id="resource-google_storage_bucket">Resource: <code>google_storage_bucket</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/lifecycle_rule.condition.no_age%20is%20now%20removed"></a><h3 id="lifecycle_ruleconditionno_age-is-now-removed"><code>lifecycle_rule.condition.no_age</code> is now removed</h3>
+
+<p>Previously <code>lifecycle_rule.condition.age</code> attribute was being set to zero by default and <code>lifecycle_rule.condition.no_age</code> was introduced to prevent that.
+Now <code>lifecycle_rule.condition.no_age</code> is no longer supported and <code>lifecycle_rule.condition.age</code> won't be set to zero by default.
+Removed in favor of the field <code>lifecycle_rule.condition.send_age_if_zero</code> which can be used to set a zero value for the <code>lifecycle_rule.condition.age</code> attribute. </p>
+
+<p>For a seamless update, if your state today uses <code>no_age=true</code>, update it to remove <code>no_age</code> and set <code>send_age_if_zero=false</code>. If you do not use <code>no_age=true</code> and desire to continue creating rules with an <code>age=0</code> condition, you will need to add <code>send_age_if_zero=true</code> to your state to avoid any changes after updating to 6.0.0. </p>
+
+<p>With the 6.0.0 update, <code>send_age_if_zero</code> will be set to <code>false</code> by default unless declared explicitly <code>true</code>, and <code>age=0</code> conditions will be removed from existing buckets next time your <code>lifecycle_rule.condition</code> configuration is updated.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_vpc_access_connector"></a><h2 id="resource-google_vpc_access_connector">Resource: <code>google_vpc_access_connector</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Fields%20min_throughput%20and%20max_throughput%20no%20longer%20have%20default%20values"></a><h3 id="fields-min_throughput-and-max_throughput-no-longer-have-default-values">Fields <code>min_throughput</code> and <code>max_throughput</code> no longer have default values</h3>
+
+<p>The fields <code>min_throughput</code> and <code>max_throughput</code> no longer have default values
+set by the provider. This was necessary to add conflicting field validation, also
+described in this guide.</p>
+
+<p>No configuration changes are needed for existing resources as these fields' values
+will default to values present in data returned from the API.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Conflicting%20field%20validation%20added%20for%20min_throughput%20and%20min_instances%2C%20and%20max_throughput%20and%20max_instances"></a><h3 id="conflicting-field-validation-added-for-min_throughput-and-min_instances-and-max_throughput-and-max_instances">Conflicting field validation added for <code>min_throughput</code> and <code>min_instances</code>, and <code>max_throughput</code> and <code>max_instances</code></h3>
+
+<p>The provider will now enforce that <code>google_vpc_access_connector</code> resources can only
+include one of <code>min_throughput</code> and <code>min_instances</code> and one of <code>max_throughput</code> and
+<code>max_instances</code>. Previously if a user included all four fields in a resource block
+they would experience a permadiff. This is a result of how <code>min_instances</code> and
+<code>max_instances</code> fields' values take precedence in the API, and how the API calculates
+values for <code>min_throughput</code> and <code>max_throughput</code> that match the number of instances.</p>
+
+<p>Users will need to check their configuration for any <code>google_vpc_access_connector</code>
+resource blocks that contain both fields in a conflicting pair, and remove one of those fields.
+The fields that are removed from the configuration will still have Computed values,
+that are derived from the API.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_workstations_workstation_config"></a><h2 id="resource-google_workstations_workstation_config">Resource: <code>google_workstations_workstation_config</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/host.gce_instance.disable_ssh%20now%20defaults%20to%20true"></a><h3 id="hostgce_instancedisable_ssh-now-defaults-to-true"><code>host.gce_instance.disable_ssh</code> now defaults to true</h3>
+
+<p><code>disable_ssh</code> field now defaults to true. To enable SSH, please set <code>disable_ssh</code> to false.</p>
+
+            
+        
+    </body></html>

@@ -1,0 +1,988 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/version_5_upgrade --><head>
+                <title>Terraform provider for Google Cloud 5.0.0 Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-provider-for-google-cloud-500-upgrade-guide">Terraform provider for Google Cloud 5.0.0 Upgrade Guide</h1>
+
+<p>The <code>5.0.0</code> release of the Terraform provider for Google Cloud is a major version and
+includes some changes that you will need to consider when upgrading. This guide
+is intended to help with that process and focuses only on the changes necessary
+to upgrade from the final <code>4.X</code> series release to <code>5.0.0</code>.</p>
+
+<p>Most of the changes outlined in this guide have been previously marked as
+deprecated in the Terraform <code>plan</code>/<code>apply</code> output throughout previous provider
+releases, up to and including the final <code>4.X</code> series release. These changes,
+such as deprecation notices, can always be found in the CHANGELOG of the
+affected providers. <a href="https://github.com/hashicorp/terraform-provider-google/blob/main/CHANGELOG.md">google</a>
+<a href="https://github.com/hashicorp/terraform-provider-google-beta/blob/main/CHANGELOG.md">google-beta</a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/I%20accidentally%20upgraded%20to%205.0.0%2C%20how%20do%20I%20downgrade%20to%204.X%3F"></a><h2 id="i-accidentally-upgraded-to-500-how-do-i-downgrade-to-4x">I accidentally upgraded to 5.0.0, how do I downgrade to <code>4.X</code>?</h2>
+
+<p>If you've inadvertently upgraded to <code>5.0.0</code>, first see the
+<a href="#provider-version-configuration">Provider Version Configuration Guide</a> to lock
+your provider version; if you've constrained the provider to a lower version
+such as shown in the previous version example in that guide, Terraform will pull
+in a <code>4.X</code> series release on <code>terraform init</code>.</p>
+
+<p>If you've only ran <code>terraform init</code> or <code>terraform plan</code>, your state will not
+have been modified and downgrading your provider is sufficient.</p>
+
+<p>If you've ran <code>terraform refresh</code> or <code>terraform apply</code>, Terraform may have made
+state changes in the meantime.</p>
+
+<ul>
+<li><p>If you're using a local state, or a remote state backend that does not support
+versioning, <code>terraform refresh</code> with a downgraded provider is likely sufficient
+to revert your state. The Google provider generally refreshes most state
+information from the API, and the properties necessary to do so have been left
+unchanged.</p></li>
+<li><p>If you're using a remote state backend that supports versioning such as
+<a href="https://developer.hashicorp.com/terraform/language/settings/backends/gcs">Google Cloud Storage</a>,
+you can revert the Terraform state file to a previous version. If you do
+so and Terraform had created resources as part of a <code>terraform apply</code> in the
+meantime, you'll need to either delete them by hand or <code>terraform import</code> them
+so Terraform knows to manage them.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Version%20Configuration"></a><h2 id="provider-version-configuration">Provider Version Configuration</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Before upgrading to version 5.0.0, it is recommended to upgrade to the most recent <code>4.X</code> series release of the provider, make the changes noted in this guide, and ensure that your environment successfully runs <a href="https://developer.hashicorp.com/terraform/cli/commands/plan"><code>terraform plan</code></a> without unexpected changes or deprecation notices.</p>
+</aside>
+
+<p>It is recommended to use <a href="https://developer.hashicorp.com/terraform/language/providers/requirements#requiring-providers">version constraints</a>
+when configuring Terraform providers. If you are following that recommendation,
+update the version constraints in your Terraform configuration and run
+<a href="https://developer.hashicorp.com/terraform/cli/commands/init"><code>terraform init</code></a> to download
+the new version.</p>
+
+<p>If you aren't using version constraints, you can use <code>terraform init -upgrade</code>
+in order to upgrade your provider to the latest released version.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">google</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 4.84.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">google</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 5.0.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider"></a><h2 id="provider">Provider</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider-level%20Labels%20Rework"></a><h3 id="provider-level-labels-rework">Provider-level Labels Rework</h3>
+
+<p>Label and annotation fields across the provider have been reworked with impact
+across numerous resources. Two notable cases from this upgrade are covered
+immediately, with more details in dedicated headers below:</p>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>danger</em>
+    <p>For resources with <strong>any</strong> <code>labels</code> values previously defined, running <code>terraform plan</code> or <code>terraform apply</code> on Google provider <code>5.0.0</code> or later with an existing pre-<code>5.0.0</code> resource before an <code>apply</code>, the plan will show an update adding your current <code>labels</code> values to <code>terraform_labels</code>. This change will result in a no-op update on most resources, which can be safely applied. However, some resources are immutable. Before 5.6.0 this would fail. After 5.6.0, a plan that includes recreating the resource will be created. This may be applied to move forward with the upgrade but will recreate the resource if you do so. We plan to make a change for these resources that will be recreated that will compute the terraform_labels value as part of the upgrade, and will come out for affected resources in the following releases after 5.6.0.</p>
+</aside>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>danger</em>
+    <p>This change introduced a regression we were unable to resolve, and labels with an empty value (<code>""</code>) should be avoided, as they will be ignored and not included in requests to the API. Replacing those labels' values with <code>_</code> or <code>true</code> are recommended.</p>
+</aside>
+
+<p>Not all of Google Cloud resources support labels and annotations. Please check
+the resource documentation to figure out if a given resource supports <code>labels</code>
+or <code>annotations</code> fields.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20default%20labels"></a><h4 id="provider-default-labels">Provider default labels</h4>
+
+<p>Default labels configured on the provider through a new <code>default_labels</code> field
+are now supported. The default labels configured on the provider will be applied
+to all  resources with a top level <code>labels</code> field or a <code>labels</code> field nested
+inside a top level <code>metadata</code> field.</p>
+
+<p>Setting the same key as a default label at the resource level will override the
+default value for that label.</p>
+
+<p>These values will be recorded in individual resource plans through the
+<code>terraform_labels</code> and <code>effective_labels</code> fields.</p>
+
+<pre><code>provider "google" {
+  default_labels = {
+    my_global_key = "one"
+    my_default_key = "two"
+  }
+}
+
+resource "google_compute_address" "my_address" {
+  name     = "my-address"
+
+  labels = {
+    my_key = "three"
+    # overrides provider-wide setting
+    my_default_key = "four"
+  }
+}
+</code></pre>
+
+<pre><code># google_compute_address.my_address will be created
+  + resource "google_compute_address" "my_address" {
+      + address            = (known after apply)
+      + address_type       = "EXTERNAL"
+      + creation_timestamp = (known after apply)
+      + effective_labels   = {
+          + "my_default_key" = "four"
+          + "my_global_key"  = "one"
+          + "my_key"         = "three"
+        }
+      + id                 = (known after apply)
+      + label_fingerprint  = (known after apply)
+      + labels             = {
+          + "my_default_key" = "four"
+          + "my_key"         = "three"
+        }
+      + name               = "my-address"
+      + network_tier       = (known after apply)
+      + prefix_length      = (known after apply)
+      + project            = "my-project"
+      + purpose            = (known after apply)
+      + region             = (known after apply)
+      + self_link          = (known after apply)
+      + subnetwork         = (known after apply)
+      + terraform_labels   = {
+          + "my_default_key" = "four"
+          + "my_global_key"  = "one"
+          + "my_key"         = "three"
+        }
+      + users              = (known after apply)
+    }
+
+Plan: 1 to add, 0 to change, 0 to destroy.
+</code></pre>
+
+<p>Provider-level default annotations are not supported at this time.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%20labels"></a><h4 id="resource-labels">Resource labels</h4>
+
+<p>Previously, <code>labels</code> and <code>annotations</code> fields in the Google Cloud provider
+were authoritative and Terraform thought it was the only owner of the fields.
+This model worked well initially, but with the introduction of system labels and
+other client-managed labels, Terraform would conflict with their labels and show
+a diff. We've reworked the <code>labels</code> field to resolve this class of problem.</p>
+
+<p>This reworked labels model has been applied to all resources with a top level
+<code>labels</code> field or a nested <code>labels</code> field inside a top level <code>metadata</code> field.
+Non-standard labels fields are unaffected, for example the <code>node_labels</code> GKE
+field that affects child resources.</p>
+
+<p>Resources that previously contained a single <code>labels</code> field will now contain
+three fields:</p>
+
+<ul>
+<li>The <code>labels</code> field is now non-authoritative and only manages the label keys
+defined in your configuration for the resource. If a label was added outside of
+Terraform, it will not be managed by Terraform, unless it is added to the
+<code>labels</code> field in the configuration.</li>
+<li>The <code>terraform_labels</code> cannot be specified directly by the user. It merges the
+labels defined in the resource's configuration and the default labels configured
+in the provider block. If the same label key exists on both the resource level
+and provider level, the value on the resource will override the
+provider-level default.</li>
+<li>The output-only <code>effective_labels</code> will list all the labels present on the
+resource in GCP, including the labels configured through Terraform, the system,
+and other clients.</li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p><code>ignore_changes</code> can be applied to <code>labels</code> field to ignore the changes of the user defined labels. It is not recommended to apply <code>ignore_changes</code> to <code>terraform_labels</code> or <code>effective_labels</code>, as it may unintuitively affect the final API call.</p>
+</aside>
+
+<p>The following changes will be observed in applicable resources after upgrading to <code>5.0.0</code>:</p>
+
+<ul>
+<li>Running <code>terraform refresh</code> on Google provider <code>5.0.0</code> or later with an existing pre-<code>5.0.0</code> resource before an <code>apply</code>, these three fields will show in the state file. <code>labels</code> field will have your current labels, <code>terraform_labels</code> will be empty, and <code>effective_labels</code> will have all of labels present on the resource in GCP.</li>
+<li>For resources with <strong>any</strong> <code>labels</code> values previously defined, running <code>terraform plan</code> or <code>terraform apply</code> on Google provider <code>5.0.0</code> or later with an existing pre-<code>5.0.0</code> resource before an <code>apply</code>, the plan will show an updated adding your current labels to <code>terraform_labels</code>. After running <code>terraform apply</code>, these three fields will show in the state file. <code>labels</code> will have your current labels, <code>terraform_labels</code> will have the combination of <code>labels</code> and your provider-default labels, and <code>effective_labels</code> will have all of labels present on the resource in GCP.</li>
+<li>Running <code>terraform import</code> on Google provider <code>5.0.0</code> or later, these three fields will show in the state file with an empty <code>labels</code> and <code>terraform_labels</code> value. <code>effective_labels</code> will have all the labels present on the resource in GCP. You can update the resource to bring labels defined in your configuration under management by Terraform.</li>
+</ul>
+
+<p>The following are resource-specific label changes:</p>
+
+<ul>
+<li>In the resource <code>google_cloud_run_domain_mapping</code>, the system labels <code>cloud.googleapis.com/location</code> and <code>run.googleapis.com/overrideAt</code> will be removed from <code>labels</code> inside <code>metadata</code> field in the state file as part of a one-time resource schema upgrade. If any of these label keys are in the configuration, after upgrading to <code>5.0.0</code>, the plan will show that these keys will be added. You can safely accept this change, and Terraform will begin to manage them again.</li>
+<li>In the resource <code>google_cloud_run_service</code>, the system label <code>cloud.googleapis.com/location</code> will be removed from <code>labels</code> inside <code>metadata</code> field in the state file as part of a one-time resource schema upgrade. If this system label key is in the configuration, after upgrading to <code>5.0.0</code>, the plan will show that this key will be added. You can safely accept this change, and Terraform will begin to manage it again.</li>
+<li>In the resource <code>google_dataflow_flex_template_job</code>, the system labels with the prefix <code>goog-dataflow-provided</code> are removed from <code>labels</code> field in the state file as part of a one-time resource schema upgrade. If any of these label keys are in the configuration, after upgrading to <code>5.0.0</code>, the plan will show that these keys will be added. You can safely accept this change, and Terraform will begin to manage them again.</li>
+<li>In the resource <code>google_dataflow_job</code>, the system labels with the prefix <code>goog-dataflow-provided</code> will be removed from <code>labels</code> field in the state file as part of a one-time resource schema upgrade. If any of these label keys are in the configuration, after upgrading to <code>5.0.0</code>, the plan will show that these keys will be added. You can safely accept this change, and Terraform will begin to manage them again.</li>
+<li>In the resource <code>google_dataproc_cluster</code>, the system labels with the prefix <code>goog-dataproc</code> will be removed from <code>labels</code> field in the state file as part of a one-time resource schema upgrade. If any of these label keys are in the configuration, after upgrading to <code>5.0.0</code>, the plan will show that these keys will be added. You can safely accept this change.</li>
+<li>In the resource <code>google_notebooks_instance</code>, the system labels with the prefix <code>goog-caip-notebook</code> will be removed from <code>labels</code> field in the state file as part of a one-time resource schema upgrade. If any of these label keys are in the configuration, after upgrading to <code>5.0.0</code>, the plan will show that these keys will be added. You can safely accept this change, and Terraform will begin to manage them again.</li>
+<li>In the resource <code>google_storage_bucket</code>, the system labels with the prefix <code>goog-dataplex</code> will be removed from <code>labels</code> field in the state file as part of a one-time resource schema upgrade. If any of these label keys are in the configuration, after upgrading to <code>5.0.0</code>, the plan will show that these keys will be added. You can safely accept this change, and Terraform will begin to manage them again.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20source%20labels"></a><h4 id="data-source-labels">Data source labels</h4>
+
+<p>For most resource-based datasources, all three of <code>labels</code>, <code>effective_labels</code>
+and <code>terraform_labels</code> will now be present. All of these three fields include
+all of the labels present on the resource in GCP including the labels configured
+through Terraform, the system, and other clients, equivalent to
+<code>effective_labels</code> on the resource.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/How%20to%20make%20Terraform%20Cloud%27s%20Drift%20Detection%20feature%20compatible%20with%20the%20new%20implementation%20of%20labels"></a><h3 id="how-to-make-terraform-clouds-drift-detection-feature-compatible-with-the-new-implementation-of-labels">How to make Terraform Cloud's Drift Detection feature compatible with the new implementation of labels</h3>
+
+<p>In &lt;5.0.0, Drift Detection was possible for labels but would lead to some confusion for users due to GCP often adding labels to itself. This resulted in Drift Detection not being 100% correct of the time.</p>
+
+<p>In order to detect drift, it's recommended to use Terraform's <code>check</code> block to compare the number of labels in both <code>effective_labels</code> and <code>terraform_labels</code>. A mismatch would only happen if drift is present, the following code would run this check on applicable resources.</p>
+
+<pre><code> check "google_storage_bucket" {
+  assert {
+    condition = length(google_storage_bucket.drift.effective_labels) == length(google_storage_bucket.drift.terraform_labels)
+    error_message = "Drift Detected"
+  }
+}
+</code></pre>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This would reintroduce the original problem with Drift Detection where it's not 100% correct with labels. Users will need to determine if the change comes from GCP and update their Terraform configuration assuming it's a stable GCP created label.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%20annotations"></a><h4 id="resource-annotations">Resource annotations</h4>
+
+<p>Annotations have been reworked similarly to <code>labels</code>, and <code>annotations</code> fields
+will now manage only the keys included in configuration. This model has been
+applied to top level <code>annotations</code> fields and those nested in <code>metadata</code> blocks.</p>
+
+<p>Resources that previously contained a single <code>annotations</code> field will now contain
+two fields:</p>
+
+<ul>
+<li>The <code>annotations</code> field is now non-authoritative and only manage the keys
+defined in your configuration for the resource. If an annotations entry was
+added outside of Terraform, it will not be managed by Terraform, unless it is
+added to the <code>annotations</code> field in the configuration.</li>
+<li>The output-only <code>effective_annotations</code> will list all the annotations present
+on the resource in GCP, including the entries configured through Terraform, the
+system, and other clients.</li>
+</ul>
+
+<p><strong>Note:</strong> <code>ignore_changes</code> can be applied to <code>annotations</code> field to ignore the
+changes of the user defined annotations. It is not recommended to apply
+<code>ignore_changes</code> to <code>effective_annotations</code>, as it may unintuitively affect the
+final API call.</p>
+
+<p>The following changes will be observed after upgrading to <code>5.0.0</code>.</p>
+
+<ul>
+<li>Running <code>terraform import</code> on Google provider <code>5.0.0</code> or later, these two fields will show in the state file with an empty <code>annotations</code> value. <code>effective_annotations</code> will have all of annotations present on the resource in GCP. You can update the resource to bring annotations defined in your configuration under management by Terraform.</li>
+<li>Running <code>terraform refresh</code> on Google provider <code>5.0.0</code> or later with an existing pre-<code>5.0.0</code> resource before an <code>apply</code>, these two fields will show in the state file. <code>annotations</code> field will have your current annotations and <code>effective_annotations</code> will have all of annotations present on the resource in GCP.</li>
+<li>Running <code>terraform apply</code> on Google provider <code>5.0.0</code> or later with an existing pre-<code>5.0.0</code> resource before an <code>apply</code>, these two fields will show in the state file. <code>annotations</code> field will have your current annotations and <code>effective_annotations</code> will have all of annotations present on the resource in GCP.</li>
+<li>In the resource <code>google_cloud_run_domain_mapping</code>, the system annotations <code>serving.knative.dev/creator</code>, <code>serving.knative.dev/lastModifier</code>, <code>run.googleapis.com/operation-id</code>, <code>run.googleapis.com/ingress-status</code>, <code>run.googleapis.com/ingress</code> with the value <code>all</code> will be removed from <code>annotations</code> inside <code>metadata</code> field in the state file as part of a one-time resource schema upgrade. If any of these annotation keys are in the configuration, after upgrading to <code>5.0.0</code>, the plan will show that these keys will be added. You can safely accept this change, and Terraform will begin to manage them again.</li>
+<li>In the resource <code>google_cloud_run_service</code>, the system annotations <code>serving.knative.dev/creator</code>, <code>serving.knative.dev/lastModifier</code>, <code>run.googleapis.com/operation-id</code>, <code>run.googleapis.com/ingress-status</code>, <code>run.googleapis.com/ingress</code> with the value <code>all</code> will be removed from <code>annotations</code> inside <code>metadata</code> field in the state file as part of a one-time resource schema upgrade. If any of these annotation keys are in the configuration, after upgrading to <code>5.0.0</code>, the plan will show that these keys will be added. You can safely accept this change, and Terraform will begin to manage them again.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20source%20annotations"></a><h4 id="data-source-annotations">Data source annotations</h4>
+
+<p>For most resource-based datasources, both <code>annotations</code> and
+<code>effective_annotations</code> will now be present. Both fields will have all the
+annotations present on the resource in GCP including the annotations configured
+through Terraform, the system, and other clients, equivalent to
+<code>effective_annotations</code> on the resource.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example"></a><h4 id="example">Example</h4>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Mixing%20resource%2C%20provider%2C%20and%20system%20labels"></a><h5 id="mixing-resource-provider-and-system-labels">Mixing resource, provider, and system labels</h5>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">default_labels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">default_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"default_value"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_dataproc_cluster"</span><span class="w"> </span><span class="nv">"with_labels"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-test-dproc-test-1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">labels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">key1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"value1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"value2"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After the configuration is applied, Terraform is managing <code>key1</code> and <code>key2</code> in
+the <code>labels</code> field. <code>terraform_labels</code> field has the keys <code>default_key</code>, <code>key1</code>
+and <code>key2</code>. <code>effective_labels</code> has the keys <code>default_key</code>, <code>key1</code>, <code>key2</code> and
+any system labels added by GCP.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Removing%20a%20key"></a><h5 id="removing-a-key">Removing a key</h5>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">default_labels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">default_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"default_value"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_dataproc_cluster"</span><span class="w"> </span><span class="nv">"with_labels"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-test-dproc-test-1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">labels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">key1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"value1"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Applying this configuration <strong>after</strong> the previous example, Terraform will clear
+the value of <code>key2</code>. Other values are unaffected.</p>
+
+<pre><code>      ~ effective_labels   = {
+          - "key2" = "value2" -&gt; null
+            # (5 unchanged elements hidden)
+        }
+      ~ labels             = {
+          - "key2" = "value2" -&gt; null
+            # (1 unchanged element hidden)
+        }
+      ~ terraform_labels   = {
+          - "key2" = "value2" -&gt; null
+            # (2 unchanged elements hidden)
+        }
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Updates%20to%20how%20empty%20strings%20are%20handled%20in%20the%20provider%20block"></a><h3 id="updates-to-how-empty-strings-are-handled-in-the-provider-block">Updates to how empty strings are handled in the <code>provider</code> block</h3>
+
+<p>In 5.0.0+ any empty strings set in the <code>provider</code> block will be used and not ignored. Previously any empty strings used as arguments in the <code>provider</code> block were ignored and did not contribute to configuration of the provider. </p>
+
+<p>Users should remove empty string arguments to avoid errors during plan/apply stages.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">credentials</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="c1"> # this line should be removed</span>
+<span class="w">  </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-project"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="c1"> # this line should be removed</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20to%20how%20default%20location%2C%20region%20and%20zone%20values%20are%20obtained%20for%20resources"></a><h3 id="changes-to-how-default-location-region-and-zone-values-are-obtained-for-resources">Changes to how default <code>location</code>, <code>region</code> and <code>zone</code> values are obtained for resources</h3>
+
+<p>Currently, when configuring resources that require a <code>location</code>, <code>region</code> or <code>zone</code> field you have the choice of specifying it in the resource block or allowing default values to be used. Default <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/provider_reference#region">region</a> or <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/provider_reference#zone">zone</a> values can be configured in the provider block or by providing values through environment variables.</p>
+
+<p>Changes in 5.0.0 make the way the provider handles <code>location</code>/<code>region</code>/<code>zone</code> values more consistent:</p>
+
+<ul>
+<li>Resources that have a <code>location</code> field will now use the default <code>region</code> value preferentially over the default <code>zone</code> value set on the provider. This is only relevant to resources where <code>location</code> is not provided in the resource block directly.</li>
+<li>Previously, default <code>region</code> and <code>zone</code> values set as URIs were incompatible with resources that have <code>location</code> or <code>region</code> arguments. In 5.0.0+ those values will now be valid and won't result in errors during plan/apply stages.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/When%20you%20may%20need%20to%20take%20action"></a><h4 id="when-you-may-need-to-take-action">When you may need to take action</h4>
+
+<p>There is only one change that we anticipate can lead to unexpected diffs in Terraform plans after upgrading to 5.0.0, which is:</p>
+
+<blockquote>
+  <p>Resources that have a <code>location</code> field will now use the default <code>region</code> value preferentially over the default <code>zone</code> value set on the provider. This is only relevant to resources where <code>location</code> is not provided in the resource block directly.</p>
+</blockquote>
+
+<p>Users will need to check for unexpected <code>location</code> changes for resources. If an unexpected change is seen, the solution is to explicitly set the <code>location</code> value in that resource's configuration block to match the desired value.</p>
+
+<p>This will only affect users whose configuration contains resource blocks that have missing <code>location</code> values and whose <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/provider_reference#zone">default zone</a> value belongs to a region that's different than the <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/provider_reference#region">default region</a> value. For example, if you set <code>us-central1-a</code> as the default zone and <code>us-central2</code> as the default region on the provider you may see plans that contain unexpected diffs to move resources from <code>us-central1</code> to <code>us-central2</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20default%20values%20shown%20at%20plan-time"></a><h3 id="provider-default-values-shown-at-plan-time">Provider default values shown at plan-time</h3>
+
+<p>The <code>project</code>, <code>region</code>, and <code>zone</code> fields will now display their values during
+plan-time instead of the placeholder <code>(known after apply)</code> value normally
+displayed for fields without fixed Terraform default values. These values will
+be taken from either the Terraform resource config file, provider config, or
+local environment variables, depending on which variables are supplied by the
+user, matching the existing per-resource functionality for what default values
+are used in execution of a Terraform plan.</p>
+
+<p>Before <code>5.0.0</code>:</p>
+
+<pre><code>project = (known after apply)
+</code></pre>
+
+<p>After <code>5.0.0</code> (when possible):</p>
+
+<pre><code>project = "my-project"
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%20import%20formats%20have%20improved%20validation"></a><h3 id="resource-import-formats-have-improved-validation">Resource import formats have improved validation</h3>
+
+<p>Throughout the provider there were many resources which erroneously gave false positives to poorly formatted import input if a subset of the provided input was valid to their configured import formats. All GCP resource IDs supplied to "terraform import" must match the documentation specified import formats exactly.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Datasources%20now%20error%20universally%20on%20404"></a><h3 id="datasources-now-error-universally-on-404">Datasources now error universally on 404</h3>
+
+<p>All non-IAM data sources have been updated to return an error when a target resource URI can not be reached. Previously this was inconsistent between different datasources in whether an empty value was returned to Terraform state upon 404 or if an error was returned, but this has been standardized. Any plans that reference datasources which no longer exist (or do not exist yet) will need to be revised to have these datasources removed from configuration files.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Removals"></a><h2 id="removals">Removals</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Product%3A%20gameservices%20is%20now%20removed"></a><h3 id="product-gameservices-is-now-removed">Product: <code>gameservices</code> is now removed</h3>
+
+<p>This change involved the following resources: <code>google_game_services_game_server_cluster</code>, <code>google_game_services_game_server_deployment</code>, <code>google_game_services_game_server_config</code>, <code>google_game_services_realm</code> and <code>google_game_services_game_server_deployment_rollout</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Product%3A%20cloudiot%20is%20now%20removed"></a><h3 id="product-cloudiot-is-now-removed">Product: <code>cloudiot</code> is now removed</h3>
+
+<p>This change involved the following: <code>google_cloudiot_device</code>, <code>google_cloudiot_registry</code>, <code>google_cloudiot_registry_iam_*</code>, and <code>data.google_cloudiot_registry_iam_policy</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_access_context_manager_service_perimeters%20and%20google_access_context_manager_service_perimeter"></a><h2 id="resource-google_access_context_manager_service_perimeters-and-google_access_context_manager_service_perimeter">Resource: <code>google_access_context_manager_service_perimeters</code> and <code>google_access_context_manager_service_perimeter</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Fields%20changed%20from%20lists%20to%20sets%20where%20appropriate"></a><h3 id="fields-changed-from-lists-to-sets-where-appropriate">Fields changed from lists to sets where appropriate</h3>
+
+<p>The following fields have been changed from a list to a set in both <code>google_access_context_manager_service_perimeters</code> and <code>google_access_context_manager_service_perimeter</code>:</p>
+
+<p><code>spec.access_levels</code>
+<code>spec.resources</code>
+<code>spec.restricted_services</code>
+<code>spec.vpc_accessible_services.allowed_services</code>
+<code>spec.egress_policies.egress_from.identities</code>
+<code>spec.egress_policies.egress_to.external_resources</code>
+<code>spec.egress_policies.egress_to.resources</code>
+<code>spec.ingress_policies.ingress_from.identities</code>
+<code>spec.ingress_policies.ingress_to.resources</code>
+<code>status.access_levels</code>
+<code>status.resources</code>
+<code>status.restricted_services</code>
+<code>status.egress_policies.egress_from.identities</code>
+<code>status.egress_policies.egress_to.external_resources</code>
+<code>status.egress_policies.egress_to.resources</code>
+<code>status.ingress_policies.ingress_from.identities</code>
+<code>status.ingress_policies.ingress_to.resources</code></p>
+
+<p>If you were relying on accessing an individual field by index (for example, google_access_context_manager_service_perimeters.spec.access_levels.0, then that will now need to by hash (for example, google_access_context_manager_service_perimeters.spec.access_levels.\<some-hash\&gt;).< p="">
+
+</some-hash\&gt;).<></p><a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_bigquery_routine"></a><h2 id="resource-google_bigquery_routine">Resource: <code>google_bigquery_routine</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/routine_type%20is%20now%20required."></a><h3 id="routine_type-is-now-required"><code>routine_type</code> is now required.</h3>
+
+<p>The provider will now enforce at plan time that <code>routine_type</code> be set.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_bigquery_table"></a><h2 id="resource-google_bigquery_table">Resource: <code>google_bigquery_table</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/schema%20can%20only%20be%20represented%20as%20a%20JSON%20array%20with%20non-null%20elements."></a><h3 id="schema-can-only-be-represented-as-a-json-array-with-non-null-elements"><code>schema</code> can only be represented as a JSON array with non-null elements.</h3>
+
+<p>The provider will now enforce at plan time that <code>schema</code> is a valid JSON array with non-null elements.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_cloud_run_v2_job"></a><h2 id="resource-google_cloud_run_v2_job">Resource: <code>google_cloud_run_v2_job</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/startup_probe%20and%20liveness_probe%20are%20now%20removed"></a><h3 id="startup_probe-and-liveness_probe-are-now-removed"><code>startup_probe</code> and <code>liveness_probe</code> are now removed</h3>
+
+<p>These two unsupported fields were introduced incorrectly. They are now removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_cloud_run_v2_service"></a><h2 id="resource-google_cloud_run_v2_service">Resource: <code>google_cloud_run_v2_service</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/liveness_probe.tcp_socket%20is%20now%20removed"></a><h3 id="liveness_probetcp_socket-is-now-removed"><code>liveness_probe.tcp_socket</code> is now removed</h3>
+
+<p>This unsupported field was introduced incorrectly. It is now removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/retyped%20volumes.cloud_sql_instance.instances%20to%20SET%20from%20ARRAY%20for%20google_cloud_run_v2_service"></a><h3 id="retyped-volumescloud_sql_instanceinstances-to-set-from-array-for-google_cloud_run_v2_service">retyped <code>volumes.cloud_sql_instance.instances</code> to SET from ARRAY for <code>google_cloud_run_v2_service</code></h3>
+
+<p>Previously, <code>database_flags</code> was a list, making it order-dependent. It is now a set.</p>
+
+<p>If you were relying on accessing an individual flag by index (for example, <code>google_sql_database_instance.instance.settings.0.database_flags.0.name</code>), then that will now need to by hash (for example, <code>google_sql_database_instance.instance.settings.0.database_flags.&lt;some-hash&gt;.name</code>).</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_cloudfunctions2_function"></a><h2 id="resource-google_cloudfunctions2_function">Resource: <code>google_cloudfunctions2_function</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/location%20now%20a%20required%20field"></a><h3 id="location-now-a-required-field"><code>location</code> now a required field</h3>
+
+<p>Deployment would fail if this field was unspecified. Marked this field as requied to align with implementation. This value cannot be inferred from any provider level config. No change is necessary for upgrade as this field is already needed for any deployments.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_autoscaler"></a><h2 id="resource-google_compute_autoscaler">Resource: <code>google_compute_autoscaler</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/metric.filter%20now%20defaults%20to%20resource.type%20%3D%20gce_instance%20%28beta-only%29"></a><h3 id="metricfilter-now-defaults-to-resourcetype-gce_instance-beta-only"><code>metric.filter</code> now defaults to <code>resource.type = gce_instance</code> (beta-only)</h3>
+
+<p>Previously, <code>metric.filter</code> doesn't have the defult value and causes a UI error.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_node_group"></a><h2 id="resource-google_compute_node_group">Resource: <code>google_compute_node_group</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Node%20groups%20are%20now%20mutable"></a><h3 id="node-groups-are-now-mutable">Node groups are now mutable</h3>
+
+<p>Due to limitations in previous field configurations, the only field that could be updated previously was <code>node_template</code>. It is now possible to adjust the <code>autoscaling_policy</code> without recreating the group, nor will any adjustment to the <code>size</code> of the nodepool prompt resource recration.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/size%20is%20now%20an%20output%20only%20field."></a><h3 id="size-is-now-an-output-only-field"><code>size</code> is now an output only field.</h3>
+
+<p><code>size</code> previously served as an alias for <code>initial_size</code> on resource creation, and users would be required to recreate the resource if the <code>size</code> value ever adjusted due to either direct user update or auto-scaling adjustment outside of Terraform.</p>
+
+<p>It will now mirror its API functionality and serve as an output only field to show how many nodes currently exist within the resource. All existing configurations which used <code>size</code> as an input field must be updated for its removal.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/One%20of%20initial_size%20or%20autoscaling_policy%7B%7D%20must%20be%20configured%20on%20resource%20creation."></a><h3 id="one-of-initial_size-or-autoscaling_policy-must-be-configured-on-resource-creation">One of <code>initial_size</code> or <code>autoscaling_policy{}</code> must be configured on resource creation.</h3>
+
+<p>These fields will supply the base node-count for a node group and one of them will be required for successful resource creation. Both will be freely updateable or removable on future state changes that do not require recreation.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_router_nat"></a><h2 id="resource-google_compute_router_nat">Resource: <code>google_compute_router_nat</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/enable_endpoint_independent_mapping%20now%20defaults%20to%20API%27s%20default%20value%20which%20is%20FALSE"></a><h3 id="enable_endpoint_independent_mapping-now-defaults-to-apis-default-value-which-is-false"><code>enable_endpoint_independent_mapping</code> now defaults to API's default value which is <code>FALSE</code></h3>
+
+<p>Previously, the default value of <code>enable_endpoint_independent_mapping</code> was <code>TRUE</code>. Now,
+it will use the default value from the API which is <code>FALSE</code>. If you want to
+enable endpoint independent mapping, then explicity set the value of
+<code>enable_endpoint_independent_mapping</code> field to <code>TRUE</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_security_policy"></a><h2 id="resource-google_compute_security_policy">Resource: <code>google_compute_security_policy</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/rule.rate_limit_options.encorce_on_key%20no%20longer%20has%20default%20value"></a><h3 id="rulerate_limit_optionsencorce_on_key-no-longer-has-default-value"><code>rule.rate_limit_options.encorce_on_key</code> no longer has default value</h3>
+
+<p>Previously, the default value for <code>rule.rate_limit_options.encorce_on_key</code> is "ALL", now this field no longer has a default value.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_service_attachment"></a><h2 id="resource-google_compute_service_attachment">Resource: <code>google_compute_service_attachment</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/reconcile_connections%20now%20defaults%20from%20API"></a><h3 id="reconcile_connections-now-defaults-from-api"><code>reconcile_connections</code> now defaults from API</h3>
+
+<p><code>reconcile_connections</code> previously defaulted to true. Now it will default from the API.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Retyped%20consumer_accept_lists%20to%20SET%20from%20ARRAY"></a><h3 id="retyped-consumer_accept_lists-to-set-from-array">Retyped <code>consumer_accept_lists</code> to SET from ARRAY</h3>
+
+<p>Previously, <code>consumer_accept_lists</code> was a list, making it order-dependent. It is now a set.</p>
+
+<p>If you were relying on accessing an individual flag by index (for example, <code>google_compute_service_attachment.consumer_accept_lists.0.project_id_or_num</code>), then that will now need to by hash (for example, <code>google_compute_service_attachment.consumer_accept_lists.&lt;some-hash&gt;.project_id_or_num</code>).</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_container_cluster"></a><h2 id="resource-google_container_cluster">Resource: <code>google_container_cluster</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Cluster%20deletion%20now%20prevented%20by%20default%20with%20deletion_protection"></a><h3 id="cluster-deletion-now-prevented-by-default-with-deletion_protection">Cluster deletion now prevented by default with <code>deletion_protection</code></h3>
+
+<p>The field <code>deletion_protection</code> has been added with a default of <code>true</code>. This field prevents
+Terraform from destroying or recreating the cluster. In 5.0.0, existing clusters will have 
+<code>deletion_protection</code> set to <code>true</code> during the next refresh unless otherwise set in configuration.</p>
+
+<p><strong><code>deletion_protection</code> does NOT prevent deletion outside of Terraform.</strong></p>
+
+<p>To disable deletion protection, explicitly set this field to <code>false</code> in configuration
+and then run <code>terraform apply</code> to apply the change.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Clusters%20created%20in%20error%20states%20are%20now%20tainted%20rather%20than%20deleted"></a><h3 id="clusters-created-in-error-states-are-now-tainted-rather-than-deleted">Clusters created in error states are now tainted rather than deleted</h3>
+
+<p>GKE clusters that are created but do not become healthy will now be recorded in
+state and marked as tainted for cleanup on next apply rather than immediately
+deleted.</p>
+
+<p>This behavior was changed to allow users to collect internal logs from the
+cluster and/or manually resolve the issues and untaint their failed clusters.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/node_config.0.taint%20and%20node_pool.0.node_config.0.taint%20field%20change"></a><h3 id="node_config0taint-and-node_pool0node_config0taint-field-change"><code>node_config.0.taint</code> and <code>node_pool.0.node_config.0.taint</code> field change</h3>
+
+<p>The <code>taint</code> field has been changed to manage a subset of the taint keys on a node pool
+and the <code>effective_taints</code> output field has been added to record the complete set of
+taints applied to the node pool by GKE.</p>
+
+<p>Previously, the field was authoritative and would require every taint on the node pool
+to be recorded, causing friction when users used GPUs or configured sandbox settings,
+actions which added taints. After this change, only "Terraform-managed" taints will be
+managed by the <code>taint</code> field. Other taints, including new taints injected by the
+server, will not have drift detected.</p>
+
+<p>Currently, the set of managed taints and their values are immutable in Terraform, and
+any changes will cause a recreate to be planned. However, taints can be unmanaged by
+simultaneously removing the taint entry from GKE and your Terraform configuration at
+the same time.</p>
+
+<p>The set of taints Terraform manages (and their values) will be determined based on
+how the cluster or node pool resource was added to your Terraform state file:</p>
+
+<ul>
+<li>If you created the cluster or node pool with Terraform with Google provider 5.0.0
+or later, the set of taints specified during resource creation will be managed.</li>
+<li>If you imported the cluster or node pool with Google provider 5.0.0 or later, no
+taints will be managed by Terraform</li>
+<li>If you upgraded from an earlier version, the complete set of taint values applied to the
+node pool at the time of your last refresh will be managed by Terraform</li>
+</ul>
+
+<p>Most existing configurations will not be affected with this change as they already specify
+the whole set of managed taints, or are already ignoring changes with <code>lifecycle.ignore_changes</code>,
+preventing a diff.</p>
+
+<p>A limited number of users may see a diff if they are using the <code>google-beta</code> provider
+and have specified a <code>sandbox_config</code> value. If that's the case, you can safely add the
+proposed value to configuration (below) or apply <code>lifecycle.ignore_changes</code> to the field to resolve.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gi">+    taint {</span><span class="w"></span>
+<span class="gi">+      key    = "sandbox.gke.io/runtime"</span><span class="w"></span>
+<span class="gi">+      value  = "gvisor"</span><span class="w"></span>
+<span class="gi">+      effect = "NO_SCHEDULE"</span><span class="w"></span>
+<span class="gi">+    }</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/networking_mode%20defaults%20to%20VPC_NATIVE%20for%20newly%20created%20clusters"></a><h3 id="networking_mode-defaults-to-vpc_native-for-newly-created-clusters"><code>networking_mode</code> defaults to <code>VPC_NATIVE</code> for newly created clusters</h3>
+
+<p>New clusters will default to <code>VPC_NATIVE</code> which enables <a href="https://cloud.google.com/kubernetes-engine/docs/how-to/ip-aliases">IP aliasing</a>. Previously, <code>google_container_cluster</code> would default to using routes as
+the networking mode unless <code>ip_allocation_policy</code> policy was set. Now, <code>networking_mode</code> will
+default to <code>VPC_NATIVE</code> and <code>ip_allocation_policy</code> will be set by the server if unset in
+configuration. Existing clusters should not be affected.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Minimal%20Config%20for%20VPC-native%20cluster"></a><h4 id="new-minimal-config-for-vpc-native-cluster">New Minimal Config for VPC-native cluster</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"primary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+<span class="w">  </span><span class="na">initial_node_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Minimal%20Config%20for%20Routes-based%20cluster"></a><h4 id="new-minimal-config-for-routes-based-cluster">New Minimal Config for Routes-based cluster</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"primary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+<span class="w">  </span><span class="na">initial_node_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="na">networking_mode</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"ROUTES"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/enable_binary_authorization%20is%20now%20removed"></a><h3 id="enable_binary_authorization-is-now-removed"><code>enable_binary_authorization</code> is now removed</h3>
+
+<p><code>enable_binary_authorization</code> has been removed in favor of <code>binary_authorization.evaluation_mode</code>.
+To enable Binary Authorization, set evaluation mode to "PROJECT_SINGLETON_POLICY_ENFORCE"
+as shown in the example below. To disable it, set evaluation mode to "DISABLED".</p>
+
+<pre><code>  binary_authorization {
+    evaluation_mode = "PROJECT_SINGLETON_POLICY_ENFORCE"
+  }
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Default%20value%20of%20network_policy.provider%20is%20now%20removed"></a><h3 id="default-value-of-network_policyprovider-is-now-removed">Default value of <code>network_policy.provider</code> is now removed</h3>
+
+<p>Previously <code>network_policy.provider</code> defaulted to "PROVIDER_UNSPECIFIED". It no longer
+has a default value.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_container_node_pool"></a><h2 id="resource-google_container_node_pool">Resource: <code>google_container_node_pool</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/management.auto_repair%20and%20management.auto_upgrade%20now%20default%20to%20true"></a><h3 id="managementauto_repair-and-managementauto_upgrade-now-default-to-true"><code>management.auto_repair</code> and <code>management.auto_upgrade</code> now default to true</h3>
+
+<p>Previously both fields defaulted to false if <code>management</code> was set as an empty block.
+They now default to true.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/logging_variant%20no%20longer%20has%20a%20provider%20default%20value"></a><h3 id="logging_variant-no-longer-has-a-provider-default-value"><code>logging_variant</code> no longer has a provider default value</h3>
+
+<p>The provider no longer shows a default value at plan-time, and defers to the 
+API server default.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/node_config.0.taint%20field%20change"></a><h3 id="node_config0taint-field-change"><code>node_config.0.taint</code> field change</h3>
+
+<p>The <code>taint</code> field has been changed to manage a subset of the taint keys on a node pool
+and the <code>effective_taints</code> output field has been added to record the complete set of
+taints applied to the node pool by GKE.</p>
+
+<p>Previously, the field was authoritative and would require every taint on the node pool
+to be recorded, causing friction when users used GPUs or configured sandbox settings,
+actions which added taints. After this change, only "Terraform-managed" taints will be
+managed by the <code>taint</code> field. Other taints, including new taints injected by the
+server, will not have drift detected.</p>
+
+<p>Currently, the set of managed taints and their values are immutable in Terraform, and
+any changes will cause a recreate to be planned. However, taints can be unmanaged by
+simultaneously removing the taint entry from GKE and your Terraform configuration at
+the same time.</p>
+
+<p>The set of taints Terraform manages (and their values) will be determined based on
+how the cluster or node pool resource was added to your Terraform state file:</p>
+
+<ul>
+<li>If you created the cluster or node pool with Terraform with Google provider 5.0.0
+or later, the set of taints specified during resource creation will be managed.</li>
+<li>If you imported the cluster or node pool with Google provider 5.0.0 or later, no
+taints will be managed by Terraform</li>
+<li>If you upgraded from an earlier version, the complete set of taint values applied to the
+node pool at the time of your last refresh will be managed by Terraform</li>
+</ul>
+
+<p>Most existing configurations will not be affected with this change as they already specify
+the whole set of managed taints, or are already ignoring changes with <code>lifecycle.ignore_changes</code>,
+preventing a diff.</p>
+
+<p>A limited number of users may see a diff if they are using the <code>google-beta</code> provider
+and have specified a <code>sandbox_config</code> value. If that's the case, you can safely add the
+proposed value to configuration (below) or apply <code>lifecycle.ignore_changes</code> to the field to resolve.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gi">+    taint {</span><span class="w"></span>
+<span class="gi">+      key    = "sandbox.gke.io/runtime"</span><span class="w"></span>
+<span class="gi">+      value  = "gvisor"</span><span class="w"></span>
+<span class="gi">+      effect = "NO_SCHEDULE"</span><span class="w"></span>
+<span class="gi">+    }</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_dataflow_flex_template_job"></a><h2 id="resource-google_dataflow_flex_template_job">Resource: <code>google_dataflow_flex_template_job</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Fields%20that%20are%20a%20part%20of%20the%20environment%20block%20will%20be%20overridden%20to%20be%20sent%20via%20their%20fields%20even%20when%20supplied%20via%20parameters."></a><h3 id="fields-that-are-a-part-of-the-environment-blockhttpscloudgooglecomdataflowdocsreferencerestv1b3projectslocationsflextemplateslaunchflextemplateruntimeenvironment-will-be-overridden-to-be-sent-via-their-fields-even-when-supplied-via-parameters">Fields that are a part of the <a href="https://cloud.google.com/dataflow/docs/reference/rest/v1b3/projects.locations.flexTemplates/launch#FlexTemplateRuntimeEnvironment">environment block</a> will be overridden to be sent via their fields even when supplied via parameters.</h3>
+
+<p>Several fields within the <code>google_dataflow_flex_template_job</code> resource can be supplied through either the <code>parameters{}</code> block or a field on the resource object. Support for these fields on the resource object was added in the <code>4.66.0</code> release of the Google provider. That version introduced an issue where the values were being double-sent to the API due to being recorded in Terraform state in two places. To resolve this issue, these fields will be deduplicated and sent to the API through the resource object.</p>
+
+<p>Additionally, due to the API returning these fields to the user they will now be considered computed and users will see values twice within their state when configuring these fields' values via the <code>parameters{}</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_dataplex_datascan"></a><h2 id="resource-google_dataplex_datascan">Resource: <code>google_dataplex_datascan</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/dataQualityResult%20and%20dataProfileResult%20output%20fields%20are%20now%20removed"></a><h3 id="dataqualityresult-and-dataprofileresult-output-fields-are-now-removed"><code>dataQualityResult</code> and <code>dataProfileResult</code> output fields are now removed</h3>
+
+<p><code>dataQualityResult</code> and <code>dataProfileResult</code> were output-only fields which listed results for the latest job created under a Datascan. These were problematic fields that are unlikely to be relevant in a Terraform context. Removing them reduces the likelihood of additional parsing errors, and reduces maintenance overhead for the API surface.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_firebase_project_location"></a><h2 id="resource-google_firebase_project_location">Resource: <code>google_firebase_project_location</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/google_firebase_project_location%20is%20now%20removed"></a><h3 id="google_firebase_project_location-is-now-removed"><code>google_firebase_project_location</code> is now removed</h3>
+
+<p>In <code>4.X</code>, <code>google_firebase_project_location</code> would implicitly trigger creation of an App Engine application with a default Cloud Storage bucket and Firestore database, located in the specified <code>location_id</code>. In <code>5.0.0</code>, these resources should instead be set up explicitly using <code>google_app_engine_application</code> <code>google_firebase_storage_bucket</code>, and <code>google_firestore_database</code>.</p>
+
+<p>For more information on configuring Firebase resources with Terraform, see <a href="https://firebase.google.com/docs/projects/terraform/get-started">Get started with Terraform and Firebase</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrade%20instructions"></a><h4 id="upgrade-instructions">Upgrade instructions</h4>
+
+<p>If you have existing resources created using <code>google_firebase_project_location</code>:</p>
+
+<ol>
+<li>Remove the <code>google_firebase_project_location</code> block</li>
+<li>Add blocks according to "New config" in this section for any of the following that you need: <code>google_app_engine_application</code>, <code>google_firebase_storage_bucket</code>, and/or <code>google_firestore_database</code>.</li>
+<li>Run <code>terraform state rm</code> for your existing <code>google_firebase_project_location</code> resource</li>
+<li>Import the existing resources corresponding to the blocks added in the previous step:
+<code>terraform import google_app_engine_application.default &lt;project-id&gt;</code>
+<code>terraform import google_firebase_storage_bucket.default-bucket &lt;project-id&gt;/&lt;project-id&gt;.appspot.com</code>
+<code>terraform import google_firestore_database.default "&lt;project-id&gt;/(default)"</code></li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Old%20config"></a><h4 id="old-config">Old config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_firebase_project_location"</span><span class="w"> </span><span class="nv">"basic"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">    </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_firebase_project.default.project</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">location_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20config"></a><h4 id="new-config">New config</h4>
+
+<p>Assuming you use both the default Storage bucket and Firestore, an equivalent configuration would be:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_app_engine_application"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_firebase_project.default.project</span><span class="w"></span>
+<span class="w">  </span><span class="na">location_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central"</span><span class="w"></span>
+<span class="w">  </span><span class="na">database_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CLOUD_FIRESTORE"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_firestore_database.default</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_firebase_storage_bucket"</span><span class="w"> </span><span class="nv">"default-bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">google_firebase_project.default.project</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_app_engine_application.default.default_bucket</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_firestore_database"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">google_firebase_project.default.project</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"(default)"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"nam5"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"FIRESTORE_NATIVE"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_firebase_web_app"></a><h2 id="resource-google_firebase_web_app">Resource: <code>google_firebase_web_app</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/deletion_policy%20now%20defaults%20to%20DELETE"></a><h3 id="deletion_policy-now-defaults-to-delete"><code>deletion_policy</code> now defaults to <code>DELETE</code></h3>
+
+<p>Previously, <code>google_firebase_web_app</code> deletions default to <code>ABANDON</code>, which means to only stop tracking the WebApp in Terraform. The actual app is not deleted from the Firebase project. If you are relying on this behavior, set <code>deletion_policy</code> to <code>ABANDON</code> explicitly in the new version.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_firebaserules_release"></a><h2 id="resource-google_firebaserules_release">Resource: <code>google_firebaserules_release</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changing%20ruleset_name%20now%20triggers%20replacement"></a><h3 id="changing-ruleset_name-now-triggers-replacement">Changing <code>ruleset_name</code> now triggers replacement</h3>
+
+<p>In 4.X.X, changing the <code>ruleset_name</code> in <code>google_firebaserules_release</code> updates the <code>Release</code> in place, which prevents the old <code>Ruleset</code> referred to by <code>ruleset_name</code> from being destroyed. A workaround is to use a <code>replace_triggered_by</code> lifecycle field on the <code>google_firebaserules_release</code>. In version 5.0.0, changing <code>ruleset_name</code> will trigger a replacement, which allows the <code>Ruleset</code> to be deleted. The <code>replace_triggered_by</code> workaround becomes unnecessary.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Old%20Config"></a><h4 id="old-config-2">Old Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_firebaserules_release"</span><span class="w"> </span><span class="nv">"primary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"cloud.firestore"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ruleset_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"projects/my-project-name/rulesets/${google_firebaserules_ruleset.firestore.name}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-project-name"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">replace_triggered_by</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="nv">google_firebaserules_ruleset.firestore</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_firebaserules_ruleset"</span><span class="w"> </span><span class="nv">"firestore"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">source</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">files</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">content</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"service cloud.firestore {match /databases/{database}/documents { match /{document=**} { allow read, write: if false; } } }"</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"firestore.rules"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-project-name"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Config"></a><h4 id="new-config-2">New Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_firebaserules_release"</span><span class="w"> </span><span class="nv">"primary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"cloud.firestore"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ruleset_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"projects/my-project-name/rulesets/${google_firebaserules_ruleset.firestore.name}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-project-name"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_firebaserules_ruleset"</span><span class="w"> </span><span class="nv">"firestore"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">source</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">files</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">content</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"service cloud.firestore {match /databases/{database}/documents { match /{document=**} { allow read, write: if false; } } }"</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"firestore.rules"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-project-name"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_gkeonprem_bare_metal_admin_cluster"></a><h2 id="resource-google_gkeonprem_bare_metal_admin_cluster">Resource: <code>google_gkeonprem_bare_metal_admin_cluster</code></h2>
+
+<p>Delete operation is disabled. The command <code>terraform destroy</code> maps to no-op. Users need to delete resource manually. Please refer to the <a href="https://cloud.google.com/anthos/clusters/docs/bare-metal/latest/how-to/reset-nodes">user guide</a> for the instructions of cluster deletion.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_logging_metric"></a><h2 id="resource-google_logging_metric">Resource: <code>google_logging_metric</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Additional%20bucket_options%20subfields%20are%20now%20properly%20required"></a><h3 id="additional-bucket_options-subfields-are-now-properly-required">Additional <code>bucket_options</code> subfields are now properly required</h3>
+
+<p>When setting the <code>bucket_options</code> block, the following fields may be required:</p>
+
+<ul>
+<li><p><code>num_finite_buckets</code>, <code>width</code>, and <code>offset</code> are now required when <code>bucket_options.linear_buckets</code> is set.</p></li>
+<li><p><code>num_finite_buckets</code>, <code>growth_factor</code>, and <code>scale</code> are now required when <code>bucket_options.exponential_buckets</code> is set.</p></li>
+</ul>
+
+<p>Previously these fields should have been required but were not, which allowed for invalid <code>google_logging_metric</code> configurations.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_logging_project_sink"></a><h2 id="resource-google_logging_project_sink">Resource: <code>google_logging_project_sink</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/unique_writer_identity%20now%20defaults%20to%20TRUE"></a><h3 id="unique_writer_identity-now-defaults-to-true"><code>unique_writer_identity</code> now defaults to <code>TRUE</code></h3>
+
+<p>Previously, the default value of <code>unique_writer_identity</code> was <code>FALSE</code>. Now it will be <code>TRUE</code>.</p>
+
+<p>This will change the behavior for new sinks created using the default value. Previously, all sinks created using the default value had a <code>writer_identity</code> of <code>serviceAccount:cloud-logs@system.gserviceaccount.com</code>. Now sinks created using the default value will have a <code>writer_identity</code> that differs depending on the parent resource, for example: <code>serviceAccount:service-&lt;PROJECT_NUMBER&gt;@gcp-sa-logging.iam.gserviceaccount.com</code> for a project-level sink.</p>
+
+<p>IAM permissions that were manually configured for <code>cloud-logs@system.gserviceaccount.com</code> and <code>iam_bindings</code> that are hard-coded to use <code>cloud-logs@system.gserviceaccount.com</code> will not properly apply permissions to the <code>writer_identity</code> of new sinks created using the default value.  <strong>If a sink is missing the proper permissions it will be successfully created but it will fail to export log data.</strong></p>
+
+<p>Currently there are only two types of log sinks that populate <code>writer_identity</code> and can be created with <code>unique_writer_identity = false</code>.  Only these types of sinks may be affected:</p>
+
+<ul>
+<li>Sinks with a Cloud Pub/Sub topic <code>destination</code> for which the topic is in the same project as the sink.</li>
+<li>Sinks for a BigQuery dataset <code>destination</code> for which the dataset is in the same project as the sink.</li>
+</ul>
+
+<p>To ensure that proper permissions are in place for new sinks created using the default value, check that the related <code>iam_bindings</code> are configured and reference the sink's <code>writer_identity</code> property.</p>
+
+<p>Here is an example of proper <code>iam_bindings</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_logging_project_sink"</span><span class="w"> </span><span class="nv">"gcs-bucket-sink"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-gcs-bucket-sink"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Routes all admin activity logs to a GCS bucket"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"storage.googleapis.com/${google_storage_bucket.log-bucket.name}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">filter</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"log_id(\"cloudaudit.googleapis.com/activity\")"</span><span class="c1"></span>
+<span class="c1">  # `unique_writer_identity is explicitly set to true here, but will now default to 'true'.</span>
+<span class="w">  </span><span class="na">unique_writer_identity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># We must grant proper permissions for the log sink to access the GCS bucket.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_project_iam_binding"</span><span class="w"> </span><span class="nv">"gcs-bucket-writer"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"your-project-id"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"roles/storage.objectCreator"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">members</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_logging_project_sink.gcs-bucket-sink.writer_identity</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_looker_instance"></a><h2 id="resource-google_looker_instance">Resource: <code>google_looker_instance</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/LOOKER_MODELER%20has%20been%20removed%20as%20a%20platform%20edition."></a><h3 id="looker_modeler-has-been-removed-as-a-platform-edition"><code>LOOKER_MODELER</code> has been removed as a platform edition.</h3>
+
+<p>Looker Modeler edition is deprecated as a platform edition.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_monitoring_dashboard"></a><h2 id="resource-google_monitoring_dashboard">Resource: <code>google_monitoring_dashboard</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/dashboard_json%20suppresses%20removal%20diffs%20more%20aggressively"></a><h3 id="dashboard_json-suppresses-removal-diffs-more-aggressively"><code>dashboard_json</code> suppresses removal diffs more aggressively</h3>
+
+<p>To prevent permanent diffs from default values, Terraform will now attempt to suppress diffs where the value is returned in the JSON
+string but doesn't exist in the configuration. Consequently, legitmate remove-only diffs will also be suppressed.
+For Terraform to detect the diff, JSON key removals must also be accompanied by a non-removal change (trivial or not).</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_monitoring_metric_descriptor"></a><h2 id="resource-google_monitoring_metric_descriptor">Resource: <code>google_monitoring_metric_descriptor</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changing%20labels%20now%20triggers%20replacement"></a><h3 id="changing-labels-now-triggers-replacement">Changing <code>labels</code> now triggers replacement</h3>
+
+<p>Previously, attempting to update <code>labels</code> failed and created a permadiff. The <code>labels</code> 
+field is now immutable without destroying and recreating the resource.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_privateca_certificate"></a><h2 id="resource-google_privateca_certificate">Resource: <code>google_privateca_certificate</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/config_values%20is%20now%20removed"></a><h3 id="config_values-is-now-removed"><code>config_values</code> is now removed</h3>
+
+<p>Removed in favor of field <code>x509_description</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/pem_certificates%20is%20now%20removed"></a><h3 id="pem_certificates-is-now-removed"><code>pem_certificates</code> is now removed</h3>
+
+<p>Removed in favor of field <code>pem_certificate_chain</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_service_networking_connection"></a><h2 id="resource-google_service_networking_connection">Resource: <code>google_service_networking_connection</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Create%20endpoint%20is%20used%20to%20create%20the%20resource"></a><h3 id="create-endpoint-is-used-to-create-the-resource"><code>Create</code> endpoint is used to create the resource</h3>
+
+<p><code>google_service_networking_connection</code> now uses the Create endpoint instead of the Patch endpoint during the creation step. Previously, Patch was used as a workaround for an issue that has since been resolved.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/%22terraform%20destroy%22%20now%20fully%20deletes%20the%20resource%20instead%20of%20abandoning"></a><h3 id="terraform-destroy-now-fully-deletes-the-resource-instead-of-abandoning">"terraform destroy" now fully deletes the resource instead of abandoning</h3>
+
+<p><code>google_service_networking_connection</code> now uses API <code>deleteConnection</code> method instead of <code>removePeering</code> method during the deletion step. Previously, <code>removePeering</code> method was used because <code>deleteConnection</code> method was unavailable. In some cases a private connection cannot be deleted immediately after the resource using that connection is deleted, and users may have to delete the private connection after a waiting period.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_secret_manager_secret"></a><h2 id="resource-google_secret_manager_secret">Resource: <code>google_secret_manager_secret</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/replication.automatic%20is%20now%20removed"></a><h3 id="replicationautomatic-is-now-removed"><code>replication.automatic</code> is now removed</h3>
+
+<p>Removed in favor of field <code>replication.auto</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Old%20Config"></a><h4 id="old-config-3">Old Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_secret_manager_secret"</span><span class="w"> </span><span class="nv">"my-secret"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">secret_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-secret"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">replication</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">automatic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Config"></a><h4 id="new-config-3">New Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_secret_manager_secret"</span><span class="w"> </span><span class="nv">"my-secret"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">secret_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-secret"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">replication</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">auto</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_sql_database"></a><h2 id="resource-google_sql_database">Resource: <code>google_sql_database</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/database_flags%20is%20now%20a%20set"></a><h3 id="database_flags-is-now-a-set"><code>database_flags</code> is now a set</h3>
+
+<p>Previously, <code>database_flags</code> was a list, making it order-dependent. It is now a set.</p>
+
+<p>If you were relying on accessing an individual flag by index (for example, <code>google_sql_database_instance.instance.settings.0.database_flags.0.name</code>), then that will now need to by hash (for example, <code>google_sql_database_instance.instance.settings.0.database_flags.&lt;some-hash&gt;.name</code>).</p>
+
+            
+        
+    </body></html>

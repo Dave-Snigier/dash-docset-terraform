@@ -1,0 +1,234 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_vpc_endpoint --><head>
+                <title>databricks_mws_vpc_endpoint</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_mws_vpc_endpoint-resource">databricks_mws_vpc_endpoint Resource</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Initialize provider with <code>alias = "mws"</code>, <code>host  = "https://accounts.cloud.databricks.com"</code> and use <code>provider = databricks.mws</code></p>
+</aside>
+
+<p>Enables you to register <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_endpoint">aws_vpc_endpoint</a> resources or gcp vpc_endpoint resources with Databricks such that they can be used as part of a <a href="mws_networks.md">databricks_mws_networks</a> configuration.</p>
+
+<p>It is strongly recommended that customers read the <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/privatelink.html">Enable AWS Private Link</a> or the <a href="https://docs.gcp.databricks.com/administration-guide/cloud-configurations/gcp/private-service-connect.html">Enable GCP Private Service Connect</a> documentation before trying to leverage this resource.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Databricks%20on%20AWS%20usage"></a><h3 id="databricks-on-aws-usage">Databricks on AWS usage</h3>
+
+<p>Before using this resource, you will need to create the necessary VPC Endpoints as per your <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/privatelink.html#vpc-endpoint-requirements">VPC endpoint requirements</a>. You can use the <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_endpoint">aws_vpc_endpoint</a> resource for this, for example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"workspace"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.vpc_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">local.private_link.workspace_service</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_type</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Interface"</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_group_ids</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">module.vpc.default_security_group_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_ids</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_subnet.pl_subnet.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_subnet.pl_subnet</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_dns_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"relay"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.vpc_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">local.private_link.relay_service</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_type</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Interface"</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_group_ids</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">module.vpc.default_security_group_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_ids</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_subnet.pl_subnet.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_subnet.pl_subnet</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_dns_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Depending on your use case, you may need or choose to add VPC Endpoints for the AWS Services Databricks uses. See <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/privatelink.html#step-9-add-vpc-endpoints-for-other-aws-services-recommended-but-optional">Add VPC endpoints for other AWS services (recommended but optional)
+</a> for more information. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"s3"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.vpc_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">route_table_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.private_route_table_ids</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"com.amazonaws.${var.region}.s3"</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">module.vpc</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"sts"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.vpc_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"com.amazonaws.${var.region}.sts"</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_type</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Interface"</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_ids</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.private_subnets</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_group_ids</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">module.vpc.default_security_group_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">module.vpc</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_dns_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"kinesis-streams"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.vpc_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"com.amazonaws.${var.region}.kinesis-streams"</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"Interface"</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_ids</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.private_subnets</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_group_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">module.vpc.default_security_group_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">module.vpc</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Once you have created the necessary endpoints, you need to register each of them via <em>this</em> Terraform resource, which calls out to the <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/privatelink.html#step-3-register-your-vpc-endpoint-ids-with-the-account-api">Databricks Account API</a>):</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"workspace"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">aws_vpc_endpoint_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc_endpoint.workspace.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"VPC Relay for ${module.vpc.vpc_id}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_vpc_endpoint.workspace</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"relay"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">aws_vpc_endpoint_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc_endpoint.relay.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"VPC Relay for ${module.vpc.vpc_id}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_vpc_endpoint.relay</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Typically the next steps after this would be to create a <a href="mws_private_access_settings.md">databricks_mws_private_access_settings</a> and <a href="mws_networks.md">databricks_mws_networks</a> configuration, before passing the <code>databricks_mws_private_access_settings.pas.private_access_settings_id</code> and <code>databricks_mws_networks.this.network_id</code> into a <a href="mws_workspaces.md">databricks_mws_workspaces</a> resource:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_workspaces"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">aws_region</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">local.prefix</span><span class="w"></span>
+<span class="w">  </span><span class="na">credentials_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_credentials.this.credentials_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_configuration_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_storage_configurations.this.storage_configuration_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_id</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_networks.this.network_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_access_settings_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_private_access_settings.pas.private_access_settings_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">pricing_tier</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"ENTERPRISE"</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">databricks_mws_networks.this</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Databricks%20on%20GCP%20usage"></a><h3 id="databricks-on-gcp-usage">Databricks on GCP usage</h3>
+
+<p>Before using this resource, you will need to create the necessary Private Service Connect (PSC) connections on your Google Cloud VPC networks. You can see <a href="https://docs.gcp.databricks.com/administration-guide/cloud-configurations/gcp/private-service-connect.html">Enable Private Service Connect for your workspace</a> for more details.</p>
+
+<p>Once you have created the necessary PSC connections, you need to register each of them via <em>this</em> Terraform resource, which calls out to the Databricks Account API.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Account Id that could be found in https://accounts.gcp.databricks.com/"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_google_service_account"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"google_project"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"subnet_region"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://accounts.gcp.databricks.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"workspace"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PSC Rest API endpoint"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">gcp_vpc_endpoint_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">project_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">var.google_project</span><span class="w"></span>
+<span class="w">    </span><span class="na">psc_endpoint_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PSC Rest API endpoint"</span><span class="w"></span>
+<span class="w">    </span><span class="na">endpoint_region</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.subnet_region</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"relay"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PSC Relay endpoint"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">gcp_vpc_endpoint_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">project_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">var.google_project</span><span class="w"></span>
+<span class="w">    </span><span class="na">psc_endpoint_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PSC Relay endpoint"</span><span class="w"></span>
+<span class="w">    </span><span class="na">endpoint_region</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.subnet_region</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Typically the next steps after this would be to create a <a href="mws_private_access_settings.md">databricks_mws_private_access_settings</a> and <a href="mws_networks.md">databricks_mws_networks</a> configuration, before passing the <code>databricks_mws_private_access_settings.pas.private_access_settings_id</code> and <code>databricks_mws_networks.this.network_id</code> into a <a href="mws_workspaces.md">databricks_mws_workspaces</a> resource:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_workspaces"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gcp workspace"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">var.subnet_region</span><span class="w"></span>
+<span class="w">  </span><span class="nb">cloud_resource_container</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">gcp</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">project_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.google_project</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">gke_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">connectivity_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PRIVATE_NODE_PUBLIC_MASTER"</span><span class="w"></span>
+<span class="w">    </span><span class="na">master_ip_range</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.3.0.0/28"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_id</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_networks.this.network_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_access_settings_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_private_access_settings.pas.private_access_settings_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">pricing_tier</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"PREMIUM"</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">databricks_mws_networks.this</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>account_id</code> - Account Id that could be found in the Accounts Console for <a href="https://accounts.cloud.databricks.com/">AWS</a> or <a href="https://accounts.gcp.databricks.com/">GCP</a></li>
+<li><code>aws_vpc_endpoint_id</code> - (AWS only) ID of configured <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_endpoint">aws_vpc_endpoint</a></li>
+<li><code>vpc_endpoint_name</code> - Name of VPC Endpoint in Databricks Account</li>
+<li><code>region</code> - (AWS only) Region of AWS VPC</li>
+<li><code>gcp_vpc_endpoint_info</code> - (GCP only) a block consists of Google Cloud specific information for this PSC endpoint. It has the following fields:
+<ul>
+<li><code>project_id</code> - The Google Cloud project ID of the VPC network where the PSC connection resides.</li>
+<li><code>psc_endpoint_name</code> - The name of the PSC endpoint in the Google Cloud project.</li>
+<li><code>endpoint_region</code> - Region of the PSC endpoint.</li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - the ID of VPC Endpoint in form of <code>account_id/vpc_endpoint_id</code></li>
+<li><code>vpc_endpoint_id</code> - Canonical unique identifier of VPC Endpoint in Databricks Account</li>
+<li><code>aws_endpoint_service_id</code> - (AWS Only) The ID of the Databricks endpoint service that this VPC endpoint is connected to. Please find the list of endpoint service IDs for each supported region in the <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/privatelink.html">Databricks PrivateLink documentation</a></li>
+<li><code>state</code> - (AWS Only) State of VPC Endpoint</li>
+<li><code>gcp_vpc_endpoint_info</code>- (GCP only) a block consists of Google Cloud specific information for this PSC endpoint. It has the following fields exported:
+<ul>
+<li><code>psc_connection_id</code> - The unique ID of this PSC connection.</li>
+<li><code>service_attachment_id</code> - The service attachment this PSC connection connects to.</li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Importing this resource is not currently supported.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are used in the same context:</p>
+
+<ul>
+<li><a href="../guides/aws-workspace.md">Provisioning Databricks on AWS</a> guide.</li>
+<li><a href="../guides/aws-private-link-workspace.md">Provisioning Databricks on AWS with Private Link</a> guide.</li>
+<li><a href="../guides/aws-e2-firewall-hub-and-spoke.md">Provisioning AWS Databricks workspaces with a Hub &amp; Spoke firewall for data exfiltration protection</a> guide.</li>
+<li><a href="../guides/gcp-private-service-connect-workspace.md">Provisioning Databricks workspaces on GCP with Private Service Connect</a> guide.</li>
+<li><a href="mws_networks.md">databricks_mws_networks</a> to <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/customer-managed-vpc.html">configure VPC</a> &amp; subnets for new workspaces within AWS.</li>
+<li><a href="mws_private_access_settings.md">databricks_mws_private_access_settings</a> to create a <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/privatelink.html#step-5-create-a-private-access-settings-configuration-using-the-databricks-account-api">Private Access Setting</a> that can be used as part of a <a href="mws_workspaces.md">databricks_mws_workspaces</a> resource to create a <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/privatelink.html">Databricks Workspace that leverages AWS Private Link</a>.</li>
+<li><a href="mws_workspaces.md">databricks_mws_workspaces</a> to set up <a href="https://docs.databricks.com/getting-started/overview.html#e2-architecture-1">AWS and GCP workspaces</a>.</li>
+</ul>
+
+            
+        
+    </body></html>

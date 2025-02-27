@@ -1,0 +1,112 @@
+<html><!-- Online page at https://www.terraform.io/internals/login-protocol --><head>
+                <title>Login Protocol Reference</title>
+                <meta charset="utf-8"/>
+                <link href="../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="login-protocol-reference">Login Protocol Reference</h1>
+
+<p>This topic provides reference information about the login protocol Terraform uses for authentication against servers that profide Terraform-native services. You can use this reference information to offer Terraform-native services in a third-party system.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Introduction"></a><h2 id="introduction">Introduction</h2>
+
+<p>The <code>terraform login</code> command supports performing an OAuth 2.0 authorization
+request using configuration provided by the target host. You may wish to
+implement this protocol if you are producing a third-party implementation of
+any <a href="../terraform/internals/remote-service-discovery.html">Terraform-native services</a>,
+such as a Terraform module registry.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/OAuth%20Configuration"></a><h2 id="oauth-configuration">OAuth Configuration</h2>
+
+<p>Terraform uses <a href="../terraform/internals/remote-service-discovery.html">remote service discovery</a> to
+find the OAuth configuration for the host. The host must support the service
+name <code>login.v1</code> and define for it an object containing OAuth client
+configuration values. The following example describes a client that authenticates at ports <code>10000</code> and <code>10010</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"login.v1"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"client"</span><span class="p">:</span><span class="w"> </span><span class="s2">"terraform-cli"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"grant_types"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"authz_code"</span><span class="p">],</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"authz"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/oauth/authorization"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"token"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/oauth/token"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"ports"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">10000</span><span class="p">,</span><span class="w"> </span><span class="mi">10010</span><span class="p">],</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The properties within the discovery object are as follows:</p>
+
+<ul>
+<li><p><code>client</code> (Required): The <code>client_id</code> value to use when making requests, as
+defined in <a href="https://tools.ietf.org/html/rfc6749#section-2.2">RFC 6749 section 2.2</a>.</p>
+
+<p>Because Terraform is a <em>public client</em> (it is installed on end-user systems
+and thus cannot protect an OAuth client secret), the <code>client_id</code> is purely
+advisory and the server must not use it as a guarantee that an authorization
+request is truly coming from Terraform.</p></li>
+<li><p><code>grant_types</code> (Optional): A JSON array of strings describing a set of OAuth
+2.0 grant types the server is able to support. A "grant type" selects a
+specific mechanism by which an OAuth server authenticates the request and
+issues an authorization token.</p>
+
+<p>Terraform CLI supports a single grant type:</p>
+
+<ul>
+<li><code>authz_code</code>: <a href="https://tools.ietf.org/html/rfc6749#section-4.1">authorization code grant</a>.
+Both the <code>authz</code> and <code>token</code> properties are required when <code>authz_code</code> is
+present.</li>
+</ul>
+
+<p>If not specified, <code>grant_types</code> defaults to <code>["authz_code"]</code>.</p></li>
+<li><p><code>authz</code> (Required if needed for a given grant type): the server's
+<a href="https://tools.ietf.org/html/rfc6749#section-3.1">authorization endpoint</a>.
+If given as a relative URL, it is resolved from the location of the
+service discovery document.</p></li>
+<li><p><code>token</code> (Required if needed for a given grant type): the server's
+<a href="https://tools.ietf.org/html/rfc6749#section-3.2">token endpoint</a>.
+If given as a relative URL, it is resolved from the location of the
+service discovery document.</p></li>
+<li><p><code>ports</code> (Optional): A two-element JSON array giving an inclusive range of
+TCP ports that Terraform may use for the temporary HTTP server it will start
+to provide the <a href="https://tools.ietf.org/html/rfc6749#section-3.1.2">redirection endpoint</a>
+for the first step of an authorization code grant. Terraform opens a TCP
+listen port on the loopback interface in order to receive the response from
+the server's authorization endpoint.</p>
+
+<p>If not specified, Terraform is free to select any TCP port greater than or
+equal to 1024.</p>
+
+<p>Terraform allows constraining this port range for interoperability with OAuth
+server implementations that require each <code>client_id</code> to be associated with
+a fixed set of valid redirection endpoint URLs. Configure such a server
+to expect a range of URLs of the form <code>http://localhost:10000/</code>
+with different consecutive port numbers, and then specify that port range
+using <code>ports</code>.</p>
+
+<p></p><p>We recommend allowing at least 10 distinct port numbers if possible, and
+assigning them to numbers greater than or equal to 10000, to minimize the
+risk that all of the possible ports will already be in use on a particular
+system.</p></li>
+</ul><p></p>
+
+<p>When requesting an authorization code grant, Terraform CLI implements the
+<a href="https://tools.ietf.org/html/rfc7636">Proof Key for Code Exchange</a> extension in
+order to protect against other applications on the system intercepting the
+incoming request to the redirection endpoint. We strongly recommend that you
+select an OAuth server implementation that also implements this extension and
+verifies the code challenge sent to the token endpoint.</p>
+
+<p>Terraform CLI does not support OAuth refresh tokens or token expiration. If your
+server issues time-limited tokens, Terraform CLI will simply begin receiving
+authorization errors once the token expires, after which the user can run
+<code>terraform login</code> again to obtain a new token.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>As a special case, Terraform can use a <a href="https://tools.ietf.org/html/rfc6749#section-4.3">Resource Owner Password Credentials Grant</a> only when interacting with <code>app.terraform.io</code> (<a href="https://cloud.hashicorp.com/products/terraform">HCP Terraform</a>), under the recommendation in the OAuth specification to use this grant type only when the client and server are closely related. The <code>password</code> grant type is not supported for any other hostname and will be ignored.</p>
+</aside>
+
+            
+        
+    </body></html>

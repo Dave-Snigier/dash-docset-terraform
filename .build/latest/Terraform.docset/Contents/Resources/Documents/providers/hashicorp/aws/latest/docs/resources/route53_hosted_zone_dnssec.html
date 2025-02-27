@@ -1,0 +1,122 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_hosted_zone_dnssec --><head>
+                <title>aws_route53_hosted_zone_dnssec</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_route53_hosted_zone_dnssec">Resource: aws_route53_hosted_zone_dnssec</h1>
+
+<p>Manages Route 53 Hosted Zone Domain Name System Security Extensions (DNSSEC). For more information about managing DNSSEC in Route 53, see the <a href="https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec.html">Route 53 Developer Guide</a>.</p>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>WARNING</em>
+    <p>If you disable DNSSEC signing for your hosted zone before the DNS changes have propagated, your domain could become unavailable on the internet. When you remove the DS records, you must wait until the longest TTL for the DS records that you remove has expired before you complete the step to disable DNSSEC signing. Please refer to the <a href="https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec-disable.html">Route 53 Developer Guide - Disable DNSSEC</a> for a detailed breakdown on the steps required to disable DNSSEC safely for a hosted zone.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Route53 hosted zones are global resources, and as such any <code>aws_kms_key</code> that you use as part of a signing key needs to be located in the <code>us-east-1</code> region. In the example below, the main AWS provider declaration is for <code>us-east-1</code>, however if you are provisioning your AWS resources in a different region, you will need to specify a provider alias and use that attached to the <code>aws_kms_key</code> resource as described in the <a href="https://developer.hashicorp.com/terraform/language/providers/configuration#alias-multiple-provider-configurations">provider alias documentation</a>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_caller_identity"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_kms_key"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">customer_master_key_spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ECC_NIST_P256"</span><span class="w"></span>
+<span class="w">  </span><span class="na">deletion_window_in_days</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="m">7</span><span class="w"></span>
+<span class="w">  </span><span class="na">key_usage</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"SIGN_VERIFY"</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="na">Statement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"kms:DescribeKey"</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"kms:GetPublicKey"</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"kms:Sign"</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"kms:Verify"</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">],</span><span class="w"></span>
+<span class="w">        </span><span class="na">Effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">        </span><span class="nb">Principal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">Service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"dnssec-route53.amazonaws.com"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="na">Resource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"*"</span><span class="w"></span>
+<span class="w">        </span><span class="na">Sid</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow Route 53 DNSSEC Service"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="p">},</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"kms:*"</span><span class="w"></span>
+<span class="w">        </span><span class="na">Effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">        </span><span class="nb">Principal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">AWS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="na">Resource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"*"</span><span class="w"></span>
+<span class="w">        </span><span class="na">Sid</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Enable IAM User Permissions"</span><span class="w"></span>
+<span class="w">      </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">Version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2012-10-17"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route53_zone"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route53_key_signing_key"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hosted_zone_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route53_zone.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">key_management_service_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_kms_key.example.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route53_hosted_zone_dnssec"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">aws_route53_key_signing_key.example</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">hosted_zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route53_key_signing_key.example.hosted_zone_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>hosted_zone_id</code> - (Required) Identifier of the Route 53 Hosted Zone.</li>
+</ul>
+
+<p>The following arguments are optional:</p>
+
+<ul>
+<li><code>signing_status</code> - (Optional) Hosted Zone signing status. Valid values: <code>SIGNING</code>, <code>NOT_SIGNING</code>. Defaults to <code>SIGNING</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>id</code> - Route 53 Hosted Zone identifier.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import <code>aws_route53_hosted_zone_dnssec</code> resources using the Route 53 Hosted Zone identifier. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route53_hosted_zone_dnssec.example</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Z1D633PJN98FT9"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import <code>aws_route53_hosted_zone_dnssec</code> resources using the Route 53 Hosted Zone identifier. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_route53_hosted_zone_dnssec.example Z1D633PJN98FT9
+</code></pre></div>
+
+            
+        
+    </body></html>

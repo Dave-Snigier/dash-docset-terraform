@@ -1,0 +1,131 @@
+<html><!-- Online page at https://www.terraform.io/language/meta-arguments/module-providers --><head>
+                <title>The Module providers Meta-Argument</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="the-module-providers-meta-argument">The Module <code>providers</code> Meta-Argument</h1>
+
+<p>In a <a href="../../terraform/language/modules/syntax.html">module call</a> block, the
+optional <code>providers</code> meta-argument specifies which
+<a href="../../terraform/language/providers/configuration.html">provider configurations</a> from the parent
+module will be available inside the child module.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># The default "aws" configuration is used for AWS resources in the root</span>
+<span class="c1"># module where no explicit provider instance is selected.</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-1"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># An alternate configuration is also defined for a different</span>
+<span class="c1"># region, using the alias "usw2".</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"usw2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-2"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># An example child module is instantiated with the alternate configuration,</span>
+<span class="c1"># so any AWS resources it defines will use the us-west-2 region.</span>
+<span class="kr">module</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"./example"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">providers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.usw2</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Default%20Behavior%3A%20Inherit%20Default%20Providers"></a><h2 id="default-behavior-inherit-default-providers">Default Behavior: Inherit Default Providers</h2>
+
+<p>If the child module does not declare any <a href="../../terraform/language/modules/develop/providers.html#provider-aliases-within-modules">configuration aliases</a>,
+the <code>providers</code> argument is optional. If you omit it, a child module inherits
+all of the <em>default</em> provider configurations from its parent module. (Default
+provider configurations are ones that don't use the <code>alias</code> argument.)</p>
+
+<p>If you specify a <code>providers</code> argument, it cancels this default behavior, and the
+child module will <em>only</em> have access to the provider configurations you specify.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Usage%20and%20Behavior"></a><h2 id="usage-and-behavior">Usage and Behavior</h2>
+
+<p>The value of <code>providers</code> is a map, where:</p>
+
+<ul>
+<li>The keys are the provider configuration names used inside the child module.</li>
+<li>The values are provider configuration names from the parent module.</li>
+</ul>
+
+<p>Both keys and values should be unquoted references to provider configurations.
+For default configurations, this is the local name of the provider; for
+alternate configurations, this is a <code>&lt;PROVIDER&gt;.&lt;ALIAS&gt;</code> reference.</p>
+
+<p>Within a child module, resources are assigned to provider configurations as
+normal — either Terraform chooses a default based on the name of the resource
+type, or the resource specifies an alternate configuration with the <code>provider</code>
+argument. If the module receives a <code>providers</code> map when it's called, the
+provider configuration names used within the module are effectively remapped to
+refer the specified configurations from the parent module.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/When%20to%20Specify%20Providers"></a><h2 id="when-to-specify-providers">When to Specify Providers</h2>
+
+<p>There are two main reasons to use the <code>providers</code> argument:</p>
+
+<ul>
+<li>Using different default provider configurations for a child module.</li>
+<li>Configuring a module that requires multiple configurations of the same provider.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changing%20Default%20Provider%20Configurations"></a><h3 id="changing-default-provider-configurations">Changing Default Provider Configurations</h3>
+
+<p>Most re-usable modules only use default provider configurations, which they can
+automatically inherit from their caller when <code>providers</code> is omitted.</p>
+
+<p>However, in Terraform configurations that use multiple configurations of the
+same provider, you might want some child modules to use the default provider
+configuration and other ones to use an alternate. (This usually happens when
+using one configuration to manage resources in multiple different regions of the
+same cloud provider.)</p>
+
+<p>By using the <code>providers</code> argument (like in the code example above), you can
+accommodate this without needing to edit the child module. Although the code
+within the child module always refers to the default provider configuration, the
+actual configuration of that default can be different for each instance.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Modules%20With%20Alternate%20Provider%20Configurations"></a><h3 id="modules-with-alternate-provider-configurations">Modules With Alternate Provider Configurations</h3>
+
+<p>In rare cases, a single re-usable module might require multiple configurations
+of the same provider. For example, a module that configures connectivity between
+networks in two AWS regions is likely to need both a source and a destination
+region. In that case, the root module may look something like this:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"usw1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"usw2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-2"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">module</span><span class="w"> </span><span class="nv">"tunnel"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"./tunnel"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">providers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nv">aws.src</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nv">aws.usw1</span><span class="w"></span>
+<span class="w">    </span><span class="nv">aws.dst</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nv">aws.usw2</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Non-default provider configurations are never automatically inherited, so any
+module that works like this will always need a <code>providers</code> argument. The
+documentation for the module should specify all of the provider configuration
+names it needs.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/More%20Information%20for%20Module%20Developers"></a><h2 id="more-information-for-module-developers">More Information for Module Developers</h2>
+
+<p>For more details and guidance about working with providers inside a re-usable
+child module, see
+<a href="../../terraform/language/modules/develop/providers.html">Module Development: Providers Within Modules</a>.</p>
+
+            
+        
+    </body></html>

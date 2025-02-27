@@ -1,0 +1,570 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/hcp/latest/docs/guides/peering-azure --><head>
+                <title>Peer an Azure VNet to a HashiCorp Virtual Network (HVN)</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="peer-an-azure-vnet-to-a-hashicorp-virtual-network-hvn">Peer an Azure VNet to a HashiCorp Virtual Network (HVN)</h1>
+
+<p>In order to connect Azure workloads to an HCP services, you must peer the VNet in which the workloads reside to the HVN in which the HCP service resides.
+This is accomplished by using the <code>hcp_azure_peering_connection</code> resource to create a network peering between the HVN's VNet and your own VNet.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The CIDR blocks of the HVN and the peer VNet cannot overlap.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The Azure peering must be accepted by adding the HCP-supplied Application/Service Principal ID and associated custom role and role assignment in your Azure tenant. These must be completed by a User or Service Principal with the Azure AD API Permissions described <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/service_principal">here</a> and an AzureRM <code>_Owner_</code> or <code>_User Access Administrator_</code> role assignment over an appropriate scope where your Virtual Network resides. If the peering is not accepted in time or the AzureAD/AzureRM provider principals used with the Terraform config below do not have the appropriate permissions, this deployment will hang until the Terraform Run times out due to the <code>hcp_azure_peering_connection</code> data source that waits for the peering to be accepted.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azuread"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"hcp"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn"</span><span class="w"> </span><span class="nv">"hvn"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"main-hvn"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cloud_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azure"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"westus2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.25.16.0/20"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// This resource initially returns in a Pending state, because its application_id is required to complete acceptance of the connection.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_azure_peering_connection"</span><span class="w"> </span><span class="nv">"peer"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">peering_id</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"dev"</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vnet_name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_subscription_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_subscription.sub.subscription_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_tenant_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;tenant UUID&gt;"</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vnet_region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.location</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// This data source is the same as the resource above, but waits for the connection to be Active before returning.</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"hcp_azure_peering_connection"</span><span class="w"> </span><span class="nv">"peer"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">peering_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_azure_peering_connection.peer.peering_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">wait_for_active_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// The route depends on the data source, rather than the resource, to ensure the peering is in an Active state.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn_route"</span><span class="w"> </span><span class="nv">"route"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_route_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"azure-route"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.31.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_link</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">data.hcp_azure_peering_connection.peer.self_link</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"azurerm_subscription"</span><span class="w"> </span><span class="nv">"sub"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">subscription_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;subscription UUID&gt;"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_resource_group"</span><span class="w"> </span><span class="nv">"rg"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"resource-group-test"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"West US"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_virtual_network"</span><span class="w"> </span><span class="nv">"vnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"vnet-test"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">address_space</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"10.0.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// The principal deploying the `azuread_service_principal` resource below requires</span>
+<span class="c1">// API Permissions as described here: https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/service_principal.</span>
+<span class="c1">// The principal deploying the `azurerm_role_definition` and `azurerm_role_assigment`</span>
+<span class="c1">// resources must have Owner or User Access Administrator permissions over an appropriate</span>
+<span class="c1">// scope that includes your Virtual Network.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azuread_service_principal"</span><span class="w"> </span><span class="nv">"principal"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">application_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_azure_peering_connection.peer.application_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_role_definition"</span><span class="w"> </span><span class="nv">"definition"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcp-hvn-peering-access"</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">assignable_scopes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">azurerm_virtual_network.vnet.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">permissions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"Microsoft.Network/virtualNetworks/peer/action"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"Microsoft.Network/virtualNetworks/virtualNetworkPeerings/read"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"Microsoft.Network/virtualNetworks/virtualNetworkPeerings/write"</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_role_assignment"</span><span class="w"> </span><span class="nv">"assignment"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">azuread_service_principal.principal.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_definition_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_role_definition.definition.role_definition_resource_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Peer%20an%20Azure%20VNet%20to%20an%20HVN%20-%20Gateway%20support"></a><h2 id="peer-an-azure-vnet-to-an-hvn-gateway-support">Peer an Azure VNet to an HVN - Gateway support</h2>
+
+<p>The following example shows how to connect Azure workloads to HCP HVNs which require <a href="https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/hybrid-networking/hub-spoke?tabs=cli">Hub-spoke network topology</a> utilizing an Azure VPN Gateway.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Azure Hub/Spoke architecture support is in private beta. Please contact <a href="https://support.hashicorp.com/hc/en-us">HashiCorp support</a> for details.</p>
+</aside>
+
+<p>Notable aspects of this configuration:</p>
+
+<ul>
+<li>When the <code>use_remote_gatways</code> parameter of the <code>hcp_azure_peering_connection</code> resource is set to <code>true</code>, the peering link from customer VNet to HVN is set with <code>AllowGatewayTransit</code> to <code>true</code>.</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">hcp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/hcp"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 0.78.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azurerm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azurerm"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=3.0.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"subscription_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The Azure AD Subscription ID"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"tenant_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The Azure AD Tenant ID"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">uid</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">random_uuid.uuid.result</span><span class="w"></span>
+<span class="w">  </span><span class="na">short_uid</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"%.10s"</span><span class="p">,</span><span class="w"> </span><span class="nv">local.uid</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">subscription_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.subscription_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">tenant_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tenant_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"random_uuid"</span><span class="w"> </span><span class="nv">"uuid"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn"</span><span class="w"> </span><span class="nv">"hvn"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"hvn-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cloud_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azure"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"eastus"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.25.16.0/20"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_azure_peering_connection"</span><span class="w"> </span><span class="nv">"peering"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">peering_id</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"pcx-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_subscription_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">local.subscription_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_tenant_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">local.tenant_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vnet_name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vnet_region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"eastus"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">allow_forwarded_traffic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">use_remote_gateways</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// This data source is the same as the resource above, but waits for the connection</span>
+<span class="c1">// to be Active before returning.</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"hcp_azure_peering_connection"</span><span class="w"> </span><span class="nv">"peering"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">peering_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_azure_peering_connection.peering.peering_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">wait_for_active_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// The route depends on the data source, rather than the resource, to ensure the</span>
+<span class="c1">// peering is in an Active state.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn_route"</span><span class="w"> </span><span class="nv">"route"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_route_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"route-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.31.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_link</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">data.hcp_azure_peering_connection.peering.self_link</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">azure_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">next_hop_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"VIRTUAL_NETWORK_GATEWAY"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_resource_group"</span><span class="w"> </span><span class="nv">"rg"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"rg-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"East US"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_virtual_network"</span><span class="w"> </span><span class="nv">"vnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"vnet-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">address_space</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"10.0.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_subnet"</span><span class="w"> </span><span class="nv">"subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"GatewaySubnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">virtual_network_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">address_prefixes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"10.0.1.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_public_ip"</span><span class="w"> </span><span class="nv">"ip"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"ip-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">allocation_method</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Dynamic"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_virtual_network_gateway"</span><span class="w"> </span><span class="nv">"gateway"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"gateway-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"Vpn"</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpn_type</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"RouteBased"</span><span class="w"></span>
+<span class="w">  </span><span class="na">enable_bgp</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="c1"> // Explicit; defaults to false</span>
+<span class="w">  </span><span class="na">sku</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"Basic"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">ip_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                          </span><span class="o">=</span><span class="w"> </span><span class="s2">"ipconf-${local.short_uid}"</span><span class="w"></span>
+<span class="w">    </span><span class="na">public_ip_address_id</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_public_ip.ip.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">private_ip_address_allocation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Dynamic"</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnet_id</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_subnet.subnet.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// The principal deploying the `azuread_service_principal` resource below requires</span>
+<span class="c1">// API Permissions as described here: https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/service_principal.</span>
+<span class="c1">// The principal deploying the `azurerm_role_definition` and `azurerm_role_assigment`</span>
+<span class="c1">// resources must have Owner or User Access Administrator permissions over an appropriate</span>
+<span class="c1">// scope that includes your Virtual Network.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azuread_service_principal"</span><span class="w"> </span><span class="nv">"principal"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">application_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_azure_peering_connection.peering.application_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_role_definition"</span><span class="w"> </span><span class="nv">"definition"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcp-provider-test-role-def"</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">assignable_scopes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">azurerm_virtual_network.vnet.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">permissions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"Microsoft.Network/virtualNetworks/peer/action"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"Microsoft.Network/virtualNetworks/virtualNetworkPeerings/read"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"Microsoft.Network/virtualNetworks/virtualNetworkPeerings/write"</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_role_assignment"</span><span class="w"> </span><span class="nv">"assignment"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">azuread_service_principal.principal.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_definition_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_role_definition.definition.role_definition_resource_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Peer%20an%20Azure%20VNet%20to%20an%20HVN%20-%20Network%20Virtual%20Appliance%20%28NVA%29%20support"></a><h2 id="peer-an-azure-vnet-to-an-hvn-network-virtual-appliance-nva-support">Peer an Azure VNet to an HVN - Network Virtual Appliance (NVA) support</h2>
+
+<p>The following example shows how to connect Azure workloads to HCP HVNs which require <a href="https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/hybrid-networking/hub-spoke?tabs=cli">Hub-spoke network topology</a> utilizing an Azure Network Virtual Appliance.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Azure Hub/Spoke architecture support is in private beta. Please contact <a href="https://support.hashicorp.com/hc/en-us">HashiCorp support</a> for details.</p>
+</aside>
+
+<p>Notable aspects of this configuration:</p>
+
+<ul>
+<li>An Azure Firewall is used as the Network Virtual Appliance (NVA).</li>
+<li>A "Spoke" Virtual Network is included and peered to the "Hub" Virtual Network.</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">hcp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/hcp"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 0.78.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azurerm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azurerm"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=3.0.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"subscription_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The Azure AD Subscription ID"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"tenant_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The Azure AD Tenant ID"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">uid</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">random_uuid.uuid.result</span><span class="w"></span>
+<span class="w">  </span><span class="na">short_uid</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"%.10s"</span><span class="p">,</span><span class="w"> </span><span class="nv">local.uid</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">subscription_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.subscription_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">tenant_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tenant_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.25.16.0/20"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"random_uuid"</span><span class="w"> </span><span class="nv">"uuid"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn"</span><span class="w"> </span><span class="nv">"hvn"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"hvn-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cloud_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azure"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"eastus"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">local.cidr</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_azure_peering_connection"</span><span class="w"> </span><span class="nv">"peering"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">peering_id</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"pcx-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_subscription_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">local.subscription_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_tenant_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">local.tenant_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vnet_name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vnet_region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"eastus"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">allow_forwarded_traffic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">use_remote_gateways</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// This data source is the same as the resource above, but waits for the connection</span>
+<span class="c1">// to be Active before returning.</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"hcp_azure_peering_connection"</span><span class="w"> </span><span class="nv">"peering"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">peering_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_azure_peering_connection.peering.peering_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">wait_for_active_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// The route depends on the data source, rather than the resource, to ensure the</span>
+<span class="c1">// peering is in an Active state.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn_route"</span><span class="w"> </span><span class="nv">"route"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_route_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"route-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.spoke.address_space[0</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_link</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">data.hcp_azure_peering_connection.peering.self_link</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">azure_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">next_hop_type</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"VIRTUAL_APPLIANCE"</span><span class="w"></span>
+<span class="w">    </span><span class="na">next_hop_ip_address</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_firewall.firewall.ip_configuration[0].private_ip_address</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_resource_group"</span><span class="w"> </span><span class="nv">"rg"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"rg-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"East US"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_virtual_network"</span><span class="w"> </span><span class="nv">"vnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"vnet-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">address_space</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"10.0.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_subnet"</span><span class="w"> </span><span class="nv">"spoke"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"subnet-spoke-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">virtual_network_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.spoke.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">address_prefixes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"10.1.0.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_virtual_network"</span><span class="w"> </span><span class="nv">"spoke"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"vnet-spoke-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">address_space</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"10.1.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_route_table"</span><span class="w"> </span><span class="nv">"spoke"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"rtab-spoke-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">disable_bgp_route_propagation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_subnet_route_table_association"</span><span class="w"> </span><span class="nv">"spoke"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_subnet.spoke.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_route_table.spoke.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_route"</span><span class="w"> </span><span class="nv">"spoke"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"route-spoke-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">route_table_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_route_table.spoke.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">address_prefix</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">local.cidr</span><span class="w"></span>
+<span class="w">  </span><span class="na">next_hop_type</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"VirtualAppliance"</span><span class="w"></span>
+<span class="w">  </span><span class="na">next_hop_in_ip_address</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_firewall.firewall.ip_configuration[0].private_ip_address</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_subnet"</span><span class="w"> </span><span class="nv">"firewall"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"AzureFirewallSubnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">virtual_network_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">address_prefixes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"10.0.255.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_firewall"</span><span class="w"> </span><span class="nv">"firewall"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"firewall-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">sku_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AZFW_VNet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">sku_tier</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Standard"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">ip_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"firewall-conf-${local.short_uid}"</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnet_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_subnet.firewall.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">public_ip_address_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_public_ip.firewall.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_public_ip"</span><span class="w"> </span><span class="nv">"firewall"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"firewall-ip-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">allocation_method</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Static"</span><span class="w"></span>
+<span class="w">  </span><span class="na">sku</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"Standard"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_firewall_network_rule_collection"</span><span class="w"> </span><span class="nv">"firewall"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"firewall-collection-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">azure_firewall_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_firewall.firewall.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">priority</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="w"></span>
+<span class="w">  </span><span class="na">action</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"HNVtoSpoke"</span><span class="w"></span>
+<span class="w">    </span><span class="na">protocols</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"Any"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">source_addresses</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">hcp_hvn.hvn.cidr_block</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">destination_addresses</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.spoke.address_space</span><span class="w"></span>
+<span class="w">    </span><span class="na">destination_ports</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"SpokeToHVN"</span><span class="w"></span>
+<span class="w">    </span><span class="na">protocols</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"Any"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">source_addresses</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.spoke.address_space</span><span class="w"></span>
+<span class="w">    </span><span class="na">destination_addresses</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">hcp_hvn.hvn.cidr_block</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">destination_ports</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_virtual_network_peering"</span><span class="w"> </span><span class="nv">"firewall_spoketohub"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"peering-sth-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">virtual_network_name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.spoke.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">remote_virtual_network_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">allow_virtual_network_access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">allow_forwarded_traffic</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">allow_gateway_transit</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">use_remote_gateways</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_virtual_network_peering"</span><span class="w"> </span><span class="nv">"firewall_hubtospoke"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"peering-hts-${local.short_uid}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">virtual_network_name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">remote_virtual_network_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.spoke.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">allow_virtual_network_access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">allow_forwarded_traffic</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">allow_gateway_transit</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">use_remote_gateways</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// The principal deploying the `azuread_service_principal` resource below requires</span>
+<span class="c1">// API Permissions as described here: https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/service_principal.</span>
+<span class="c1">// The principal deploying the `azurerm_role_definition` and `azurerm_role_assigment`</span>
+<span class="c1">// resources must have Owner or User Access Administrator permissions over an appropriate</span>
+<span class="c1">// scope that includes your Virtual Network.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azuread_service_principal"</span><span class="w"> </span><span class="nv">"principal"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">application_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_azure_peering_connection.peering.application_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_role_definition"</span><span class="w"> </span><span class="nv">"definition"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcp-provider-test-role-def"</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">assignable_scopes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">azurerm_virtual_network.vnet.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">permissions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"Microsoft.Network/virtualNetworks/peer/action"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"Microsoft.Network/virtualNetworks/virtualNetworkPeerings/read"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"Microsoft.Network/virtualNetworks/virtualNetworkPeerings/write"</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_role_assignment"</span><span class="w"> </span><span class="nv">"assignment"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">azuread_service_principal.principal.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_definition_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_role_definition.definition.role_definition_resource_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Tutorials"></a><h2 id="tutorials">Tutorials</h2>
+
+<p>Refer to the following tutorials for additional usage examples:</p>
+
+<ul>
+<li><a href="https://developer.hashicorp.com/consul/tutorials/cloud-production/consul-client-azure-virtual-machines">Configure Azure VM for HCP</a></li>
+</ul>
+
+            
+        
+    </body></html>

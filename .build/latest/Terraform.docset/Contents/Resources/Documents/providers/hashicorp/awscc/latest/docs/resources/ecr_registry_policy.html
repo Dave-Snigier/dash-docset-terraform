@@ -1,0 +1,85 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/awscc/latest/docs/resources/ecr_registry_policy --><head>
+                <title>awscc_ecr_registry_policy</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="awscc_ecr_registry_policy-resource">awscc_ecr_registry_policy (Resource)</h1>
+
+<p>The <code>AWS::ECR::RegistryPolicy</code> resource creates or updates the permissions policy for a private registry.
+ A private registry policy is used to specify permissions for another AWS-account and is used when configuring cross-account replication. For more information, see <a href="https://docs.aws.amazon.com/AmazonECR/latest/userguide/registry-permissions.html">Registry permissions</a> in the <em>Amazon Elastic Container Registry User Guide</em>.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This resource can only be used in the <code>us-east-1</code> region.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Specify%20a%20registry%20policy%20for%20a%20private%20registry"></a><h3 id="specify-a-registry-policy-for-a-private-registry">Specify a registry policy for a private registry</h3>
+
+<p>The following example create a private registry policy and grants permission for an AWS account to create repositories and replicate their contents to your private registry.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_caller_identity"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"awscc_ecr_registry_policy"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="na">Version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2012-10-17"</span><span class="w"></span>
+<span class="w">    </span><span class="na">Statement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Sid</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"ReplicationAccessCrossAccount"</span><span class="w"></span>
+<span class="w">        </span><span class="na">Effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">        </span><span class="nb">Principal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">AWS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam::${var.source_account}:root"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="na">Action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"ecr:CreateRepository"</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"ecr:ReplicateImage"</span><span class="w"></span>
+<span class="w">        </span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="na">Resource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${awscc_ecr_repository.example.arn}/*"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"awscc_ecr_repository"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">repository_name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-ecr"</span><span class="w"></span>
+<span class="w">  </span><span class="na">image_tag_mutability</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MUTABLE"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">image_scanning_configuration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">scan_on_push</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"source_account"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<!-- schema generated by tfplugindocs -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Schema"></a><h2 id="schema">Schema</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Required"></a><h3 id="required">Required</h3>
+
+<ul>
+<li><code>policy_text</code> (String) The JSON policy text for your registry.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Read-Only"></a><h3 id="read-only">Read-Only</h3>
+
+<ul>
+<li><code>id</code> (String) Uniquely identifies the resource.</li>
+<li><code>registry_id</code> (String) The registry id.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Import is supported using the following syntax:</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform import awscc_ecr_registry_policy.example <span class="s2">"registry_id"</span>
+</code></pre></div>
+
+            
+        
+    </body></html>

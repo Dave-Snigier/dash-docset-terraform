@@ -1,0 +1,481 @@
+<html><!-- Online page at https://www.terraform.io/language/syntax/json --><head>
+                <title>JSON Configuration Syntax</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="json-configuration-syntax">JSON Configuration Syntax</h1>
+
+<p>Most Terraform configurations are written in
+<a href="../../terraform/language/syntax/configuration.html">the native Terraform language syntax</a>, which is designed to be
+relatively easy for humans to read and update.</p>
+
+<p>Terraform also supports an alternative syntax that is JSON-compatible. This
+syntax is useful when generating portions of a configuration programmatically,
+since existing JSON libraries can be used to prepare the generated
+configuration files.</p>
+
+<p>The JSON syntax is defined in terms of the native syntax. Everything that can
+be expressed in native syntax can also be expressed in JSON syntax, but some
+constructs are more complex to represent in JSON due to limitations of the
+JSON grammar.</p>
+
+<p>Terraform expects native syntax for files named with a <code>.tf</code> suffix, and
+JSON syntax for files named with a <code>.tf.json</code> suffix.</p>
+
+<p>The low-level JSON syntax, just as with the native syntax, is defined in terms
+of a specification called <em>HCL</em>. It is not necessary to know all of the details
+of HCL syntax or its JSON mapping in order to use Terraform, and so this page
+summarizes the most important differences between native and JSON syntax.
+If you are interested, you can find a full definition of HCL's JSON syntax
+in <a href="https://github.com/hashicorp/hcl/blob/main/json/spec.md">its specification</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/JSON%20File%20Structure"></a><h2 id="json-file-structure">JSON File Structure</h2>
+
+<p>At the root of any JSON-based Terraform configuration is a JSON object. The
+properties of this object correspond to the top-level block types of the
+Terraform language. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"variable"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"example"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"default"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hello"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Each top-level object property must match the name of one of the expected
+top-level block types. Block types that expect labels, such as <code>variable</code>
+shown above, are represented by one nested object value for each level
+of label. <code>resource</code> blocks expect two labels, so two levels of nesting
+are required:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"resource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"aws_instance"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"example"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nt">"instance_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"t2.micro"</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nt">"ami"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ami-abc123"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After any nested objects representing the labels, finally one more nested
+object represents the body of the block itself. In the above examples, the
+<code>default</code> argument for <code>variable "example"</code> and the <code>instance_type</code> and
+<code>ami</code> arguments for <code>resource "aws_instance" "example"</code> are specified.</p>
+
+<p>Taken together, the above two configuration files are equivalent to the
+following blocks in the native syntax:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hello"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"t2.micro"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"ami-abc123"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Within each top-level block type the rules for mapping to JSON are slightly
+different (see the <a href="#block-type-specific-exceptions">block-type-specific exceptions</a> below), but the following general rules apply in most cases:</p>
+
+<ul>
+<li><p>The JSON object representing the block body contains properties that
+correspond either to argument names or to nested block type names.</p></li>
+<li><p>Where a property corresponds to an argument that accepts
+<a href="../../terraform/language/expressions.html">arbitrary expressions</a> in the native syntax, the
+property value is mapped to an expression as described under
+<a href="#expression-mapping"><em>Expression Mapping</em></a> below. For arguments that
+do <em>not</em> accept arbitrary expressions, the interpretation of the property
+value depends on the argument, as described in the
+<a href="#block-type-specific-exceptions">block-type-specific exceptions</a>
+given later in this page.</p></li>
+<li><p>Where a property name corresponds to an expected nested block type name,
+the value is interpreted as described under
+<a href="#nested-block-mapping"><em>Nested Block Mapping</em></a> below, unless otherwise
+stated in <a href="#block-type-specific-exceptions">the block-type-specific exceptions</a>
+given later in this page.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Expression%20Mapping"></a><h2 id="expression-mapping">Expression Mapping</h2>
+
+<p>Since JSON grammar is not able to represent all of the Terraform language
+<a href="../../terraform/language/expressions.html">expression syntax</a>, JSON values interpreted as expressions
+are mapped as follows:</p>
+
+<table>
+<thead>
+<tr>
+  <th>JSON</th>
+  <th>Terraform Language Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Boolean</td>
+  <td>A literal <code>bool</code> value.</td>
+</tr>
+<tr>
+  <td>Number</td>
+  <td>A literal <code>number</code> value.</td>
+</tr>
+<tr>
+  <td>String</td>
+  <td>Parsed as a <a href="../../terraform/language/expressions/strings.html#string-templates">string template</a> and then evaluated as described below.</td>
+</tr>
+<tr>
+  <td>Object</td>
+  <td>Each property value is mapped per this table, producing an <code>object(...)</code> value with suitable attribute types.</td>
+</tr>
+<tr>
+  <td>Array</td>
+  <td>Each element is mapped per this table, producing a <code>tuple(...)</code> value with suitable element types.</td>
+</tr>
+<tr>
+  <td>Null</td>
+  <td>A literal <code>null</code>.</td>
+</tr>
+</tbody>
+</table>
+
+<p>When a JSON string is encountered in a location where arbitrary expressions are
+expected, its value is first parsed as a <a href="../../terraform/language/expressions/strings.html#string-templates">string template</a>
+and then it is evaluated to produce the final result.</p>
+
+<p>If the given template consists <em>only</em> of a single interpolation sequence,
+the result of its expression is taken directly, without first converting it
+to a string. This allows non-string expressions to be used within the
+JSON syntax:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"output"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"example"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="s2">"${aws_instance.example}"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The <code>output "example"</code> declared above has the object value representing the
+given <code>aws_instance</code> resource block as its value, rather than a string value.
+This special behavior does not apply if any literal or control sequences appear
+in the template; in these other situations, a string value is always produced.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Nested%20Block%20Mapping"></a><h2 id="nested-block-mapping">Nested Block Mapping</h2>
+
+<p>When a JSON object property is named after a nested block type, the value
+of this property represents one or more blocks of that type. The value of
+the property must be either a JSON object or a JSON array.</p>
+
+<p>The simplest situation is representing only a single block of the given type
+when that type expects no labels, as with the <code>lifecycle</code> nested block used
+within <code>resource</code> blocks:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"resource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"aws_instance"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"example"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nt">"lifecycle"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="nt">"create_before_destroy"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The above is equivalent to the following native syntax configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create_before_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When the nested block type requires one or more labels, or when multiple
+blocks of the same type can be given, the mapping gets a little more
+complicated. For example, the <code>provisioner</code> nested block type used
+within <code>resource</code> blocks expects a label giving the provisioner to use,
+and the ordering of provisioner blocks is significant to decide the order
+of operations.</p>
+
+<p>The following native syntax example shows a <code>resource</code> block with a number
+of provisioners of different types:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # (resource configuration omitted for brevity)</span>
+
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"local-exec"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"echo 'Hello World' &gt;example.txt"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"file"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"example.txt"</span><span class="w"></span>
+<span class="w">    </span><span class="na">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/tmp/example.txt"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"remote-exec"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">inline</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"sudo install-something -f /tmp/example.txt"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In order to preserve the order of these blocks, you must use a JSON array
+as the direct value of the property representing this block type, as in
+this JSON equivalent of the above:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"resource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"aws_instance"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"example"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nt">"provisioner"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">          </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nt">"local-exec"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">              </span><span class="nt">"command"</span><span class="p">:</span><span class="w"> </span><span class="s2">"echo 'Hello World' &gt;example.txt"</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"></span>
+<span class="w">          </span><span class="p">},</span><span class="w"></span>
+<span class="w">          </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nt">"file"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">              </span><span class="nt">"source"</span><span class="p">:</span><span class="w"> </span><span class="s2">"example.txt"</span><span class="p">,</span><span class="w"></span>
+<span class="w">              </span><span class="nt">"destination"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/example.txt"</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"></span>
+<span class="w">          </span><span class="p">},</span><span class="w"></span>
+<span class="w">          </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nt">"remote-exec"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">              </span><span class="nt">"inline"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"sudo install-something -f /tmp/example.txt"</span><span class="p">]</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"></span>
+<span class="w">          </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Each element of the <code>provisioner</code> array is an object with a single property
+whose name represents the label for each <code>provisioner</code> block. For block types
+that expect multiple labels, this pattern of alternating array and object
+nesting can be used for each additional level.</p>
+
+<p>If a nested block type requires labels but the order does <em>not</em> matter, you
+may omit the array and provide just a single object whose property names
+correspond to unique block labels. This is allowed as a shorthand for the above
+for simple cases, but the alternating array and object approach is the most
+general. We recommend using the most general form if systematically converting
+from native syntax to JSON, to ensure that the meaning of the configuration is
+preserved exactly.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Comment%20Properties"></a><h3 id="comment-properties">Comment Properties</h3>
+
+<p>Although we do not recommend hand-editing of JSON syntax configuration files
+-- this format is primarily intended for programmatic generation and consumption --
+a limited form of <em>comments</em> are allowed inside JSON objects that represent
+block bodies using a special property name:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"resource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"aws_instance"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"example"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nt">"//"</span><span class="p">:</span><span class="w"> </span><span class="s2">"This instance runs the scheduled tasks for backup"</span><span class="p">,</span><span class="w"></span>
+
+<span class="w">        </span><span class="nt">"instance_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"t2.micro"</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nt">"ami"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ami-abc123"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In any object that represents a block body, properties named <code>"//"</code> are
+ignored by Terraform entirely. This exception does <em>not</em> apply to objects
+that are being <a href="#expression-mapping">interpreted as expressions</a>, where this
+would be interpreted as an object type attribute named <code>"//"</code>.</p>
+
+<p>This special property name can also be used at the root of a JSON-based
+configuration file. This can be useful to note which program created the file.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"//"</span><span class="p">:</span><span class="w"> </span><span class="s2">"This file is generated by generate-outputs.py. DO NOT HAND-EDIT!"</span><span class="p">,</span><span class="w"></span>
+
+<span class="w">  </span><span class="nt">"output"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"example"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="s2">"${aws_instance.example}"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Block-type-specific%20Exceptions"></a><h2 id="block-type-specific-exceptions">Block-type-specific Exceptions</h2>
+
+<p>Certain arguments within specific block types are processed in a special way
+by Terraform, and so their mapping to the JSON syntax does not follow the
+general rules described above. The following sub-sections describe the special
+mapping rules that apply to each top-level block type.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/resource%20and%20data%20blocks"></a><h3 id="resource-and-data-blocks"><code>resource</code> and <code>data</code> blocks</h3>
+
+<p>Some meta-arguments for the <code>resource</code> and <code>data</code> block types take direct
+references to objects, or literal keywords. When represented in JSON, the
+reference or keyword is given as a JSON string with no additional surrounding
+spaces or symbols.</p>
+
+<p>For example, the <code>provider</code> meta-argument takes a <code>&lt;PROVIDER&gt;.&lt;ALIAS&gt;</code> reference
+to a provider configuration, which appears unquoted in the native syntax but
+must be presented as a string in the JSON syntax:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"resource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"aws_instance"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"example"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nt">"provider"</span><span class="p">:</span><span class="w"> </span><span class="s2">"aws.foo"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>This special processing applies to the following meta-arguments:</p>
+
+<ul>
+<li><code>provider</code>: a single string, as shown above</li>
+<li><code>depends_on</code>: an array of strings containing references to named entities,
+like <code>["aws_instance.example"]</code>.</li>
+<li><code>ignore_changes</code> within the <code>lifecycle</code> block: if set to <code>all</code>, a single
+string <code>"all"</code> must be given. Otherwise, an array of JSON strings containing
+property references must be used, like <code>["ami"]</code>.</li>
+</ul>
+
+<p>Special processing also applies to the <code>type</code> argument of any <code>connection</code>
+blocks, whether directly inside the <code>resource</code> block or nested inside
+<code>provisioner</code> blocks: the given string is interpreted literally, and not
+parsed and evaluated as a string template.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/variable%20blocks"></a><h3 id="variable-blocks"><code>variable</code> blocks</h3>
+
+<p>All arguments inside <code>variable</code> blocks have non-standard mappings to JSON:</p>
+
+<ul>
+<li><code>type</code>: a string containing a type expression, like <code>"string"</code> or <code>"list(string)"</code>.</li>
+<li><code>default</code>: a literal JSON value that can be converted to the given type.
+Strings within this value are taken literally and <em>not</em> interpreted as
+string templates.</li>
+<li><code>description</code>: a literal JSON string, <em>not</em> interpreted as a template.</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"variable"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"example"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"default"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hello"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/output%20blocks"></a><h3 id="output-blocks"><code>output</code> blocks</h3>
+
+<p>The <code>description</code> and <code>sensitive</code> arguments are interpreted as literal JSON
+values. The <code>description</code> string is not interpreted as a string template.</p>
+
+<p>The <code>value</code> argument is <a href="#expression-mapping">interpreted as an expression</a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"output"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"example"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="s2">"${aws_instance.example}"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/locals%20blocks"></a><h3 id="locals-blocks"><code>locals</code> blocks</h3>
+
+<p>The value of the JSON object property representing the locals block type
+must be a JSON object whose property names are the local value names to
+declare:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"locals"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"greeting"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Hello, ${var.name}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The value of each of these nested properties is
+<a href="#expression-mapping">interpreted as an expression</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/module%20blocks"></a><h3 id="module-blocks"><code>module</code> blocks</h3>
+
+<p>The <code>source</code> and <code>version</code> meta-arguments must be given as literal strings. The
+values are not interpreted as string templates.</p>
+
+<p>The <code>providers</code> meta-argument must be given as a JSON object whose properties
+are the compact provider addresses to expose into the child module and whose
+values are the provider addresses to use from the current module, both
+given as literal strings:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"module"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"example"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"source"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hashicorp/consul/azurerm"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"= 1.0.0"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"providers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nt">"aws"</span><span class="p">:</span><span class="w"> </span><span class="s2">"aws.usw1"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/provider%20blocks"></a><h3 id="provider-blocks"><code>provider</code> blocks</h3>
+
+<p>The <code>alias</code> and <code>version</code> meta-arguments must be given as literal strings. The
+values are not interpreted as string templates.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"provider"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"aws"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nt">"region"</span><span class="p">:</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="w">      </span><span class="p">},</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nt">"alias"</span><span class="p">:</span><span class="w"> </span><span class="s2">"usw1"</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nt">"region"</span><span class="p">:</span><span class="w"> </span><span class="s2">"us-west-1"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/terraform%20blocks"></a><h3 id="terraform-blocks"><code>terraform</code> blocks</h3>
+
+<p>Since no settings within <code>terraform</code> blocks accept named object references or
+function calls, all setting values are taken literally. String values are not
+interpreted as string templates.</p>
+
+<p>Since only one <code>backend</code> block is allowed per <code>terraform</code> block, the compact
+block mapping can be used to represent it, with a nested object containing
+a single property whose name represents the backend type.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"terraform"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"required_version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&gt;= 0.12.0"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"backend"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"s3"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nt">"region"</span><span class="p">:</span><span class="w"> </span><span class="s2">"us-west-2"</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nt">"bucket"</span><span class="p">:</span><span class="w"> </span><span class="s2">"acme-terraform-states"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

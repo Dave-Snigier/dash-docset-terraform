@@ -1,0 +1,143 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/compute_machine_types --><head>
+                <title>google_compute_machine_types</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="google_compute_machine_types">google_compute_machine_types</h1>
+
+<p>Provides access to available Google Compute machine types in a zone for a given project.
+See more about <a href="https://cloud.google.com/compute/docs/regions-zones#available">machine type availability</a> in the upstream docs.</p>
+
+<p>To get more information about machine types, see:</p>
+
+<ul>
+<li><a href="https://cloud.google.com/compute/docs/reference/rest/v1/machineTypes/list">API Documentation</a></li>
+<li><a href="https://cloud.google.com/compute/docs/machine-resource">Comparison Guide</a></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Machine%20Type%20properties"></a><h2 id="example-usage-machine-type-properties">Example Usage - Machine Type properties</h2>
+
+<p>Configure a Google Kubernetes Engine (GKE) cluster with node auto-provisioning, using memory constraints matching the memory of the provided machine type.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"google_compute_machine_types"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">filter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"name = \"n1-standard-1\""</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-gke-cluster"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">cluster_autoscaling</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="nb">resource_limits</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">resource_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"memory"</span><span class="w"></span>
+<span class="w">      </span><span class="na">minimum</span><span class="w">       </span><span class="o">=</span><span class="w">  </span><span class="m">2</span><span class="w"> </span><span class="err">*</span><span class="w"> </span><span class="nv">data.google_compute_machine_types.example.machine_types[0].memory_mb</span><span class="w"></span>
+<span class="w">      </span><span class="na">maximum</span><span class="w">       </span><span class="o">=</span><span class="w">  </span><span class="m">4</span><span class="w"> </span><span class="err">*</span><span class="w"> </span><span class="nv">data.google_compute_machine_types.example.machine_types[0].memory_mb</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Property-based%20availability"></a><h2 id="example-usage-property-based-availability">Example Usage - Property-based availability</h2>
+
+<p>Create a VM instance template for each machine type with 16GB of memory and 8 CPUs available in the provided zone.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"google_compute_machine_types"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">filter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"memoryMb = 16384 AND guestCpus = 8"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.zone</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_template"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nf">toset</span><span class="p">(</span><span class="nv">data.google_compute_machine_types.example.machine_types</span><span class="p">[</span><span class="err">*</span><span class="p">].</span><span class="err">name</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source_image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud/debian-11"</span><span class="w"></span>
+<span class="w">    </span><span class="na">auto_delete</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">boot</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Machine%20Family%20preference"></a><h2 id="example-usage-machine-family-preference">Example Usage - Machine Family preference</h2>
+
+<p>Create an instance template, preferring <code>c3</code> machine family if available in the provided zone, otherwise falling back to <code>c2</code> and finally <code>n2</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"google_compute_machine_types"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">filter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"memoryMb = 16384 AND guestCpus = 4"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.zone</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_template"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">coalescelist</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="p">[</span><span class="err">for</span><span class="w"> </span><span class="err">mt</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">data.google_compute_machine_types.example.machine_types</span><span class="p">:</span><span class="w"> </span><span class="nv">mt.name</span><span class="w"> </span><span class="err">if</span><span class="w"> </span><span class="err">startswith</span><span class="p">(</span><span class="nv">mt.name</span><span class="p">,</span><span class="w"> </span><span class="s2">"c3-"</span><span class="p">)],</span><span class="w"></span>
+<span class="w">    </span><span class="p">[</span><span class="err">for</span><span class="w"> </span><span class="err">mt</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">data.google_compute_machine_types.example.machine_types</span><span class="p">:</span><span class="w"> </span><span class="nv">mt.name</span><span class="w"> </span><span class="err">if</span><span class="w"> </span><span class="err">startswith</span><span class="p">(</span><span class="nv">mt.name</span><span class="p">,</span><span class="w"> </span><span class="s2">"c2-"</span><span class="p">)],</span><span class="w"></span>
+<span class="w">    </span><span class="p">[</span><span class="err">for</span><span class="w"> </span><span class="err">mt</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">data.google_compute_machine_types.example.machine_types</span><span class="p">:</span><span class="w"> </span><span class="nv">mt.name</span><span class="w"> </span><span class="err">if</span><span class="w"> </span><span class="err">startswith</span><span class="p">(</span><span class="nv">mt.name</span><span class="p">,</span><span class="w"> </span><span class="s2">"n2-"</span><span class="p">)],</span><span class="w"></span>
+<span class="w">  </span><span class="p">)[</span><span class="m">0</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source_image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud/debian-11"</span><span class="w"></span>
+<span class="w">    </span><span class="na">auto_delete</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">boot</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>filter</code> (Required) - A filter expression that filters machine types listed in the response.</p></li>
+<li><p><code>zone</code> (Required) - Zone from which to list machine types.</p></li>
+<li><p><code>project</code> (Optional) - Project from which to list available zones. Defaults to project declared in the provider.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>The following attributes are exported:</p>
+
+<ul>
+<li><code>machine_types</code> - The list of machine types matching the provided filter. Structure is <a href="#nested_machine_types">documented below</a>.</li>
+</ul>
+
+<p><a name="nested_machine_types"></a>The <code>machine_types</code> block supports:</p>
+
+<ul>
+<li><p><code>name</code> - The name of the machine type.</p></li>
+<li><p><code>description</code> - A textual description of the machine type.</p></li>
+<li><p><code>bundled_local_ssds</code> - (<a href="https://terraform.io/docs/providers/google/guides/provider_versions.html">Beta</a>) The configuration of bundled local SSD for the machine type. Structure is <a href="#nested_bundled_local_ssds">documented below</a>.</p></li>
+<li><p><code>deprecated</code> - The deprecation status associated with this machine type. Structure is <a href="#nested_deprecated">documented below</a>.</p></li>
+<li><p><code>guest_cpus</code> - The number of virtual CPUs that are available to the instance.</p></li>
+<li><p><code>memory_mb</code> - The amount of physical memory available to the instance, defined in MB.</p></li>
+<li><p><code>maximum_persistent_disks</code> - The maximum persistent disks allowed.</p></li>
+<li><p><code>maximum_persistent_disks_size_gb</code> - The maximum total persistent disks size (GB) allowed.</p></li>
+<li><p><code>is_shared_cpus</code> - Whether this machine type has a shared CPU.</p></li>
+<li><p><code>accelerators</code> - A list of accelerator configurations assigned to this machine type. Structure is <a href="#nested_accelerators">documented below</a>.</p></li>
+<li><p><code>self_link</code> - The server-defined URL for the machine type.</p></li>
+</ul>
+
+<p><a name="nested_bundled_local_ssds"></a>The <code>bundled_local_ssds</code> block supports:</p>
+
+<ul>
+<li><p><code>default_interface</code> - (<a href="https://terraform.io/docs/providers/google/guides/provider_versions.html">Beta</a>) The default disk interface if the interface is not specified.</p></li>
+<li><p><code>partition_count</code> - (<a href="https://terraform.io/docs/providers/google/guides/provider_versions.html">Beta</a>) The number of partitions.</p></li>
+</ul>
+
+<p><a name="nested_deprecated"></a>The <code>deprecated</code> block supports:</p>
+
+<ul>
+<li><p><code>replacement</code> - The URL of the suggested replacement for a deprecated machine type.</p></li>
+<li><p><code>state</code> - The deprecation state of this resource. This can be <code>ACTIVE</code>, <code>DEPRECATED</code>, <code>OBSOLETE</code>, or <code>DELETED</code>.</p></li>
+</ul>
+
+<p><a name="nested_accelerators"></a>The <code>accelerators</code> block supports:</p>
+
+<ul>
+<li><p><code>guest_accelerator_type</code> - The accelerator type resource name, not a full URL, e.g. <code>nvidia-tesla-t4</code>.</p></li>
+<li><p><code>guest_accelerator_count</code> - Number of accelerator cards exposed to the guest.</p></li>
+</ul>
+
+            
+        
+    </body></html>

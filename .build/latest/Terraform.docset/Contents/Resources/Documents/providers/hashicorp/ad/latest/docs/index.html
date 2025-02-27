@@ -1,0 +1,198 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/ad/latest/docs --><head>
+                <title>AD (Active Directory) Provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="ad-active-directory-provider">AD (Active Directory) Provider</h1>
+
+<p>The AD (Active Directory) provider provides resources to interact with an AD domain controller.</p>
+
+<p>Requirements:</p>
+
+<ul>
+<li>Windows Server 2012R2 or greater.</li>
+<li>WinRM enabled.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Note%20about%20Kerberos%20Authentication"></a><h2 id="note-about-kerberos-authentication">Note about Kerberos Authentication</h2>
+
+<p>Starting with version 0.4.0, this provider supports Kerberos Authentication for WinRM connections.
+The underlying library used for Kerberos authentication supports setting its configuration by parsing
+a configuration file as specified in this <a href="https://web.mit.edu/kerberos/krb5-1.12/doc/admin/conf_files/krb5_conf.html">page</a>.
+If a configuration file is not supplied then we will use the equivalent of the following config:</p>
+
+<pre><code>[libdefaults]
+   default_realm = YOURDOMAIN.COM
+   dns_lookup_realm = false
+   dns_lookup_kdc = false
+
+[realms]
+    YOURDOMAIN.COM = {
+        kdc     =   192.168.1.122
+        admin_server = 192.168.1.122
+        default_domain = YOURDOMAIN.COM
+    }
+
+[domain_realm]
+    yourdomain.com = YOURDOMAIN.COM
+</code></pre>
+
+<p>where <code>YOURDOMAIN.COM</code> is the value of the <code>krb_realm</code> setting, and 192.168.1.122 is the value of <code>winrm_hostname</code>.
+<code>Basic</code> remains the default authentication method, although this may change in the future. The provider will use
+Kerberos as its authentication when <code>krb_realm</code> is set.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Double%20hop%20Authentication"></a><h2 id="double-hop-authentication">Double hop Authentication</h2>
+
+<p>Starting with version 0.4.3 it is possible to point the provider to a host other than a Domain Controller and perform
+all the management tasks through that host. Here is an example of The provider config:</p>
+
+<pre><code>provider "ad" {
+  winrm_hostname         = "10.0.0.1"
+  winrm_username         = var.username
+  winrm_password         = var.password
+  krb_realm              = "YOURDOMAIN.COM"
+  krb_conf               = "${path.module}/krb5.conf"
+  krb_spn                = "winserver1"
+  winrm_port             = 5986
+  winrm_proto            = "https"
+  winrm_pass_credentials = true
+}
+</code></pre>
+
+<p>In this case krb5.conf would look like this:</p>
+
+<pre><code>[libdefaults]
+   default_realm = YOURDOMAIN.COM
+   dns_lookup_realm = false
+   dns_lookup_kdc = false
+
+
+[realms]
+    YOURDOMAIN.COM = {
+        kdc     =   172.16.12.109
+        admin_server = 172.16.12.109
+        default_domain = YOURDOMAIN.COM
+    }
+
+[domain_realm]
+    .kerberos.server = YOURDOMAIN.COM
+    .yourdomain.com = YOURDOMAIN.COM
+    yourdomain.com = YOURDOMAIN.COM
+    yourdomain = YOURDOMAIN.COM
+</code></pre>
+
+<p>A few things to note:
+    - Double Hop Authentication is only enabled when using https
+    - Authentication between management host and DC is done via Kerberos
+    - The <a href="https://docs.microsoft.com/en-us/powershell/module/activedirectory/?view=winserver2012r2-ps">AD Powershell module</a> as well as the <a href="https://docs.microsoft.com/en-us/powershell/module/grouppolicy/?view=windowsserver2019-ps">Group Policy Powersehll Module</a> is expected to be installed
+      on the server before running the provider.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Note%20about%20Local%20execution%20%28Windows%20only%29"></a><h2 id="note-about-local-execution-windows-only">Note about Local execution (Windows only)</h2>
+
+<p>It is possible to execute commands locally if the OS on which terraform is running is Windows.
+In such case, your need to put the following settings in the provider configuration :</p>
+
+<ul>
+<li>Set winrm_username to null</li>
+<li>Set winrm_password to null</li>
+<li>Set winrm_hostname to null</li>
+</ul>
+
+<p>Note: it will set to local only <code>if all 3 parameters are set to null</code></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example"></a><h3 id="example">Example</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"ad"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_hostname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>## Example Usage</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"hostname"</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ad.yourdomain.com"</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"username"</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"user"</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"password"</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"password"</span><span class="w"> </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// remote using Basic authentication</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"ad"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_hostname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.hostname</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.username</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.password</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// remote using NTLM authentication</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"ad"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_hostname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.hostname</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.username</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.password</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_use_ntlm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// remote using NTLM authentication and HTTPS</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"ad"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_hostname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.hostname</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.username</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.password</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_use_ntlm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_port</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">5986</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_proto</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"https"</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_insecure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// remote using Kerberos authentication</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"ad"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_hostname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.hostname</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.username</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.password</span><span class="w"></span>
+<span class="w">  </span><span class="na">krb_realm</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"YOURDOMAIN.COM"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// remote using Kerberos authentication with krb5.conf file</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"ad"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_hostname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.hostname</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.username</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.password</span><span class="w"></span>
+<span class="w">  </span><span class="na">krb_conf</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"/etc/krb5.conf"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// local (windows only)</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"ad"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_hostname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="w"></span>
+<span class="w">  </span><span class="na">winrm_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<!-- schema generated by tfplugindocs -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Schema"></a><h2 id="schema">Schema</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Required"></a><h3 id="required">Required</h3>
+
+<ul>
+<li><code>winrm_hostname</code> (String) The hostname of the server we will use to run powershell scripts over WinRM. (Environment variable: AD_HOSTNAME)</li>
+<li><code>winrm_password</code> (String) The password used to authenticate to the server's WinRM service. (Environment variable: AD_PASSWORD)</li>
+<li><code>winrm_username</code> (String) The username used to authenticate to the server's WinRM service. (Environment variable: AD_USER)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Optional"></a><h3 id="optional">Optional</h3>
+
+<ul>
+<li><code>domain_controller</code> (String) Use a specific domain controller. (default: none, environment variable: AD_DC)</li>
+<li><code>krb_conf</code> (String) Path to kerberos configuration file. (default: none, environment variable: AD_KRB_CONF)</li>
+<li><code>krb_keytab</code> (String) Path to a keytab file to be used instead of a password</li>
+<li><code>krb_realm</code> (String) The name of the kerberos realm (domain) we will use for authentication. (default: "", environment variable: AD_KRB_REALM)</li>
+<li><code>krb_spn</code> (String) Alternative Service Principal Name. (default: none, environment variable: AD_KRB_SPN)</li>
+<li><code>winrm_insecure</code> (Boolean) Trust unknown certificates. (default: false, environment variable: AD_WINRM_INSECURE)</li>
+<li><code>winrm_pass_credentials</code> (Boolean) Pass credentials in WinRM session to create a System.Management.Automation.PSCredential. (default: false, environment variable: AD_WINRM_PASS_CREDENTIALS)</li>
+<li><code>winrm_port</code> (Number) The port WinRM is listening for connections. (default: 5985, environment variable: AD_PORT)</li>
+<li><code>winrm_proto</code> (String) The WinRM protocol we will use. (default: http, environment variable: AD_PROTO)</li>
+<li><code>winrm_use_ntlm</code> (Boolean) Use NTLM authentication. (default: false, environment variable: AD_WINRM_USE_NTLM)</li>
+</ul>
+
+            
+        
+    </body></html>

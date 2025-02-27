@@ -1,0 +1,258 @@
+<html><!-- Online page at https://www.terraform.io/cli/commands/test --><head>
+                <title>terraform test command</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-test-command"><code>terraform test</code> command</h1>
+
+<p>The <code>terraform test</code> command loads and exectures Terraform testing files.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Introduction"></a><h2 id="introduction">Introduction</h2>
+
+<p>The <code>terraform test</code> command and the test file syntax help module authors validate and test their shared modules. You can also use the <code>terraform test</code> command to validate root modules.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Usage"></a><h2 id="usage">Usage</h2>
+
+<p>Usage: <code>terraform test [options]</code></p>
+
+<p>This command searches the current directory and the specified testing directory for Terraform testing files and executes the specified tests. By default, the directory containing test files is named <code>tests</code>. Refer to <a href="../../terraform/language/tests.html">Tests</a> for more details on test files.</p>
+
+<p>Terraform then executes a series of Terraform plan or apply commands according to the test files' specifications, and also validates the relevant plan and state files according to the test files' specifications.</p>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>Warning</em>
+    <p>The Terraform test command can create real infrastructure than can cost you money. Refer to the <a href="#terraform-test-cleanup">Terraform Test Cleanup</a> section for best practices on ensuring created infrastructure is destroyed.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/General%20Options"></a><h2 id="general-options">General Options</h2>
+
+<p>The following options apply to the Terraform <code>terraform test</code> command:</p>
+
+<ul>
+<li><p><code>-cloud-run=&lt;module source&gt;</code> - This test run executes remotely on HCP Terraform within the specified Terraform <a href="../../terraform/language/modules/sources.html#terraform-registry">private registry</a> module.</p></li>
+<li><p><code>-filter=testfile</code> - Limits the <code>terraform test</code> operation to the specified test files.</p></li>
+<li><p><code>-json</code> - Displays machine-readable JSON output for your testing results.</p></li>
+<li><p><code>-junit-xml=&lt;output file path&gt;</code> - Saves a test report in JUnit XML format to the specified file. This is currently incompatible with remote test execution using the the <code>-cloud-run</code> option. The file path must be relative or absolute.</p></li>
+<li><p><code>-test-directory=&lt;relative directory&gt;</code> - Overrides the directory that Terraform looks into for test files. Note that Terraform always loads testing files within the main configuration directory. The default testing directory is <code>tests</code>.</p></li>
+<li><p><code>-verbose</code> - Prints out the plan or state for each <code>run</code> block within a test file, based on the <code>command</code> attribute of each <code>run</code> block.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/State%20Management"></a><h2 id="state-management">State Management</h2>
+
+<p>Each Terraform test file will maintain all Terraform state it requires within memory as it executes, starting empty. This state is entirely separate from any existing state for the configuration under test, so you can safely execute Terraform test commands without affecting any live infrastructure.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Terraform%20Test%20Cleanup"></a><h3 id="terraform-test-cleanup">Terraform Test Cleanup</h3>
+
+<p>The Terraform <code>terraform test</code> command creates <em>real</em> infrastructure. Once Terraform fully executes each test file, Terraform attempts to destroy any remaining infrastructure. If it cannot do this, Terraform reports a list of resources it created but could not destroy.</p>
+
+<p>You should monitor the output of the test command closely to ensure Terraform removes the infrastructure it created or perform manual cleanup if not. We recommend creating dedicated testing accounts within the target providers that you can routinely and safely purge to ensure any accidental and costly resources aren't left behind.</p>
+
+<p>Terraform also provides diagnostics explaining why it could not automatically clean up. You should review these diagnostics to ensure that future clean-up operations are successful.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/HCP%20Terraform%20execution"></a><h2 id="hcp-terraform-execution">HCP Terraform execution</h2>
+
+<p>You can execute tests remotely on HCP Terraform using the <code>-cloud-run</code> option.</p>
+
+<p>The <code>-cloud-run</code> option accepts a <a href="../../terraform/language/modules/sources.html#terraform-registry">private registry module source</a>. This option associates the test run with your specified private module within the HCP Terraform user interface.</p>
+
+<p>You must provide a module from a <em>private</em> registry, not the public Terraform registry.</p>
+
+<p>You must execute <a href="../../terraform/cli/commands/login.html"><code>terraform login</code></a> before using this option, and ensure that your <code>hostname</code> argument matches the private registry hostname of your target module.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%3A%20Test%20Directory%20Structure%20and%20Commands"></a><h2 id="example-test-directory-structure-and-commands">Example: Test Directory Structure and Commands</h2>
+
+<p>The following directory structure represents an example directory tree for a Terraform module with tests and a setup module.</p>
+
+<pre><code>project/
+|-- main.tf
+|-- outputs.tf
+|-- terraform.tf
+|-- variables.tf
+|-- tests/
+|   |-- validations.tftest.hcl
+|   |-- outputs.tftest.hcl
+|-- testing/
+    |-- setup/
+        |-- main.tf
+        |-- outputs.tf
+        |-- terraform.tf
+        |-- variables.tf
+</code></pre>
+
+<p>At the root directory of the project, there are some typical Terraform configuration files: <code>main.tf</code>, <code>outputs.tf</code>, <code>terraform.tf</code>, and <code>variables.tf</code>. The test files, <code>validations.tftest.hcl</code> and <code>outputs.tftest.hcl</code>, are within the default tests directory: <code>tests</code>.</p>
+
+<p>In addition, a <a href="../../terraform/language/tests.html#modules">setup module</a> for the tests exists within the <code>testing</code> directory.</p>
+
+<p>In order to execute the tests you should run <code>terraform test</code> from the root configuration directory as if running <code>terraform plan</code> or <code>terraform apply</code>. Despite the actual test files being in the nested <code>tests</code> directory, Terraform executes from the main configuration directory.</p>
+
+<p>Specific test files can be executed using the <code>-filter</code> option.</p>
+
+<p>Linux, Mac OS, and UNIX:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform <span class="nb">test</span> -filter<span class="o">=</span>tests/validations.tftest.hcl
+</code></pre></div>
+
+<p>PowerShell:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform <span class="nb">test</span> -filter<span class="o">=</span><span class="s1">'tests\validations.tftest.hcl'</span>
+</code></pre></div>
+
+<p>Windows <code>cmd.exe</code>:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform <span class="nb">test</span> -filter<span class="o">=</span>tests<span class="se">\v</span>alidations.tftest.hcl
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Alternate%20Test%20Directories"></a><h3 id="alternate-test-directories">Alternate Test Directories</h3>
+
+<p>In the above example the tests are in the default testing directory of <code>tests</code>. Test files can also be included directly within the main configuration directory:</p>
+
+<pre><code>project/
+|-- main.tf
+|-- outputs.tf
+|-- terraform.tf
+|-- variables.tf
+|-- validations.tftest.hcl
+|-- outputs.tftest.hcl
+|-- testing/
+    |-- setup/
+        |-- main.tf
+        |-- outputs.tf
+        |-- terraform.tf
+        |-- variables.tf
+</code></pre>
+
+<p>The location of the testing files does not affect the operation of <code>terraform test</code>. All references to, and absolute file paths within, the testing files should be relative to the main configuration directory.</p>
+
+<p>You can also use the <code>-test-directory</code> argument to change the location of the testing files. For example, <code>terraform test -test-directory=testing</code> would instruct Terraform to load tests from the directory <code>testing</code> instead of <code>tests</code>.</p>
+
+<p>The testing directory must be beneath the main configuration directory, but it can be nested many times.</p>
+
+<blockquote>
+  <p>Note: Test files within the root configuration directory are always loaded, regardless of the <code>-test-directory</code> value.</p>
+</blockquote>
+
+<p>We do not recommend changing the default test directory. The option for customization is included for configuration authors who may have included a <code>tests</code> submodule in their configuration before the <code>terraform test</code> command was released. In general, the default test directory of <code>tests</code> should always be used.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%3A%20Test%20Output%20Format%20Options"></a><h2 id="example-test-output-format-options">Example: Test Output Format Options</h2>
+
+<p>Below is a contrived example of Terraform testing that makes assertions about the values of local variables <code>true</code> and <code>false</code>.
+There are two test files: one contains a passing test, and one contains a failing test.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tf</span>
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">true</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"true"</span><span class="w"></span>
+<span class="w">  </span><span class="na">false</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"true" # incorrect, should be "false"</span><span class="p">!</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The assertion that <code>local.true == "true"</code> in <code>example_1.tftest.hcl</code> will pass:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># example_1.tftest.hcl</span>
+<span class="err">run</span><span class="w"> </span><span class="s2">"true_is_true"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">local.true</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"true"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"local.true did not match expected value"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The assertion that <code>local.false == "false"</code> in <code>example_2.tftest.hcl</code> will fail:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># example_2.tftest.hcl</span>
+<span class="err">run</span><span class="w"> </span><span class="s2">"false_is_false"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">local.false</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"false"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"local.false did not match expected value"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Test%20output%20in%20JUnit%20XML%20format%2C%20saved%20to%20file"></a><h3 id="test-output-in-junit-xml-format-saved-to-file">Test output in JUnit XML format, saved to file</h3>
+
+<p>Below is the output of the <code>terraform test -junit-xml=./output.xml</code> command using the example files above.
+The test output is:</p>
+
+<ul>
+<li>Printed to the terminal in the default, human-readable format.</li>
+<li>Also saved in JUnit XML format in the file specified by the flag.</li>
+</ul>
+
+<p>Below is the contents of the resulting <code>output.xml</code> file:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="cp">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span><span class="nt">&lt;testsuites&gt;</span>
+  <span class="nt">&lt;testsuite</span> <span class="na">name=</span><span class="s">"example_1.tftest.hcl"</span> <span class="na">tests=</span><span class="s">"1"</span> <span class="na">skipped=</span><span class="s">"0"</span> <span class="na">failures=</span><span class="s">"0"</span> <span class="na">errors=</span><span class="s">"0"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;testcase</span> <span class="na">name=</span><span class="s">"true_is_true"</span> <span class="na">classname=</span><span class="s">"example_1.tftest.hcl"</span> <span class="na">time=</span><span class="s">"0.002295"</span> <span class="na">timestamp=</span><span class="s">"2025-01-13T19:23:16Z"</span><span class="nt">&gt;&lt;/testcase&gt;</span>
+  <span class="nt">&lt;/testsuite&gt;</span>
+  <span class="nt">&lt;testsuite</span> <span class="na">name=</span><span class="s">"example_2.tftest.hcl"</span> <span class="na">tests=</span><span class="s">"1"</span> <span class="na">skipped=</span><span class="s">"0"</span> <span class="na">failures=</span><span class="s">"1"</span> <span class="na">errors=</span><span class="s">"0"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;testcase</span> <span class="na">name=</span><span class="s">"false_is_false"</span> <span class="na">classname=</span><span class="s">"example_2.tftest.hcl"</span> <span class="na">time=</span><span class="s">"0.001468"</span> <span class="na">timestamp=</span><span class="s">"2025-01-13T19:23:16Z"</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;failure</span> <span class="na">message=</span><span class="s">"local.false did not match expected value"</span><span class="nt">&gt;</span><span class="cp">&lt;![CDATA[</span>
+<span class="cp">Error: Test assertion failed</span>
+
+<span class="cp">  on example_2.tftest.hcl line 3, in run "false_is_false":</span>
+<span class="cp">   3:     condition     = local.false == "false"</span>
+<span class="cp">    ├────────────────</span>
+<span class="cp">    │ local.false is "true"</span>
+
+<span class="cp">local.false did not match expected value</span>
+<span class="cp">]]&gt;</span><span class="nt">&lt;/failure&gt;</span>
+    <span class="nt">&lt;/testcase&gt;</span>
+  <span class="nt">&lt;/testsuite&gt;</span>
+<span class="nt">&lt;/testsuites&gt;</span>
+</code></pre></div>
+
+<p>If a run block contains a failing assertion, the <code>&lt;testcase&gt;</code> element will contain a <code>&lt;failure&gt;</code> element that includes the error message and further details.</p>
+
+<p>A <code>&lt;testcase&gt;</code> element could contain a <code>&lt;skipped&gt;</code> element that includes details about why a test was skipped. This could either be due to an error causing remaining run blocks to be skipped, or due to the command being interrupted.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Mapping%20Terraform%20test%20command%20concepts%20to%20JUnit%20XML%20format"></a><h4 id="mapping-terraform-test-command-concepts-to-junit-xml-format">Mapping Terraform test command concepts to JUnit XML format</h4>
+
+<p>The test report generated when using <code>-junit-xml</code> maps Terraform test command concepts to JUnit XML format according to the table below:</p>
+
+<table>
+<thead>
+<tr>
+  <th>Terraform test concept</th>
+  <th>Element in JUnit XML output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Test directory</td>
+  <td><code>&lt;testsuites&gt;</code></td>
+</tr>
+<tr>
+  <td>Test file</td>
+  <td><code>&lt;testsuite&gt;</code></td>
+</tr>
+<tr>
+  <td>Run block</td>
+  <td><code>&lt;testcase&gt;</code></td>
+</tr>
+<tr>
+  <td>Run block assertion</td>
+  <td>None; details are included only on failure</td>
+</tr>
+<tr>
+  <td>Test failure</td>
+  <td><code>&lt;failure&gt;</code></td>
+</tr>
+<tr>
+  <td>Test was skipped</td>
+  <td><code>&lt;skipped&gt;</code></td>
+</tr>
+<tr>
+  <td>Test stopped due to error</td>
+  <td><code>&lt;error&gt;</code></td>
+</tr>
+<tr>
+  <td>Any unhandled warnings or errors</td>
+  <td><code>&lt;system-err&gt;</code></td>
+</tr>
+</tbody>
+</table>
+
+            
+        
+    </body></html>

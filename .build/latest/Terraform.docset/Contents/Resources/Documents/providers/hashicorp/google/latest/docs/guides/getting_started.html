@@ -1,0 +1,281 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/getting_started --><head>
+                <title>Getting Started with the Google Cloud provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="getting-started-with-the-google-cloud-provider">Getting Started with the Google Cloud provider</h1>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Before%20you%20begin"></a><h2 id="before-you-begin">Before you begin</h2>
+
+<ul>
+<li>Create a project in the <a href="https://console.cloud.google.com/">Google Cloud Console</a>
+and set up billing on that project. Any examples in this guide will be part of
+the <a href="https://cloud.google.com/free/">GCP "always free" tier</a>.</li>
+<li><a href="https://learn.hashicorp.com/tutorials/terraform/install-cli?in=terraform/gcp-get-started">Install Terraform</a>
+and read the Terraform getting started guide that follows. This guide will
+assume basic proficiency with Terraform - it is an introduction to the Google
+provider.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20the%20Provider"></a><h2 id="configuring-the-provider">Configuring the Provider</h2>
+
+<p>First, authenticate with GCP.  The easiest way to do this is to run
+<code>gcloud auth application-default login</code>, if you already have gcloud
+installed.  If you don't already have it, you can install it from <a href="https://cloud.google.com/sdk/docs/install">here</a>.</p>
+
+<p>Next, create a Terraform config file named <code>"main.tf"</code>. Inside, you'll
+want to include the following configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"{{YOUR GCP PROJECT}}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-c"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<ul>
+<li>The <code>project</code> field should be your personal project id. The <code>project</code>
+indicates the default GCP project all of your resources will be created in.
+Most Terraform resources will have a <code>project</code> field.</li>
+<li>The <code>region</code> and <code>zone</code> are <a href="https://cloud.google.com/compute/docs/regions-zones/global-regional-zonal-resources">locations</a>
+for your resources to be created in.
+<ul>
+<li>The <code>region</code> will be used to choose the default location for regional
+resources. Regional resources are spread across several zones.</li>
+<li>The <code>zone</code> will be used to choose the default location for zonal resources.
+Zonal resources exist in a single zone. All zones are a part of a region.</li>
+</ul></li>
+</ul>
+
+<p>Not all resources require a location. Some GCP resources are global and are
+automatically spread across all of GCP.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Want to try out another location? Check out the <a href="https://cloud.google.com/compute/docs/regions-zones/#available">list of available regions and zones</a>. Instances created in zones outside the US are not necessarily part of the always free tier and could incur charges.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20a%20VM%20instance"></a><h2 id="creating-a-vm-instance">Creating a VM instance</h2>
+
+<p>A <a href="https://cloud.google.com/compute/docs/instances/">Google Compute Engine VM instance</a> is
+named <code>google_compute_instance</code> in Terraform. The <code>google</code> part of the name
+identifies the provider for Terraform, <code>compute</code> indicates the GCP product
+family, and <code>instance</code> is the resource name.</p>
+
+<p>Google provider resources will generally, although not always, be named after
+the name used in <code>gcloud</code>/the REST API. For example, a VM instance is called
+<a href="https://cloud.google.com/compute/docs/reference/rest/v1/instances"><code>instance</code> in the API</a>.
+Most resource field names will also correspond 1:1 with their <code>gcloud</code>/REST API
+names.</p>
+
+<p>If you look at the <a href="../resources/compute_instance.html"><code>google_compute_instance documentation</code></a>,
+you'll see that <code>project</code> and <code>zone</code> (VM instances are a zonal resource) are
+listed as optional. When present in a resource's config block, these values will
+be used. If omitted, the provider defaults will be used instead.</p>
+
+<p>Add the following to your config file:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance"</span><span class="w"> </span><span class="nv">"vm_instance"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-instance"</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"e2-micro"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">boot_disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">initialize_params</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud/debian-11"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">network_interface</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # A default network is created for all GCP projects</span>
+<span class="w">    </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"default"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">access_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Note: Don't use <code>terraform apply</code> quite yet! You still need to add GCP credentials. If you want to try out provisioning your VM instance before continuing, follow the instructions in the "Adding credentials" section below.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Linking%20GCP%20resources"></a><h2 id="linking-gcp-resources">Linking GCP resources</h2>
+
+<p>Like this VM instance, nearly every GCP resource will have a <code>name</code> field. They
+are used as a short way to identify resources, and a resource's display name in
+the Cloud Console will be the one defined in the <code>name</code> field.</p>
+
+<p>When linking resources in a Terraform config though, you'll primarily want to
+use a different field, the <code>id</code> of a resource. Every Terraform resource has an
+<code>id</code>. In the Google provider they generally look like:</p>
+
+<pre><code>projects/{{your project}}/{{location type}}/{{location}}/{{resource type}}/{{name}}
+</code></pre>
+
+<p>For example, the instance defined earlier in a project named <code>foo</code> will have
+the <code>id</code>:</p>
+
+<pre><code>projects/foo/zones/us-central1-c/instances/terraform-instance
+</code></pre>
+
+<p>A resource's <code>id</code> is a unique reference to that resource. When
+linking two resources in Terraform, you can use Terraform interpolation to
+avoid typing out the id! Let's use a <code>google_compute_network</code> to
+demonstrate.</p>
+
+<p>Add this block to your config:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"vpc_network"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"true"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>This will create <a href="../resources/compute_network.html">VPC network resource</a>
+with a subnetwork in each region. Next, change the network of the
+<code>google_compute_instance</code> from the <code>"default"</code> network to the new network.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="w">network_interface {</span>
+<span class="gd">-  # A default network is created for all GCP projects</span><span class="w"></span>
+<span class="gd">-  network = "default"</span><span class="w"></span>
+<span class="gi">+  network = google_compute_network.vpc_network.id</span><span class="w"></span>
+<span class="w"> </span> access_config {<span class="w"></span>
+</code></pre></div>
+
+<p>This means that when we create the VM instance, it will use
+<code>"terraform-network"</code> instead of the default VPC network for the project. If you
+run <code>terraform plan</code>, you will see that <code>"terraform-instance"</code> depends on
+<code>"terraform-network"</code>.</p>
+
+<p>Your configuration is complete. Before you can run <code>terraform apply</code> though,
+Terraform needs GCP credentials.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Adding%20credentials"></a><h2 id="adding-credentials">Adding credentials</h2>
+
+<p>In order to make requests against the GCP API, you need to authenticate to prove
+that it's you making the request. The preferred method of provisioning resources
+with Terraform on your workstation is to use the Google Cloud SDK as we mentioned earlier.</p>
+
+<p>You can also use a Google Cloud Service Account with terraform.</p>
+
+<p>From <a href="https://console.cloud.google.com/iam-admin/serviceaccounts">the service account key page in the Cloud Console</a>
+choose an existing account, or create a new one. Next, download the JSON key
+file. Name it something you can remember, and store it somewhere secure on your
+machine.</p>
+
+<blockquote>
+  <p><em>Note</em>: Currently the only supported service account credentials are credentials
+  downloaded from Cloud Console or generated by <code>gcloud</code>.</p>
+</blockquote>
+
+<p>You supply the key to Terraform using the environment variable
+<code>GOOGLE_APPLICATION_CREDENTIALS</code>, setting the value to the location of the file.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span> <span class="nv">GOOGLE_APPLICATION_CREDENTIALS</span><span class="o">={{</span>path<span class="o">}}</span>
+</code></pre></div>
+
+<p>If you choose to use <code>gcloud</code>-generated credentials, and you encounter
+quota or billing issues which don't seem to apply to you, you may want to set
+<code>user_project_override</code> to <code>true</code> in the provider block - see the
+<a href="../guides/provider_reference.html">provider reference</a> for more information.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Remember to add this line to a startup file such as <code>bash_profile</code> or <code>bashrc</code> to store your credentials across sessions!</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20Terraform%20Cloud%20as%20the%20Backend"></a><h3 id="using-terraform-cloud-as-the-backend">Using Terraform Cloud as the Backend</h3>
+
+<p>You need to use a different <a href="https://www.terraform.io/docs/cloud/workspaces/variables.html">environment variable</a> name to store your credentials in Terraform Cloud.</p>
+
+<ol>
+<li>Create an environment variable called <code>GOOGLE_CREDENTIALS</code> in your Terraform Cloud workspace.</li>
+<li>Remove the newline characters from your JSON key file and then paste the credentials into the environment variable value field. (Running <code>cat CREDENTIALS.json | tr -s '\n' ' '</code> will remove newline characters from your JSON key file)</li>
+<li>Mark the variable as <strong>Sensitive</strong> and click <strong>Save variable</strong>.</li>
+</ol>
+
+<p>All runs within the workspace will use the <code>GOOGLE_CREDENTIALS</code> variable to authenticate with Google Cloud Platform.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>When running inside a CLI-driven TFC workspace, local environment variables will only be accessible when executed <a href="https://www.terraform.io/cloud-docs/workspaces/settings#execution-mode">locally</a>. All credentials environment variables (including default application credentials) need to be set in the <a href="https://www.terraform.io/cloud-docs/workspaces/variables/managing-variables#workspace-specific-variables">Variables tab</a> in order to be accessible by workspaces executed remotely.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provisioning%20your%20resources"></a><h2 id="provisioning-your-resources">Provisioning your resources</h2>
+
+<p>By now, your config will look something like:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"{{YOUR GCP PROJECT}}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-c"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance"</span><span class="w"> </span><span class="nv">"vm_instance"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-instance"</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"e2-micro"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">boot_disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">initialize_params</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud/debian-11"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">network_interface</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # A default network is created for all GCP projects</span>
+<span class="w">    </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.vpc_network.id</span><span class="w"></span>
+<span class="w">    </span><span class="nb">access_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"vpc_network"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"true"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>With a Terraform config and with your credentials configured, it's time to
+provision your resources:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">terraform</span><span class="w"> </span><span class="err">apply</span><span class="w"></span>
+</code></pre></div>
+
+<p>Congratulations! You've gotten started using the Google provider and provisioned
+a virtual machine on Google Cloud Platform. The key concepts unique to GCP are:</p>
+
+<ul>
+<li>How a <code>project</code> contains resources
+<ul>
+<li>and how to use a default <code>project</code> in your provider</li>
+</ul></li>
+<li>What a resource being global, regional, or zonal means on GCP
+<ul>
+<li>and how to specify a default <code>region</code> and <code>zone</code></li>
+</ul></li>
+<li>How GCP uses <code>name</code> and <code>id</code> to identify resources</li>
+<li>How to add GCP service account credentials to Terraform</li>
+</ul>
+
+<p>Run <code>terraform destroy</code> to tear down your resources.</p>
+
+<p>Afterwards, check out the <a href="../guides/provider_reference.html">provider reference</a> for more details on configuring
+the provider block (including how you can eliminate it entirely!).</p>
+
+<p>You can also check out the <a href="https://cloud.google.com/community/tutorials/">GCP Community tutorials</a>
+such as:</p>
+
+<ul>
+<li><p><a href="https://cloud.google.com/community/tutorials/getting-started-on-gcp-with-terraform">Getting started with Terraform on Google Cloud Platform</a></p></li>
+<li><p><a href="https://cloud.google.com/community/tutorials/managing-gcp-projects-with-terraform">Managing GCP Projects with Terraform</a></p></li>
+<li><p><a href="https://cloud.google.com/community/tutorials/modular-load-balancing-with-terraform">Modular Load Balancing with Terraform</a></p></li>
+</ul>
+
+            
+        
+    </body></html>

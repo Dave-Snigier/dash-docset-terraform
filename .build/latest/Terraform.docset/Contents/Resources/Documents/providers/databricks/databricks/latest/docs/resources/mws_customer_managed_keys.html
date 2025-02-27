@@ -1,0 +1,301 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_customer_managed_keys --><head>
+                <title>databricks_mws_customer_managed_keys</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_mws_customer_managed_keys-resource">databricks_mws_customer_managed_keys Resource</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Initialize provider with <code>alias = "mws"</code>, <code>host  = "https://accounts.cloud.databricks.com"</code> and use <code>provider = databricks.mws</code></p>
+</aside>
+
+<p>This resource to configure KMS keys for new workspaces within AWS or GCP. This is to support the following features:</p>
+
+<ul>
+<li><a href="https://docs.databricks.com/security/keys/customer-managed-keys-managed-services-aws.html">Customer-managed keys for managed services</a>: Encrypt the workspace’s managed services data in the control plane, including notebooks, secrets, Databricks SQL queries, and Databricks SQL query history  with a CMK.</li>
+<li><a href="https://docs.databricks.com/security/keys/customer-managed-keys-storage-aws.html">Customer-managed keys for workspace storage</a>: Encrypt the workspace's root S3 bucket and clusters' EBS volumes with a CMK.</li>
+</ul>
+
+<p>Please follow this <a href="../guides/aws-workspace.md">complete runnable example</a> with new VPC and new workspace setup. Please pay special attention to the fact that there you have two different instances of a databricks provider - one for deploying workspaces (with <code>host="https://accounts.cloud.databricks.com/"</code>) and another for the workspace you've created with databricks_mws_workspaces resource. If you want both creation of workspaces &amp; clusters within workspace within the same terraform module (essentially same directory), you should use the provider aliasing feature of Terraform. We strongly recommend having one Terraform module for creation of workspace + PAT token and the rest in different modules.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you've used the resource before, please add <code>use_cases = ["MANAGED_SERVICES"]</code> to keep the previous behaviour.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Customer-managed%20key%20for%20managed%20services"></a><h3 id="customer-managed-key-for-managed-services">Customer-managed key for managed services</h3>
+
+<p>You must configure this during workspace creation</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/For%20AWS"></a><h4 id="for-aws">For AWS</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Account Id that could be found in the top right corner of https://accounts.cloud.databricks.com/"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_caller_identity"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"databricks_managed_services_cmk"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2012-10-17"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">sid</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Enable IAM User Permissions"</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">data.aws_caller_identity.current.account_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"kms:*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">resources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">sid</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow Databricks to use KMS key for control plane managed services"</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"arn:aws:iam::414351767826:root"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"kms:Encrypt"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"kms:Decrypt"</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">resources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_kms_key"</span><span class="w"> </span><span class="nv">"managed_services_customer_managed_key"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.databricks_managed_services_cmk.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_kms_alias"</span><span class="w"> </span><span class="nv">"managed_services_customer_managed_key_alias"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"alias/managed-services-customer-managed-key-alias"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_key_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_kms_key.managed_services_customer_managed_key.key_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_customer_managed_keys"</span><span class="w"> </span><span class="nv">"managed_services"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">aws_key_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">key_arn</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_kms_key.managed_services_customer_managed_key.arn</span><span class="w"></span>
+<span class="w">    </span><span class="na">key_alias</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_kms_alias.managed_services_customer_managed_key_alias.name</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">use_cases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"MANAGED_SERVICES"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+<span class="c1"># supply databricks_mws_customer_managed_keys.managed_services.customer_managed_key_id as managed_services_customer_managed_key_id for databricks_mws_workspaces</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/For%20GCP"></a><h4 id="for-gcp">For GCP</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Account Id that could be found in the top right corner of https://accounts.gcp.databricks.com/"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"cmek_resource_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Id of a google_kms_crypto_key"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_customer_managed_keys"</span><span class="w"> </span><span class="nv">"managed_services"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">gcp_key_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">kms_key_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.cmek_resource_id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">use_cases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"MANAGED_SERVICES"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+<span class="c1"># supply databricks_mws_customer_managed_keys.managed_services.customer_managed_key_id as managed_services_customer_managed_key_id for databricks_mws_workspaces</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Customer-managed%20key%20for%20workspace%20storage"></a><h3 id="customer-managed-key-for-workspace-storage">Customer-managed key for workspace storage</h3>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/For%20AWS"></a><h4 id="for-aws-2">For AWS</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Account Id that could be found in the top right corner of https://accounts.cloud.databricks.com/"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_cross_account_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS ARN for the Databricks cross account role"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_caller_identity"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"databricks_storage_cmk"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2012-10-17"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">sid</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Enable IAM User Permissions"</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">data.aws_caller_identity.current.account_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"kms:*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">resources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">sid</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow Databricks to use KMS key for DBFS"</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"arn:aws:iam::414351767826:root"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"kms:Encrypt"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"kms:Decrypt"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"kms:ReEncrypt*"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"kms:GenerateDataKey*"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"kms:DescribeKey"</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">resources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">sid</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow Databricks to use KMS key for DBFS (Grants)"</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"arn:aws:iam::414351767826:root"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"kms:CreateGrant"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"kms:ListGrants"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"kms:RevokeGrant"</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">resources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">test</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"Bool"</span><span class="w"></span>
+<span class="w">      </span><span class="na">variable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"kms:GrantIsForAWSResource"</span><span class="w"></span>
+<span class="w">      </span><span class="na">values</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"true"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">sid</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow Databricks to use KMS key for EBS"</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">var.databricks_cross_account_role</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"kms:Decrypt"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"kms:GenerateDataKey*"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"kms:CreateGrant"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"kms:DescribeKey"</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">resources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">test</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"ForAnyValue:StringLike"</span><span class="w"></span>
+<span class="w">      </span><span class="na">variable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"kms:ViaService"</span><span class="w"></span>
+<span class="w">      </span><span class="na">values</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"ec2.*.amazonaws.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_kms_key"</span><span class="w"> </span><span class="nv">"storage_customer_managed_key"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.databricks_storage_cmk.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_kms_alias"</span><span class="w"> </span><span class="nv">"storage_customer_managed_key_alias"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"alias/storage-customer-managed-key-alias"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_key_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_kms_key.storage_customer_managed_key.key_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_customer_managed_keys"</span><span class="w"> </span><span class="nv">"storage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">aws_key_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">key_arn</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_kms_key.storage_customer_managed_key.arn</span><span class="w"></span>
+<span class="w">    </span><span class="na">key_alias</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_kms_alias.storage_customer_managed_key_alias.name</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">use_cases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"STORAGE"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+<span class="c1"># supply databricks_mws_customer_managed_keys.storage.customer_managed_key_id as storage_customer_managed_key_id for databricks_mws_workspaces</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/For%20GCP"></a><h4 id="for-gcp-2">For GCP</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Account Id that could be found in the top right corner of https://accounts.gcp.databricks.com/"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"cmek_resource_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Id of a google_kms_crypto_key"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_customer_managed_keys"</span><span class="w"> </span><span class="nv">"storage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">gcp_key_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">kms_key_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.cmek_resource_id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">use_cases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"STORAGE"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+<span class="c1"># supply databricks_mws_customer_managed_keys.storage.customer_managed_key_id as storage_customer_managed_key_id for databricks_mws_workspaces</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>aws_key_info</code> - This field is a block and is documented below. This conflicts with <code>gcp_key_info</code></li>
+<li><code>gcp_key_info</code> - This field is a block and is documented below. This conflicts with <code>aws_key_info</code></li>
+<li><code>account_id</code> - Account Id that could be found in the top right corner of <a href="https://accounts.cloud.databricks.com/">Accounts Console</a></li>
+<li><code>use_cases</code> - <em>(since v0.3.4)</em> List of use cases for which this key will be used. <em>If you've used the resource before, please add <code>use_cases = ["MANAGED_SERVICES"]</code> to keep the previous behaviour.</em> Possible values are:
+<ul>
+<li><code>MANAGED_SERVICES</code> - for encryption of the workspace objects (notebooks, secrets) that are stored in the control plane</li>
+<li><code>STORAGE</code> - for encryption of the DBFS Storage &amp; Cluster EBS Volumes</li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/aws_key_info%20Configuration%20Block"></a><h3 id="aws_key_info-configuration-block">aws_key_info Configuration Block</h3>
+
+<ul>
+<li><code>key_arn</code> - The AWS KMS key's Amazon Resource Name (ARN).</li>
+<li><code>key_alias</code> - (Optional) The AWS KMS key alias.</li>
+<li><code>key_region</code> - (Optional) (Computed) The AWS region in which KMS key is deployed to. This is not required.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/gcp_key_info%20Configuration%20Block"></a><h3 id="gcp_key_info-configuration-block">gcp_key_info Configuration Block</h3>
+
+<ul>
+<li><code>kms_key_id</code> - The GCP KMS key's resource name.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - Canonical unique identifier for the mws customer managed keys.</li>
+<li><code>customer_managed_key_id</code> - (String) ID of the encryption key configuration object.</li>
+<li><code>creation_time</code> - (Integer) Time in epoch milliseconds when the customer key was created.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>This resource can be imported by Databricks account ID and customer managed key ID.</p>
+
+<div class="codehilite"><pre><span></span><code>terraform import databricks_mws_customer_managed_keys.this <span class="s1">'&lt;account_id&gt;/&lt;customer_managed_key_id&gt;'</span>
+</code></pre></div>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This resource does not support updates. If your configuration does not match the existing resource, the next <code>terraform apply</code> will cause the resource to be destroyed and recreated. After importing, verify that the configuration matches the existing resource by running <code>terraform plan</code>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are used in the same context:</p>
+
+<ul>
+<li><a href="../guides/aws-workspace.md">Provisioning Databricks on AWS</a> guide.</li>
+<li><a href="mws_credentials.md">databricks_mws_credentials</a> to configure the cross-account role for creation of new workspaces within AWS.</li>
+<li><a href="mws_log_delivery.md">databricks_mws_log_delivery</a> to configure delivery of <a href="https://docs.databricks.com/administration-guide/account-settings/billable-usage-delivery.html">billable usage logs</a> and <a href="https://docs.databricks.com/administration-guide/account-settings/audit-logs.html">audit logs</a>.</li>
+<li><a href="mws_networks.md">databricks_mws_networks</a> to <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/customer-managed-vpc.html">configure VPC</a> &amp; subnets for new workspaces within AWS.</li>
+<li><a href="mws_storage_configurations.md">databricks_mws_storage_configurations</a> to configure root bucket new workspaces within AWS.</li>
+<li><a href="mws_workspaces.md">databricks_mws_workspaces</a> to set up <a href="https://docs.databricks.com/getting-started/overview.html#e2-architecture-1">AWS and GCP workspaces</a>.</li>
+</ul>
+
+            
+        
+    </body></html>

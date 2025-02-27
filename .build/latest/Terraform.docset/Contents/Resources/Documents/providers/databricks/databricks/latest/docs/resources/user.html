@@ -1,0 +1,148 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/user --><head>
+                <title>databricks_user</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_user-resource">databricks_user Resource</h1>
+
+<p>This resource allows you to manage <a href="https://docs.databricks.com/administration-guide/users-groups/users.html">users in Databricks Workspace</a>, <a href="https://accounts.cloud.databricks.com/">Databricks Account Console</a> or <a href="https://accounts.azuredatabricks.net">Azure Databricks Account Console</a>. You can also <a href="group_member.md">associate</a> Databricks users to <a href="group.md">databricks_group</a>. Upon user creation the user will receive a welcome email. You can also get information about caller identity using <a href="../data-sources/current_user.md">databricks_current_user</a> data source.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>To assign account level users to workspace use <a href="mws_permission_assignment.md">databricks_mws_permission_assignment</a>.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Entitlements, like, <code>allow_cluster_create</code>, <code>allow_instance_pool_create</code>, <code>databricks_sql_access</code>, <code>workspace_access</code> applicable only for workspace-level users.  Use <a href="entitlements.md">databricks_entitlements</a> resource to assign entitlements inside a workspace to account-level users.</p>
+</aside>
+
+<p>To create users in the Databricks account, the provider must be configured with <code>host = "https://accounts.cloud.databricks.com"</code> on AWS deployments or <code>host = "https://accounts.azuredatabricks.net"</code> and authenticate using <a href="https://registry.terraform.io/providers/databricks/databricks/latest/docs#special-configurations-for-azure">AAD tokens</a> on Azure deployments.</p>
+
+<p>The default behavior when deleting a <code>databricks_user</code> resource depends on whether the provider is configured at the workspace-level or account-level. When the provider is configured at the workspace-level, the user will be deleted from the workspace. When the provider is configured at the account-level, the user will be deactivated but not deleted. When the provider is configured at the account level, to delete the user from the account when the resource is deleted, set <code>disable_as_user_deletion = false</code>. Conversely, when the provider is configured at the account-level, to deactivate the user when the resource is deleted, set <code>disable_as_user_deletion = true</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>Creating regular user:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_user"</span><span class="w"> </span><span class="nv">"me"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">user_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"me@example.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Creating user with administrative permissions - referencing special <code>admins</code> <a href="../data-sources/group.md">databricks_group</a> in <a href="group_member.md">databricks_group_member</a> resource:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"admins"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"admins"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_user"</span><span class="w"> </span><span class="nv">"me"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">user_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"me@example.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group_member"</span><span class="w"> </span><span class="nv">"i-am-admin"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">group_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_group.admins.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">member_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_user.me.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Creating user with cluster create permissions:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_user"</span><span class="w"> </span><span class="nv">"me"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">user_name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"me@example.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example user"</span><span class="w"></span>
+<span class="w">  </span><span class="na">allow_cluster_create</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Creating user in AWS Databricks account:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// initialize provider at account-level</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"mws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://accounts.cloud.databricks.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.client_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.client_secret</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_user"</span><span class="w"> </span><span class="nv">"account_user"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">user_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"me@example.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example user"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Creating user in Azure Databricks account:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// initialize provider at Azure account-level</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"azure_account"</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://accounts.azuredatabricks.net"</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auth_type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"azure-cli"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_user"</span><span class="w"> </span><span class="nv">"account_user"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.azure_account</span><span class="w"></span>
+<span class="w">  </span><span class="na">user_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"me@example.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example user"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are available:</p>
+
+<ul>
+<li><code>user_name</code> - (Required) This is the username of the given user and will be their form of access and identity.  Provided username will be converted to lower case if it contains upper case characters.</li>
+<li><code>display_name</code> - (Optional) This is an alias for the username that can be the full name of the user.</li>
+<li><code>external_id</code> - (Optional) ID of the user in an external identity provider.</li>
+<li><code>allow_cluster_create</code> -  (Optional) Allow the user to have <a href="cluster.md">cluster</a> create privileges. Defaults to false. More fine grained permissions could be assigned with <a href="permissions.md#Cluster-usage">databricks_permissions</a> and <code>cluster_id</code> argument. Everyone without <code>allow_cluster_create</code> argument set, but with <a href="permissions.md#Cluster-Policy-usage">permission to use</a> Cluster Policy would be able to create clusters, but within boundaries of that specific policy.</li>
+<li><code>allow_instance_pool_create</code> -  (Optional) Allow the user to have <a href="instance_pool.md">instance pool</a> create privileges. Defaults to false. More fine grained permissions could be assigned with <a href="permissions.md#Instance-Pool-usage">databricks_permissions</a> and <a href="permissions.md#instance_pool_id">instance_pool_id</a> argument.</li>
+<li><code>databricks_sql_access</code> - (Optional) This is a field to allow the group to have access to <a href="https://databricks.com/product/databricks-sql">Databricks SQL</a> feature in User Interface and through <a href="sql_endpoint.md">databricks_sql_endpoint</a>.</li>
+<li><code>active</code> - (Optional) Either user is active or not. True by default, but can be set to false in case of user deactivation with preserving user assets.</li>
+<li><code>force</code> - (Optional) Ignore <code>cannot create user: User with username X already exists</code> errors and implicitly import the specific user into Terraform state, enforcing entitlements defined in the instance of resource. _This functionality is experimental_ and is designed to simplify corner cases, like Azure Active Directory synchronisation.</li>
+<li><code>force_delete_repos</code> - (Optional) This flag determines whether the user's repo directory is deleted when the user is deleted. It will have no impact when in the accounts SCIM API. False by default.</li>
+<li><code>force_delete_home_dir</code> - (Optional) This flag determines whether the user's home directory is deleted when the user is deleted. It will have not impact when in the accounts SCIM API. False by default.</li>
+<li><code>disable_as_user_deletion</code> - (Optional) Deactivate the user when deleting the resource, rather than deleting the user entirely. Defaults to <code>true</code> when the provider is configured at the account-level and <code>false</code> when configured at the workspace-level. This flag is exclusive to force_delete_repos and force_delete_home_dir flags.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - Canonical unique identifier for the user.</li>
+<li><code>home</code> - Home folder of the user, e.g. <code>/Users/mr.foo@example.com</code>.</li>
+<li><code>repos</code> - Personal Repos location of the user, e.g. <code>/Repos/mr.foo@example.com</code>.</li>
+<li><code>acl_principal_id</code> - identifier for use in <a href="access_control_rule_set.md">databricks_access_control_rule_set</a>, e.g. <code>users/mr.foo@example.com</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>The resource scim user can be imported using id:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform import databricks_user.me &lt;user-id&gt;
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are often used in the same context:</p>
+
+<ul>
+<li><a href="../guides/workspace-management.md">End to end workspace management</a> guide.</li>
+<li><a href="group.md">databricks_group</a> to manage <a href="https://docs.databricks.com/administration-guide/users-groups/groups.html">groups in Databricks Workspace</a> or <a href="https://accounts.cloud.databricks.com/">Account Console</a> (for AWS deployments).</li>
+<li><a href="../data-sources/group.md">databricks_group</a> data to retrieve information about <a href="group.md">databricks_group</a> members, entitlements and instance profiles.</li>
+<li><a href="group_instance_profile.md">databricks_group_instance_profile</a> to attach <a href="instance_profile.md">databricks_instance_profile</a> (AWS) to <a href="group.md">databricks_group</a>.</li>
+<li><a href="group_member.md">databricks_group_member</a> to attach <a href="user.md">users</a> and <a href="group.md">groups</a> as group members.</li>
+<li><a href="instance_profile.md">databricks_instance_profile</a> to manage AWS EC2 instance profiles that users can launch <a href="cluster.md">databricks_cluster</a> and access data, like <a href="mount.md">databricks_mount</a>.</li>
+<li><a href="../data-sources/user.md">databricks_user</a> data to retrieve information about <a href="user.md">databricks_user</a>.</li>
+</ul>
+
+            
+        
+    </body></html>

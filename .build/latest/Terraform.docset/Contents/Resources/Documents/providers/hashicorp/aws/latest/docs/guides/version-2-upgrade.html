@@ -1,0 +1,821 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/guides/version-2-upgrade --><head>
+                <title>Terraform AWS Provider Version 2 Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-aws-provider-version-2-upgrade-guide">Terraform AWS Provider Version 2 Upgrade Guide</h1>
+
+<p>Version 2.0.0 of the AWS provider for Terraform is a major release and includes some changes that you will need to consider when upgrading. This guide is intended to help with that process and focuses only on changes from version 1.60.0 to version 2.0.0.</p>
+
+<p>Most of the changes outlined in this guide have been previously marked as deprecated in the Terraform plan/apply output throughout previous provider releases. These changes, such as deprecation notices, can always be found in the <a href="https://github.com/hashicorp/terraform-provider-aws/blob/main/CHANGELOG.md">Terraform AWS Provider CHANGELOG</a>.</p>
+
+<p>Upgrade topics:</p>
+
+<!-- TOC depthFrom:2 depthTo:2 -->
+
+<ul>
+<li><a href="#provider-version-configuration">Provider Version Configuration</a></li>
+<li><a href="#provider-configuration">Provider: Configuration</a></li>
+<li><a href="#data-source-aws_ami">Data Source: aws_ami</a></li>
+<li><a href="#data-source-aws_ami_ids">Data Source: aws_ami_ids</a></li>
+<li><a href="#data-source-aws_iam_role">Data Source: aws_iam_role</a></li>
+<li><a href="#data-source-aws_kms_secret">Data Source: aws_kms_secret</a></li>
+<li><a href="#data-source-aws_lambda_function">Data Source: aws_lambda_function</a></li>
+<li><a href="#data-source-aws_region">Data Source: aws_region</a></li>
+<li><a href="#resource-aws_api_gateway_api_key">Resource: aws_api_gateway_api_key</a></li>
+<li><a href="#resource-aws_api_gateway_integration">Resource: aws_api_gateway_integration</a></li>
+<li><a href="#resource-aws_api_gateway_integration_response">Resource: aws_api_gateway_integration_response</a></li>
+<li><a href="#resource-aws_api_gateway_method">Resource: aws_api_gateway_method</a></li>
+<li><a href="#resource-aws_api_gateway_method_response">Resource: aws_api_gateway_method_response</a></li>
+<li><a href="#resource-aws_appautoscaling_policy">Resource: aws_appautoscaling_policy</a></li>
+<li><a href="#resource-aws_autoscaling_policy">Resource: aws_autoscaling_policy</a></li>
+<li><a href="#resource-aws_batch_compute_environment">Resource: aws_batch_compute_environment</a></li>
+<li><a href="#resource-aws_cloudfront_distribution">Resource: aws_cloudfront_distribution</a></li>
+<li><a href="#resource-aws_cognito_user_pool">Resource: aws_cognito_user_pool</a></li>
+<li><a href="#resource-aws_dx_lag">Resource: aws_dx_lag</a></li>
+<li><a href="#resource-aws_ecs_service">Resource: aws_ecs_service</a></li>
+<li><a href="#resource-aws_efs_file_system">Resource: aws_efs_file_system</a></li>
+<li><a href="#resource-aws_elasticache_cluster">Resource: aws_elasticache_cluster</a></li>
+<li><a href="#resource-aws_iam_user_login_profile">Resource: aws_iam_user_login_profile</a></li>
+<li><a href="#resource-aws_instance">Resource: aws_instance</a></li>
+<li><a href="#resource-aws_lambda_function">Resource: aws_lambda_function</a></li>
+<li><a href="#resource-aws_lambda_layer_version">Resource: aws_lambda_layer_version</a></li>
+<li><a href="#resource-aws_network_acl">Resource: aws_network_acl</a></li>
+<li><a href="#resource-aws_redshift_cluster">Resource: aws_redshift_cluster</a></li>
+<li><a href="#resource-aws_route_table">Resource: aws_route_table</a></li>
+<li><a href="#resource-aws_route53_record">Resource: aws_route53_record</a></li>
+<li><a href="#resource-aws_route53_zone">Resource: aws_route53_zone</a></li>
+<li><a href="#resource-aws_wafregional_byte_match_set">Resource: aws_wafregional_byte_match_set</a></li>
+</ul>
+
+<!-- /TOC -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Version%20Configuration"></a><h2 id="provider-version-configuration">Provider Version Configuration</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Before upgrading to version 2.0.0 or later, it is recommended to upgrade to the most recent 1.X version of the provider (version 1.60.0) and ensure that your environment successfully runs <a href="https://www.terraform.io/docs/commands/plan.html"><code>terraform plan</code></a> without unexpected changes or deprecation notices.</p>
+</aside>
+
+<p>We recommend using <a href="https://www.terraform.io/docs/configuration/providers.html#provider-versions">version constraints when configuring Terraform providers</a>. If you are following that recommendation, update the version constraints in your Terraform configuration and run <a href="https://www.terraform.io/docs/commands/init.html"><code>terraform init</code></a> to download the new version.</p>
+
+<p>Update to latest 1.X version:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.60"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Update to latest 2.X version:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 2.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%3A%20Configuration"></a><h2 id="provider-configuration">Provider: Configuration</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/skip_requesting_account_id%20Argument%20Now%20Required%20to%20Skip%20Account%20ID%20Lookup%20Errors"></a><h3 id="skip_requesting_account_id-argument-now-required-to-skip-account-id-lookup-errors">skip_requesting_account_id Argument Now Required to Skip Account ID Lookup Errors</h3>
+
+<p>If the provider is unable to determine the AWS account ID from a provider assume role configuration or the STS GetCallerIdentity call used to verify the credentials (if <code>skip_credentials_validation = false</code>), it will attempt to lookup the AWS account ID via EC2 metadata, IAM GetUser, IAM ListRoles, and STS GetCallerIdentity. Previously, the provider would silently allow the failure of all the above methods.</p>
+
+<p>The provider will now return an error to ensure operators understand the implications of the missing AWS account ID in the provider.</p>
+
+<p>If necessary, the AWS account ID lookup logic can be skipped via:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">skip_requesting_account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20aws_ami"></a><h2 id="data-source-aws_ami">Data Source: aws_ami</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/owners%20Argument%20Now%20Required"></a><h3 id="owners-argument-now-required">owners Argument Now Required</h3>
+
+<p>The <code>owners</code> argument is now required. Specifying <code>owner-id</code> or <code>owner-alias</code> under <code>filter</code> does not satisfy this requirement.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20aws_ami_ids"></a><h2 id="data-source-aws_ami_ids">Data Source: aws_ami_ids</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/owners%20Argument%20Now%20Required"></a><h3 id="owners-argument-now-required-2">owners Argument Now Required</h3>
+
+<p>The <code>owners</code> argument is now required. Specifying <code>owner-id</code> or <code>owner-alias</code> under <code>filter</code> does not satisfy this requirement.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20aws_iam_role"></a><h2 id="data-source-aws_iam_role">Data Source: aws_iam_role</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/assume_role_policy_document%20Attribute%20Removal"></a><h3 id="assume_role_policy_document-attribute-removal">assume_role_policy_document Attribute Removal</h3>
+
+<p>Switch your attribute references to the <code>assume_role_policy</code> attribute instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/role_id%20Attribute%20Removal"></a><h3 id="role_id-attribute-removal">role_id Attribute Removal</h3>
+
+<p>Switch your attribute references to the <code>unique_id</code> attribute instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/role_name%20Argument%20Removal"></a><h3 id="role_name-argument-removal">role_name Argument Removal</h3>
+
+<p>Switch your Terraform configuration to the <code>name</code> argument instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20aws_kms_secret"></a><h2 id="data-source-aws_kms_secret">Data Source: aws_kms_secret</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%20Removal%20and%20Migrating%20to%20aws_kms_secrets%20Data%20Source"></a><h3 id="data-source-removal-and-migrating-to-aws_kms_secrets-data-source">Data Source Removal and Migrating to aws_kms_secrets Data Source</h3>
+
+<p>The implementation of the <code>aws_kms_secret</code> data source, prior to Terraform AWS provider version 2.0.0, used dynamic attribute behavior which is not supported with Terraform 0.12 and beyond (full details available in <a href="https://github.com/hashicorp/terraform-provider-aws/issues/5144">this GitHub issue</a>).</p>
+
+<p>Terraform configuration migration steps:</p>
+
+<ul>
+<li>Change the data source type from <code>aws_kms_secret</code> to <code>aws_kms_secrets</code></li>
+<li>Change any attribute reference (e.g., <code>"${data.aws_kms_secret.example.ATTRIBUTE}"</code>) from <code>.ATTRIBUTE</code> to <code>.plaintext["ATTRIBUTE"]</code></li>
+</ul>
+
+<p>As an example, lets take the below sample configuration and migrate it.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Below example configuration will not be supported in Terraform AWS provider version 2.0.0</span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_kms_secret"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">secret</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... potentially other configuration ...</span>
+<span class="w">    </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"master_password"</span><span class="w"></span>
+<span class="w">    </span><span class="na">payload</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AQEC..."</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">secret</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... potentially other configuration ...</span>
+<span class="w">    </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"master_username"</span><span class="w"></span>
+<span class="w">    </span><span class="na">payload</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AQEC..."</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_rds_cluster"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+<span class="w">  </span><span class="na">master_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.aws_kms_secret.example.master_password}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">master_username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.aws_kms_secret.example.master_username}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Notice that the <code>aws_kms_secret</code> data source previously was taking the two <code>secret</code> configuration block <code>name</code> arguments and generating those as attribute names (<code>master_password</code> and <code>master_username</code> in this case). To remove the incompatible behavior, this updated version of the data source provides the decrypted value of each of those <code>secret</code> configuration block <code>name</code> arguments within a map attribute named <code>plaintext</code>.</p>
+
+<p>Updating the sample configuration from above:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_kms_secrets"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">secret</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... potentially other configuration ...</span>
+<span class="w">    </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"master_password"</span><span class="w"></span>
+<span class="w">    </span><span class="na">payload</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AQEC..."</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">secret</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... potentially other configuration ...</span>
+<span class="w">    </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"master_username"</span><span class="w"></span>
+<span class="w">    </span><span class="na">payload</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AQEC..."</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_rds_cluster"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+<span class="w">  </span><span class="na">master_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.aws_kms_secrets.example.plaintext["master_password"]}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">master_username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.aws_kms_secrets.example.plaintext["master_username"]}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20aws_lambda_function"></a><h2 id="data-source-aws_lambda_function">Data Source: aws_lambda_function</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/arn%20and%20qualified_arn%20Attribute%20Behavior%20Changes"></a><h3 id="arn-and-qualified_arn-attribute-behavior-changes">arn and qualified_arn Attribute Behavior Changes</h3>
+
+<p>The <code>arn</code> attribute now always returns the unqualified (no <code>:QUALIFIER</code> or <code>:VERSION</code> suffix) ARN value and the <code>qualified_arn</code> attribute now always returns the qualified (includes <code>:QUALIFIER</code> or <code>:VERSION</code> suffix) ARN value. Previously by default, the <code>arn</code> attribute included <code>:$LATEST</code> suffix when not setting the optional <code>qualifier</code> argument, which was not compatible with many other resources. To restore the previous default behavior, set the <code>qualifier</code> argument to <code>$LATEST</code> and reference the <code>qualified_arn</code> attribute.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20aws_region"></a><h2 id="data-source-aws_region">Data Source: aws_region</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/current%20Argument%20Removal"></a><h3 id="current-argument-removal">current Argument Removal</h3>
+
+<p>Simply remove <code>current = true</code> from your Terraform configuration. The data source defaults to the current provider region if no other filtering is enabled.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_api_gateway_api_key"></a><h2 id="resource-aws_api_gateway_api_key">Resource: aws_api_gateway_api_key</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/stage_key%20Argument%20Removal"></a><h3 id="stage_key-argument-removal">stage_key Argument Removal</h3>
+
+<p>Since the API Gateway usage plans feature was launched on August 11, 2016, usage plans are now required to associate an API key with an API stage. To migrate your Terraform configuration, the AWS provider implements support for usage plans with the following resources:</p>
+
+<ul>
+<li><a href="../resources/api_gateway_usage_plan.html"><code>aws_api_gateway_usage_plan</code></a></li>
+<li><a href="../resources/api_gateway_usage_plan_key.html"><code>aws_api_gateway_usage_plan_key</code></a></li>
+</ul>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_rest_api"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_deployment"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">rest_api_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${aws_api_gateway_rest_api.example.id}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">stage_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_api_key"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">stage_key</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">rest_api_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${aws_api_gateway_rest_api.example.id}"</span><span class="w"></span>
+<span class="w">    </span><span class="na">stage_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"${aws_api_gateway_deployment.example.stage_name}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_rest_api"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_deployment"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">rest_api_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${aws_api_gateway_rest_api.example.id}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">stage_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_api_key"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_usage_plan"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">api_stages</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">api_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${aws_api_gateway_rest_api.example.id}"</span><span class="w"></span>
+<span class="w">    </span><span class="na">stage</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"${aws_api_gateway_deployment.example.stage_name}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_usage_plan_key"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">key_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"${aws_api_gateway_api_key.example.id}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">key_type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"API_KEY"</span><span class="w"></span>
+<span class="w">  </span><span class="na">usage_plan_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${aws_api_gateway_usage_plan.example.id}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_api_gateway_integration"></a><h2 id="resource-aws_api_gateway_integration">Resource: aws_api_gateway_integration</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/request_parameters_in_json%20Argument%20Removal"></a><h3 id="request_parameters_in_json-argument-removal">request_parameters_in_json Argument Removal</h3>
+
+<p>Switch your Terraform configuration to the <code>request_parameters</code> argument instead.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_integration"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">request_parameters_in_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">PARAMS</span><span class="sh"></span>
+<span class="sh">{</span>
+<span class="sh">    "integration.request.header.X-Authorization": "'static'"</span>
+<span class="sh">}</span>
+<span class="dl">PARAMS</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_integration"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">request_parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"integration.request.header.X-Authorization"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"'static'"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_api_gateway_integration_response"></a><h2 id="resource-aws_api_gateway_integration_response">Resource: aws_api_gateway_integration_response</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/response_parameters_in_json%20Argument%20Removal"></a><h3 id="response_parameters_in_json-argument-removal">response_parameters_in_json Argument Removal</h3>
+
+<p>Switch your Terraform configuration to the <code>response_parameters</code> argument instead.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_integration_response"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">response_parameters_in_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">PARAMS</span><span class="sh"></span>
+<span class="sh">{</span>
+<span class="sh">    "method.response.header.Content-Type": "integration.response.body.type"</span>
+<span class="sh">}</span>
+<span class="dl">PARAMS</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_integration_response"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">response_parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"method.response.header.Content-Type"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"integration.response.body.type"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_api_gateway_method"></a><h2 id="resource-aws_api_gateway_method">Resource: aws_api_gateway_method</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/request_parameters_in_json%20Argument%20Removal"></a><h3 id="request_parameters_in_json-argument-removal-2">request_parameters_in_json Argument Removal</h3>
+
+<p>Switch your Terraform configuration to the <code>request_parameters</code> argument instead.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_method"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">request_parameters_in_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">PARAMS</span><span class="sh"></span>
+<span class="sh">{</span>
+<span class="sh">    "method.request.header.Content-Type": false,</span>
+<span class="sh">    "method.request.querystring.page": true</span>
+<span class="sh">}</span>
+<span class="dl">PARAMS</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_method"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">request_parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"method.request.header.Content-Type"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"method.request.querystring.page"</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_api_gateway_method_response"></a><h2 id="resource-aws_api_gateway_method_response">Resource: aws_api_gateway_method_response</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/response_parameters_in_json%20Argument%20Removal"></a><h3 id="response_parameters_in_json-argument-removal-2">response_parameters_in_json Argument Removal</h3>
+
+<p>Switch your Terraform configuration to the <code>response_parameters</code> argument instead.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_method_response"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">response_parameters_in_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">PARAMS</span><span class="sh"></span>
+<span class="sh">{</span>
+<span class="sh">    "method.response.header.Content-Type": true</span>
+<span class="sh">}</span>
+<span class="dl">PARAMS</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_api_gateway_method_response"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">response_parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"method.response.header.Content-Type"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_appautoscaling_policy"></a><h2 id="resource-aws_appautoscaling_policy">Resource: aws_appautoscaling_policy</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Removals"></a><h3 id="argument-removals">Argument Removals</h3>
+
+<p>The following arguments have been moved into a nested argument named <code>step_scaling_policy_configuration</code>:</p>
+
+<ul>
+<li><code>adjustment_type</code></li>
+<li><code>cooldown</code></li>
+<li><code>metric_aggregation_type</code></li>
+<li><code>min_adjustment_magnitude</code></li>
+<li><code>step_adjustment</code></li>
+</ul>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_appautoscaling_policy"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">adjustment_type</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"ChangeInCapacity"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cooldown</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="m">60</span><span class="w"></span>
+<span class="w">  </span><span class="na">metric_aggregation_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Maximum"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">step_adjustment</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">metric_interval_upper_bound</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">    </span><span class="na">scaling_adjustment</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="err">-</span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_appautoscaling_policy"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">step_scaling_policy_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">adjustment_type</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"ChangeInCapacity"</span><span class="w"></span>
+<span class="w">    </span><span class="na">cooldown</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="m">60</span><span class="w"></span>
+<span class="w">    </span><span class="na">metric_aggregation_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Maximum"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">step_adjustment</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">metric_interval_upper_bound</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">      </span><span class="na">scaling_adjustment</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="err">-</span><span class="m">1</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_autoscaling_policy"></a><h2 id="resource-aws_autoscaling_policy">Resource: aws_autoscaling_policy</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/min_adjustment_step%20Argument%20Removal"></a><h3 id="min_adjustment_step-argument-removal">min_adjustment_step Argument Removal</h3>
+
+<p>Switch your Terraform configuration to the <code>min_adjustment_magnitude</code> argument instead.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_autoscaling_policy"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">min_adjustment_step</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_autoscaling_policy"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">min_adjustment_magnitude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_batch_compute_environment"></a><h2 id="resource-aws_batch_compute_environment">Resource: aws_batch_compute_environment</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ecc_cluster_arn%20Attribute%20Removal"></a><h3 id="ecc_cluster_arn-attribute-removal">ecc_cluster_arn Attribute Removal</h3>
+
+<p>Switch your attribute references to the <code>ecs_cluster_arn</code> attribute instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_cloudfront_distribution"></a><h2 id="resource-aws_cloudfront_distribution">Resource: aws_cloudfront_distribution</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cache_behavior%20Argument%20Removal"></a><h3 id="cache_behavior-argument-removal">cache_behavior Argument Removal</h3>
+
+<p>Switch your Terraform configuration to the <code>ordered_cache_behavior</code> argument instead. It behaves similar to the previous <code>cache_behavior</code> argument, however the ordering of the configurations in Terraform is now reflected in the distribution where previously it was indeterminate.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_cloudfront_distribution"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">cache_behavior</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... other configuration ...</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">cache_behavior</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... other configuration ...</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_cloudfront_distribution"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">ordered_cache_behavior</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... other configuration ...</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">ordered_cache_behavior</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... other configuration ...</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_cognito_user_pool"></a><h2 id="resource-aws_cognito_user_pool">Resource: aws_cognito_user_pool</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/email_verification_subject%20Argument%20Now%20Conflicts%20With%20verification_message_template%20Configuration%20Block%20email_subject%20Argument"></a><h3 id="email_verification_subject-argument-now-conflicts-with-verification_message_template-configuration-block-email_subject-argument">email_verification_subject Argument Now Conflicts With verification_message_template Configuration Block email_subject Argument</h3>
+
+<p>Choose one argument or the other. These arguments update the same underlying information in Cognito and the selection is indeterminate if differing values are provided.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/email_verification_message%20Argument%20Now%20Conflicts%20With%20verification_message_template%20Configuration%20Block%20email_message%20Argument"></a><h3 id="email_verification_message-argument-now-conflicts-with-verification_message_template-configuration-block-email_message-argument">email_verification_message Argument Now Conflicts With verification_message_template Configuration Block email_message Argument</h3>
+
+<p>Choose one argument or the other. These arguments update the same underlying information in Cognito and the selection is indeterminate if differing values are provided.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/sms_verification_message%20Argument%20Now%20Conflicts%20With%20verification_message_template%20Configuration%20Block%20sms_message%20Argument"></a><h3 id="sms_verification_message-argument-now-conflicts-with-verification_message_template-configuration-block-sms_message-argument">sms_verification_message Argument Now Conflicts With verification_message_template Configuration Block sms_message Argument</h3>
+
+<p>Choose one argument or the other. These arguments update the same underlying information in Cognito and the selection is indeterminate if differing values are provided.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_dx_lag"></a><h2 id="resource-aws_dx_lag">Resource: aws_dx_lag</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/number_of_connections%20Argument%20Removal"></a><h3 id="number_of_connections-argument-removal">number_of_connections Argument Removal</h3>
+
+<p>Default connections have been removed as part of LAG creation. To migrate your Terraform configuration, the AWS provider implements the following resources:</p>
+
+<ul>
+<li><a href="../resources/dx_connection.html"><code>aws_dx_connection</code></a></li>
+<li><a href="../resources/dx_connection_association.html"><code>aws_dx_connection_association</code></a></li>
+</ul>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_dx_lag"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">connections_bandwidth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1Gbps"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"EqSe2-EQ"</span><span class="w"></span>
+<span class="w">  </span><span class="na">number_of_connections</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_dx_connection"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">bandwidth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1Gbps"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"EqSe2-EQ"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_dx_lag"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">connections_bandwidth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1Gbps"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"EqSe2-EQ"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_dx_connection_association"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">connection_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${aws_dx_connection.example.id}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">lag_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"${aws_dx_lag.example.id}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_ecs_service"></a><h2 id="resource-aws_ecs_service">Resource: aws_ecs_service</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/placement_strategy%20Argument%20Removal"></a><h3 id="placement_strategy-argument-removal">placement_strategy Argument Removal</h3>
+
+<p>Switch your Terraform configuration to the <code>ordered_placement_strategy</code> argument instead. It behaves similar to the previous <code>placement_strategy</code> argument, however the ordering of the configurations in Terraform is now reflected in the distribution where previously it was indeterminate.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ecs_service"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">placement_strategy</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... other configuration ...</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">placement_strategy</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... other configuration ...</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ecs_service"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">ordered_placement_strategy</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... other configuration ...</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">ordered_placement_strategy</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... other configuration ...</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_efs_file_system"></a><h2 id="resource-aws_efs_file_system">Resource: aws_efs_file_system</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/reference_name%20Argument%20Removal"></a><h3 id="reference_name-argument-removal">reference_name Argument Removal</h3>
+
+<p>Switch your Terraform configuration to the <code>creation_token</code> argument instead.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_efs_file_system"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">reference_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_efs_file_system"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">creation_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_elasticache_cluster"></a><h2 id="resource-aws_elasticache_cluster">Resource: aws_elasticache_cluster</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/availability_zones%20Argument%20Removal"></a><h3 id="availability_zones-argument-removal">availability_zones Argument Removal</h3>
+
+<p>Switch your Terraform configuration to the <code>preferred_availability_zones</code> argument instead. The argument is still optional and the API will continue to automatically choose Availability Zones for nodes if not specified. The new argument will also continue to match the APIs required behavior that the length of the list must be the same as <code>num_cache_nodes</code>.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_elasticache_cluster"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">availability_zones</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"us-west-2a", "us-west-2b"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_elasticache_cluster"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">preferred_availability_zones</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"us-west-2a", "us-west-2b"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_iam_user_login_profile"></a><h2 id="resource-aws_iam_user_login_profile">Resource: aws_iam_user_login_profile</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import%20Now%20Required%20For%20Existing%20Infrastructure"></a><h3 id="import-now-required-for-existing-infrastructure">Import Now Required For Existing Infrastructure</h3>
+
+<p>When attempting to bring existing IAM User Login Profiles under Terraform management, <code>terraform import</code> is now required. See the <a href="https://www.terraform.io/docs/providers/aws/r/iam_user_login_profile.html"><code>aws_iam_user_login_profile</code> resource documentation</a> for more information.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_instance"></a><h2 id="resource-aws_instance">Resource: aws_instance</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/network_interface_id%20Attribute%20Removal"></a><h3 id="network_interface_id-attribute-removal">network_interface_id Attribute Removal</h3>
+
+<p>Switch your attribute references to the <code>primary_network_interface_id</code> attribute instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_lambda_function"></a><h2 id="resource-aws_lambda_function">Resource: aws_lambda_function</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/reserved_concurrent_executions%20Argument%20Behavior%20Change"></a><h3 id="reserved_concurrent_executions-argument-behavior-change">reserved_concurrent_executions Argument Behavior Change</h3>
+
+<p>Setting <code>reserved_concurrent_executions</code> to <code>0</code> will now disable Lambda Function invocations, causing downtime for the Lambda Function.</p>
+
+<p>Previously <code>reserved_concurrent_executions</code> accepted <code>0</code> and below for unreserved concurrency, which means it was not previously possible to disable invocations. The argument now differentiates between a new value for unreserved concurrency (<code>-1</code>) and disabling Lambda invocations (<code>0</code>). If previously configuring this value to <code>0</code> for unreserved concurrency, update the configured value to <code>-1</code> or the resource will disable Lambda Function invocations on update. If previously unconfigured, the argument does not require any changes.</p>
+
+<p>See the <a href="https://docs.aws.amazon.com/lambda/latest/dg/concurrent-executions.html">Lambda User Guide</a> for more information about concurrency.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_lambda_layer_version"></a><h2 id="resource-aws_lambda_layer_version">Resource: aws_lambda_layer_version</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/arn%20and%20layer_arn%20Attribute%20Value%20Swap"></a><h3 id="arn-and-layer_arn-attribute-value-swap">arn and layer_arn Attribute Value Swap</h3>
+
+<p>Switch your <code>arn</code> attribute references to the <code>layer_arn</code> attribute instead and vice-versa.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_network_acl"></a><h2 id="resource-aws_network_acl">Resource: aws_network_acl</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/subnet_id%20Argument%20Removal"></a><h3 id="subnet_id-argument-removal">subnet_id Argument Removal</h3>
+
+<p>Switch your Terraform configuration to the <code>subnet_ids</code> argument instead.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_network_acl"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">subnet_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"subnet-12345678"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_network_acl"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">subnet_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"subnet-12345678"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_redshift_cluster"></a><h2 id="resource-aws_redshift_cluster">Resource: aws_redshift_cluster</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Removals"></a><h3 id="argument-removals-2">Argument Removals</h3>
+
+<p>The following arguments have been moved into a nested argument named <code>logging</code>:</p>
+
+<ul>
+<li><code>bucket_name</code></li>
+<li><code>enable_logging</code> (also renamed to just <code>enable</code>)</li>
+<li><code>s3_key_prefix</code></li>
+</ul>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_redshift_cluster"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">bucket_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">enable_logging</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">s3_key_prefix</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_redshift_cluster"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">logging</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">bucket_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">    </span><span class="na">enable</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">s3_key_prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_route_table"></a><h2 id="resource-aws_route_table">Resource: aws_route_table</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import%20Change"></a><h3 id="import-change">Import Change</h3>
+
+<p>Previously, importing this resource resulted in an <code>aws_route</code> resource for each route, in
+addition to the <code>aws_route_table</code>, in the Terraform state. Support for importing <code>aws_route</code> resources has been added and importing this resource only adds the <code>aws_route_table</code>
+resource, with in-line routes, to the state.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_route53_record"></a><h2 id="resource-aws_route53_record">Resource: aws_route53_record</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/allow_overwrite%20Default%20Value%20Change"></a><h3 id="allow_overwrite-default-value-change">allow_overwrite Default Value Change</h3>
+
+<p>The resource now requires existing Route 53 Records to be imported into the Terraform state for management unless the <code>allow_overwrite</code> argument is enabled.</p>
+
+<p>For example, if the <code>www.example.com</code> Route 53 Record in the <code>example.com</code> Route 53 Hosted Zone existed previously and this new Terraform configuration was introduced:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route53_record"</span><span class="w"> </span><span class="nv">"www"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"www.example.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>During resource creation in version 1.X and prior, it would silently perform an <code>UPSERT</code> changeset to the existing Route 53 Record and not report back an error. In version 2.0.0 of the Terraform AWS Provider, the resource now performs a <code>CREATE</code> changeset, which will error for existing Route 53 Records.</p>
+
+<p>The <code>allow_overwrite</code> argument provides a workaround to keep the old behavior, but most existing workflows should be updated to perform a <code>terraform import</code> command like the following instead:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">$ </span>terraform import aws_route53_record.www ZONEID_www.example.com_TYPE
+</code></pre></div>
+
+<p>More information can be found in the <a href="https://www.terraform.io/docs/providers/aws/r/route53_record.html#import"><code>aws_route53_record</code> resource documentation</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_route53_zone"></a><h2 id="resource-aws_route53_zone">Resource: aws_route53_zone</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/vpc_id%20and%20vpc_region%20Argument%20Removal"></a><h3 id="vpc_id-and-vpc_region-argument-removal">vpc_id and vpc_region Argument Removal</h3>
+
+<p>Switch your Terraform configuration to <code>vpc</code> configuration block(s) instead.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route53_zone"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route53_zone"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">vpc</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20aws_wafregional_byte_match_set"></a><h2 id="resource-aws_wafregional_byte_match_set">Resource: aws_wafregional_byte_match_set</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/byte_match_tuple%20Argument%20Removal"></a><h3 id="byte_match_tuple-argument-removal">byte_match_tuple Argument Removal</h3>
+
+<p>Switch your Terraform configuration to the <code>byte_match_tuples</code> argument instead.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_wafregional_byte_match_set"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">byte_match_tuple</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... other configuration ...</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">byte_match_tuple</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... other configuration ...</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_wafregional_byte_match_set"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">byte_match_tuples</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... other configuration ...</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">byte_match_tuples</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ... other configuration ...</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

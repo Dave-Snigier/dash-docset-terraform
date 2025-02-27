@@ -1,0 +1,265 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/vault/latest/docs/guides/version_2_upgrade --><head>
+                <title>Terraform Vault Provider 2.0.0 Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The <code>2.x</code> series of the Vault Provider is now in maintenance mode. It will only receive critical fixes on a case by case basis. All new feature development has been moved to the <code>3.x</code> series of the provider. Please see the <a href="./version_3_upgrade.html">3.0.0 Upgrade Guide</a> for more details.</p>
+</aside>
+
+<h1 id="terraform-vault-provider-200-upgrade-guide">Terraform Vault Provider 2.0.0 Upgrade Guide</h1>
+
+<p>Version <code>2.0.0</code> of the Vault provider for Terraform is a major release and
+includes some changes that you will need to consider when upgrading. This guide
+is intended to help with that process and focuses only on the changes necessary
+to upgrade from version <code>1.9.0</code> to <code>2.0.0</code>.</p>
+
+<p>Most of the changes outlined in this guide have been previously marked as
+deprecated in the Terraform <code>plan</code>/<code>apply</code> output throughout previous provider
+releases, up to and including 1.9.0. These changes, such as deprecation notices,
+can always be found in the <a href="https://github.com/hashicorp/terraform-provider-vault/blob/master/CHANGELOG.md">CHANGELOG</a>.</p>
+
+<p>Version 2.0.0 of the Vault provider is the first version to offer compatibility with
+Terraform 0.12.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Why%20version%202.0.0%3F"></a><h2 id="why-version-200">Why version 2.0.0?</h2>
+
+<p>We introduced version <code>2.0.0</code> of the Vault provider in order to correct some bugs
+that were affecting the provider and had no backwards-compatible solutions.
+These bugs largely revolved around API types changing and our config structure
+changing to match, or changing the format we store strings in state.</p>
+
+<p>While you may see some small changes in your configurations as a result of
+these changes, we don't expect you'll need to make any major refactorings.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/I%20accidentally%20upgraded%20to%202.0.0%2C%20how%20do%20I%20downgrade%20to%201.X%3F"></a><h2 id="i-accidentally-upgraded-to-200-how-do-i-downgrade-to-1x">I accidentally upgraded to 2.0.0, how do I downgrade to <code>1.X</code>?</h2>
+
+<p>If you've inadvertently upgraded to <code>2.0.0</code>, first see the
+<a href="#provider-version-configuration">Provider Version Configuration Guide</a> to lock
+your provider version; if you've constrained the provider to a lower version
+such as shown in the previous version example in that guide, Terraform will pull
+in a <code>1.X</code> series release on <code>terraform init</code>.</p>
+
+<p>If you've only run <code>terraform init</code> or <code>terraform plan</code>, your state will not
+have been modified and downgrading your provider is sufficient.</p>
+
+<p>If you've run <code>terraform refresh</code> or <code>terraform apply</code>, Terraform may have made
+state changes in the meantime.</p>
+
+<ul>
+<li>If you're using a <em>local</em> state, <code>terraform refresh</code> with a downgraded
+provider is likely sufficient to revert your state.</li>
+<li>If you're using a <em>remote</em> state backend
+<ul>
+<li>That does not support versioning, see the local state instructions above</li>
+<li>That supports <em>versioning</em> you can revert the Terraform state file to a previous
+version by hand. If you do so and Terraform created resources as part of a
+<code>terraform apply</code>, you'll need to either <code>terraform import</code> them or delete
+them by hand.</li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrade%20Topics"></a><h2 id="upgrade-topics">Upgrade Topics</h2>
+
+<!-- TOC depthFrom:2 depthTo:2 -->
+
+<ul>
+<li><a href="#provider-version-configuration">Provider Version Configuration</a></li>
+<li><a href="#resource-vault_auth_backend">Resource: <code>vault_auth_backend</code></a></li>
+<li><a href="#resource-vault_aws_auth_backend_role">Resource: <code>vault_aws_auth_backend_role</code></a></li>
+<li><a href="#resource-vault_database_secret_backend_role">Resource: <code>vault_database_secret_backend_role</code></a></li>
+<li><a href="#resource-vault_gcp_auth_backend_role">Resource: <code>vault_gcp_auth_backend_role</code></a></li>
+<li><a href="#resource-vault_generic_secret">Resource: <code>vault_generic_secret</code></a></li>
+<li><a href="#resource-vault_pki_secret_backend_config_urls">Resource: <code>vault_pki_secret_backend_config_urls</code></a></li>
+<li><a href="#resource-vault_pki_secret_backend_role">Resource: <code>vault_pki_secret_backend_role</code></a></li>
+<li><a href="#resource-vault_pki_secret_backend_sign">Resource: <code>vault_pki_secret_backend_sign</code></a></li>
+<li><a href="#resource-vault_rabbitmq_secret_backend_role">Resource: <code>vault_rabbitmq_secret_backend_role</code></a></li>
+</ul>
+
+<!-- /TOC -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Version%20Configuration"></a><h2 id="provider-version-configuration">Provider Version Configuration</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Before upgrading to version <code>2.0.0</code>, it is recommended to upgrade to the most recent version of the provider (<code>1.9.0</code>) and ensure that your environment successfully runs <a href="https://www.terraform.io/docs/commands/plan.html"><code>terraform plan</code></a> without unexpected changes or deprecation notices.</p>
+</aside>
+
+<p>It is recommended to use <a href="https://www.terraform.io/docs/configuration/providers.html#provider-versions">version constraints</a>
+when configuring Terraform providers. If you are following that recommendation,
+update the version constraints in your Terraform configuration and run
+<a href="https://www.terraform.io/docs/commands/init.html"><code>terraform init</code></a> to download
+the new version.</p>
+
+<p>If you aren't using version constraints, you can use <code>terraform init -upgrade</code>
+in order to upgrade your provider to the latest released version.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"vault"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.9.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"vault"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 2.0.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_auth_backend"></a><h2 id="resource-vault_auth_backend">Resource: <code>vault_auth_backend</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Paths%20no%20longer%20have%20a%20trailing%20slash"></a><h3 id="paths-no-longer-have-a-trailing-slash">Paths no longer have a trailing slash</h3>
+
+<p>In the <code>1.x</code> series of the Vault provider, the <code>vault_auth_backend</code> resource's <code>path</code> field and <code>id</code> both consistently have a trailing slash. To ensure what is stored in state matches what is written in your config, these fields will be stored in state with no trailing slash. Any interpolations involving these fields that relied on the trailing slash (for example, to manually rebuild a URL) should be updated to add a slash.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_aws_auth_backend_role"></a><h2 id="resource-vault_aws_auth_backend_role">Resource: <code>vault_aws_auth_backend_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed and will now throw an error if you try to use them:</p>
+
+<ul>
+<li><code>bound_account_id</code> (use the <code>bound_accounts_ids</code> list instead)</li>
+<li><code>bound_ami_id</code> (use the <code>bound_ami_ids</code> list instead)</li>
+<li><code>bound_ec2_instance_id</code> (use the <code>bound_ec2_instance_ids</code> list instead)</li>
+<li><code>bound_iam_instance_profile_arn</code> (use the <code>bound_iam_instance_profile_arns</code> list instead)</li>
+<li><code>bound_iam_principal_arn</code> (use the <code>bound_iam_principal_arns</code> list instead)</li>
+<li><code>bound_iam_role_arn</code> (use the <code>bound_iam_role_arns</code> list instead)</li>
+<li><code>bound_region</code> (use the <code>bound_regions</code> list instead)</li>
+<li><code>bound_subnet_id</code> (use the <code>bound_subnet_ids</code> list instead)</li>
+<li><code>bound_vpc_id</code> (use the <code>bound_vpc_ids</code> list instead)</li>
+</ul>
+
+<p>Specifying any of these fields in your config or trying to interpolate them in your config will raise an error. Use the list variations instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_database_secret_backend_role"></a><h2 id="resource-vault_database_secret_backend_role">Resource: <code>vault_database_secret_backend_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Statements%20fields%20are%20now%20lists"></a><h3 id="statements-fields-are-now-lists">Statements fields are now lists</h3>
+
+<p>The following fields have changed from strings to lists:</p>
+
+<ul>
+<li><code>creation_statements</code></li>
+<li><code>renew_statements</code></li>
+<li><code>revocation_statements</code></li>
+<li><code>rollback_statements</code></li>
+</ul>
+
+<p>Anywhere they are specified in your config, they need to be turned into lists, by putting <code>[</code> and <code>]</code> around them. Anywhere they are interpolated, a list will now be returned. To get a string, use indexing or <code>for_each</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_gcp_auth_backend_role"></a><h2 id="resource-vault_gcp_auth_backend_role">Resource: <code>vault_gcp_auth_backend_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed-2">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed and will now throw an error if you try to use them:</p>
+
+<ul>
+<li><code>project_id</code> (use the <code>bound_projects</code> list instead)</li>
+</ul>
+
+<p>Specifying any of these fields in your config or trying to interpolate them in your config will raise an error. Use the list variations instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_generic_secret"></a><h2 id="resource-vault_generic_secret">Resource: <code>vault_generic_secret</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed-3">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed and will now throw an error if you try to use them:</p>
+
+<ul>
+<li><code>allow_read</code> (use the <code>disable_read</code> boolean instead)</li>
+</ul>
+
+<p>Specifying any of these fields in your config or trying to interpolate them in your config will raise an error. Use the suggested fields instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_pki_secret_backend_config_urls"></a><h2 id="resource-vault_pki_secret_backend_config_urls">Resource: <code>vault_pki_secret_backend_config_urls</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Fields%20are%20now%20lists"></a><h3 id="fields-are-now-lists">Fields are now lists</h3>
+
+<p>The following fields have changed from strings to lists:</p>
+
+<ul>
+<li><code>crl_distribution_points</code></li>
+<li><code>issuing_certificates</code></li>
+<li><code>ocsp_servers</code></li>
+</ul>
+
+<p>Anywhere they are specified in your config, they need to be turned into lists, by putting <code>[</code> and <code>]</code> around them. Anywhere they are interpolated, a list will now be returned. To get a string, use indexing or <code>for_each</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_pki_secret_backend_role"></a><h2 id="resource-vault_pki_secret_backend_role">Resource: <code>vault_pki_secret_backend_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Certificate%20fields%20are%20now%20lists"></a><h3 id="certificate-fields-are-now-lists">Certificate fields are now lists</h3>
+
+<p>The following fields have changed from strings to lists:</p>
+
+<ul>
+<li><code>allowed_other_sans</code></li>
+<li><code>allowed_uri_sans</code></li>
+<li><code>country</code></li>
+<li><code>locality</code></li>
+<li><code>organization</code></li>
+<li><code>ou</code></li>
+<li><code>postal_code</code></li>
+<li><code>province</code></li>
+<li><code>street_address</code></li>
+</ul>
+
+<p>Anywhere they are specified in your config, they need to be turned into lists, by putting <code>[</code> and <code>]</code> around them. Anywhere they are interpolated, a list will now be returned. To get a string, use indexing or <code>for_each</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_pki_secret_backend_sign"></a><h2 id="resource-vault_pki_secret_backend_sign">Resource: <code>vault_pki_secret_backend_sign</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/CA%20fields%20are%20now%20lists"></a><h3 id="ca-fields-are-now-lists">CA fields are now lists</h3>
+
+<p>The following fields have changed from strings to lists:</p>
+
+<ul>
+<li><code>ca_chain</code></li>
+</ul>
+
+<p>Anywhere they are specified in your config, they need to be turned into lists, by putting <code>[</code> and <code>]</code> around them. Anywhere they are interpolated, a list will now be returned. To get a string, use indexing or <code>for_each</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_rabbitmq_secret_backend_role"></a><h2 id="resource-vault_rabbitmq_secret_backend_role">Resource: <code>vault_rabbitmq_secret_backend_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/vhost%20is%20now%20a%20sub-block"></a><h3 id="vhost-is-now-a-sub-block"><code>vhost</code> is now a sub-block</h3>
+
+<p>The <code>vhosts</code> field is removed, and is now a <code>vhost</code> sub-block. Rather than storing the JSON formatted object in that string, it should now be expanded into the <code>host</code>, <code>configure</code>, and <code>read</code> fields on the <code>vhost</code> block. Any interpolations will need to be updated, and the configuration needs to be updated to match.</p>
+
+<p>Example previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"vault_rabbitmq_secret_backend_role"</span><span class="w"> </span><span class="nv">"role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${vault_rabbitmq_secret_backend.rabbitmq.path}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"deploy"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tag1,tag2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">vhosts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"{\"/\"</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="err">\</span><span class="s2">"configure\"</span><span class="o">:</span><span class="err">\</span><span class="s2">".*\", \"write\":\".*\", \"read\": \".*\"}}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Example updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"vault_rabbitmq_secret_backend_role"</span><span class="w"> </span><span class="nv">"role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${vault_rabbitmq_secret_backend.rabbitmq.path}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"deploy"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tag1,tag2"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">vhost</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">configure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">".*"</span><span class="w"></span>
+<span class="w">    </span><span class="na">host</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"/"</span><span class="w"></span>
+<span class="w">    </span><span class="na">read</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">".*"</span><span class="w"></span>
+<span class="w">    </span><span class="na">write</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">".*"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

@@ -1,0 +1,117 @@
+<html><!-- Online page at https://registry.terraform.io/providers/Azure/azapi/latest/docs/guides/managed_service_identity --><head>
+                <title>Authentication: Authenticating via Managed Identity</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <a class="dashAnchor" name="//apple_ref/cpp/Section/What%20is%20a%20managed%20identity%3F"></a><h2 id="what-is-a-managed-identity">What is a managed identity?</h2>
+
+<p><a href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview">Managed identities for Azure resources</a> can be used to authenticate to services that support Azure Active Directory (Azure AD) authentication. There are two types of managed identities: system-assigned and user-assigned. This article is based on system-assigned managed identities.</p>
+
+<p>Managed identities work in conjunction with Azure Resource Manager (ARM), Azure AD, and the Azure Instance Metadata Service (IMDS). Azure resources that support managed identities expose an internal IMDS endpoint that the client can use to request an access token. No credentials are stored on the VM, and the only additional information needed to bootstrap the Terraform connection to Azure is the subscription ID and tenant ID.</p>
+
+<p>Azure AD creates an AD identity when you configure an Azure resource to use a system-assigned managed identity. The configuration process is described in more detail, below. Azure AD then creates a service principal to represent the resource for role-based access control (RBAC) and access control (IAM). The lifecycle of a system-assigned identity is tied to the resource it is enabled for: it is created when the resource is created and it is automatically removed when the resource is deleted.</p>
+
+<p>Before you can use the managed identity, it has to be configured. There are two steps:</p>
+
+<ol>
+<li>Assign a role for the identity, associating it with the subscription that will be used to run Terraform. This step gives the identity permission to access Azure Resource Manager (ARM) resources.</li>
+<li>Configure access control for one or more Azure resources. For example, if you use a key vault and a storage account, you will need to configure the vault and container separately.</li>
+</ol>
+
+<p>Before you can create a resource with a managed identity and then assign an RBAC role, your account needs sufficient permissions. You need to be a member of the account <strong>Owner</strong> role, or have <strong>Contributor</strong> plus <strong>User Access Administrator</strong> roles.</p>
+
+<p>Not all Azure services support managed identities, and availability varies by region. Configuration details vary slightly among services. For more information, see <a href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/services-support-managed-identities">Services that support managed identities for Azure resources</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20a%20VM%20to%20use%20a%20system-assigned%20managed%20identity"></a><h2 id="configuring-a-vm-to-use-a-system-assigned-managed-identity">Configuring a VM to use a system-assigned managed identity</h2>
+
+<p>The (simplified) Terraform configuration below provisions a virtual machine with a system-assigned managed identity, and then grants the Contributor role to the identity.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"azurerm_subscription"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Compute/virtualMachines@2021-11-01"</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+
+<span class="w">  </span><span class="nb">identity</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SystemAssigned"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"azurerm_role_definition"</span><span class="w"> </span><span class="nv">"contributor"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Contributor"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_role_assignment"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_subscription.primary.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_definition_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.azurerm_subscription.subscription.id}${data.azurerm_role_definition.contributor.id}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.example.identity.principal_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20Terraform%20to%20use%20a%20managed%20identity"></a><h2 id="configuring-terraform-to-use-a-managed-identity">Configuring Terraform to use a managed identity</h2>
+
+<p>At this point we assume that managed identity is configured on the resource (e.g. virtual machine) being used - and that permissions have been assigned via Azure's Identity and Access Management system.</p>
+
+<p>Terraform can be configured to use managed identity for authentication in one of two ways: using environment variables, or by defining the fields within the provider block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20with%20environment%20variables"></a><h3 id="configuring-with-environment-variables">Configuring with environment variables</h3>
+
+<p>Using managed identity for Azure resources as authentication is enabled in <code>azapi</code> provider by default.</p>
+
+<p>By default, Terraform will use the system assigned identity for authentication. To use a user assigned identity instead, you will need to specify the <code>ARM_CLIENT_ID</code> environment variable (equivalent to provider block argument <a href="https://registry.terraform.io/providers/azure/azapi/latest/docs#client_id"><code>client_id</code></a>) to the <a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/user_assigned_identity#client_id">client id</a> of the identity.</p>
+
+<p>By default, Terraform will use a well-known MSI endpoint to get the authentication token, which covers most use cases.</p>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>danger</em>
+    <p>we recommend against running Terraform inside of a Function App as the low memory ceiling can lead to Terraform being terminated and data (including the State File) being lost. Instead we’d recommend considering triggering an external process, such as Terraform Cloud or a CI System to run these longer-running more intensive processes - see <a href="https://learn.hashicorp.com/tutorials/terraform/automate-terraform">Terraform in Automation</a> for more details.</p>
+</aside>
+
+<p>In addition to a properly-configured management identity, Terraform needs to know the subscription ID and tenant ID to identify the full context for the Azure provider.</p>
+
+<div class="codehilite"><pre><span></span><code>$ <span class="nb">export</span> <span class="nv">ARM_SUBSCRIPTION_ID</span><span class="o">=</span>159f2485-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+$ <span class="nb">export</span> <span class="nv">ARM_TENANT_ID</span><span class="o">=</span>72f988bf-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+$ <span class="nb">export</span> <span class="nv">ARM_CLIENT_ID</span><span class="o">=</span>xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx <span class="c1"># only necessary for user assigned identity</span>
+</code></pre></div>
+
+<p>A provider block is _technically_ optional when using environment variables. Even so, we recommend defining provider blocks so that you can pin or constrain the version of the provider being used, and configure other optional settings:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azapi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"azure/azapi"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=0.1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azapi"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20with%20the%20provider%20block"></a><h3 id="configuring-with-the-provider-block">Configuring with the provider block</h3>
+
+<p>It's also possible to configure a managed identity within the provider block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azapi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"azure/azapi"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=0.1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azapi"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  #...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>More information on <a href="../index.html#argument-reference">the fields supported in the provider block can be found here</a>.</p>
+
+            
+        
+    </body></html>

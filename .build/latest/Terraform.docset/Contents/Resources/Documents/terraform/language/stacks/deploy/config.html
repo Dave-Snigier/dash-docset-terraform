@@ -1,0 +1,119 @@
+<html><!-- Online page at https://www.terraform.io/language/stacks/deploy/config --><head>
+                <title>Define deployment configuration</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="define-deployment-configuration">Define deployment configuration</h1>
+
+<p>In Stacks, deployments allow you to replicate infrastructure across multiple environments, regions, or accounts. Each deployment runs in its own isolated agent, ensuring that changes in one deployment do not affect others. </p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>: HCP Terraform supports up to a maximum of 20 deployments.</p>
+</aside>
+
+<p>Learn how to write deployment configuration files that allow you to specify the environments, regions, and other parameters that will vary across deployments, while keeping your stack’s configuration nonrepetitive and reusable.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Background"></a><h2 id="background">Background</h2>
+
+<p>The deployment configuration file (<code>tfdeploy.hcl</code>) defines how many times HCP Terraform should deploy a stack’s infrastructure. A stack must have at least one <code>deployment</code> block. Adding a new <code>deployment</code> block tells Terraform to redeploy a stack’s infrastructure with that <code>deployment</code> block’s input values.</p>
+
+<p>You can automatically manage plans for your deployments by defining orchestrate blocks to create orchestration rules for your stack deployments. For example, you can set up automatic approvals when a deployment meets specific criteria. Learn more about orchestrating deployments in <a href="../../../terraform/language/stacks/deploy/conditions.html">Set conditions for deployment plans</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Write%20a%20deployment%20configuration%20file"></a><h2 id="write-a-deployment-configuration-file">Write a deployment configuration file</h2>
+
+<p>Deployment configuration files live at the top level of your repository and use the <code>.tfdeploy.hcl</code> file extension. We recommend naming your deployments file <code>deployments.tfdeploy.hcl</code>. In your deployment configuration file, create a new <code>deployment</code> block for each environment or region where you want to deploy your stack. </p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployments.tfdeploy.hcl</span>
+
+<span class="err">deployment</span><span class="w"> </span><span class="s2">"production"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws_region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-1"</span><span class="w"></span>
+<span class="w">        </span><span class="na">instance_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The <code>deployment</code> block accepts a map of <code>inputs</code> where you can specify any unique configurations that deployment may need. The <code>deployment</code> block does not accept any meta-arguments. </p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployments.tfdeploy.hcl</span>
+
+<span class="err">deployment</span><span class="w"> </span><span class="s2">"production"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">aws_region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">deployment</span><span class="w"> </span><span class="s2">"staging"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">aws_region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>You can also specify <code>identity_token</code> blocks and <code>orchestrate</code> blocks in a deployment configuration file. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deployment%20authentication"></a><h2 id="deployment-authentication">Deployment authentication</h2>
+
+<p>The <code>identity_token</code> block tells HCP Terraform to generate a JSON Web Token (JWT) for that deployment’s components to authenticate to providers using OIDC. For example, you can set up your deployment to authenticate with the AWS provider using a particular role ARN. </p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployments.tfdeploy.hcl</span>
+
+<span class="err">identity_token</span><span class="w"> </span><span class="s2">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">audience</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"aws.workload.identity"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">deployment</span><span class="w"> </span><span class="s2">"staging"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">aws_region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eu-west-1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">role_arn</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam::123456789101:role/my-oidc-role"</span><span class="w"></span>
+<span class="w">    </span><span class="na">aws_token</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">identity_token.aws.jwt</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>That deployment generates a JWT token named <code>aws_token</code>, which is available to that deployment’s components and providers.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># providers.tfstack.hcl</span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nc">"aws"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.aws_region</span><span class="w"></span>
+<span class="w">    </span><span class="nb">assume_role_with_web_identity</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">role_arn</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">var.aws_role</span><span class="w"></span>
+<span class="w">      </span><span class="na">web_identity_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.aws_token</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>For more details and examples of using the <code>identity_token</code> block, refer to <a href="../../../terraform/language/stacks/deploy/authenticate.html">Authenticate a stack</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Automatically%20manage%20deployments"></a><h2 id="automatically-manage-deployments">Automatically manage deployments</h2>
+
+<p>The <code>orchestrate</code> block lets you codify your stack’s behavior by creating orchestration rules, enabling you to manage deployments at scale. For example, you could set an orchestration rule to automatically approve plans or apply operations that don’t contain any changes.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployments.tfdeploy.hcl</span>
+
+<span class="err">orchestrate</span><span class="w"> </span><span class="s2">"auto_approve" "no_pet_changes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">check</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # Check that the pet component has no changes</span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">context.plan.component_changes</span><span class="p">[</span><span class="s2">"component.pet"</span><span class="p">].</span><span class="na">total</span><span class="w"> </span><span class="o">=</span><span class="p">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">    </span><span class="na">reason</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Changes proposed to pet component."</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>For more information and examples of using the <code>orchestrate</code> block, refer to <a href="../../../terraform/language/stacks/deploy/conditions.html">Set conditions for deployment plans</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Next%20steps"></a><h2 id="next-steps">Next steps</h2>
+
+<p>Refer to the <a href="../../../terraform/language/stacks/reference/tfdeploy.html">Deployment file reference</a> to learn more about the syntax of the blocks and attributes you can use in deployment configuration files. Refer to <a href="../../../terraform/cloud-docs/stacks/create.html">Create a stack</a> to learn how to deploy your stack’s infrastructure with HCP Terraform.</p>
+
+            
+        
+    </body></html>

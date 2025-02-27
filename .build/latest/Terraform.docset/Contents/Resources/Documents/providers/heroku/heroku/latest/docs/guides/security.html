@@ -1,0 +1,83 @@
+<html><!-- Online page at https://registry.terraform.io/providers/heroku/heroku/latest/docs/guides/security --><head>
+                <title>Authentication</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="authentication">Authentication</h1>
+
+<p>The API key used by Terraform must inherently have complete permission 
+to manage Heroku resources.</p>
+
+<p>To generate API keys with minimal scope, see 
+<a href="https://devcenter.heroku.com/articles/using-terraform-with-heroku#authorization">Dev Center article <strong>Using Terraform with Heroku: Authorization</strong></a>.</p>
+
+<p>The API key can be set for the provider following the 
+<a href="../#authentication">Provider Authentication docs</a>.</p>
+
+<h1 id="sensitivity">Sensitivity</h1>
+
+<p>Terraform includes the concept of <code>sensitive</code> values which are 
+automatically redacted from terminal output, such as plan diffs and 
+output summaries.</p>
+
+<p>Various resource attributes are defined in the provider as sensitive, 
+including: <code>heroku_app</code>#<code>all_config_vars</code>, 
+<code>heroku_addon</code>#<code>config_var_values</code>, &amp; <code>heroku_app_webhook</code>#<code>secret</code>.</p>
+
+<p>In every configuration, practice marking <code>sensitive = true</code> variables &amp;
+outputs that contain secret data:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"heroku_api_key"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"production_database_url"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">heroku_addon.production_postgres.config_var_values</span><span class="p">[</span><span class="s2">"DATABASE_URL"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<h1 id="config-vars">Config Vars</h1>
+
+<p>Especially sensitive Heroku app config vars may be managed from outside of 
+Terraform, set through <code>heroku config</code> CLI, web dashboard, or Platform API,
+to avoid their values touching Terraform workflows.</p>
+
+<p>Also, config vars automatically set by add-ons, such as Postgres 
+<code>DATABASE_URL</code>, will be recorded in Terraform state as part of the standard
+functionality of this Terraform provider.</p>
+
+<p>In high-security situations, these externally managed config vars can be 
+completely excluded from Terraform by setting the 
+<a href="../#argument-reference">provider attributes</a>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"heroku"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">customizations</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">set_app_all_config_vars_in_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="na">set_addon_config_vars_in_state</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>As a result, <code>heroku_app</code>#<code>all_config_vars</code> and 
+<code>heroku_addon</code>#<code>config_var_values</code> will be empty for all resources 
+managed in Terraform.</p>
+
+<h1 id="logging">Logging</h1>
+
+<p>In normal runtime, the provider is designed to avoid logging sensitive data.</p>
+
+<p>When <code>TF_LOG</code> environment variable is set, such as <code>TF_LOG=debug</code>, the 
+provider will log extensive data including Heroku API calls. <code>Authorization</code> 
+headers are automatically redacted, but logged request and response JSON
+bodies will contain secret values, such as app config vars.</p>
+
+<p>Only set <code>TF_LOG</code> in environments where the sensitive log output is 
+acceptable. Destroy/delete such logs after use to avoid disclosure.</p>
+
+            
+        
+    </body></html>

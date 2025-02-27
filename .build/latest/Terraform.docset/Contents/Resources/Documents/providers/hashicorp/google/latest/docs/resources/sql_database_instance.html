@@ -1,0 +1,680 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/sql_database_instance --><head>
+                <title>google_sql_database_instance</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="google_sql_database_instance">google_sql_database_instance</h1>
+
+<p>Creates a new Google SQL Database Instance. For more information, see the <a href="https://cloud.google.com/sql/docs/mysql/create-instance">official documentation</a>,
+or the <a href="https://cloud.google.com/sql/docs/admin-api/v1beta4/instances">JSON API</a>.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>NOTE on `google_sql_database_instance`</em>
+    <ul>
+    <li>Second-generation instances include a default 'root'@'%' user with no password. This user will be deleted by Terraform on instance creation. You should use <code>google_sql_user</code> to define a custom user with a restricted host and strong password.</li>
+    </ul>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>: On newer versions of the provider, you must explicitly set <code>deletion_protection=false</code> (and run <code>terraform apply</code> to write the field to state) in order to destroy an instance. It is recommended to not set this field (or set it to true) until you're ready to destroy the instance and its databases.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/SQL%20Second%20Generation%20Instance"></a><h3 id="sql-second-generation-instance">SQL Second Generation Instance</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_sql_database_instance"</span><span class="w"> </span><span class="nv">"main"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"main-instance"</span><span class="w"></span>
+<span class="w">  </span><span class="na">database_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"POSTGRES_15"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">settings</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # Second-generation instance tiers are based on the machine</span>
+<span class="c1">    # type. See argument reference below.</span>
+<span class="w">    </span><span class="na">tier</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"db-f1-micro"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Granular%20restriction%20of%20network%20access"></a><h3 id="granular-restriction-of-network-access">Granular restriction of network access</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance"</span><span class="w"> </span><span class="nv">"apps"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">8</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"apps-${count.index + 1}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"f1-micro"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">boot_disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">initialize_params</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ubuntu-os-cloud/ubuntu-1804-lts"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">network_interface</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"default"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">access_config</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">      // Ephemeral IP</span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"random_id"</span><span class="w"> </span><span class="nv">"db_name_suffix"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">byte_length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">4</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">onprem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"192.168.1.2", "192.168.2.3"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_sql_database_instance"</span><span class="w"> </span><span class="nv">"postgres"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"postgres-instance-${random_id.db_name_suffix.hex}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">database_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"POSTGRES_15"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">settings</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">tier</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"db-f1-micro"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">ip_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="w">      </span><span class="err">dynamic</span><span class="w"> </span><span class="s2">"authorized_networks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance.apps</span><span class="w"></span>
+<span class="w">        </span><span class="na">iterator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">apps</span><span class="w"></span>
+
+<span class="w">        </span><span class="nb">content</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">apps.value.name</span><span class="w"></span>
+<span class="w">          </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">apps.value.network_interface.0.access_config.0.nat_ip</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">      </span><span class="err">dynamic</span><span class="w"> </span><span class="s2">"authorized_networks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.onprem</span><span class="w"></span>
+<span class="w">        </span><span class="na">iterator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">onprem</span><span class="w"></span>
+
+<span class="w">        </span><span class="nb">content</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"onprem-${onprem.key}"</span><span class="w"></span>
+<span class="w">          </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">onprem.value</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Private%20IP%20Instance"></a><h3 id="private-ip-instance">Private IP Instance</h3>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>For private IP instance setup, note that the <code>google_sql_database_instance</code> does not actually interpolate values from <code>google_service_networking_connection</code>. You must explicitly add a <code>depends_on</code>reference as shown below.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"private_network"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"private-network"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_address"</span><span class="w"> </span><span class="nv">"private_ip_address"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"private-ip-address"</span><span class="w"></span>
+<span class="w">  </span><span class="na">purpose</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"VPC_PEERING"</span><span class="w"></span>
+<span class="w">  </span><span class="na">address_type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"INTERNAL"</span><span class="w"></span>
+<span class="w">  </span><span class="na">prefix_length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">16</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.private_network.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_service_networking_connection"</span><span class="w"> </span><span class="nv">"private_vpc_connection"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">network</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.private_network.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">service</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"servicenetworking.googleapis.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">reserved_peering_ranges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_global_address.private_ip_address.name</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"random_id"</span><span class="w"> </span><span class="nv">"db_name_suffix"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">byte_length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">4</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_sql_database_instance"</span><span class="w"> </span><span class="nv">"instance"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"private-instance-${random_id.db_name_suffix.hex}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">database_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MYSQL_5_7"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_service_networking_connection.private_vpc_connection</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">settings</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">tier</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"db-f1-micro"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">ip_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">ipv4_enabled</span><span class="w">                                  </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">      </span><span class="na">private_network</span><span class="w">                               </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.private_network.self_link</span><span class="w"></span>
+<span class="w">      </span><span class="na">enable_private_path_for_google_cloud_services</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"google-beta"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ENTERPRISE_PLUS%20Instance%20with%20data_cache_config"></a><h3 id="enterprise_plus-instance-with-data_cache_config">ENTERPRISE_PLUS Instance with data_cache_config</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_sql_database_instance"</span><span class="w"> </span><span class="nv">"main"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"enterprise-plus-main-instance"</span><span class="w"></span>
+<span class="w">  </span><span class="na">database_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MYSQL_8_0_31"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">settings</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">tier</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"db-perf-optimized-N-2"</span><span class="w"></span>
+<span class="w">    </span><span class="na">edition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ENTERPRISE_PLUS"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">data_cache_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">data_cache_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Cloud%20SQL%20Instance%20with%20PSC%20connectivity"></a><h3 id="cloud-sql-instance-with-psc-connectivity">Cloud SQL Instance with PSC connectivity</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_sql_database_instance"</span><span class="w"> </span><span class="nv">"main"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"psc-enabled-main-instance"</span><span class="w"></span>
+<span class="w">  </span><span class="na">database_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MYSQL_8_0"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">settings</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">tier</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"db-f1-micro"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">ip_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">psc_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">psc_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">        </span><span class="na">allowed_consumer_projects</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"allowed-consumer-project-name"</span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="na">ipv4_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">backup_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">      </span><span class="na">binary_log_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="na">availability_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"REGIONAL"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Cloud%20SQL%20Instance%20with%20PSC%20auto%20connections"></a><h3 id="cloud-sql-instance-with-psc-auto-connections">Cloud SQL Instance with PSC auto connections</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_sql_database_instance"</span><span class="w"> </span><span class="nv">"main"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"psc-enabled-main-instance"</span><span class="w"></span>
+<span class="w">  </span><span class="na">database_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MYSQL_8_0"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">settings</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">tier</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"db-f1-micro"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">ip_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">psc_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">psc_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">        </span><span class="na">allowed_consumer_projects</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"allowed-consumer-project-name"</span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="nb">psc_auto_connections</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">consumer_network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"network-name"</span><span class="w"></span>
+<span class="w">          </span><span class="na">consumer_service_project_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"project-id"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="na">ipv4_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">backup_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">      </span><span class="na">binary_log_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="na">availability_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"REGIONAL"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>region</code> - (Optional) The region the instance will sit in. If a region is not provided in the resource definition,
+the provider region will be used instead.</li>
+</ul>
+
+<hr/>
+
+<ul>
+<li><p><code>settings</code> - (Optional) The settings to use for the database. The
+configuration is detailed below. Required if <code>clone</code> is not set.</p></li>
+<li><p><code>database_version</code> - (Required) The MySQL, PostgreSQL or
+SQL Server version to use. Supported values include <code>MYSQL_5_6</code>,
+<code>MYSQL_5_7</code>, <code>MYSQL_8_0</code>, <code>MYSQL_8_4</code>, <code>POSTGRES_9_6</code>,<code>POSTGRES_10</code>, <code>POSTGRES_11</code>,
+<code>POSTGRES_12</code>, <code>POSTGRES_13</code>, <code>POSTGRES_14</code>, <code>POSTGRES_15</code>, <code>POSTGRES_16</code>, <code>POSTGRES_17</code>,
+<code>SQLSERVER_2017_STANDARD</code>, <code>SQLSERVER_2017_ENTERPRISE</code>, <code>SQLSERVER_2017_EXPRESS</code>, <code>SQLSERVER_2017_WEB</code>.
+<code>SQLSERVER_2019_STANDARD</code>, <code>SQLSERVER_2019_ENTERPRISE</code>, <code>SQLSERVER_2019_EXPRESS</code>,
+<code>SQLSERVER_2019_WEB</code>.
+<a href="https://cloud.google.com/sql/docs/db-versions">Database Version Policies</a>
+includes an up-to-date reference of supported versions.</p></li>
+<li><p><code>name</code> - (Optional, Computed) The name of the instance. If the name is left
+blank, Terraform will randomly generate one when the instance is first
+created. This is done because after a name is used, it cannot be reused for
+up to <a href="https://cloud.google.com/sql/docs/delete-instance">one week</a>.</p></li>
+<li><p><code>maintenance_version</code>  - (Optional) The current software version on the instance. This attribute can not be set during creation. Refer to <code>available_maintenance_versions</code> attribute to see what <code>maintenance_version</code> are available for upgrade. When this attribute gets updated, it will cause an instance restart. Setting a <code>maintenance_version</code> value that is older than the current one on the instance will be ignored.</p></li>
+<li><p><code>master_instance_name</code> - (Optional) The name of the existing instance that will
+act as the master in the replication setup. Note, this requires the master to
+have <code>binary_log_enabled</code> set, as well as existing backups.</p></li>
+<li><p><code>project</code> - (Optional) The ID of the project in which the resource belongs. If it
+is not provided, the provider project is used.</p></li>
+<li><p><code>replica_configuration</code> - (Optional) The configuration for replication. The
+configuration is detailed below.</p></li>
+<li><p><code>replica_names</code> - (Optional, Computed) List of replica names. Can be updated.</p></li>
+<li><p><code>root_password</code> - (Optional) Initial root password. Can be updated. Required for MS SQL Server.</p></li>
+<li><p><code>encryption_key_name</code> - (Optional)
+The full path to the encryption key used for the CMEK disk encryption.  Setting
+up disk encryption currently requires manual steps outside of Terraform.
+The provided key must be in the same region as the SQL instance.  In order
+to use this feature, a special kind of service account must be created and
+granted permission on this key.  This step can currently only be done
+manually, please see <a href="https://cloud.google.com/sql/docs/mysql/configure-cmek#service-account">this step</a>.
+That service account needs the <code>Cloud KMS &gt; Cloud KMS CryptoKey Encrypter/Decrypter</code> role on your
+key - please see <a href="https://cloud.google.com/sql/docs/mysql/configure-cmek#grantkey">this step</a>.</p></li>
+<li><p><code>deletion_protection</code> - (Optional) Whether Terraform will be prevented from destroying the instance.
+When the field is set to true or unset in Terraform state, a <code>terraform apply</code>
+or <code>terraform destroy</code> that would delete the instance will fail.
+When the field is set to false, deleting the instance is allowed.</p>
+
+<p>~&gt; <strong>NOTE:</strong> This flag only protects instances from deletion within Terraform. To protect your instances from accidental deletion across all surfaces (API, gcloud, Cloud Console and Terraform), use the API flag <code>settings.deletion_protection_enabled</code>.</p></li>
+<li><p><code>restore_backup_context</code> - (optional) The context needed to restore the database to a backup run. This field will
+cause Terraform to trigger the database to restore from the backup run indicated. The configuration is detailed below.
+<strong>NOTE:</strong> Restoring from a backup is an imperative action and not recommended via Terraform. Adding or modifying this
+block during resource creation/update will trigger the restore action after the resource is created/updated.</p></li>
+<li><p><code>clone</code> - (Optional) The context needed to create this instance as a clone of another instance. When this field is set during
+resource creation, Terraform will attempt to clone another instance as indicated in the context. The
+configuration is detailed below.</p></li>
+</ul>
+
+<p>The <code>settings</code> block supports:</p>
+
+<ul>
+<li><p><code>tier</code> - (Required) The machine type to use. See <a href="https://cloud.google.com/sql/docs/admin-api/v1beta4/tiers">tiers</a>
+for more details and supported versions. Postgres supports only shared-core machine types,
+and custom machine types such as <code>db-custom-2-13312</code>. See the <a href="https://cloud.google.com/compute/docs/instances/creating-instance-with-custom-machine-type#create">Custom Machine Type Documentation</a> to learn about specifying custom machine types.</p></li>
+<li><p><code>edition</code> - (Optional) The edition of the instance, can be <code>ENTERPRISE</code> or <code>ENTERPRISE_PLUS</code>.</p></li>
+<li><p><code>user_labels</code> - (Optional) A set of key/value user label pairs to assign to the instance.</p></li>
+<li><p><code>activation_policy</code> - (Optional) This specifies when the instance should be
+active. Can be either <code>ALWAYS</code>, <code>NEVER</code> or <code>ON_DEMAND</code>.</p></li>
+<li><p><code>availability_type</code> - (Optional) The availability type of the Cloud SQL
+instance, high availability (<code>REGIONAL</code>) or single zone (<code>ZONAL</code>).' For all instances, ensure that
+<code>settings.backup_configuration.enabled</code> is set to <code>true</code>.
+For MySQL instances, ensure that <code>settings.backup_configuration.binary_log_enabled</code> is set to <code>true</code>.
+For Postgres and SQL Server instances, ensure that <code>settings.backup_configuration.point_in_time_recovery_enabled</code>
+is set to <code>true</code>. Defaults to <code>ZONAL</code>.</p></li>
+<li><p><code>collation</code> - (Optional) The name of server instance collation.</p></li>
+<li><p><code>connector_enforcement</code> - (Optional) Control the enforcement of Cloud SQL Auth Proxy or Cloud SQL connectors for all the connections, can be <code>REQUIRED</code> or <code>NOT_REQUIRED</code>. If enabled, all the direct connections are rejected.</p></li>
+<li><p><code>deletion_protection_enabled</code> - (Optional) Enables deletion protection of an instance at the GCP level. Enabling this protection will guard against accidental deletion across all surfaces (API, gcloud, Cloud Console and Terraform) by enabling the <a href="https://cloud.google.com/sql/docs/postgres/deletion-protection">GCP Cloud SQL instance deletion protection</a>. Terraform provider support was introduced in version 4.48.0. Defaults to <code>false</code>.</p></li>
+<li><p><code>enable_google_ml_integration</code> - (Optional) Enables <a href="https://cloud.google.com/sql/docs/postgres/integrate-cloud-sql-with-vertex-ai">Cloud SQL instances to connect to Vertex AI</a> and pass requests for real-time predictions and insights. Defaults to <code>false</code>.</p></li>
+<li><p><code>enable_dataplex_integration</code> - (Optional) Enables <a href="https://cloud.google.com/sql/docs/mysql/dataplex-catalog-integration">Cloud SQL instance integration with Dataplex</a>. MySQL, Postgres and SQL Server instances are supported for this feature. Defaults to <code>false</code>.</p></li>
+<li><p><code>disk_autoresize</code> - (Optional) Enables auto-resizing of the storage size. Defaults to <code>true</code>. Note that if <code>disk_size</code> is set, future <code>terraform apply</code> calls will attempt to delete the instance in order to resize the disk to the value specified in disk_size if it has been resized. To avoid this, ensure that <code>lifecycle.ignore_changes</code> is applied to <code>disk_size</code>.</p></li>
+<li><p><code>disk_autoresize_limit</code> - (Optional) The maximum size to which storage capacity can be automatically increased. The default value is 0, which specifies that there is no limit.</p></li>
+<li><p><code>disk_size</code> - (Optional) The size of data disk, in GB. Size of a running instance cannot be reduced but can be increased. The minimum value is 10GB. Note that this value will override the resizing from <code>disk_autoresize</code> if that feature is enabled. To avoid this, set <code>lifecycle.ignore_changes</code> on this field.</p></li>
+<li><p><code>disk_type</code> - (Optional) The type of data disk: PD_SSD or PD_HDD. Defaults to <code>PD_SSD</code>.</p></li>
+<li><p><code>pricing_plan</code> - (Optional) Pricing plan for this instance, can only be <code>PER_USE</code>.</p></li>
+<li><p><code>time_zone</code> - (Optional) The time_zone to be used by the database engine (supported only for SQL Server), in SQL Server timezone format.</p></li>
+</ul>
+
+<p>The optional <code>settings.advanced_machine_features</code> subblock supports:</p>
+
+<ul>
+<li><code>threads_per_core</code> - (Optional) The number of threads per core. The value of this flag can be 1 or 2. To disable SMT, set this flag to 1. Only available in Cloud SQL for SQL Server instances. See <a href="https://cloud.google.com/sql/docs/sqlserver/create-instance#smt-create-instance">smt</a> for more details.</li>
+</ul>
+
+<p>The optional <code>settings.database_flags</code> sublist supports:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) Name of the flag.</p></li>
+<li><p><code>value</code> - (Required) Value of the flag.</p></li>
+</ul>
+
+<p>The optional <code>settings.active_directory_config</code> subblock supports:</p>
+
+<ul>
+<li><code>domain</code> - (Required) The domain name for the active directory (e.g., mydomain.com).
+Can only be used with SQL Server.</li>
+</ul>
+
+<p>The optional <code>settings.data_cache_config</code> subblock supports:</p>
+
+<ul>
+<li><code>data_cache_enabled</code> - (Optional) Whether data cache is enabled for the instance. Defaults to <code>false</code>. Can be used with MYSQL and PostgreSQL only.</li>
+</ul>
+
+<p>The optional <code>settings.deny_maintenance_period</code> subblock supports:</p>
+
+<ul>
+<li><p><code>end_date</code> - (Required) "deny maintenance period" end date. If the year of the end date is empty, the year of the start date also must be empty. In this case, it means the no maintenance interval recurs every year. The date is in format yyyy-m-dd (the month is without leading zeros)i.e., 2020-1-01, or 2020-11-01, or mm-dd, i.e., 11-01</p></li>
+<li><p><code>start_date</code> - (Required) "deny maintenance period" start date. If the year of the start date is empty, the year of the end date also must be empty. In this case, it means the deny maintenance period recurs every year. The date is in format yyyy-m-dd (the month is without leading zeros)i.e., 2020-1-01, or 2020-11-01, or mm-dd, i.e., 11-01</p></li>
+<li><p><code>time</code> - (Required) Time in UTC when the "deny maintenance period" starts on startDate and ends on endDate. The time is in format: HH:mm:SS, i.e., 00:00:00</p></li>
+</ul>
+
+<p>The optional <code>settings.sql_server_audit_config</code> subblock supports:</p>
+
+<ul>
+<li><p><code>bucket</code> - (Optional) The name of the destination bucket (e.g., gs://mybucket).</p></li>
+<li><p><code>upload_interval</code> - (Optional) How often to upload generated audit files. A duration in seconds with up to nine fractional digits, terminated by 's'. Example: "3.5s".</p></li>
+<li><p><code>retention_interval</code> - (Optional) How long to keep generated audit files. A duration in seconds with up to nine fractional digits, terminated by 's'. Example: "3.5s".</p></li>
+</ul>
+
+<p>The optional <code>settings.backup_configuration</code> subblock supports:</p>
+
+<ul>
+<li><p><code>binary_log_enabled</code> - (Optional) True if binary logging is enabled.
+Can only be used with MySQL.</p></li>
+<li><p><code>enabled</code> - (Optional) True if backup configuration is enabled.</p></li>
+<li><p><code>start_time</code> - (Optional) <code>HH:MM</code> format time indicating when backup
+configuration starts.</p></li>
+<li><p><code>point_in_time_recovery_enabled</code> - (Optional) True if Point-in-time recovery is enabled. Will restart database if enabled after instance creation. Valid only for PostgreSQL and SQL Server instances. Enabled by default for PostgreSQL Enterprise Plus and SQL Server Enterprise Plus instances.</p></li>
+<li><p><code>location</code> - (Optional) The region where the backup will be stored</p></li>
+<li><p><code>transaction_log_retention_days</code> - (Optional) The number of days of transaction logs we retain for point in time restore, from 1-7. For PostgreSQL Enterprise Plus and SQL Server Enterprise Plus instances, the number of days of retained transaction logs can be set from 1 to 35.</p></li>
+<li><p><code>backup_retention_settings</code> - (Optional) Backup retention settings. The configuration is detailed below.</p></li>
+</ul>
+
+<p>The optional <code>settings.backup_configuration.backup_retention_settings</code> subblock supports:</p>
+
+<ul>
+<li><p><code>retained_backups</code> - (Optional) Depending on the value of retention_unit, this is used to determine if a backup needs to be deleted. If retention_unit
+is 'COUNT', we will retain this many backups.</p></li>
+<li><p><code>retention_unit</code> - (Optional) The unit that 'retained_backups' represents. Defaults to <code>COUNT</code>.</p></li>
+</ul>
+
+<p>The optional <code>settings.ip_configuration</code> subblock supports:</p>
+
+<ul>
+<li><p><code>ipv4_enabled</code> - (Optional) Whether this Cloud SQL instance should be assigned
+a public IPV4 address. At least <code>ipv4_enabled</code> must be enabled or a
+<code>private_network</code> must be configured.</p></li>
+<li><p><code>private_network</code> - (Optional) The VPC network from which the Cloud SQL
+instance is accessible for private IP. For example, projects/myProject/global/networks/default.
+Specifying a network enables private IP.
+At least <code>ipv4_enabled</code> must be enabled or a <code>private_network</code> must be configured.
+This setting can be updated, but it cannot be removed after it is set.</p></li>
+<li><p><code>ssl_mode</code> - (Optional) Specify how SSL connection should be enforced in DB connections. Supported values are <code>ALLOW_UNENCRYPTED_AND_ENCRYPTED</code>, <code>ENCRYPTED_ONLY</code>, and <code>TRUSTED_CLIENT_CERTIFICATE_REQUIRED</code> (not supported for SQL Server). See <a href="https://cloud.google.com/sql/docs/postgres/admin-api/rest/v1/instances#ipconfiguration">API reference doc</a> for details.</p></li>
+<li><p><code>server_ca_mode</code> - (Optional) Specify how the server certificate's Certificate Authority is hosted. Supported values are <code>GOOGLE_MANAGED_INTERNAL_CA</code> and <code>GOOGLE_MANAGED_CAS_CA</code>.</p></li>
+<li><p><code>server_ca_pool</code> - (Optional) The resource name of the server CA pool for an instance with <code>CUSTOMER_MANAGED_CAS_CA</code> as the <code>server_ca_mode</code>.</p></li>
+<li><p><code>allocated_ip_range</code> - (Optional) The name of the allocated ip range for the private ip CloudSQL instance. For example: "google-managed-services-default". If set, the instance ip will be created in the allocated range. The range name must comply with <a href="https://datatracker.ietf.org/doc/html/rfc1035">RFC 1035</a>. Specifically, the name must be 1-63 characters long and match the regular expression <a href="[-a-z0-9]*[a-z0-9]">a-z</a>?.</p></li>
+<li><p><code>enable_private_path_for_google_cloud_services</code> - (Optional) Whether Google Cloud services such as BigQuery are allowed to access data in this Cloud SQL instance over a private IP connection. SQLSERVER database type is not supported.</p></li>
+</ul>
+
+<p>The optional <code>settings.ip_configuration.authorized_networks[]</code> sublist supports:</p>
+
+<ul>
+<li><p><code>expiration_time</code> - (Optional) The <a href="https://tools.ietf.org/html/rfc3339">RFC 3339</a>
+formatted date time string indicating when this whitelist expires.</p></li>
+<li><p><code>name</code> - (Optional) A name for this whitelist entry.</p></li>
+<li><p><code>value</code> - (Required) A CIDR notation IPv4 or IPv6 address that is allowed to
+access this instance. Must be set even if other two attributes are not for
+the whitelist to become active.</p></li>
+</ul>
+
+<p>The optional <code>settings.ip_configuration.psc_config</code> sublist supports:</p>
+
+<ul>
+<li><p><code>psc_enabled</code> - (Optional) Whether PSC connectivity is enabled for this instance.</p></li>
+<li><p><code>allowed_consumer_projects</code> - (Optional) List of consumer projects that are allow-listed for PSC connections to this instance. This instance can be connected to with PSC from any network in these projects. Each consumer project in this list may be represented by a project number (numeric) or by a project id (alphanumeric).</p></li>
+<li><p>The optional <code>psc_config.psc_auto_connections</code> subblock - (Optional) A comma-separated list of networks or a comma-separated list of network-project pairs. Each project in this list is represented by a project number (numeric) or by a project ID (alphanumeric). This allows Private Service Connect connections to be created automatically for the specified networks.</p></li>
+<li><p><code>consumer_network</code> - "The consumer network of this consumer endpoint. This must be a resource path that includes both the host project and the network name. For example, <code>projects/project1/global/networks/network1</code>. The consumer host project of this network might be different from the consumer service project."</p></li>
+<li><p><code>consumer_service_project_id</code> - (Optional) The project ID of consumer service project of this consumer endpoint.</p></li>
+</ul>
+
+<p>The optional <code>settings.location_preference</code> subblock supports:</p>
+
+<ul>
+<li><p><code>follow_gae_application</code> - (Optional) A GAE application whose zone to remain
+in. Must be in the same region as this instance.</p></li>
+<li><p><code>zone</code> - (Optional) The preferred compute engine
+<a href="https://cloud.google.com/compute/docs/zones?hl=en">zone</a>.</p></li>
+<li><p><code>secondary_zone</code> - (Optional) The preferred Compute Engine zone for the secondary/failover.</p></li>
+</ul>
+
+<p>The optional <code>settings.maintenance_window</code> subblock for instances declares a one-hour
+<a href="https://cloud.google.com/sql/docs/instance-settings?hl=en#maintenance-window-2ndgen">maintenance window</a>
+when an Instance can automatically restart to apply updates. The maintenance window is specified in UTC time. It supports:</p>
+
+<ul>
+<li><p><code>day</code> - (Optional) Day of week (<code>1-7</code>), starting on Monday</p></li>
+<li><p><code>hour</code> - (Optional) Hour of day (<code>0-23</code>), ignored if <code>day</code> not set</p></li>
+<li><p><code>update_track</code> - (Optional) Receive updates after one week (<code>canary</code>) or after two weeks (<code>stable</code>) or after five weeks (<code>week5</code>) of notification.</p></li>
+</ul>
+
+<p>The optional <code>settings.insights_config</code> subblock for instances declares Query Insights(<a href="https://cloud.google.com/sql/docs/mysql/using-query-insights">MySQL</a>, <a href="https://cloud.google.com/sql/docs/postgres/using-query-insights">PostgreSQL</a>) configuration. It contains:</p>
+
+<ul>
+<li><p><code>query_insights_enabled</code> - True if Query Insights feature is enabled.</p></li>
+<li><p><code>query_string_length</code> - Maximum query length stored in bytes. Between 256 and 4500. Default to 1024. Higher query lengths are more useful for analytical queries, but they also require more memory. Changing the query length requires you to restart the instance. You can still add tags to queries that exceed the length limit.</p></li>
+<li><p><code>record_application_tags</code> - True if Query Insights will record application tags from query when enabled.</p></li>
+<li><p><code>record_client_address</code> - True if Query Insights will record client address when enabled.</p></li>
+<li><p><code>query_plans_per_minute</code> - Number of query execution plans captured by Insights per minute for all queries combined. Between 0 and 20. Default to 5.</p></li>
+</ul>
+
+<p>The optional <code>settings.password_validation_policy</code> subblock for instances declares <a href="https://cloud.google.com/sql/docs/postgres/built-in-authentication">Password Validation Policy</a> configuration. It contains:</p>
+
+<ul>
+<li><p><code>min_length</code> - Specifies the minimum number of characters that the password must have.</p></li>
+<li><p><code>complexity</code> - Checks if the password is a combination of lowercase, uppercase, numeric, and non-alphanumeric characters.</p></li>
+<li><p><code>reuse_interval</code> - Specifies the number of previous passwords that you can't reuse.</p></li>
+<li><p><code>disallow_username_substring</code> - Prevents the use of the username in the password.</p></li>
+<li><p><code>password_change_interval</code> - Specifies the minimum duration after which you can change the password.</p></li>
+<li><p><code>enable_password_policy</code> - Enables or disable the password validation policy.</p></li>
+</ul>
+
+<p>The optional <code>replica_configuration</code> block must have <code>master_instance_name</code> set
+to work, cannot be updated and supports:</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p><code>replica_configuration</code> field is not meant to be used if the master instance is a source representation instance. The configuration provided by this field can be set on the source representation instance directly. If this field is present when the master instance is a source representation instance, <code>dump_file_path</code> must be provided.</p>
+</aside>
+
+<ul>
+<li><p><code>cascadable_replica</code> - (Optional) Specifies if the replica is a cascadable replica. If true, instance must be in different region from primary.</p>
+
+<p>~&gt; <strong>NOTE:</strong> Only supported for SQL Server database.</p></li>
+<li><p><code>ca_certificate</code> - (Optional) PEM representation of the trusted CA's x509
+certificate.</p></li>
+<li><p><code>client_certificate</code> - (Optional) PEM representation of the replica's x509
+certificate.</p></li>
+<li><p><code>client_key</code> - (Optional) PEM representation of the replica's private key. The
+corresponding public key in encoded in the <code>client_certificate</code>.</p></li>
+<li><p><code>connect_retry_interval</code> - (Optional) The number of seconds
+between connect retries. MySQL's default is 60 seconds.</p></li>
+<li><p><code>dump_file_path</code> - (Optional) Path to a SQL file in GCS from which replica
+instances are created. Format is <code>gs://bucket/filename</code>. Note, if the master
+instance is a source representation instance this field must be present.</p></li>
+<li><p><code>failover_target</code> - (Optional) Specifies if the replica is the failover target.
+If the field is set to true the replica will be designated as a failover replica.
+If the master instance fails, the replica instance will be promoted as
+the new master instance.
+~&gt; <strong>NOTE:</strong> Not supported for Postgres database.</p></li>
+<li><p><code>master_heartbeat_period</code> - (Optional) Time in ms between replication
+heartbeats.</p></li>
+<li><p><code>password</code> - (Optional) Password for the replication connection.</p></li>
+<li><p><code>ssl_cipher</code> - (Optional) Permissible ciphers for use in SSL encryption.</p></li>
+<li><p><code>username</code> - (Optional) Username for replication connection.</p></li>
+<li><p><code>verify_server_certificate</code> - (Optional) True if the master's common name
+value is checked during the SSL handshake.</p></li>
+</ul>
+
+<p>The optional <code>clone</code> block supports:</p>
+
+<ul>
+<li><p><code>source_instance_name</code> - (Required) Name of the source instance which will be cloned.</p></li>
+<li><p><code>point_in_time</code> -  (Optional) The timestamp of the point in time that should be restored.</p>
+
+<p>A timestamp in RFC3339 UTC "Zulu" format, with nanosecond resolution and up to nine fractional digits. Examples: "2014-10-02T15:01:23Z" and "2014-10-02T15:01:23.045123456Z".</p></li>
+<li><p><code>preferred_zone</code> - (Optional) (Point-in-time recovery for PostgreSQL only) Clone to an instance in the specified zone. If no zone is specified, clone to the same zone as the source instance. <a href="https://cloud.google.com/sql/docs/postgres/clone-instance#clone-unavailable-instance">clone-unavailable-instance</a></p></li>
+<li><p><code>database_names</code> - (Optional) (SQL Server only, use with <code>point_in_time</code>) Clone only the specified databases from the source instance. Clone all databases if empty.</p></li>
+<li><p><code>allocated_ip_range</code> -  (Optional) The name of the allocated ip range for the private ip CloudSQL instance. For example: "google-managed-services-default". If set, the cloned instance ip will be created in the allocated range. The range name must comply with <a href="https://tools.ietf.org/html/rfc1035">RFC 1035</a>. Specifically, the name must be 1-63 characters long and match the regular expression <a href="[-a-z0-9]*[a-z0-9]">a-z</a>?.</p></li>
+</ul>
+
+<p>The optional <code>restore_backup_context</code> block supports:
+<strong>NOTE:</strong> Restoring from a backup is an imperative action and not recommended via Terraform. Adding or modifying this
+block during resource creation/update will trigger the restore action after the resource is created/updated.</p>
+
+<ul>
+<li><p><code>backup_run_id</code> - (Required) The ID of the backup run to restore from.</p></li>
+<li><p><code>instance_id</code> - (Optional) The ID of the instance that the backup was taken from. If left empty,
+this instance's ID will be used.</p></li>
+<li><p><code>project</code> - (Optional) The full project ID of the source instance.`</p></li>
+</ul>
+
+<p>The optional, computed <code>replication_cluster</code> block represents a primary instance and disaster recovery replica pair. Applicable to MySQL and PostgreSQL. This field can be set only after both the primary and replica are created. This block supports:</p>
+
+<ul>
+<li><p><code>failover_dr_replica_name</code>: (Optional) If the instance is a primary instance, then this field identifies the disaster recovery (DR) replica. The standard format of this field is "your-project:your-instance". You can also set this field to "your-instance", but cloud SQL backend will convert it to the aforementioned standard format.</p></li>
+<li><p><code>dr_replica</code>: Read-only field that indicates whether the replica is a DR replica.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to the arguments listed above, the following computed attributes are
+exported:</p>
+
+<ul>
+<li><p><code>self_link</code> - The URI of the created resource.</p></li>
+<li><p><code>connection_name</code> - The connection name of the instance to be used in
+connection strings. For example, when connecting with <a href="https://cloud.google.com/sql/docs/mysql/connect-admin-proxy">Cloud SQL Proxy</a>.</p></li>
+<li><p><code>dns_name</code> - The DNS name of the instance. See <a href="https://cloud.google.com/sql/docs/mysql/configure-private-service-connect#view-summary-information-cloud-sql-instances-psc-enabled">Connect to an instance using Private Service Connect</a> for more details.</p></li>
+<li><p><code>service_account_email_address</code> - The service account email address assigned to the
+instance.</p></li>
+<li><p><code>ip_address.0.ip_address</code> - The IPv4 address assigned.</p></li>
+<li><p><code>ip_address.0.time_to_retire</code> - The time this IP address will be retired, in RFC
+3339 format.</p></li>
+<li><p><code>ip_address.0.type</code> - The type of this IP address.</p>
+
+<ul>
+<li><p>A <code>PRIMARY</code> address is an address that can accept incoming connections.</p></li>
+<li><p>An <code>OUTGOING</code> address is the source address of connections originating from the instance, if supported.</p></li>
+<li><p>A <code>PRIVATE</code> address is an address for an instance which has been configured to use private networking see: <a href="https://cloud.google.com/sql/docs/mysql/private-ip">Private IP</a>.</p></li>
+</ul></li>
+<li><p><code>first_ip_address</code> - The first IPv4 address of any type assigned. This is to
+support accessing the <a href="https://github.com/hashicorp/terraform-provider-google/issues/912">first address in the list in a terraform output</a>
+when the resource is configured with a <code>count</code>.</p></li>
+<li><p><code>available_maintenance_versions</code>  - The list of all maintenance versions applicable on the instance.</p></li>
+<li><p><code>public_ip_address</code> - The first public (<code>PRIMARY</code>) IPv4 address assigned. This is
+a workaround for an <a href="https://github.com/hashicorp/terraform/issues/17048">issue fixed in Terraform 0.12</a>
+but also provides a convenient way to access an IP of a specific type without
+performing filtering in a Terraform config.</p></li>
+<li><p><code>private_ip_address</code> - The first private (<code>PRIVATE</code>) IPv4 address assigned. This is
+a workaround for an <a href="https://github.com/hashicorp/terraform/issues/17048">issue fixed in Terraform 0.12</a>
+but also provides a convenient way to access an IP of a specific type without
+performing filtering in a Terraform config.</p></li>
+<li><p><code>psc_service_attachment_link</code> - the URI that points to the service attachment of the instance.</p></li>
+<li><p><code>instance_type</code> - The type of the instance. The supported values are <code>SQL_INSTANCE_TYPE_UNSPECIFIED</code>, <code>CLOUD_SQL_INSTANCE</code>, <code>ON_PREMISES_INSTANCE</code> and <code>READ_REPLICA_INSTANCE</code>.</p></li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Users can upgrade a read replica instance to a stand-alone Cloud SQL instance with the help of <code>instance_type</code>. To promote, users have to set the <code>instance_type</code> property as <code>CLOUD_SQL_INSTANCE</code> and remove/unset <code>master_instance_name</code> and <code>replica_configuration</code> from instance configuration. This operation might cause your instance to restart.</p>
+</aside>
+
+<ul>
+<li><p><code>settings.version</code> - Used to make sure changes to the <code>settings</code> block are
+atomic.</p></li>
+<li><p><code>server_ca_cert.0.cert</code> - The CA Certificate used to connect to the SQL Instance via SSL.</p></li>
+<li><p><code>server_ca_cert.0.common_name</code> - The CN valid for the CA Cert.</p></li>
+<li><p><code>server_ca_cert.0.create_time</code> - Creation time of the CA Cert.</p></li>
+<li><p><code>server_ca_cert.0.expiration_time</code> - Expiration time of the CA Cert.</p></li>
+<li><p><code>server_ca_cert.0.sha1_fingerprint</code> - SHA Fingerprint of the CA Cert.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Switchover"></a><h2 id="switchover">Switchover</h2>
+
+<p>Users can perform a switchover on a replica by following the steps below.</p>
+
+<p>~&gt;<strong>WARNING:</strong> Failure to follow these steps can lead to data loss (You will be warned during plan stage). To prevent data loss during a switchover, please verify your plan with the checklist below.</p>
+
+<p>For a more in-depth walkthrough with example code, see the <a href="../guides/sql_instance_switchover.html.markdown">Switchover Guide</a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Steps%20to%20Invoke%20Switchover"></a><h3 id="steps-to-invoke-switchover">Steps to Invoke Switchover</h3>
+
+<p>MySQL/PostgreSQL: Create a cross-region, Enterprise Plus edition primary and replica pair, then set the value of primary's <code>replication_cluster.failover_dr_replica_name</code> as the replica.</p>
+
+<p>SQL Server: Create a <code>cascadable</code> replica in a different region from the primary (<code>cascadable_replica</code> is set to true in <code>replica_configuration</code>)</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Invoking%20switchover%20in%20the%20replica%20resource%3A"></a><h4 id="invoking-switchover-in-the-replica-resource">Invoking switchover in the replica resource:</h4>
+
+<ol>
+<li>Change instance_type from <code>READ_REPLICA_INSTANCE</code> to <code>CLOUD_SQL_INSTANCE</code></li>
+<li>Remove <code>master_instance_name</code></li>
+<li>(SQL Server) Remove <code>replica_configuration</code></li>
+<li>Add current primary's name to the replica's <code>replica_names</code> list</li>
+<li>(MySQL/PostgreSQL) Add current primary's name to the replica's <code>replication_cluster.failover_dr_replica_name</code>.</li>
+<li>(MySQL/PostgreSQL) Adjust <code>backup_configuration</code>. See <a href="../guides/sql_instance_switchover.html.markdown">Switchover Guide</a> for details.</li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Updating%20the%20primary%20resource%3A"></a><h4 id="updating-the-primary-resource">Updating the primary resource:</h4>
+
+<ol>
+<li>Change <code>instance_type</code> from <code>CLOUD_SQL_INSTANCE</code> to <code>READ_REPLICA_INSTANCE</code></li>
+<li>Set <code>master_instance_name</code> to the original replica (which will be primary after switchover)</li>
+<li>(SQL Server) Set <code>replica_configuration</code> and set <code>cascadable_replica</code> to <code>true</code></li>
+<li>Remove original replica from <code>replica_names</code>
+<ul>
+<li><strong>NOTE</strong>: Do <strong>not</strong> delete the replica_names field, even if it has no replicas remaining. Set replica_names = [ ] to indicate it having no replicas.</li>
+</ul></li>
+<li>(MySQL/PostgreSQL) Set <code>replication_cluster.failover_dr_replica_name</code> as the empty string.</li>
+<li>(MySQL/PostgreSQL) Adjust <code>backup_configuration</code>. See <a href="../guides/sql_instance_switchover.html.markdown">Switchover Guide</a> for details.
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Plan%20and%20verify%20that%3A"></a><h4 id="plan-and-verify-that">Plan and verify that:</h4></li>
+</ol>
+
+<ul>
+<li><code>terraform plan</code> outputs <strong>"0 to add, 0 to destroy"</strong></li>
+<li><code>terraform plan</code> does not say <strong>"must be replaced"</strong> for any resource</li>
+<li>Every resource <strong>"will be updated in-place"</strong></li>
+<li>Only the 2 instances involved in switchover have planned changes</li>
+<li>(Recommended) Use <code>deletion_protection</code> on instances as a safety measure</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p><code>google_sql_database_instance</code> provides the following
+<a href="https://developer.hashicorp.com/terraform/plugin/sdkv2/resources/retries-and-customizable-timeouts">Timeouts</a> configuration options:</p>
+
+<ul>
+<li><code>create</code> - Default is 90 minutes.</li>
+<li><code>update</code> - Default is 90 minutes.</li>
+<li><code>delete</code> - Default is 90 minutes.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Database instances can be imported using one of any of these accepted formats:</p>
+
+<ul>
+<li><code>projects/{{project}}/instances/{{name}}</code></li>
+<li><code>{{project}}/{{name}}</code></li>
+<li><code>{{name}}</code></li>
+</ul>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import Database instances using one of the formats above. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"projects/{{project}}/instances/{{name}}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_sql_database_instance.default</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When using the <a href="https://developer.hashicorp.com/terraform/cli/commands/import"><code>terraform import</code> command</a>, Database instances can be imported using one of the formats above. For example:</p>
+
+<pre><code>$ terraform import google_sql_database_instance.default projects/{{project}}/instances/{{name}}
+$ terraform import google_sql_database_instance.default {{project}}/{{name}}
+$ terraform import google_sql_database_instance.default {{name}}
+</code></pre>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Some fields (such as <code>replica_configuration</code>) won't show a diff if they are unset in config and set on the server. When importing, double-check that your config has all the fields set that you expect- just seeing no diff isn't sufficient to know that your config could reproduce the imported resource.</p>
+</aside>
+
+            
+        
+    </body></html>

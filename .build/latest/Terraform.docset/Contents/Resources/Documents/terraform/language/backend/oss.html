@@ -1,0 +1,130 @@
+<html><!-- Online page at https://www.terraform.io/language/backend/oss --><head>
+                <title>OSS</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="oss">OSS</h1>
+
+<p>Stores the state as a given key in a given bucket on Stores
+<a href="https://www.alibabacloud.com/help/product/31815.htm">Alibaba Cloud OSS</a>.
+This backend also supports state locking and consistency checking via
+<a href="https://www.alibabacloud.com/help/doc-detail/27280.htm">Alibaba Cloud Table Store</a>, which can be enabled by setting
+the <code>tablestore_table</code> field to an existing TableStore table name.</p>
+
+<p>This backend supports <a href="../../terraform/language/state/locking.html">state locking</a> via TableStore.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The OSS backend is available from terraform version 0.12.2.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Configuration"></a><h2 id="example-configuration">Example Configuration</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"oss"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"bucket-for-terraform-state"</span><span class="w"></span>
+<span class="w">    </span><span class="na">prefix</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"path/mystate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"version-1.tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"cn-beijing"</span><span class="w"></span>
+<span class="w">    </span><span class="na">tablestore_endpoint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://terraform-remote.cn-hangzhou.ots.aliyuncs.com"</span><span class="w"></span>
+<span class="w">    </span><span class="na">tablestore_table</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"statelock"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>This assumes we have a <a href="https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/oss_bucket">OSS Bucket</a> created called <code>bucket-for-terraform-state</code>,
+a <a href="https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/ots_instance">OTS Instance</a> called <code>terraform-remote</code> and
+a <a href="https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/ots_table">OTS TableStore</a> called <code>statelock</code>. The
+Terraform state will be written into the file <code>path/mystate/version-1.tfstate</code>. The <code>TableStore</code> must have a primary key named <code>LockID</code> of type <code>String</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%20Configuration"></a><h2 id="data-source-configuration">Data Source Configuration</h2>
+
+<p>To make use of the OSS remote state in another configuration, use the
+<a href="../../terraform/language/state/remote-state-data.html"><code>terraform_remote_state</code> data
+source</a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"oss"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"remote-state-dns"</span><span class="w"></span>
+<span class="w">    </span><span class="na">prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mystate/state"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform.tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"cn-beijing"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The <code>terraform_remote_state</code> data source will return all of the root outputs
+defined in the referenced remote state, an example output might look like:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"terraform_remote_state"</span><span class="w"> </span><span class="nv">"network"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">backend</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"oss"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">config</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"remote-state-dns"</span><span class="w"></span>
+<span class="w">        </span><span class="na">key</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform.tfstate"</span><span class="w"></span>
+<span class="w">        </span><span class="na">prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mystate/state"</span><span class="w"></span>
+<span class="w">        </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"cn-beijing"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">outputs</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="w">    </span><span class="na">workspace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"default"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuration%20Variables"></a><h2 id="configuration-variables">Configuration Variables</h2>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>Warning</em>
+    <p>We recommend using environment variables to supply credentials and other sensitive data. If you use <code>-backend-config</code> or hardcode these values directly in your configuration, Terraform will include these values in both the <code>.terraform</code> subdirectory and in plan files. Refer to <a href="../../terraform/language/backend.html#credentials-and-sensitive-data">Credentials and Sensitive Data</a> for details.</p>
+</aside>
+
+<p>The following configuration options or environment variables are supported:</p>
+
+<ul>
+<li><p><code>access_key</code> - (Optional) Alibaba Cloud access key. It supports environment variables <code>ALICLOUD_ACCESS_KEY</code> and  <code>ALICLOUD_ACCESS_KEY_ID</code>.</p></li>
+<li><p><code>secret_key</code> - (Optional) Alibaba Cloud secret access key. It supports environment variables <code>ALICLOUD_SECRET_KEY</code> and  <code>ALICLOUD_ACCESS_KEY_SECRET</code>.</p></li>
+<li><p><code>security_token</code> - (Optional) STS access token. It supports environment variable <code>ALICLOUD_SECURITY_TOKEN</code>.</p></li>
+<li><p><code>ecs_role_name</code> - (Optional, Available in 0.12.14+) The RAM Role Name attached on a ECS instance for API operations. You can retrieve this from the 'Access Control' section of the Alibaba Cloud console.</p></li>
+<li><p><code>region</code> - (Optional) The region of the OSS bucket. It supports environment variables <code>ALICLOUD_REGION</code> and <code>ALICLOUD_DEFAULT_REGION</code>.</p></li>
+<li><p><code>endpoint</code> - (Optional) A custom endpoint for the OSS API. It supports environment variables <code>ALICLOUD_OSS_ENDPOINT</code> and <code>OSS_ENDPOINT</code>.</p></li>
+<li><p><code>bucket</code> - (Required) The name of the OSS bucket.</p></li>
+<li><p><code>prefix</code> - (Opeional) The path directory of the state file will be stored. Default to "env:".</p></li>
+<li><p><code>key</code> - (Optional) The name of the state file. Defaults to <code>terraform.tfstate</code>.</p></li>
+<li><p><code>tablestore_endpoint</code> / <code>ALICLOUD_TABLESTORE_ENDPOINT</code> - (Optional) A custom endpoint for the TableStore API.</p></li>
+<li><p><code>tablestore_table</code> - (Optional) A TableStore table for state locking and consistency. The table must have a primary key named <code>LockID</code> of type <code>String</code>.</p></li>
+<li><p><code>sts_endpoint</code> - (Optional, Available in 1.0.11+) Custom endpoint for the AliCloud Security Token Service (STS) API. It supports environment variable <code>ALICLOUD_STS_ENDPOINT</code>.</p></li>
+<li><p><code>encrypt</code> - (Optional) Whether to enable server side
+encryption of the state file. If it is true, OSS will use 'AES256' encryption algorithm to encrypt state file.</p></li>
+<li><p><code>acl</code> - (Optional) <a href="https://www.alibabacloud.com/help/doc-detail/52284.htm">Object
+ACL</a>
+to be applied to the state file.</p></li>
+<li><p><code>shared_credentials_file</code> - (Optional, Available in 0.12.8+) This is the path to the shared credentials file. It can also be sourced from the <code>ALICLOUD_SHARED_CREDENTIALS_FILE</code> environment variable. If this is not set and a profile is specified, <code>~/.aliyun/config.json</code> will be used.</p></li>
+<li><p><code>profile</code> - (Optional, Available in 0.12.8+)  This is the Alibaba Cloud profile name as set in the shared credentials file. It can also be sourced from the <code>ALICLOUD_PROFILE</code> environment variable.</p></li>
+<li><p><code>assume_role_role_arn</code> - (Optional, Available in 1.1.0+) The ARN of the role to assume. If ARN is set to an empty string, it does not perform role switching. It supports the environment variable <code>ALICLOUD_ASSUME_ROLE_ARN</code>.
+Terraform executes configuration on account with provided credentials.</p></li>
+<li><p><code>assume_role_policy</code> - (Optional, Available in 1.1.0+) A more restrictive policy to apply to the temporary credentials. This gives you a way to further restrict the permissions for the resulting temporary security credentials. You cannot use this policy to grant permissions that exceed those of the role that is being assumed.</p></li>
+<li><p><code>assume_role_session_name</code> - (Optional, Available in 1.1.0+) The session name to use when assuming the role. If omitted, 'terraform' is passed to the AssumeRole call as session name. It supports environment variable <code>ALICLOUD_ASSUME_ROLE_SESSION_NAME</code>.</p></li>
+<li><p><code>assume_role_session_expiration</code> - (Optional, Available in 1.1.0+) The time after which the established session for assuming role expires. Valid value range: [900-3600] seconds. Default to 3600 (in this case Alibaba Cloud uses its own default value). It supports environment variable <code>ALICLOUD_ASSUME_ROLE_SESSION_EXPIRATION</code>.</p></li>
+<li><p><code>assume_role</code> - (<strong>Deprecated as of 1.1.0+</strong>, Available in 0.12.6+) If provided with a role ARN, will attempt to assume this role using the supplied credentials. It will be ignored when <code>assume_role_role_arn</code> is specified.</p>
+
+<p><strong>Deprecated in favor of flattening assume<em>role</em>* options</strong></p>
+
+<ul>
+<li><p><code>role_arn</code> - (Required) The ARN of the role to assume. If ARN is set to an empty string, it does not perform role switching. It supports the environment variable <code>ALICLOUD_ASSUME_ROLE_ARN</code>.
+Terraform executes configuration on account with provided credentials.</p></li>
+<li><p><code>policy</code> - (Optional) A more restrictive policy to apply to the temporary credentials. This gives you a way to further restrict the permissions for the resulting temporary security credentials. You cannot use this policy to grant permissions that exceed those of the role that is being assumed.</p></li>
+<li><p><code>session_name</code> - (Optional) The session name to use when assuming the role. If omitted, 'terraform' is passed to the AssumeRole call as session name. It supports environment variable <code>ALICLOUD_ASSUME_ROLE_SESSION_NAME</code>.</p></li>
+<li><p><code>session_expiration</code> - (Optional) The time after which the established session for assuming role expires. Valid value range: [900-3600] seconds. Default to 3600 (in this case Alibaba Cloud uses its own default value). It supports environment variable <code>ALICLOUD_ASSUME_ROLE_SESSION_EXPIRATION</code>.</p></li>
+</ul></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you want to store state in the custom OSS endpoint, you can specify an environment variable <code>OSS_ENDPOINT</code>, like "oss-cn-beijing-internal.aliyuncs.com"</p>
+</aside>
+
+            
+        
+    </body></html>

@@ -1,0 +1,108 @@
+<html><!-- Online page at https://registry.terraform.io/providers/gitlabhq/gitlab/latest/docs/resources/project_security_policy_attachment --><head>
+                <title>gitlab_project_security_policy_attachment</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="gitlab_project_security_policy_attachment-resource">gitlab_project_security_policy_attachment (Resource)</h1>
+
+<p>The <code>gitlab_project_security_policy_attachment</code> resource allows to attach a security policy project to a project.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p><a href="https://docs.gitlab.com/user/application_security/policies/">Policies</a> are files stored in a policy project as raw YAML, to allow maximum flexibility with support of all kind of policy and all their options. See the examples for how to create a policy project, add a policy, and link it. Use the <code>gitlab_repository_file</code> resource to create policies instead of a specific policy resource. This ensures all policy options are immediately via Terraform once released.</p>
+</aside>
+
+<p><strong>Upstream API</strong>: <a href="https://docs.gitlab.com/api/graphql/reference/index/#mutationsecuritypolicyprojectassign">GitLab GraphQL API docs</a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># This resource can be used to attach a security policy to a pre-existing project</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"gitlab_project_security_policy_attachment"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">1234</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">4567</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+
+<span class="c1"># Or Terraform can create a new project, add a policy to that project,</span>
+<span class="c1"># then attach that policy project to other projects.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"gitlab_project"</span><span class="w"> </span><span class="nv">"my-policy-project"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"security-policy-project"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"gitlab_repository_file"</span><span class="w"> </span><span class="nv">"policy-yml"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">gitlab_project.my-policy-project.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">file_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">".gitlab/security-policies/my-policy.yml"</span><span class="w"></span>
+<span class="w">  </span><span class="na">branch</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"master"</span><span class="w"></span>
+<span class="w">  </span><span class="na">encoding</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"text"</span><span class="w"></span>
+<span class="w">  </span><span class="na">content</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;-</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="sh">---</span>
+<span class="sh">approval_policy:</span>
+<span class="sh">- name: test</span>
+<span class="sh">description: test</span>
+<span class="sh">enabled: true</span>
+<span class="sh">rules:</span>
+<span class="sh">- type: any_merge_request</span>
+<span class="sh">    branch_type: protected</span>
+<span class="sh">    commits: any</span>
+<span class="sh">approval_settings:</span>
+<span class="sh">    block_branch_modification: true</span>
+<span class="sh">    prevent_pushing_and_force_pushing: true</span>
+<span class="sh">    prevent_approval_by_author: true</span>
+<span class="sh">    prevent_approval_by_commit_author: true</span>
+<span class="sh">    remove_approvals_with_new_commit: true</span>
+<span class="sh">    require_password_to_approve: false</span>
+<span class="sh">fallback_behavior:</span>
+<span class="sh">    fail: closed</span>
+<span class="sh">actions:</span>
+<span class="sh">- type: send_bot_message</span>
+<span class="sh">    enabled: true</span>
+<span class="dl">EOT</span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Multiple policies can be attached to a single project by repeating this resource or using a `for_each`</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"gitlab_project_security_policy_attachment"</span><span class="w"> </span><span class="nv">"my-policy"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">1234</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">gitlab_project.my-policy-project.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<!-- schema generated by tfplugindocs -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Schema"></a><h2 id="schema">Schema</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Required"></a><h3 id="required">Required</h3>
+
+<ul>
+<li><code>policy_project</code> (String) The ID or Full Path of the security policy project.</li>
+<li><code>project</code> (String) The ID or Full Path of the project which will have the security policy project assigned to it.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Read-Only"></a><h3 id="read-only">Read-Only</h3>
+
+<ul>
+<li><code>id</code> (String) The ID of this Terraform resource. In the format of <code>&lt;project&gt;:&lt;policy_project&gt;</code>.</li>
+<li><code>policy_project_graphql_id</code> (String) The GraphQL ID of the security policy project.</li>
+<li><code>project_graphql_id</code> (String) The GraphQL ID of the project to which the security policty project will be attached.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Starting in Terraform v1.5.0 you can use an <a href="https://developer.hashicorp.com/terraform/language/import">import block</a> to import <code>gitlab_project_security_policy_attachment</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">gitlab_project_security_policy_attachment.example</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"see CLI command below for ID"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Import using the CLI is supported using the following syntax:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># GitLab project security policy attachments can be imported using an id made up of `project:policy_project_id` where the policy project ID is the project ID of the policy project, e.g.</span>
+terraform import gitlab_project_security_policy_attachment.foo <span class="m">1</span>:2
+</code></pre></div>
+
+            
+        
+    </body></html>

@@ -1,0 +1,112 @@
+<html><!-- Online page at https://www.terraform.io/language/backend/pg --><head>
+                <title>pg</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="pg">pg</h1>
+
+<p>Stores the state in a <a href="https://www.postgresql.org">Postgres database</a> version 10 or newer.</p>
+
+<p>This backend supports <a href="../../terraform/language/state/locking.html">state locking</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Configuration"></a><h2 id="example-configuration">Example Configuration</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"pg"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">conn_str</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"postgres://user:pass@db.example.com/terraform_backend"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Before initializing the backend with <code>terraform init</code>, the database must already exist:</p>
+
+<pre><code>createdb terraform_backend
+</code></pre>
+
+<p>This <code>createdb</code> command is found in <a href="https://www.postgresql.org/docs/10/reference-client.html">Postgres client applications</a> which are installed along with the database server.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20environment%20variables"></a><h3 id="using-environment-variables">Using environment variables</h3>
+
+<p>We recommend using environment variables to configure the <code>pg</code> backend in order
+not to have sensitive credentials written to  disk and committed to source
+control.</p>
+
+<p>The <code>pg</code> backend supports the standard <a href="https://www.postgresql.org/docs/current/libpq-envars.html"><code>libpq</code> environment variables</a>.</p>
+
+<p>The backend can be configured either by giving the whole configuration as an
+environment variable:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"pg"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<pre><code>$ export PG_CONN_STR=postgres://user:pass@db.example.com/terraform_backend
+$ terraform init
+</code></pre>
+
+<p>or just the sensitive parameters:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"pg"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">conn_str</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"postgres://db.example.com/terraform_backend"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<pre><code>$ export PGUSER=user
+$ read -s PGPASSWORD
+$ export PGPASSWORD
+$ terraform init
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%20Configuration"></a><h2 id="data-source-configuration">Data Source Configuration</h2>
+
+<p>To make use of the pg remote state in another configuration, use the <a href="../../terraform/language/state/remote-state-data.html"><code>terraform_remote_state</code> data source</a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"terraform_remote_state"</span><span class="w"> </span><span class="nv">"network"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"pg"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">conn_str</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"postgres://localhost/terraform_backend"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuration%20Variables"></a><h2 id="configuration-variables">Configuration Variables</h2>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>Warning</em>
+    <p>We recommend using environment variables to supply credentials and other sensitive data. If you use <code>-backend-config</code> or hardcode these values directly in your configuration, Terraform will include these values in both the <code>.terraform</code> subdirectory and in plan files. Refer to <a href="../../terraform/language/backend.html#credentials-and-sensitive-data">Credentials and Sensitive Data</a> for details.</p>
+</aside>
+
+<p>The following configuration options or environment variables are supported:</p>
+
+<ul>
+<li><code>conn_str</code> - Postgres connection string; a <code>postgres://</code> URL. The <code>PG_CONN_STR</code> and <a href="https://www.postgresql.org/docs/current/libpq-envars.html">standard <code>libpq</code></a> environment variables can also be used to indicate how to connect to the PostgreSQL database.</li>
+<li><code>schema_name</code> - Name of the automatically-managed Postgres schema, default to <code>terraform_remote_state</code>. Can also be set using the <code>PG_SCHEMA_NAME</code> environment variable.</li>
+<li><code>skip_schema_creation</code> - If set to <code>true</code>, the Postgres schema must already exist. Can also be set using the <code>PG_SKIP_SCHEMA_CREATION</code> environment variable. Terraform won't try to create the schema, this is useful when it has already been created by a database administrator.</li>
+<li><code>skip_table_creation</code> - If set to <code>true</code>, the Postgres table must already exist. Can also be set using the <code>PG_SKIP_TABLE_CREATION</code> environment variable. Terraform won't try to create the table, this is useful when it has already been created by a database administrator.</li>
+<li><code>skip_index_creation</code> - If set to <code>true</code>, the Postgres index must already exist. Can also be set using the <code>PG_SKIP_INDEX_CREATION</code> environment variable. Terraform won't try to create the index, this is useful when it has already been created by a database administrator.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Technical%20Design"></a><h2 id="technical-design">Technical Design</h2>
+
+<p>This backend creates one table <strong>states</strong> in the automatically-managed Postgres schema configured by the <code>schema_name</code> variable.</p>
+
+<p>The table is keyed by the <a href="../../terraform/language/state/workspaces.html">workspace</a> name. If workspaces are not in use, the name <code>default</code> is used.</p>
+
+<p>Locking is supported using <a href="https://www.postgresql.org/docs/9.5/explicit-locking.html#ADVISORY-LOCKS">Postgres advisory locks</a>. <a href="../../terraform/cli/commands/force-unlock.html"><code>force-unlock</code></a> is not supported, because these database-native locks will automatically unlock when the session is aborted or the connection fails. To see outstanding locks in a Postgres server, use the <a href="https://www.postgresql.org/docs/9.5/view-pg-locks.html"><code>pg_locks</code> system view</a>.</p>
+
+<p>The <strong>states</strong> table contains:</p>
+
+<ul>
+<li>a serial integer <code>id</code>, used as the key for advisory locks</li>
+<li>the workspace <code>name</code> key as <em>text</em> with a unique index</li>
+<li>the Terraform state <code>data</code> as <em>text</em></li>
+</ul>
+
+            
+        
+    </body></html>

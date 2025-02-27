@@ -1,0 +1,267 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/logging_project_sink --><head>
+                <title>google_logging_project_sink</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="google_logging_project_sink">google_logging_project_sink</h1>
+
+<p>Manages a project-level logging sink. For more information see:</p>
+
+<ul>
+<li><a href="https://cloud.google.com/logging/docs/reference/v2/rest/v2/projects.sinks">API documentation</a></li>
+<li>How-to Guides
+<ul>
+<li><a href="https://cloud.google.com/logging/docs/export">Exporting Logs</a></li>
+</ul></li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>You can specify exclusions for log sinks created by terraform by using the exclusions field of <code>google_logging_folder_sink</code></p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>You must have <a href="https://cloud.google.com/logging/docs/access-control">granted the "Logs Configuration Writer"</a> IAM role (<code>roles/logging.configWriter</code>) to the credentials used with terraform.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>You must <a href="https://console.cloud.google.com/apis/library/cloudresourcemanager.googleapis.com">enable the Cloud Resource Manager API</a></p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>The <code>_Default</code> and <code>_Required</code> logging sinks are automatically created for a given project and cannot be deleted. Creating a resource of this type will acquire and update the resource that already exists at the desired location. These sinks cannot be removed so deleting this resource will remove the sink config from your terraform state but will leave the logging sink unchanged. The sinks that are currently automatically created are "_Default" and "_Required".</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Basic%20Sink"></a><h2 id="example-usage-basic-sink">Example Usage - Basic Sink</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_logging_project_sink"</span><span class="w"> </span><span class="nv">"my-sink"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-pubsub-instance-sink"</span><span class="c1"></span>
+
+<span class="c1">  # Can export to pubsub, cloud storage, bigquery, log bucket, or another project</span>
+<span class="w">  </span><span class="na">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"pubsub.googleapis.com/projects/my-project/topics/instance-activity"</span><span class="c1"></span>
+
+<span class="c1">  # Log all WARN or higher severity messages relating to instances</span>
+<span class="w">  </span><span class="na">filter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"resource.type = gce_instance AND severity &gt;= WARNING"</span><span class="c1"></span>
+
+<span class="c1">  # Use a unique writer (creates a unique service account used for writing)</span>
+<span class="w">  </span><span class="na">unique_writer_identity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Cloud%20Storage%20Bucket%20Destination"></a><h2 id="example-usage-cloud-storage-bucket-destination">Example Usage - Cloud Storage Bucket Destination</h2>
+
+<p>A more complete example follows: this creates a compute instance, as well as a log sink that logs all activity to a
+cloud storage bucket. Because we are using <code>unique_writer_identity</code>, we must grant it access to the bucket.</p>
+
+<p>Note that this grant requires the "Project IAM Admin" IAM role (<code>roles/resourcemanager.projectIamAdmin</code>) granted to the
+credentials used with Terraform.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Our logged compute instance</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance"</span><span class="w"> </span><span class="nv">"my-logged-instance"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-instance"</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"e2-medium"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">boot_disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">initialize_params</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud/debian-11"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">network_interface</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"default"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">access_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># A gcs bucket to store logs in</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_storage_bucket"</span><span class="w"> </span><span class="nv">"gcs-bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-unique-logging-bucket"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"US"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Our sink; this logs all activity related to our "my-logged-instance" instance</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_logging_project_sink"</span><span class="w"> </span><span class="nv">"instance-sink"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-instance-sink"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"some explanation on what this is"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"storage.googleapis.com/${google_storage_bucket.gcs-bucket.name}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">filter</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"resource.type = gce_instance AND resource.labels.instance_id = \"${google_compute_instance.my-logged-instance.instance_id}\""</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">unique_writer_identity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Because our sink uses a unique_writer, we must grant that writer access to the bucket.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_project_iam_binding"</span><span class="w"> </span><span class="nv">"gcs-bucket-writer"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"your-project-id"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"roles/storage.objectCreator"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">members</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_logging_project_sink.instance-sink.writer_identity</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20User-managed%20Service%20Account"></a><h2 id="example-usage-user-managed-service-account">Example Usage - User-managed Service Account</h2>
+
+<p>The following example creates a sink that are configured with user-managed service accounts, by specifying
+the <code>custom_writer_identity</code> field.</p>
+
+<p>Note that you can only create a sink that uses a user-managed service account when the sink destination
+is a log bucket.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_service_account"</span><span class="w"> </span><span class="nv">"custom-sa"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"other-project-id"</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"gce-log-bucket-sink"</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gce-log-bucket-sink"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create a sink that uses user-managed service account</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_logging_project_sink"</span><span class="w"> </span><span class="nv">"my-sink"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"other-project-log-bucket-sink"</span><span class="c1"></span>
+
+<span class="c1">  # Can export to log bucket in another project</span>
+<span class="w">  </span><span class="na">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"logging.googleapis.com/projects/other-project-id/locations/global/buckets/gce-logs"</span><span class="c1"></span>
+
+<span class="c1">  # Log all WARN or higher severity messages relating to instances</span>
+<span class="w">  </span><span class="na">filter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"resource.type = gce_instance AND severity &gt;= WARNING"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">unique_writer_identity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1"></span>
+
+<span class="c1">  # Use a user-managed service account</span>
+<span class="w">  </span><span class="na">custom_writer_identity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_service_account.custom-sa.email</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># grant writer access to the user-managed service account</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_project_iam_member"</span><span class="w"> </span><span class="nv">"custom-sa-logbucket-binding"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"destination-project-id"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"roles/logging.bucketWriter"</span><span class="w"></span>
+<span class="w">  </span><span class="na">member</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"serviceAccount:${google_service_account.custom-sa.email}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The above example will create a log sink that route logs to destination GCP project using
+an user-managed service account. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Sink%20Exclusions"></a><h2 id="example-usage-sink-exclusions">Example Usage - Sink Exclusions</h2>
+
+<p>The following example uses <code>exclusions</code> to filter logs that will not be exported. In this example logs are exported to a <a href="https://cloud.google.com/logging/docs/buckets">log bucket</a> and there are 2 exclusions configured</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_logging_project_sink"</span><span class="w"> </span><span class="nv">"log-bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-logging-sink"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"logging.googleapis.com/projects/my-project/locations/global/buckets/_Default"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">exclusions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"nsexcllusion1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Exclude logs from namespace-1 in k8s"</span><span class="w"></span>
+<span class="w">    </span><span class="na">filter</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"resource.type = k8s_container resource.labels.namespace_name=\"namespace-1\" "</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">exclusions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"nsexcllusion2"</span><span class="w"></span>
+<span class="w">    </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Exclude logs from namespace-2 in k8s"</span><span class="w"></span>
+<span class="w">    </span><span class="na">filter</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"resource.type = k8s_container resource.labels.namespace_name=\"namespace-2\" "</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">unique_writer_identity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The name of the logging sink. Logging automatically creates two sinks: <code>_Required</code> and <code>_Default</code>.</p></li>
+<li><p><code>destination</code> - (Required) The destination of the sink (or, in other words, where logs are written to). Can be a Cloud Storage bucket, a PubSub topic, a BigQuery dataset, a Cloud Logging bucket, or a Google Cloud project. Examples:</p>
+
+<ul>
+<li><code>storage.googleapis.com/[GCS_BUCKET]</code></li>
+<li><code>bigquery.googleapis.com/projects/[PROJECT_ID]/datasets/[DATASET]</code></li>
+<li><code>pubsub.googleapis.com/projects/[PROJECT_ID]/topics/[TOPIC_ID]</code></li>
+<li><code>logging.googleapis.com/projects/[PROJECT_ID]/locations/global/buckets/[BUCKET_ID]</code></li>
+<li><code>logging.googleapis.com/projects/[PROJECT_ID]</code></li>
+</ul>
+
+<p></p><p>The writer associated with the sink must have access to write to the above resource.</p></li>
+<li><p><code>filter</code> - (Optional) The filter to apply when exporting logs. Only log entries that match the filter are exported.
+See <a href="https://cloud.google.com/logging/docs/view/advanced_filters">Advanced Log Filters</a> for information on how to
+write a filter.</p></li>
+<li><p><code>description</code> - (Optional) A description of this sink. The maximum length of the description is 8000 characters.</p></li>
+<li><p><code>disabled</code> - (Optional) If set to True, then this sink is disabled and it does not export any log entries.</p></li>
+<li><p><code>project</code> - (Optional) The ID of the project to create the sink in. If omitted, the project associated with the provider is
+used.</p></li>
+<li><p><code>unique_writer_identity</code> - (Optional) Whether or not to create a unique identity associated with this sink. If <code>false</code>, then the <code>writer_identity</code> used is <code>serviceAccount:cloud-logs@system.gserviceaccount.com</code>. If <code>true</code> (the default),
+then a unique service account is created and used for this sink. If you wish to publish logs across projects or utilize
+<code>bigquery_options</code>, you must set <code>unique_writer_identity</code> to true.</p></li>
+<li><p><code>custom_writer_identity</code> - (Optional) A user managed service account that will be used to write
+the log entries. The format must be <code>serviceAccount:some@email</code>. This field can only be specified if you are
+routing logs to a destination outside this sink's project. If not specified, a Logging service account 
+will automatically be generated.</p></li>
+<li><p><code>bigquery_options</code> - (Optional) Options that affect sinks exporting data to BigQuery. Structure <a href="#nested_bigquery_options">documented below</a>.</p></li>
+<li><p><code>exclusions</code> - (Optional) Log entries that match any of the exclusion filters will not be exported. If a log entry is matched by both <code>filter</code> and one of <code>exclusions.filter</code>, it will not be exported.  Can be repeated multiple times for multiple exclusions. Structure is <a href="#nested_exclusions">documented below</a>.</p></li>
+</ul><p></p>
+
+<p><a name="nested_bigquery_options"></a>The <code>bigquery_options</code> block supports:</p>
+
+<ul>
+<li><code>use_partitioned_tables</code> - (Required) Whether to use <a href="https://cloud.google.com/bigquery/docs/partitioned-tables">BigQuery's partition tables</a>.
+By default, Logging creates dated tables based on the log entries' timestamps, e.g. <code>syslog_20170523</code>. With partitioned
+tables the date suffix is no longer present and <a href="https://cloud.google.com/bigquery/docs/querying-partitioned-tables">special query syntax</a>
+has to be used instead. In both cases, tables are sharded based on UTC timezone.</li>
+</ul>
+
+<p><a name="nested_exclusions"></a>The <code>exclusions</code> block supports:</p>
+
+<ul>
+<li><code>name</code> - (Required) A client-assigned identifier, such as <code>load-balancer-exclusion</code>. Identifiers are limited to 100 characters and can include only letters, digits, underscores, hyphens, and periods. First character has to be alphanumeric.</li>
+<li><code>description</code> - (Optional) A description of this exclusion.</li>
+<li><code>filter</code> - (Required) An advanced logs filter that matches the log entries to be excluded. By using the sample function, you can exclude less than 100% of the matching log entries. See <a href="https://cloud.google.com/logging/docs/view/advanced_filters">Advanced Log Filters</a> for information on how to
+write a filter.</li>
+<li><code>disabled</code> - (Optional) If set to True, then this exclusion is disabled and it does not exclude any log entries.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to the arguments listed above, the following computed attributes are
+exported:</p>
+
+<ul>
+<li><p><code>id</code> - an identifier for the resource with format <code>projects/{{project}}/sinks/{{name}}</code></p></li>
+<li><p><code>writer_identity</code> - The identity associated with this sink. This identity must be granted write access to the
+configured <code>destination</code>.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Project-level logging sinks can be imported using their URI, e.g.</p>
+
+<ul>
+<li><code>projects/{{project_id}}/sinks/{{name}}</code></li>
+</ul>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import project-level logging sinks using one of the formats above. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"projects/{{project_id}}/sinks/{{name}}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_logging_project_sink.default</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When using the <a href="https://developer.hashicorp.com/terraform/cli/commands/import"><code>terraform import</code> command</a>, project-level logging sinks can be imported using one of the formats above. For example:</p>
+
+<pre><code>$ terraform import google_logging_project_sink.default projects/{{project_id}}/sinks/{{name}}
+</code></pre>
+
+            
+        
+    </body></html>

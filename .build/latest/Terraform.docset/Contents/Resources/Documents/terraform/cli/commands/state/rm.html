@@ -1,0 +1,125 @@
+<html><!-- Online page at https://www.terraform.io/cli/commands/state/rm --><head>
+                <title>terraform state rm command</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-state-rm-command"><code>terraform state rm</code> command</h1>
+
+<p>The <code>terraform state rm</code> command removes the binding to an existing remote object without first destroying it. The remote object continues
+to exist but is no longer managed by Terraform.</p>
+
+<p>Instead of using the <code>terraform state rm</code> command, you can use <code>removed</code> blocks to remove resources. You can remove more than one resource at a time, and you can review removals as part of your normal plan and apply workflow. <a href="../../../terraform/language/resources/syntax.html#removing-resources">Learn more about using <code>removed</code> blocks with resources</a> and <a href="../../../terraform/language/modules/syntax.html#removing-modules">using <code>removed</code> blocks with modules</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Usage"></a><h2 id="usage">Usage</h2>
+
+<p>Usage: <code>terraform state rm [options] ADDRESS...</code></p>
+
+<p>Terraform will search the state for any instances matching the given
+<a href="../../../terraform/cli/state/resource-addressing.html">resource address</a>, and remove
+the record of each one so that Terraform will no longer be tracking the
+corresponding remote objects.</p>
+
+<p>This means that although the objects will still continue to exist in the
+remote system, a subsequent
+<a href="../../../terraform/cli/commands/plan.html"><code>terraform plan</code></a>
+will include an action to create a new object for each of the "forgotten"
+instances. Depending on the constraints imposed by the remote system, creating
+those objects might fail if their names or other identifiers conflict with
+the old objects still present.</p>
+
+<p>This command also accepts the following options:</p>
+
+<ul>
+<li><p><code>-dry-run</code> - Report all of the resource instances that match the given
+address without actually "forgetting" any of them.</p></li>
+<li><p><code>-lock=false</code> - Don't hold a state lock during the operation. This is
+dangerous if others might concurrently run commands against the same
+workspace.</p></li>
+<li><p><code>-lock-timeout=DURATION</code> - Unless locking is disabled with <code>-lock=false</code>,
+instructs Terraform to retry acquiring a lock for a period of time before
+returning an error. The duration syntax is a number followed by a time
+unit letter, such as "3s" for three seconds.</p></li>
+</ul>
+
+<p>For configurations using the <a href="../../../terraform/cli/cloud.html">HCP Terraform CLI integration</a> or the <a href="../../../terraform/language/backend/remote.html"><code>remote</code> backend</a>
+only, <code>terraform state rm</code>
+also accepts the option
+<a href="../../../terraform/cli/cloud/command-line-arguments.html#ignore-remote-version"><code>-ignore-remote-version</code></a>.</p>
+
+<p>For configurations using
+<a href="../../../terraform/language/backend/local.html">the <code>local</code> state rm</a> only,
+<code>terraform state rm</code> also accepts the legacy options
+<a href="../../../terraform/language/backend/local.html#command-line-arguments"><code>-state</code>, <code>-state-out</code>, and <code>-backup</code></a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%3A%20Remove%20all%20Instances%20of%20a%20Resource"></a><h2 id="example-remove-all-instances-of-a-resource">Example: Remove all Instances of a Resource</h2>
+
+<p>The following example will cause Terraform to "forget" all of the instances
+of the <code>packet_device</code> resource named "worker".</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform state rm <span class="s1">'packet_device.worker'</span>
+</code></pre></div>
+
+<p>A resource that doesn't use <code>count</code> or <code>for_each</code> has only one instance, so
+this is also the appropriate syntax to select that single instance.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%3A%20Remove%20all%20Instances%20of%20a%20Resource%20in%20a%20Module"></a><h2 id="example-remove-all-instances-of-a-resource-in-a-module">Example: Remove all Instances of a Resource in a Module</h2>
+
+<p>To select a resource that you've defined in a child module you must specify
+the path of that module as part of the resource address:</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform state rm <span class="s1">'module.foo.packet_device.worker'</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%3A%20Remove%20all%20Instances%20of%20all%20Resources%20in%20a%20Module"></a><h2 id="example-remove-all-instances-of-all-resources-in-a-module">Example: Remove all Instances of all Resources in a Module</h2>
+
+<p>The following example will cause Terraform to "forget" all of the instances
+associated with all resources defined in all instances of the module named
+<code>foo</code>:</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform state rm <span class="s1">'module.foo'</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%3A%20Remove%20a%20Particular%20Instance%20of%20a%20Resource%20using%20count"></a><h2 id="example-remove-a-particular-instance-of-a-resource-using-count">Example: Remove a Particular Instance of a Resource using <code>count</code></h2>
+
+<p>A resource defined with <a href="../../../terraform/language/meta-arguments/count.html">the <code>count</code> meta-argument</a>
+has multiple instances that are each identified by an integer. You can
+select a particular instance by including an explicit index in your given
+address:</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform state rm <span class="s1">'packet_device.worker[0]'</span>
+</code></pre></div>
+
+<p>Brackets (<code>[</code>, <code>]</code>) have a special meaning in some shells, so you may need to
+quote or escape the address in order to pass it literally to Terraform.
+The above shows the typical quoting syntax for Unix-style shells.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%3A%20Remove%20a%20Particular%20Instance%20of%20a%20Resource%20using%20for_each"></a><h2 id="example-remove-a-particular-instance-of-a-resource-using-for_each">Example: Remove a Particular Instance of a Resource using <code>for_each</code></h2>
+
+<p>A resource defined with <a href="../../../terraform/language/meta-arguments/for_each.html">the <code>for_each</code> meta-argument</a>
+has multiple instances that are each identified by an string. You can
+select a particular instance by including an explicit key in your given
+address.</p>
+
+<p>However, the syntax for strings includes quotes and the quote symbol often
+has special meaning in command shells, so you'll need to use the appropriate
+quoting and/or escaping syntax for the shell you are using. For example:</p>
+
+<p>Unix-style shells, such as on Linux or macOS:</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform state rm <span class="s1">'packet_device.worker["example"]'</span>
+</code></pre></div>
+
+<p>Windows Command Prompt (<code>cmd.exe</code>):</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform state rm packet_device.worker<span class="o">[</span><span class="se">\"</span>example<span class="se">\"</span><span class="o">]</span>
+</code></pre></div>
+
+<p>PowerShell:</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform state rm <span class="s1">'packet_device.worker[\"example\"]'</span>
+</code></pre></div>
+
+            
+        
+    </body></html>

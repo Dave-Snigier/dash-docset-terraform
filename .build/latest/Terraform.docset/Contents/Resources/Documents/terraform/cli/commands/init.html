@@ -1,0 +1,213 @@
+<html><!-- Online page at https://www.terraform.io/cli/commands/init --><head>
+                <title>terraform init command</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-init-command"><code>terraform init</code> command</h1>
+
+<p>The <code>terraform init</code> command initializes a working directory
+containing Terraform configuration files. This is the first command you should
+run after writing a new Terraform configuration or cloning an existing configuration
+from version control. It is safe to run this command multiple times.</p>
+
+<blockquote>
+  <p><strong>Hands-on:</strong> Try the <a href="../../terraform/tutorials/aws-get-started?utm_source=WEBSITE&amp;utm_medium=WEB_IO&amp;utm_offer=ARTICLE_PAGE&amp;utm_content=DOCS.html">Terraform: Get Started</a> tutorials. For more in-depth details on the <code>init</code> command, check out the <a href="../../terraform/tutorials/cli/init?utm_source=WEBSITE&amp;utm_medium=WEB_IO&amp;utm_offer=ARTICLE_PAGE&amp;utm_content=DOCS.html">Initialize Terraform Configuration tutorial</a>.</p>
+</blockquote>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Usage"></a><h2 id="usage">Usage</h2>
+
+<p>Usage: <code>terraform init [options]</code></p>
+
+<p>This command performs several different initialization steps in order to
+prepare the current working directory for use with Terraform. More details on
+these are in the sections below, but in most cases it is not necessary to worry
+about these individual steps.</p>
+
+<p>This command is always safe to run multiple times, to bring the working
+directory up to date with changes in the configuration. Though subsequent runs
+may give errors, this command will never delete your existing configuration or
+state.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/General%20Options"></a><h2 id="general-options">General Options</h2>
+
+<p>The following options apply to all of (or several of) the initialization steps:</p>
+
+<ul>
+<li><p><code>-input=true</code> Ask for input if necessary. If false, will error if
+input was required.</p></li>
+<li><p><code>-lock=false</code> Disable locking of state files during state-related operations.</p></li>
+<li><p><code>-lock-timeout=&lt;duration&gt;</code> Override the time Terraform will wait to acquire
+a state lock. The default is <code>0s</code> (zero seconds), which causes immediate
+failure if the lock is already held by another process.</p></li>
+<li><p><code>-no-color</code> Disable color codes in the command output.</p></li>
+<li><p><code>-upgrade</code> Opt to upgrade modules and plugins as part of their respective
+installation steps. See the sections below for more details.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Copy%20a%20Source%20Module"></a><h2 id="copy-a-source-module">Copy a Source Module</h2>
+
+<p>By default, <code>terraform init</code> assumes that the working directory already
+contains a configuration and will attempt to initialize that configuration.</p>
+
+<p>Optionally, init can be run against an empty directory with the
+<code>-from-module=MODULE-SOURCE</code> option, in which case the given module will be
+copied into the target directory before any other initialization steps are
+run.</p>
+
+<p>This special mode of operation supports two use-cases:</p>
+
+<ul>
+<li><p>Given a version control source, it can serve as a shorthand for checking out
+a configuration from version control and then initializing the working directory
+for it.</p></li>
+<li><p>If the source refers to an <em>example</em> configuration, it can be copied into
+a local directory to be used as a basis for a new configuration.</p></li>
+</ul>
+
+<p>For routine use it is recommended to check out configuration from version
+control separately, using the version control system's own commands. This way
+it is possible to pass extra flags to the version control system when necessary,
+and to perform other preparation steps (such as configuration generation, or
+activating credentials) before running <code>terraform init</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Backend%20Initialization"></a><h2 id="backend-initialization">Backend Initialization</h2>
+
+<p>During init, the root configuration directory is consulted for
+<a href="../../terraform/language/backend.html">backend configuration</a> and the chosen backend
+is initialized using the given configuration settings.</p>
+
+<p>Re-running init with an already-initialized backend will update the working
+directory to use the new backend settings. Either <code>-reconfigure</code> or
+<code>-migrate-state</code> must be supplied to update the backend configuration.</p>
+
+<p>The <code>-migrate-state</code> option will attempt to copy existing state to the new
+backend, and depending on what changed, may result in interactive prompts to
+confirm migration of workspace states.  The <code>-force-copy</code> option suppresses
+these prompts and answers "yes" to the migration questions.
+Enabling <code>-force-copy</code> also automatically enables the <code>-migrate-state</code> option.</p>
+
+<p>The <code>-reconfigure</code> option disregards any existing configuration, preventing
+migration of any existing state.</p>
+
+<p>To skip backend configuration, use <code>-backend=false</code>. Note that some other init
+steps require an initialized backend, so it is recommended to use this flag only
+when the working directory was already previously initialized for a particular
+backend.</p>
+
+<p>The <code>-backend-config=...</code> option can be used for
+<a href="../../terraform/language/backend.html#partial-configuration">partial backend configuration</a>,
+in situations where the backend settings are dynamic or sensitive and so cannot
+be statically specified in the configuration file.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Child%20Module%20Installation"></a><h2 id="child-module-installation">Child Module Installation</h2>
+
+<p>During init, the configuration is searched for <code>module</code> blocks, and the source
+code for referenced <a href="../../terraform/language/modules/develop.html">modules</a> is retrieved from the locations
+given in their <code>source</code> arguments.</p>
+
+<p>Re-running init with modules already installed will install the sources for
+any modules that were added to configuration since the last init, but will not
+change any already-installed modules. Use <code>-upgrade</code> to override this behavior,
+updating all modules to the latest available source code.</p>
+
+<p>To skip child module installation, use <code>-get=false</code>. Note that some other init
+steps can complete only when the module tree is complete, so it's recommended
+to use this flag only when the working directory was already previously
+initialized with its child modules.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Plugin%20Installation"></a><h2 id="plugin-installation">Plugin Installation</h2>
+
+<p>Most Terraform providers are published separately from Terraform as plugins.
+During init, Terraform searches the configuration for both direct and indirect
+references to providers and attempts to install the plugins for those providers.</p>
+
+<p>For providers that are published in either
+<a href="https://registry.terraform.io/">the public Terraform Registry</a> or in a
+third-party provider registry, <code>terraform init</code> will automatically find,
+download, and install the necessary provider plugins. If you cannot or do not
+wish to install providers from their origin registries, you can customize how
+Terraform installs providers using
+<a href="../../terraform/cli/config/config-file.html#provider-installation">the provider installation settings in the CLI configuration</a>.</p>
+
+<p>For more information about specifying which providers are required for each
+of your modules, see <a href="../../terraform/language/providers/requirements.html">Provider Requirements</a>.</p>
+
+<p>After successful installation, Terraform writes information about the selected
+providers to <a href="../../terraform/language/files/dependency-lock.html">the dependency lock file</a>.
+You should commit this file to your version control system to ensure that
+when you run <code>terraform init</code> again in future Terraform will select exactly
+the same provider versions. Use the <code>-upgrade</code> option if you want Terraform
+to ignore the dependency lock file and consider installing newer versions.</p>
+
+<p>You can modify <code>terraform init</code>'s plugin behavior with the following options:</p>
+
+<ul>
+<li><code>-upgrade</code> Upgrade all previously-selected plugins to the newest version
+that complies with the configuration's version constraints. This will
+cause Terraform to ignore any selections recorded in the dependency lock
+file, and to take the newest available version matching the configured
+version constraints.</li>
+<li><p><code>-get-plugins=false</code> — Skip plugin installation.</p>
+
+<p>-&gt; Note: Since Terraform 0.13, this option has been superseded by the
+<a href="../../terraform/cli/config/config-file.html#provider-installation"><code>provider_installation</code></a> and
+<a href="../../terraform/cli/config/config-file.html#plugin_cache_dir"><code>plugin_cache_dir</code></a> settings.
+It should not be used in Terraform versions 0.13+, and this option
+was removed in Terraform 0.15.</p></li>
+<li><code>-plugin-dir=PATH</code> — Force plugin installation to read plugins <em>only</em> from
+the specified directory, as if it had been configured as a <code>filesystem_mirror</code>
+in the CLI configuration. If you intend to routinely use a particular
+filesystem mirror then we recommend
+<a href="../../terraform/cli/config/config-file.html#provider-installation">configuring Terraform's installation methods globally</a>.
+You can use <code>-plugin-dir</code> as a one-time override for exceptional situations,
+such as if you are testing a local build of a provider plugin you are
+currently developing.</li>
+<li><code>-lockfile=MODE</code> Set a dependency lockfile mode.</li>
+</ul>
+
+<p>The valid values for the lockfile mode are as follows:</p>
+
+<ul>
+<li><code>readonly</code>: suppress the lockfile changes, but verify checksums against the
+information already recorded. It conflicts with the <code>-upgrade</code> flag. If you
+update the lockfile with third-party dependency management tools, it would be
+useful to control when it changes explicitly.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Running%20terraform%20init%20in%20automation"></a><h2 id="running-terraform-init-in-automation">Running <code>terraform init</code> in automation</h2>
+
+<p>For teams that use Terraform as a key part of a change management and
+deployment pipeline, it can be desirable to orchestrate Terraform runs in some
+sort of automation in order to ensure consistency between runs, and provide
+other interesting features such as integration with version control hooks.</p>
+
+<p>There are some special concerns when running <code>init</code> in such an environment,
+including optionally making plugins available locally to avoid repeated
+re-installation. For more information, see
+the <a href="../../terraform/tutorials/automation/automate-terraform?utm_source=WEBSITE&amp;utm_medium=WEB_IO&amp;utm_offer=ARTICLE_PAGE&amp;utm_content=DOCS.html">Running Terraform in Automation</a> tutorial.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Passing%20a%20Different%20Configuration%20Directory"></a><h2 id="passing-a-different-configuration-directory">Passing a Different Configuration Directory</h2>
+
+<p>Terraform v0.13 and earlier also accepted a directory path in place of the
+plan file argument to <code>terraform apply</code>, in which case Terraform would use
+that directory as the root module instead of the current working directory.</p>
+
+<p>That usage is still supported in Terraform v0.14, but is now deprecated and removed in
+Terraform v0.15. If your workflow relies on overriding
+the root module directory, use
+<a href="../../terraform/cli/commands.html#switching-working-directory-with-chdir">the <code>-chdir</code> global option</a>
+instead, which works across all commands and makes Terraform consistently look
+in the given directory for all files it would normally read or write in the
+current working directory.</p>
+
+<p>If your previous use of this legacy pattern was also relying on Terraform
+writing the <code>.terraform</code> subdirectory into the current working directory even
+though the root module directory was overridden, use
+<a href="../../terraform/cli/config/environment-variables.html#tf_data_dir">the <code>TF_DATA_DIR</code> environment variable</a>
+to direct Terraform to write the <code>.terraform</code> directory to a location other
+than the current working directory.</p>
+
+            
+        
+    </body></html>

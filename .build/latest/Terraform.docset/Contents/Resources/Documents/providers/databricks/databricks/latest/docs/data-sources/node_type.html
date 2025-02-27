@@ -1,0 +1,100 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/data-sources/node_type --><head>
+                <title>databricks_node_type</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_node_type-data-source">databricks_node_type Data Source</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you have a fully automated setup with workspaces created by <a href="../resources/mws_workspaces.md">databricks_mws_workspaces</a> or <a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/databricks_workspace">azurerm_databricks_workspace</a>, please make sure to add <a href="../guides/troubleshooting.md#data-resources-and-authentication-is-not-configured-errors">depends_on attribute</a> in order to prevent _default auth: cannot configure default credentials_ errors.</p>
+</aside>
+
+<p>Gets the smallest node type for <a href="../resources/cluster.md">databricks_cluster</a> that fits search criteria, like amount of RAM or number of cores. <a href="https://databricks.com/product/aws-pricing/instance-types">AWS</a> or <a href="https://azure.microsoft.com/en-us/pricing/details/databricks/">Azure</a>. Internally data source fetches <a href="https://docs.databricks.com/dev-tools/api/latest/clusters.html#list-node-types">node types</a> available per cloud, similar to executing <code>databricks clusters list-node-types</code>, and filters it to return the smallest possible node with criteria.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This is experimental functionality, which aims to simplify things. In case of wrong parameters given (e.g. <code>min_gpus = 876</code>) or no nodes matching, data source will return cloud-default node type, even though it doesn't match search criteria specified by data source arguments: <a href="https://aws.amazon.com/ec2/instance-types/i3/">i3.xlarge</a> for AWS or <a href="https://docs.microsoft.com/en-us/azure/cloud-services/cloud-services-sizes-specs#dv2-series">Standard_D3_v2</a> for Azure.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_node_type"</span><span class="w"> </span><span class="nv">"with_gpu"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">local_disk</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">min_cores</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">16</span><span class="w"></span>
+<span class="w">  </span><span class="na">gb_per_core</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="na">min_gpus</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_spark_version"</span><span class="w"> </span><span class="nv">"gpu_ml"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">gpu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">ml</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_cluster"</span><span class="w"> </span><span class="nv">"research"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"Research Cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">spark_version</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_spark_version.gpu_ml.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_type_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_node_type.with_gpu.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">autotermination_minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">20</span><span class="w"></span>
+<span class="w">  </span><span class="nb">autoscale</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">min_workers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">    </span><span class="na">max_workers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">50</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>Data source allows you to pick groups by the following attributes</p>
+
+<ul>
+<li><code>min_memory_gb</code> - (Optional) Minimum amount of memory per node in gigabytes. Defaults to _0_.</li>
+<li><code>gb_per_core</code> - (Optional) Number of gigabytes per core available on instance. Conflicts with <code>min_memory_gb</code>. Defaults to _0_.</li>
+<li><code>min_cores</code> - (Optional) Minimum number of CPU cores available on instance. Defaults to _0_.</li>
+<li><code>min_gpus</code> - (Optional) Minimum number of GPU's attached to instance. Defaults to _0_.</li>
+<li><code>local_disk</code> - (Optional) Pick only nodes with local storage. Defaults to _false_.</li>
+<li><code>local_disk_min_size</code> - (Optional) Pick only nodes that have size local storage greater or equal to given value. Defaults to _0_.</li>
+<li><code>category</code> - (Optional, case insensitive string) Node category, which can be one of (depending on the cloud environment, could be checked with <code>databricks clusters list-node-types -o json|jq '.node_types[]|.category'|sort |uniq</code>):
+<ul>
+<li><code>General Purpose</code> (all clouds)</li>
+<li><code>General Purpose (HDD)</code> (Azure)</li>
+<li><code>Compute Optimized</code> (all clouds)</li>
+<li><code>Memory Optimized</code> (all clouds)</li>
+<li><code>Memory Optimized (Remote HDD)</code> (Azure)</li>
+<li><code>Storage Optimized</code> (AWS, Azure)</li>
+<li><code>GPU Accelerated</code> (AWS, Azure)</li>
+</ul></li>
+<li><code>photon_worker_capable</code> - (Optional) Pick only nodes that can run Photon workers. Defaults to _false_.</li>
+<li><code>photon_driver_capable</code> - (Optional) Pick only nodes that can run Photon driver. Defaults to _false_.</li>
+<li><code>graviton</code> - (boolean, optional)  if we should limit the search only to nodes with AWS Graviton or Azure Cobalt CPUs. Default to _false_.</li>
+<li><code>fleet</code> - (boolean, optional)  if we should limit the search only to <a href="https://docs.databricks.com/compute/aws-fleet-instances.html">AWS fleet instance types</a>. Default to _false_.</li>
+<li><code>is_io_cache_enabled</code> - (Optional) . Pick only nodes that have IO Cache. Defaults to _false_.</li>
+<li><code>support_port_forwarding</code> - (Optional) Pick only nodes that support port forwarding. Defaults to _false_.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>Data source exposes the following attributes:</p>
+
+<ul>
+<li><code>id</code> - node type, that can be used for <a href="../resources/job.md">databricks_job</a>, <a href="../resources/cluster.md">databricks_cluster</a>, or <a href="../resources/instance_pool.md">databricks_instance_pool</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are used in the same context:</p>
+
+<ul>
+<li><a href="../guides/workspace-management.md">End to end workspace management</a> guide.</li>
+<li><a href="../resources/cluster.md">databricks_cluster</a> to create <a href="https://docs.databricks.com/clusters/index.html">Databricks Clusters</a>.</li>
+<li><a href="../resources/cluster_policy.md">databricks_cluster_policy</a> to create a <a href="../resources/cluster.md">databricks_cluster</a> policy, which limits the ability to create clusters based on a set of rules.</li>
+<li><a href="../resources/instance_pool.md">databricks_instance_pool</a> to manage <a href="https://docs.databricks.com/clusters/instance-pools/index.html">instance pools</a> to reduce <a href="../resources/cluster.md">cluster</a> start and auto-scaling times by maintaining a set of idle, ready-to-use instances.</li>
+<li><a href="../resources/job.md">databricks_job</a> to manage <a href="https://docs.databricks.com/jobs.html">Databricks Jobs</a> to run non-interactive code in a <a href="../resources/cluster.md">databricks_cluster</a>.</li>
+</ul>
+
+            
+        
+    </body></html>

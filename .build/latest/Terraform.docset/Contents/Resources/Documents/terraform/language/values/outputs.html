@@ -1,0 +1,254 @@
+<html><!-- Online page at https://www.terraform.io/language/values/outputs --><head>
+                <title>Output Values</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="output-values">Output Values</h1>
+
+<p>Output values make information about your infrastructure available on the
+command line, and can expose information for other Terraform configurations to
+use. Output values are similar to return values in programming languages.</p>
+
+<blockquote>
+  <p><strong>Hands-on:</strong> Try the <a href="../../terraform/tutorials/configuration-language/outputs.html">Output Data From
+  Terraform</a>
+  tutorial.</p>
+</blockquote>
+
+<p>Output values have several uses:</p>
+
+<ul>
+<li>A child module can use outputs to expose a subset of its resource attributes
+to a parent module.</li>
+<li>A root module can use outputs to print certain values in the CLI output after
+running <code>terraform apply</code>.</li>
+<li>When using <a href="../../terraform/language/state/remote.html">remote state</a>, root module outputs can be
+accessed by other configurations via a
+<a href="../../terraform/language/state/remote-state-data.html"><code>terraform_remote_state</code> data source</a>.</li>
+</ul>
+
+<p>Resource instances managed by Terraform each export attributes whose values
+can be used elsewhere in configuration. Output values are a way to expose some
+of that information to the user of your module.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>For brevity, output values are often referred to as just "outputs" when the meaning is clear from context.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Declaring%20an%20Output%20Value"></a><h2 id="declaring-an-output-value">Declaring an Output Value</h2>
+
+<p>Each output value exported by a module must be declared using an <code>output</code>
+block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">output</span><span class="w"> </span><span class="nv">"instance_ip_addr"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.server.private_ip</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The label immediately after the <code>output</code> keyword is the name, which must be a
+valid <a href="../../terraform/language/syntax/configuration.html#identifiers">identifier</a>. In a root module, this name is
+displayed to the user; in a child module, it can be used to access the output's
+value.</p>
+
+<p>The <code>value</code> argument takes an <a href="../../terraform/language/expressions.html">expression</a>
+whose result is to be returned to the user. In this example, the expression
+refers to the <code>private_ip</code> attribute exposed by an <code>aws_instance</code> resource
+defined elsewhere in this module (not shown). Any valid expression is allowed
+as an output value.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Outputs are only rendered when Terraform applies your plan. Running <code>terraform plan</code> will not render outputs.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Accessing%20Child%20Module%20Outputs"></a><h2 id="accessing-child-module-outputs">Accessing Child Module Outputs</h2>
+
+<p>In a parent module, outputs of child modules are available in expressions as
+<code>module.&lt;MODULE NAME&gt;.&lt;OUTPUT NAME&gt;</code>. For example, if a child module named
+<code>web_server</code> declared an output named <code>instance_ip_addr</code>, you could access that
+value as <code>module.web_server.instance_ip_addr</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Custom%20Condition%20Checks"></a><h2 id="custom-condition-checks">Custom Condition Checks</h2>
+
+<p>You can use <code>precondition</code> blocks to specify guarantees about output data. The following examples creates a precondition that checks whether the EC2 instance has an encrypted root volume.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">output</span><span class="w"> </span><span class="nv">"api_base_url"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://${aws_instance.example.private_dns}:8433/"</span><span class="c1"></span>
+
+<span class="c1">  # The EC2 instance must have an encrypted root volume.</span>
+<span class="w">  </span><span class="nb">precondition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_ebs_volume.example.encrypted</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The server's root volume is not encrypted."</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Custom conditions can help capture assumptions, helping future maintainers understand the configuration design and intent. They also return useful information about errors earlier and in context, helping consumers more easily diagnose issues in their configurations.</p>
+
+<p>Refer to <a href="../../terraform/language/expressions/custom-conditions.html#preconditions-and-postconditions">Custom Condition Checks</a> for more details.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Optional%20Arguments"></a><h2 id="optional-arguments">Optional Arguments</h2>
+
+<p><code>output</code> blocks can optionally include <code>description</code>, <code>sensitive</code>, <code>ephemeral</code>, and <code>depends_on</code> arguments, which are described in the following sections.</p>
+
+<p><a id="description"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/description%20%E2%80%94%20Output%20Value%20Documentation"></a><h3 id="description-output-value-documentation"><code>description</code> — Output Value Documentation</h3>
+
+<p>Because the output values of a module are part of its user interface, you can
+briefly describe the purpose of each value using the optional <code>description</code>
+argument:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">output</span><span class="w"> </span><span class="nv">"instance_ip_addr"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.server.private_ip</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The private IP address of the main server instance."</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The description should concisely explain the
+purpose of the output and what kind of value is expected. This description
+string might be included in documentation about the module, and so it should be
+written from the perspective of the user of the module rather than its
+maintainer. For commentary for module maintainers, use comments.</p>
+
+<p><a id="ephemeral"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ephemeral%20%E2%80%94%20Avoid%20storing%20values%20in%20state%20or%20plan%20files"></a><h3 id="ephemeral-avoid-storing-values-in-state-or-plan-files"><code>ephemeral</code> — Avoid storing values in state or plan files</h3>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>: Ephemeral outputs are available in Terraform v1.10 and later.</p>
+</aside>
+
+<p>You can mark <code>output</code> values as <code>ephemeral</code> in child modules to pass ephemeral values between modules while avoiding persisting those values to state or plan files. This is useful for managing credentials, tokens, or other temporary resources you do not want to store in Terraform state files.</p>
+
+<p>You can mark an <code>output</code> in a child module as ephemeral by setting the <code>ephemeral</code> attribute to <code>true</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># modules/db/main.tf</span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"secret_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_secretsmanager_secret.secret_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Temporary secret ID for accessing database in AWS."</span><span class="w"></span>
+<span class="w">  </span><span class="na">ephemeral</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Terraform has access to the value of <code>output</code> blocks during plan and apply operations. At the end of a plan or apply operation, Terraform does not persist the value of any ephemeral outputs.</p>
+
+<p>You can only reference ephemeral outputs in specific contexts or Terraform throws an error. The following are valid contexts for referencing ephemeral outputs:</p>
+
+<ul>
+<li>In a <a href="../../terraform/language/resources/ephemeral.html#write-only-arguments">write-only argument</a></li>
+<li>In another child module's ephemeral <code>output</code> block</li>
+<li>In <a href="../../terraform/language/values/variables.html#exclude-values-from-state">ephemeral variables</a></li>
+<li>In <a href="../../terraform/language/resources/ephemeral.html">ephemeral resources</a></li>
+</ul>
+
+<p>Note that you cannot set an <code>output</code> value as <code>ephemeral</code> in the root module.</p>
+
+<p><a id="sensitive"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/sensitive%20%E2%80%94%20Suppressing%20Values%20in%20CLI%20Output"></a><h3 id="sensitive-suppressing-values-in-cli-output"><code>sensitive</code> — Suppressing Values in CLI Output</h3>
+
+<p>An output can be marked as containing sensitive material using the optional
+<code>sensitive</code> argument:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">output</span><span class="w"> </span><span class="nv">"db_password"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_db_instance.db.password</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The password for logging in to the database."</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Terraform will hide values marked as sensitive in the messages from
+<code>terraform plan</code> and <code>terraform apply</code>. In the following scenario, our root
+module has an output declared as sensitive and a module call with a
+sensitive output, which we then use in a resource attribute.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tf</span>
+
+<span class="kr">module</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./mod"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"test_instance"</span><span class="w"> </span><span class="nv">"x"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">some_attribute</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">module.foo.a</span><span class="c1"> # resource attribute references a sensitive output</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"out"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"xyz"</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># mod/main.tf, our module containing a sensitive output</span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"a"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"secret"</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When we run a plan or apply, the sensitive value is redacted from output:</p>
+
+<pre><code>Terraform will perform the following actions:
+
+  # test_instance.x will be created
+  + resource "test_instance" "x" {
+      + some_attribute    = (sensitive value)
+    }
+
+Plan: 1 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + out = (sensitive value)
+</code></pre>
+
+<p>Terraform will still record sensitive values in the <a href="../../terraform/language/state.html">state</a>,
+and so anyone who can access the state data will have access to the sensitive
+values in cleartext. For more information, see
+<a href="../../terraform/language/state/sensitive-data.html">Sensitive Data in State</a>.</p>
+
+<p><a id="depends_on"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/depends_on%20%E2%80%94%20Explicit%20Output%20Dependencies"></a><h3 id="depends_on-explicit-output-dependencies"><code>depends_on</code> — Explicit Output Dependencies</h3>
+
+<p>Since output values are just a means for passing data out of a module, it is
+usually not necessary to worry about their relationships with other nodes in
+the dependency graph.</p>
+
+<p>However, when a parent module accesses an output value exported by one of its
+child modules, the dependencies of that output value allow Terraform to
+correctly determine the dependencies between resources defined in different
+modules.</p>
+
+<p>Just as with
+<a href="../../terraform/language/resources/behavior.html#resource-dependencies">resource dependencies</a>,
+Terraform analyzes the <code>value</code> expression for an output value and automatically
+determines a set of dependencies, but in less-common cases there are
+dependencies that cannot be recognized implicitly. In these rare cases, the
+<code>depends_on</code> argument can be used to create additional explicit dependencies:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">output</span><span class="w"> </span><span class="nv">"instance_ip_addr"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.server.private_ip</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The private IP address of the main server instance."</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="c1"></span>
+<span class="c1">    # Security group rule must be created before this IP address could</span>
+<span class="c1">    # actually be used, otherwise the services will be unreachable.</span>
+<span class="w">    </span><span class="nv">aws_security_group_rule.local_access</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The <code>depends_on</code> argument should be used only as a last resort. When using it,
+always include a comment explaining why it is being used, to help future
+maintainers understand the purpose of the additional dependency.</p>
+
+            
+        
+    </body></html>

@@ -1,0 +1,149 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/guides/aks_workload_identity --><head>
+                <title>Azure Provider: Authenticating using managed identities for Azure Kubernetes Service with Workload Identity</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="azure-provider-authenticating-using-managed-identities-for-azure-kubernetes-service-with-workload-identity">Azure Provider: Authenticating using managed identities for Azure Kubernetes Service with Workload Identity</h1>
+
+<p>Terraform supports a number of different methods for authenticating to Azure:</p>
+
+<ul>
+<li><a href="azure_cli.html">Authenticating to Azure using the Azure CLI</a></li>
+<li><a href="managed_service_identity.html">Authenticating to Azure using Managed Service Identity</a></li>
+<li><a href="service_principal_client_certificate.html">Authenticating to Azure using a Service Principal and a Client Certificate</a></li>
+<li><a href="service_principal_client_secret.html">Authenticating to Azure using a Service Principal and a Client Secret</a></li>
+<li><a href="service_principal_oidc.html">Authenticating to Azure using OpenID Connect</a></li>
+<li>Authenticating to Azure using AKS Workload Identity (covered in this guide)</li>
+</ul>
+
+<hr/>
+
+<p>We recommend using a service principal or a managed identity when running Terraform non-interactively (such as when running Terraform in a CI/CD pipeline), and authenticating using the Azure CLI when running Terraform locally.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/What%20is%20AKS%20Workload%20Identity%3F"></a><h2 id="what-is-aks-workload-identity">What is AKS Workload Identity?</h2>
+
+<p><a href="https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview">AKS Workload Identity</a> can be used to authenticate to services that support Azure Active Directory (Azure AD) authentication when running in Azure Kubernetes Service clusters.</p>
+
+<p>When a service account and pod are configured to use AKS Workload Identity, a federated identity token is injected into the pod at run-time, along with environment variables to use that identity.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20a%20workload%20to%20use%20an%20AKS%20Workload%20Identity"></a><h2 id="configuring-a-workload-to-use-an-aks-workload-identity">Configuring a workload to use an AKS Workload Identity</h2>
+
+<p>The (simplified) Terraform configuration below provisions a cluster with workload identity enabled, creates an identity and federated identity credential suitable for a workload identity, and then grants the Contributor role to the identity.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"azurerm_subscription"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"workload_sa_name"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Kubernetes service account to permit"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"workload_sa_namespace"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Kubernetes service account namespace to permit"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_kubernetes_cluster"</span><span class="w"> </span><span class="nv">"mycluster"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+<span class="w">  </span><span class="na">workload_identity_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_user_assigned_identity"</span><span class="w"> </span><span class="nv">"myworkload_identity"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myworkloadidentity"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_federated_identity_credential"</span><span class="w"> </span><span class="nv">"myworkload_identity"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_user_assigned_identity.myworkload_identity.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_user_assigned_identity.myworkload_identity.resource_group_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_user_assigned_identity.myworkload_identity.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">audience</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"api://AzureADTokenExchange"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">issuer</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_kubernetes_cluster.mycluster.oidc_issuer_url</span><span class="w"></span>
+<span class="w">  </span><span class="na">subject</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"system:serviceaccount:${workload_sa_namespace}:${workload_sa_name}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"azurerm_role_definition"</span><span class="w"> </span><span class="nv">"contributor"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Contributor"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_role_assignment"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_subscription.current.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_definition_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.azurerm_subscription.current.id}${data.azurerm_role_definition.contributor.id}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_user_assigned_identity.wayfinder_main.principal_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"myworkload_identity_client_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The client ID of the created managed identity to use for the annotation 'azure.workload.identity/client-id' on your service account"</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_user_assigned_identity.myworkload_identity.client_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20Terraform%20to%20use%20an%20AKS%20workload%20identity"></a><h2 id="configuring-terraform-to-use-an-aks-workload-identity">Configuring Terraform to use an AKS workload identity</h2>
+
+<p>At this point we assume that workload identity is configured on the AKS cluster being used and that permissions have been assigned via Azure's Identity and Access Management system.</p>
+
+<p>Terraform can be configured to use AKS workload identity for authentication in one of two ways: using environment variables, or by defining the field within the provider block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20with%20environment%20variables"></a><h3 id="configuring-with-environment-variables">Configuring with environment variables</h3>
+
+<p>Setting the <code>ARM_USE_AKS_WORKLOAD_IDENTITY</code> environment variable (equivalent to provider block argument <a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs#use_aks_workload_identity"><code>use_aks_workload_identity</code></a>) to <code>true</code> tells Terraform to use an AKS workload identity. It is also suggested to disable Azure CLI authentication by setting the <code>ARM_USE_CLI</code> environment variable (equivalent to provider block argument <a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs#use_cli"><code>use_cli</code></a>) to <code>false</code>.</p>
+
+<p>If you have not annotated your Kubernetes service account with <code>azure.workload.identity/client-id</code>, you will need to specify the <code>ARM_CLIENT_ID</code> environment variable (equivalent to provider block argument <a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs#client_id"><code>client_id</code></a>) to the <a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/user_assigned_identity#client_id">client id</a> of the identity.</p>
+
+<p>In addition to a properly-configured managed identity, Terraform needs to know the subscription ID to fully configure the AzureRM provider. The tenant ID will be detected from the environment provided by AKS Workload Identity.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span> <span class="nv">ARM_USE_AKS_WORKLOAD_IDENTITY</span><span class="o">=</span><span class="nb">true</span>
+<span class="nb">export</span> <span class="nv">ARM_USE_CLI</span><span class="o">=</span><span class="nb">false</span>
+<span class="nb">export</span> <span class="nv">ARM_SUBSCRIPTION_ID</span><span class="o">=</span>159f2485-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+<span class="nb">export</span> <span class="nv">ARM_CLIENT_ID</span><span class="o">=</span>xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx <span class="c1"># only necessary if the service account is not annotated with the relevant client ID</span>
+</code></pre></div>
+
+<p>A provider block is _technically_ optional when using environment variables. Even so, we recommend defining provider blocks so that you can pin or constrain the version of the provider being used, and configure other optional settings:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># We strongly recommend using the required_providers block to set the</span>
+<span class="c1"># Azure Provider source and version being used</span>
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azurerm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azurerm"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=4.1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Configure the Microsoft Azure Provider</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20with%20the%20provider%20block"></a><h3 id="configuring-with-the-provider-block">Configuring with the provider block</h3>
+
+<p>It's also possible to configure an AKS workload identity within the provider block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># We strongly recommend using the required_providers block to set the</span>
+<span class="c1"># Azure Provider source and version being used</span>
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azurerm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azurerm"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=4.1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Configure the Microsoft Azure Provider</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">use_aks_workload_identity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">use_cli</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="c1"></span>
+<span class="c1">  #...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>More information on <a href="../index.html#argument-reference">the fields supported in the provider block can be found here</a>.</p>
+
+            
+        
+    </body></html>

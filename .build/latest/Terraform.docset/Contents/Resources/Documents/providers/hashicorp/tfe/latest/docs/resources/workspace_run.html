@@ -1,0 +1,221 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/tfe/latest/docs/resources/workspace_run --><head>
+                <title>tfe_workspace_run</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="tfe_workspace_run">tfe_workspace_run</h1>
+
+<p>Provides a resource to manage the _initial_ and/or _final_ Terraform run in a given workspace. These initial and final runs often have a special relationship to other things that depend on the workspace's existence, so it can be useful to manage the completion of these runs in the same Terraform configuration that manages the workspace.</p>
+
+<p>There are a few main use cases this resource was designed for:</p>
+
+<ul>
+<li><strong>Workspaces that depend on other workspaces.</strong> If a workspace will create infrastructure that other workspaces rely on (for example, a Kubernetes cluster to deploy resources into), those downstream workspaces can depend on an initial <code>apply</code> with <code>wait_for_run = true</code>, so they aren't created before their infrastructure dependencies.</li>
+<li><strong>A more reliable <code>queue_all_runs = true</code>.</strong> The <code>queue_all_runs</code> argument on <code>tfe_workspace</code> requests an initial run, which can complete asynchronously outside of the Terraform run that creates the workspace. Unfortunately, it can't be used with workspaces that require variables to be set, because the <code>tfe_variable</code> resources themselves depend on the <code>tfe_workspace</code>. By managing an initial <code>apply</code> with <code>wait_for_run = false</code> that depends on your <code>tfe_variables</code>, you can accomplish the same goal without a circular dependency.</li>
+<li><strong>Safe workspace destruction.</strong> To ensure a workspace's managed resources are destroyed before deleting it, add a <code>destroy</code> block with <code>wait_for_run = true</code>. When you destroy the <code>tfe_workspace_run</code> resource, Terraform will wait for the destroy run to complete before deleting the workspace. This pattern is compatible with the <code>tfe_workspace</code> resource's default safe deletion behavior.</li>
+</ul>
+
+<p>The <code>tfe_workspace_run</code> expects to own exactly one apply during a creation and/or one destroy during a destruction. This implies that even if previous successful applies exist in the workspace, a <code>tfe_workspace_run</code> resource that includes an <code>apply</code> block will queue a new apply when added to a config.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Use caution when removing the <code>tfe_workspace_run</code> resource from your configuration, as destroying it with a <code>destroy</code> block present will create a destroy run which will destroy the workspace's underlying managed resources. To avoid this behavior, remove the <code>destroy</code> block first.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>Basic usage with multiple workspaces:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"tfe_organization"</span><span class="w"> </span><span class="nv">"test-organization"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-org-name"</span><span class="w"></span>
+<span class="w">  </span><span class="na">email</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"admin@company.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tfe_oauth_client"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">organization</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">tfe_organization.test-organization</span><span class="w"></span>
+<span class="w">  </span><span class="na">api_url</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://api.github.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">http_url</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://github.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">oauth_token</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"oauth_token_id"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"github"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tfe_workspace"</span><span class="w"> </span><span class="nv">"parent"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"parent-ws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">organization</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">tfe_organization.test-organization</span><span class="w"></span>
+<span class="w">  </span><span class="na">queue_all_runs</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="nb">vcs_repo</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">branch</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"main"</span><span class="w"></span>
+<span class="w">    </span><span class="na">identifier</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-org-name/vcs-repository"</span><span class="w"></span>
+<span class="w">    </span><span class="na">oauth_token_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">tfe_oauth_client.test.oauth_token_id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tfe_workspace"</span><span class="w"> </span><span class="nv">"child"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"child-ws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">organization</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">tfe_organization.test-organization</span><span class="w"></span>
+<span class="w">  </span><span class="na">queue_all_runs</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="nb">vcs_repo</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">branch</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"main"</span><span class="w"></span>
+<span class="w">    </span><span class="na">identifier</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-org-name/vcs-repository"</span><span class="w"></span>
+<span class="w">    </span><span class="na">oauth_token_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">tfe_oauth_client.test.oauth_token_id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tfe_workspace_run"</span><span class="w"> </span><span class="nv">"ws_run_parent"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">tfe_workspace.parent.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">apply</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">manual_confirm</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="na">wait_for_run</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">retry_attempts</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="w"></span>
+<span class="w">    </span><span class="na">retry_backoff_min</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">destroy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">manual_confirm</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="na">wait_for_run</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">retry_attempts</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">    </span><span class="na">retry_backoff_min</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tfe_workspace_run"</span><span class="w"> </span><span class="nv">"ws_run_child"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">tfe_workspace.child.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">tfe_workspace_run.ws_run_parent</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">apply</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">manual_confirm</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="na">retry_attempts</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="w"></span>
+<span class="w">    </span><span class="na">retry_backoff_min</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">destroy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">manual_confirm</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="na">wait_for_run</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">retry_attempts</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">    </span><span class="na">retry_backoff_min</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>With manual confirmation:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"tfe_organization"</span><span class="w"> </span><span class="nv">"test-organization"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-org-name"</span><span class="w"></span>
+<span class="w">  </span><span class="na">email</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"admin@company.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tfe_oauth_client"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">organization</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">tfe_organization.test-organization</span><span class="w"></span>
+<span class="w">  </span><span class="na">api_url</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://api.github.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">http_url</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://github.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">oauth_token</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"oauth_token_id"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"github"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tfe_workspace"</span><span class="w"> </span><span class="nv">"parent"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"parent-ws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">organization</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">tfe_organization.test-organization</span><span class="w"></span>
+<span class="w">  </span><span class="na">queue_all_runs</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="nb">vcs_repo</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">branch</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"main"</span><span class="w"></span>
+<span class="w">    </span><span class="na">identifier</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-org-name/vcs-repository"</span><span class="w"></span>
+<span class="w">    </span><span class="na">oauth_token_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">tfe_oauth_client.test.oauth_token_id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tfe_workspace_run"</span><span class="w"> </span><span class="nv">"ws_run_parent"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">tfe_workspace.parent.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">apply</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">manual_confirm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">destroy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">manual_confirm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">wait_for_run</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>With no retries:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"tfe_organization"</span><span class="w"> </span><span class="nv">"test-organization"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-org-name"</span><span class="w"></span>
+<span class="w">  </span><span class="na">email</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"admin@company.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tfe_oauth_client"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">organization</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">tfe_organization.test-organization</span><span class="w"></span>
+<span class="w">  </span><span class="na">api_url</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://api.github.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">http_url</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://github.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">oauth_token</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"oauth_token_id"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"github"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tfe_workspace"</span><span class="w"> </span><span class="nv">"parent"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"parent-ws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">organization</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">tfe_organization.test-organization</span><span class="w"></span>
+<span class="w">  </span><span class="na">queue_all_runs</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="nb">vcs_repo</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">branch</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"main"</span><span class="w"></span>
+<span class="w">    </span><span class="na">identifier</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-org-name/vcs-repository"</span><span class="w"></span>
+<span class="w">    </span><span class="na">oauth_token_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">tfe_oauth_client.test.oauth_token_id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tfe_workspace_run"</span><span class="w"> </span><span class="nv">"ws_run_parent"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">tfe_workspace.parent.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">apply</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">manual_confirm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="na">retry</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">destroy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">manual_confirm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="na">retry</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="na">wait_for_run</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>workspace_id</code> - (Required) ID of the workspace to execute the run.</li>
+<li><code>apply</code> - (Optional) Adding an apply block ensures an apply run is queued when the resource is created. The block controls settings for the workspace's apply run during creation. </li>
+<li><code>destroy</code> - (Optional) Adding a destroy block ensures a destroy run is queued when the resource is destroyed. The block controls settings for the workspace's destroy run during destruction.</li>
+</ul>
+
+<p>Both <code>apply</code> and <code>destroy</code> block supports:</p>
+
+<ul>
+<li><code>manual_confirm</code> - (Required) If set to true a human will have to manually confirm a plan in HCP Terraform's UI to start an apply. If set to false, this resource will be automatically applied. Defaults to <code>false</code>.
+<ul>
+<li>If <code>wait_for_run</code> is set to <code>false</code>, this auto-apply will be done by HCP Terraform.</li>
+<li>If <code>wait_for_run</code> is set to <code>true</code>, the apply will be confirmed by the provider. The exception is the case of policy check soft-failed where a human has to perform an override by manually confirming the plan even though <code>manual_confirm</code> is set to false.</li>
+<li>Note that this setting will override the workspace's default apply mode. To use the workspace default apply mode, look up the setting for <code>auto_apply</code> with the <code>tfe_workspace</code> data source.</li>
+</ul></li>
+<li><code>retry</code> - (Optional) Whether or not to retry on plan or apply errors. When set to true, <code>retry_attempts</code> must also be greater than zero inorder for retries to happen. Defaults to <code>true</code>.</li>
+<li><code>retry_attempts</code> - (Optional) The number to retry attempts made after an initial error. Defaults to <code>3</code>.</li>
+<li><code>retry_backoff_min</code> - (Optional) The minimum time in seconds to backoff before attempting a retry. Defaults to <code>1</code>.</li>
+<li><code>retry_backoff_max</code> - (Optional) The maximum time in seconds to backoff before attempting a retry. Defaults to <code>30</code>.</li>
+<li><code>wait_for_run</code> - (Optional) Whether or not to wait for a run to reach completion before considering this a success. When set to <code>false</code>, the provider considers the <code>tfe_workspace_run</code> resource to have been created immediately after the run has been queued. When set to <code>true</code>, the provider waits for a successful apply on the target workspace to have applied successfully (or if it resulted in a no-change plan). Defaults to <code>true</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - The ID of the run created by this resource. Note, if the resource was created without an <code>apply{}</code> configuration block, then this ID will not refer to a real run in HCP Terraform.</li>
+</ul>
+
+            
+        
+    </body></html>

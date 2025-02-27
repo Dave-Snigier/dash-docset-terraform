@@ -1,0 +1,164 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/service_principal_client_certificate --><head>
+                <title>Authenticating using a Service Principal with a Client Certificate</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="authenticating-using-a-service-principal-with-a-client-certificate">Authenticating using a Service Principal with a Client Certificate</h1>
+
+<p>Terraform supports a number of different methods for authenticating to Azure:</p>
+
+<ul>
+<li><a href="azure_cli.html">Authenticating to Azure using the Azure CLI</a></li>
+<li><a href="managed_service_identity.html">Authenticating to Azure using Managed Identity</a></li>
+<li>Authenticating to Azure using a Service Principal and a Client Certificate (covered in this guide)</li>
+<li><a href="service_principal_client_secret.html">Authenticating to Azure using a Service Principal and a Client Secret</a></li>
+<li><a href="service_principal_oidc.html">Authenticating to Azure using a Service Principal and OpenID Connect</a></li>
+</ul>
+
+<hr/>
+
+<p>We recommend using either a Service Principal or Managed Identity when running Terraform non-interactively (such as when running Terraform in a CI server) - and authenticating using the Azure CLI when running Terraform locally.</p>
+
+<p>Once you have configured a Service Principal as described in this guide, you should follow the <a href="service_principal_configuration.html">Configuring a Service Principal for managing Azure Active Directory</a> guide to grant the Service Principal necessary permissions to create and modify Azure Active Directory objects such as users and groups.</p>
+
+<hr/>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Setting%20up%20an%20Application%20and%20Service%20Principal"></a><h2 id="setting-up-an-application-and-service-principal">Setting up an Application and Service Principal</h2>
+
+<p>A Service Principal is a security principal within Azure Active Directory which can be granted permissions to manage objects in Azure Active Directory. To authenticate with a Service Principal, you will need to create an Application object within Azure Active Directory, which you will use as a means of authentication, either using a <a href="service_principal_client_secret.html">Client Secret</a>, <a href="service_principal_oidc.html">OpenID Connect</a>, or Client Certificate (which is documented in this guide). This can be done using the Azure Portal.</p>
+
+<p>This guide will cover how to generate a client certificate, how to create an Application and linked Service Principal, and then how to assign the Client Certificate to the Application so that it can be used for authentication.</p>
+
+<hr/>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Generating%20a%20Client%20Certificate"></a><h2 id="generating-a-client-certificate">Generating a Client Certificate</h2>
+
+<p>Firstly we need to create a certificate which can be used for authentication. To do that we're going to generate a private key and self-signed certificate using OpenSSL or LibreSSL (this can also be achieved using PowerShell, however that's outside the scope of this document):</p>
+
+<div class="codehilite"><pre><span></span><code>$ openssl req -subj <span class="s1">'/CN=myclientcertificate/O=HashiCorp, Inc./ST=CA/C=US'</span> <span class="se">\</span>
+    -new -newkey rsa:4096 -sha256 -days <span class="m">730</span> -nodes -x509 -keyout client.key -out client.crt
+</code></pre></div>
+
+<p>Next we generate a PKCS#12 bundle (.pfx file) which can be used by the AzureAD provider to authenticate with Azure:</p>
+
+<div class="codehilite"><pre><span></span><code>$ openssl pkcs12 -export -password pass:<span class="s2">"Pa55w0rd123"</span> -out client.pfx -inkey client.key -in client.crt
+</code></pre></div>
+
+<p>Now that we've generated a certificate, we can create the Azure Active Directory Application.</p>
+
+<hr/>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20the%20Application%20and%20Service%20Principal"></a><h2 id="creating-the-application-and-service-principal">Creating the Application and Service Principal</h2>
+
+<p>We're going to create the Application in the Azure Portal - to do this navigate to the <a href="https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/Overview"><strong>Azure Active Directory</strong> overview</a> within the <a href="https://portal.azure.com/">Azure Portal</a> - then select the <a href="https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RegisteredApps/RegisteredApps/Overview"><strong>App Registrations</strong> blade</a>. Click the <strong>New registration</strong> button at the top to add a new Application within Azure Active Directory. On this page, set the following values then press <strong>Create</strong>:</p>
+
+<ul>
+<li><strong>Name</strong> - this is a friendly identifier and can be anything (e.g. "Terraform")</li>
+<li><strong>Supported Account Types</strong> - this should be set to "Accounts in this organisational directory only (single tenant)"</li>
+<li><strong>Redirect URI</strong> - you should choose "Web" in for the URI type. the actual value can be left blank</li>
+</ul>
+
+<p>At this point the newly created Azure Active Directory application should be visible on-screen - if it's not, navigate to the <a href="https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RegisteredApps/RegisteredApps/Overview"><strong>App Registration</strong> blade</a> and select the newly created Azure Active Directory application.</p>
+
+<p>At the top of this page, you'll need to take note of the "Application (client) ID" and the "Directory (tenant) ID", which you can use for the values of <code>client_id</code> and <code>tenant_id</code> respectively.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Assigning%20the%20Client%20Certificate%20to%20the%20Azure%20Active%20Directory%20Application"></a><h3 id="assigning-the-client-certificate-to-the-azure-active-directory-application">Assigning the Client Certificate to the Azure Active Directory Application</h3>
+
+<p>To associate the public portion of the Client Certificate with the Azure Active Directory Application, select <strong>Certificates &amp; secrets</strong>. This screen displays the Certificates and Client Secrets (i.e. passwords) which are associated with this Azure Active Directory Application.</p>
+
+<p>The Public Key associated with the generated Certificate can be uploaded by selecting <strong>Upload Certificate</strong>, selecting the file which should be uploaded (in the example above, this would be <code>client.crt</code>) - and then hitting <strong>Add</strong>.</p>
+
+<hr/>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20Terraform%20to%20use%20the%20Client%20Certificate"></a><h2 id="configuring-terraform-to-use-the-client-certificate">Configuring Terraform to use the Client Certificate</h2>
+
+<p>Now that we have our Client Certificate uploaded to Azure and ready to use, it's possible to configure Terraform in a few different ways.</p>
+
+<p>The provider can be configured to read the certificate bundle from the .pfx file in your filesystem, or alternatively you can pass a base64-encoded copy of the certificate bundle directly to the provider.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Environment%20Variables"></a><h3 id="environment-variables">Environment Variables</h3>
+
+<p>Our recommended approach is storing the credentials as Environment Variables, for example:</p>
+
+<p><em>Reading the certificate bundle from the filesystem</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp"># </span>sh
+<span class="gp">$ </span><span class="nb">export</span> <span class="nv">ARM_CLIENT_ID</span><span class="o">=</span><span class="s2">"00000000-0000-0000-0000-000000000000"</span>
+<span class="gp">$ </span><span class="nb">export</span> <span class="nv">ARM_CLIENT_CERTIFICATE_PATH</span><span class="o">=</span><span class="s2">"/path/to/my/client/certificate.pfx"</span>
+<span class="gp">$ </span><span class="nb">export</span> <span class="nv">ARM_CLIENT_CERTIFICATE_PASSWORD</span><span class="o">=</span><span class="s2">"Pa55w0rd123"</span>
+<span class="gp">$ </span><span class="nb">export</span> <span class="nv">ARM_TENANT_ID</span><span class="o">=</span><span class="s2">"10000000-2000-3000-4000-500000000000"</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c"># PowerShell</span>
+<span class="p">&gt;</span> <span class="nv">$env:ARM_CLIENT_ID</span> <span class="p">=</span> <span class="s2">"00000000-0000-0000-0000-000000000000"</span>
+<span class="p">&gt;</span> <span class="nv">$env:ARM_CLIENT_CERTIFICATE_PATH</span> <span class="p">=</span> <span class="s2">"/path/to/my/client/certificate.pfx"</span>
+<span class="p">&gt;</span> <span class="nv">$env:ARM_CLIENT_CERTIFICATE_PASSWORD</span> <span class="p">=</span> <span class="s2">"Pa55w0rd123"</span>
+<span class="p">&gt;</span> <span class="nv">$env:ARM_TENANT_ID</span> <span class="p">=</span> <span class="s2">"10000000-2000-3000-4000-500000000000"</span>
+</code></pre></div>
+
+<p><em>Passing the encoded certificate bundle directly</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp"># </span>sh
+<span class="gp">$ </span><span class="nb">export</span> <span class="nv">ARM_CLIENT_ID</span><span class="o">=</span><span class="s2">"00000000-0000-0000-0000-000000000000"</span>
+<span class="gp">$ </span><span class="nb">export</span> <span class="nv">ARM_CLIENT_CERTIFICATE</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>base64 /path/to/my/client/certificate.pfx<span class="k">)</span><span class="s2">"</span>
+<span class="gp">$ </span><span class="nb">export</span> <span class="nv">ARM_CLIENT_CERTIFICATE_PASSWORD</span><span class="o">=</span><span class="s2">"Pa55w0rd123"</span>
+<span class="gp">$ </span><span class="nb">export</span> <span class="nv">ARM_TENANT_ID</span><span class="o">=</span><span class="s2">"10000000-2000-3000-4000-500000000000"</span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c"># PowerShell</span>
+<span class="p">&gt;</span> <span class="nv">$env:ARM_CLIENT_ID</span> <span class="p">=</span> <span class="s2">"00000000-0000-0000-0000-000000000000"</span>
+<span class="p">&gt;</span> <span class="nv">$env:ARM_CLIENT_CERTIFICATE</span> <span class="p">=</span> <span class="no">[Convert]</span><span class="p">::</span><span class="n">ToBase64String</span><span class="p">(</span><span class="no">[System.IO.File]</span><span class="p">::</span><span class="n">ReadAllBytes</span><span class="p">(</span><span class="s2">"/path/to/my/client/certificate.pfx"</span><span class="p">))</span>
+<span class="p">&gt;</span> <span class="nv">$env:ARM_CLIENT_CERTIFICATE_PASSWORD</span> <span class="p">=</span> <span class="s2">"Pa55w0rd123"</span>
+<span class="p">&gt;</span> <span class="nv">$env:ARM_TENANT_ID</span> <span class="p">=</span> <span class="s2">"10000000-2000-3000-4000-500000000000"</span>
+</code></pre></div>
+
+<p>At this point running either <code>terraform plan</code> or <code>terraform apply</code> should allow Terraform to authenticate using the Client Certificate.</p>
+
+<p>Next you should follow the <a href="service_principal_configuration.html">Configuring a Service Principal for managing Azure Active Directory</a> guide to grant the Service Principal necessary permissions to create and modify Azure Active Directory objects such as users and groups.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Block"></a><h3 id="provider-block">Provider Block</h3>
+
+<p>It's also possible to configure these variables either directly, or from variables, in your provider block, like so:</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Caution</em>
+    <p>We recommend not defining these variables in-line since they could easily be checked into Source Control.</p>
+</aside>
+
+<p><em>Reading the certificate bundle from the filesystem</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"client_certificate_path"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"client_certificate_password"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azuread"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_certificate_path</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.client_certificate_path</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_certificate_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.client_certificate_password</span><span class="w"></span>
+<span class="w">  </span><span class="na">tenant_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"10000000-2000-3000-4000-500000000000"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><em>Passing the encoded certificate bundle directly</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"client_certificate"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"client_certificate_password"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azuread"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_certificate</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">var.client_certificate</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_certificate_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.client_certificate_password</span><span class="w"></span>
+<span class="w">  </span><span class="na">tenant_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"10000000-2000-3000-4000-500000000000"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>More information on <a href="../index.html#argument-reference">the fields supported in the Provider block can be found here</a>.</p>
+
+<p>At this point running either <code>terraform plan</code> or <code>terraform apply</code> should allow Terraform to authenticate using the Client Certificate.</p>
+
+<p>Next you should follow the <a href="service_principal_configuration.html">Configuring a Service Principal for managing Azure Active Directory</a> guide to grant the Service Principal necessary permissions to create and modify Azure Active Directory objects such as users and groups.</p>
+
+            
+        
+    </body></html>

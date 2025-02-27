@@ -1,0 +1,102 @@
+<html><!-- Online page at https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/data-sources/slb_rules --><head>
+                <title>alicloud_slb_rules</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="alicloud_slb_rules">alicloud_slb_rules</h1>
+
+<p>This data source provides the rules associated with a server load balancer listener.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<pre><code>variable "name" {
+  default = "slbrulebasicconfig"
+}
+
+data "alicloud_zones" "default" {
+  available_disk_category     = "cloud_efficiency"
+  available_resource_creation = "VSwitch"
+}
+
+resource "alicloud_vpc" "default" {
+  name       = var.name
+  cidr_block = "172.16.0.0/16"
+}
+
+resource "alicloud_vswitch" "default" {
+  vpc_id            = alicloud_vpc.default.id
+  cidr_block        = "172.16.0.0/16"
+  zone_id           = data.alicloud_zones.default.zones.0.id
+  vswitch_name      = var.name
+}
+
+resource "alicloud_slb_load_balancer" "default" {
+  load_balancer_name = var.name
+  vswitch_id = alicloud_vswitch.default.id
+}
+
+resource "alicloud_slb_listener" "default" {
+  load_balancer_id          = alicloud_slb_load_balancer.default.id
+  backend_port              = 22
+  frontend_port             = 22
+  protocol                  = "http"
+  bandwidth                 = 5
+  health_check_connect_port = "20"
+}
+
+resource "alicloud_slb_server_group" "default" {
+  load_balancer_id = alicloud_slb_load_balancer.default.id
+}
+
+resource "alicloud_slb_rule" "default" {
+  load_balancer_id = alicloud_slb_load_balancer.default.id
+  frontend_port    = alicloud_slb_listener.default.frontend_port
+  name             = var.name
+  domain           = "*.aliyun.com"
+  url              = "/image"
+  server_group_id  = alicloud_slb_server_group.default.id
+}
+
+data "alicloud_slb_rules" "sample_ds" {
+  load_balancer_id = alicloud_slb_load_balancer.default.id
+  frontend_port    = 22
+}
+
+output "first_slb_rule_id" {
+  value = data.alicloud_slb_rules.sample_ds.slb_rules.0.id
+}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>load_balancer_id</code> - ID of the SLB with listener rules.</li>
+<li><code>frontend_port</code> - SLB listener port.</li>
+<li><code>ids</code> - (Optional) A list of rules IDs to filter results.</li>
+<li><code>name_regex</code> - (Optional) A regex string to filter results by rule name.</li>
+<li><code>output_file</code> - (Optional) File name where to save data source results (after running <code>terraform plan</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>The following attributes are exported in addition to the arguments listed above:</p>
+
+<ul>
+<li><code>ids</code> - A list of SLB listener rules IDs.</li>
+<li><code>names</code> - A list of SLB listener rules names.</li>
+<li><code>slb_rules</code> - A list of SLB listener rules. Each element contains the following attributes:
+<ul>
+<li><code>id</code> - Rule ID.</li>
+<li><code>name</code> - Rule name.</li>
+<li><code>domain</code> - Domain name in the HTTP request where the rule applies (e.g. "*.aliyun.com").</li>
+<li><code>url</code> - Path in the HTTP request where the rule applies (e.g. "/image").</li>
+<li><code>server_group_id</code> - ID of the linked VServer group.</li>
+</ul></li>
+</ul>
+
+            
+        
+    </body></html>

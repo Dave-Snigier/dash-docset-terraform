@@ -1,0 +1,144 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/share --><head>
+                <title>databricks_share</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_share-resource">databricks_share Resource</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This resource can only be used with a workspace-level provider!</p>
+</aside>
+
+<p>In Delta Sharing, a share is a read-only collection of tables and table partitions that a provider wants to share with one or more recipients. If your recipient uses a Unity Catalog-enabled Databricks workspace, you can also include notebook files, views (including dynamic views that restrict access at the row and column level), Unity Catalog volumes, and Unity Catalog models in a share.</p>
+
+<p>In a Unity Catalog-enabled Databricks workspace, a share is a securable object registered in Unity Catalog. A <code>databricks_share</code> is contained within a <a href="metastore.md">databricks_metastore</a>. If you remove a share from your Unity Catalog metastore, all recipients of that share lose the ability to access it.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>In Terraform configuration, it is recommended to define objects in alphabetical order of their <code>name</code> arguments, so that you get consistent and readable diff. Whenever objects are added or removed, or <code>name</code> is renamed, you'll observe a change in the majority of tasks. It's related to the fact that the current version of the provider treats <code>object</code> blocks as an ordered list. Alternatively, <code>object</code> block could have been an unordered set, though end-users would see the entire block replaced upon a change in single property of the task.</p>
+</aside>
+
+<p>Creating a Delta Sharing share and add some existing tables to it</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_tables"</span><span class="w"> </span><span class="nv">"things"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">catalog_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sandbox"</span><span class="w"></span>
+<span class="w">  </span><span class="na">schema_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"things"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_share"</span><span class="w"> </span><span class="nv">"some"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_share"</span><span class="w"></span>
+<span class="w">  </span><span class="err">dynamic</span><span class="w"> </span><span class="s2">"object"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_tables.things.ids</span><span class="w"></span>
+<span class="w">    </span><span class="nb">content</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="kt">object</span><span class="p">.</span><span class="err">value</span><span class="w"></span>
+<span class="w">      </span><span class="na">data_object_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"TABLE"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Creating a Delta Sharing share and add a schema to it(including all current and future tables).</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_share"</span><span class="w"> </span><span class="nv">"schema_share"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"schema_share"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">object</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                        </span><span class="o">=</span><span class="w"> </span><span class="s2">"catalog_name.schema_name"</span><span class="w"></span>
+<span class="w">    </span><span class="na">data_object_type</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"SCHEMA"</span><span class="w"></span>
+<span class="w">    </span><span class="na">history_data_sharing_status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ENABLED"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Creating a Delta Sharing share and share a table with partitions spec and history</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_share"</span><span class="w"> </span><span class="nv">"some"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_share"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">object</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                        </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_catalog.my_schema.my_table"</span><span class="w"></span>
+<span class="w">    </span><span class="na">data_object_type</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"TABLE"</span><span class="w"></span>
+<span class="w">    </span><span class="na">history_data_sharing_status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ENABLED"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">partition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">value</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"year"</span><span class="w"></span>
+<span class="w">        </span><span class="na">op</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"EQUAL"</span><span class="w"></span>
+<span class="w">        </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2009"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="nb">value</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"month"</span><span class="w"></span>
+<span class="w">        </span><span class="na">op</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"EQUAL"</span><span class="w"></span>
+<span class="w">        </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"12"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">partition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">value</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"year"</span><span class="w"></span>
+<span class="w">        </span><span class="na">op</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"EQUAL"</span><span class="w"></span>
+<span class="w">        </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2010"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>name</code> (Required) - Name of share. Change forces creation of a new resource.</li>
+<li><code>owner</code> (Optional) -  User name/group name/sp application_id of the share owner.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/object%20Configuration%20Block"></a><h3 id="object-configuration-block">object Configuration Block</h3>
+
+<ul>
+<li><code>name</code> (Required) - Full name of the object, e.g. <code>catalog.schema.name</code> for a tables, views, volumes and models, or <code>catalog.schema</code> for schemas.</li>
+<li><code>data_object_type</code> (Required) - Type of the data object, currently <code>TABLE</code>, <code>VIEW</code>, <code>SCHEMA</code>, <code>VOLUME</code>, and <code>MODEL</code> are supported.</li>
+<li><code>comment</code> (Optional) -  Description about the object.</li>
+<li><code>shared_as</code> (Optional) - A user-provided new name for the data object within the share. If this new name is not provided, the object's original name will be used as the <code>shared_as</code> name. The <code>shared_as</code> name must be unique within a Share. Change forces creation of a new resource.</li>
+<li><code>cdf_enabled</code> (Optional) - Whether to enable Change Data Feed (cdf) on the shared object. When this field is set, field <code>history_data_sharing_status</code> can not be set.</li>
+<li><code>start_version</code> (Optional) -  The start version associated with the object for cdf. This allows data providers to control the lowest object version that is accessible by clients.</li>
+<li><code>history_data_sharing_status</code> (Optional) - Whether to enable history sharing, one of: <code>ENABLED</code>, <code>DISABLED</code>. When a table has history sharing enabled, recipients can query table data by version, starting from the current table version. If not specified, clients can only query starting from the version of the object at the time it was added to the share. <em>NOTE</em>: The start_version should be less than or equal the current version of the object. When this field is set, field <code>cdf_enabled</code> can not be set.</li>
+</ul>
+
+<p>To share only part of a table when you add the table to a share, you can provide partition specifications. This is specified by a number of <code>partition</code> blocks. Each entry in <code>partition</code> block takes a list of <code>value</code> blocks. The field is documented below.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/value%20Configuration%20Block"></a><h4 id="value-configuration-block">value Configuration Block</h4>
+
+<ul>
+<li><code>name</code> - The name of the partition column.</li>
+<li><code>op</code> - The operator to apply for the value, one of: <code>EQUAL</code>, <code>LIKE</code></li>
+<li><code>recipient_property_key</code> (Optional) - The key of a Delta Sharing recipient's property. For example <code>databricks-account-id</code>. When this field is set, field <code>value</code> can not be set.</li>
+<li><code>value</code> (Optional) - The value of the partition column. When this value is not set, it means null value. When this field is set, field <code>recipient_property_key</code> can not be set.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - the ID of the share, the same as <code>name</code>.</li>
+<li><code>created_at</code> - Time when the share was created.</li>
+<li><code>created_by</code> - The principal that created the share.</li>
+<li><code>status</code> - Status of the object, one of: <code>ACTIVE</code>, <code>PERMISSION_DENIED</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are often used in the same context:</p>
+
+<ul>
+<li><a href="recipient.md">databricks_recipient</a> to create Delta Sharing recipients.</li>
+<li><a href="grants.md">databricks_grants</a> to manage Delta Sharing permissions.</li>
+<li><a href="../data-sources/shares.md">databricks_shares</a> to read existing Delta Sharing shares.</li>
+</ul>
+
+            
+        
+    </body></html>

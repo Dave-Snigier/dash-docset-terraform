@@ -1,0 +1,548 @@
+<html><!-- Online page at https://www.terraform.io/cli/config/config-file --><head>
+                <title>Create a Terraform CLI configuration file</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="create-a-terraform-cli-configuration-file">Create a Terraform CLI configuration file</h1>
+
+<p>This topic describes how create a configuration file to customize the behavior of the Terraform CLI.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Introduction"></a><h2 id="introduction">Introduction</h2>
+
+<p>The CLI configuration file configures per-user settings for CLI behaviors,
+which apply across all Terraform working directories. This is separate from
+<a href="../../terraform/language.html">your infrastructure configuration</a>. 
+You can define custom configurations in file with the <code>.terraformrc</code> extention a file named <code>terraform.rc</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Locations"></a><h2 id="locations">Locations</h2>
+
+<p>The configuration can be placed in a single file whose location depends
+on the host operating system:</p>
+
+<ul>
+<li>On Windows, the file must be named <code>terraform.rc</code> and placed
+in the relevant user's <code>%APPDATA%</code> directory. The physical location
+of this directory depends on your Windows version and system configuration;
+use <code>$env:APPDATA</code> in PowerShell to find its location on your system.</li>
+<li>On all other systems, the file must be named <code>.terraformrc</code> (note
+the leading period) and placed directly in the home directory
+of the relevant user.</li>
+</ul>
+
+<p>On Windows, beware of Windows Explorer's default behavior of hiding filename
+extensions. Terraform will not recognize a file named <code>terraform.rc.txt</code> as a
+CLI configuration file, even though Windows Explorer may <em>display</em> its name
+as just <code>terraform.rc</code>. Use <code>dir</code> from PowerShell or Command Prompt to
+confirm the filename.</p>
+
+<p>The location of the Terraform CLI configuration file can also be specified
+using the <code>TF_CLI_CONFIG_FILE</code> <a href="../../terraform/cli/config/environment-variables.html">environment variable</a>.
+Any such file should follow the naming pattern <code>*.tfrc</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuration%20File%20Syntax"></a><h2 id="configuration-file-syntax">Configuration File Syntax</h2>
+
+<p>The configuration file uses the same <em>HCL</em> syntax as <code>.tf</code> files, but with
+different attributes and blocks. The following example illustrates the
+general syntax; see the following section for information on the meaning
+of each of these settings:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="na">plugin_cache_dir</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"$HOME/.terraform.d/plugin-cache"</span><span class="w"></span>
+<span class="na">disable_checkpoint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Available%20Settings"></a><h2 id="available-settings">Available Settings</h2>
+
+<p>The following settings can be set in the CLI configuration file:</p>
+
+<ul>
+<li><p><code>credentials</code> - configures credentials for use with HCP Terraform or
+Terraform Enterprise. See <a href="#credentials">Credentials</a> below for more
+information.</p></li>
+<li><p><code>credentials_helper</code> - configures an external helper program for the storage
+and retrieval of credentials for HCP Terraform or Terraform Enterprise.
+See <a href="#credentials-helpers">Credentials Helpers</a> below for more information.</p></li>
+<li><p><code>disable_checkpoint</code> — when set to <code>true</code>, disables
+<a href="../../terraform/cli/commands.html#upgrade-and-security-bulletin-checks">upgrade and security bulletin checks</a>
+that require reaching out to HashiCorp-provided network services.</p></li>
+<li><p><code>disable_checkpoint_signature</code> — when set to <code>true</code>, allows the upgrade and
+security bulletin checks described above but disables the use of an anonymous
+id used to de-duplicate warning messages.</p></li>
+<li><p><code>plugin_cache_dir</code> — enables
+<a href="#provider-plugin-cache">plugin caching</a>
+and specifies, as a string, the location of the plugin cache directory.</p></li>
+<li><p><code>provider_installation</code> - customizes the installation methods used by
+<code>terraform init</code> when installing provider plugins. See
+<a href="#provider-installation">Provider Installation</a> below for more information.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Credentials"></a><h2 id="credentials">Credentials</h2>
+
+<p><a href="https://cloud.hashicorp.com/products/terraform">HCP Terraform</a> provides a number of remote network
+services for use with Terraform, and
+<a href="../../terraform/enterprise.html">Terraform Enterprise</a> allows hosting those
+services inside your own infrastructure. For example, these systems offer both
+<a href="../../terraform/cloud-docs/run/cli.html">remote operations</a> and a
+<a href="../../terraform/cloud-docs/registry.html">private module registry</a>.</p>
+
+<p>When interacting with Terraform-specific network services, Terraform expects
+to find API tokens in CLI configuration files in <code>credentials</code> blocks:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">credentials</span><span class="w"> </span><span class="s2">"app.terraform.io"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"xxxxxx.atlasv1.zzzzzzzzzzzzz"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>If you are running the Terraform CLI interactively on a computer with a web browser, you can use <a href="../../terraform/cli/commands/login.html">the <code>terraform login</code> command</a>
+to get credentials and automatically save them in the CLI configuration. If
+not, you can manually write <code>credentials</code> blocks.</p>
+
+<p>You can have multiple <code>credentials</code> blocks if you regularly use services from
+multiple hosts. Many users will configure only one, for either
+HCP Terraform (at <code>app.terraform.io</code>) or for their organization's own
+Terraform Enterprise host. Each <code>credentials</code> block contains a <code>token</code> argument
+giving the API token to use for that host.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Important</em>
+    <p>If you are using HCP Terraform or Terraform Enterprise, the token provided must be either a <a href="../../terraform/cloud-docs/users-teams-organizations/users.html#api-tokens">user token</a> or a <a href="../../terraform/cloud-docs/users-teams-organizations/api-tokens.html#team-api-tokens">team token</a>; organization tokens cannot be used for command-line Terraform actions.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The credentials hostname must match the hostname in your module sources and/or backend configuration. If your Terraform Enterprise instance is available at multiple hostnames, use only one of them consistently. HCP Terraform responds to API calls at both its current hostname <code>app.terraform.io</code>, and its historical hostname <code>atlas.hashicorp.com</code>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Environment%20Variable%20Credentials"></a><h3 id="environment-variable-credentials">Environment Variable Credentials</h3>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Environment variable credentials are supported in Terraform v1.2.0 and later.</p>
+</aside>
+
+<p>If you would prefer not to store your API tokens directly in the CLI configuration, you may use
+a host-specific environment variable. Environment variable names should have the prefix
+<code>TF_TOKEN_</code> added to the domain name, with periods encoded as underscores. For example, the
+value of a variable named <code>TF_TOKEN_app_terraform_io</code> will be used as a bearer authorization
+token when the CLI makes service requests to the hostname <code>app.terraform.io</code>.</p>
+
+<p>You must convert domain names containing non-ASCII characters to their <a href="https://www.charset.org/punycode">punycode equivalent</a>
+with an ACE prefix. For example, token credentials for 例えば.com must be set in a variable
+called <code>TF_TOKEN_xn--r8j3dr99h_com</code>.</p>
+
+<p>Hyphens are also valid within host names but usually invalid as variable names and
+may be encoded as double underscores. For example, you can set a token for the domain name
+<code>café.fr</code> as <code>TF_TOKEN_xn--caf-dma.fr</code>, <code>TF_TOKEN_xn--caf-dma_fr</code>,  or <code>TF_TOKEN_xn____caf__dma_fr</code>.
+If multiple variables evaluate to the same hostname, Terraform will choose the one defined last
+in the operating system's variable table.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Credentials%20Helpers"></a><h3 id="credentials-helpers">Credentials Helpers</h3>
+
+<p>You can configure a <code>credentials_helper</code> to instruct Terraform to use a different credentials storage mechanism.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">credentials_helper</span><span class="w"> </span><span class="s2">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">args</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><code>credentials_helper</code> is a configuration block that can appear at most once
+in the CLI configuration. Its label (<code>"example"</code> above) is the name of the
+credentials helper to use. The <code>args</code> argument is optional and allows passing
+additional arguments to the helper program, for example if it needs to be
+configured with the address of a remote host to access for credentials.</p>
+
+<p>A configured credentials helper will be consulted only to retrieve credentials
+for hosts that are <em>not</em> explicitly configured in a <code>credentials</code> block as
+described in the previous section.
+Conversely, this means you can override the credentials returned by the helper
+for a specific hostname by writing a <code>credentials</code> block alongside the
+<code>credentials_helper</code> block.</p>
+
+<p>Terraform does not include any credentials helpers in the main distribution.
+To learn how to write and install your own credentials helpers to integrate
+with existing in-house credentials management systems, see
+<a href="../../terraform/internals/credentials-helpers.html">the guide to Credentials Helper internals</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Credentials%20Source%20Priority%20Order"></a><h3 id="credentials-source-priority-order">Credentials Source Priority Order</h3>
+
+<p>Credentials found in an environment variable for a particular service host
+as described above will be preferred over those in CLI config as set by <code>terraform login</code>.
+If neither are set, any configured credentials helper will be consulted.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>For users of <a href="https://github.com/apparentlymart/terraform-credentials-env">terraform-credentials-helper</a>, this priority has been effectively reversed following the release of Terraform 1.2. Previously, credentials found within CLI config or set by <code>terraform login</code> were preferred to <code>TF_TOKEN_*</code> variables.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Installation"></a><h2 id="provider-installation">Provider Installation</h2>
+
+<p>The default way to install provider plugins is from a provider registry. The
+origin registry for a provider is encoded in the provider's source address,
+like <code>registry.terraform.io/hashicorp/aws</code>. For convenience in the common case,
+Terraform allows omitting the hostname portion for providers on
+<code>registry.terraform.io</code>, so you can write shorter public provider addresses like
+<code>hashicorp/aws</code>.</p>
+
+<p>Downloading a plugin directly from its origin registry is not always
+appropriate, though. For example, the system where you are running Terraform
+may not be able to access an origin registry due to firewall restrictions
+within your organization or your locality.</p>
+
+<p>To allow using Terraform providers in these situations, there are some
+alternative options for making provider plugins available to Terraform which
+we'll describe in the following sections.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Explicit%20Installation%20Method%20Configuration"></a><h3 id="explicit-installation-method-configuration">Explicit Installation Method Configuration</h3>
+
+<p>A <code>provider_installation</code> block in the CLI configuration allows overriding
+Terraform's default installation behaviors, so you can force Terraform to use
+a local mirror for some or all of the providers you intend to use.</p>
+
+<p>The general structure of a <code>provider_installation</code> block is as follows:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">provider_installation</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">filesystem_mirror</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">path</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"/usr/share/terraform/providers"</span><span class="w"></span>
+<span class="w">    </span><span class="na">include</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"example.com/*/*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">direct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">exclude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"example.com/*/*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Each of the nested blocks inside the <code>provider_installation</code> block specifies
+one installation method. Each installation method can take both <code>include</code>
+and <code>exclude</code> patterns that specify which providers a particular installation
+method can be used for. In the example above, we specify that any provider
+whose origin registry is at <code>example.com</code> can be installed only from the
+filesystem mirror at <code>/usr/share/terraform/providers</code>, while all other
+providers can be installed only directly from their origin registries.</p>
+
+<p>If you set both <code>include</code> and <code>exclude</code> for a particular installation
+method, the exclusion patterns take priority. For example, including
+<code>registry.terraform.io/hashicorp/*</code> but also excluding
+<code>registry.terraform.io/hashicorp/dns</code> will make that installation method apply
+to everything in the <code>hashicorp</code> namespace with the exception of
+<code>hashicorp/dns</code>.</p>
+
+<p>As with provider source addresses in the main configuration, you can omit
+the <code>registry.terraform.io/</code> prefix for providers distributed through the
+public Terraform registry, even when using wildcards. For example,
+<code>registry.terraform.io/hashicorp/*</code> and <code>hashicorp/*</code> are equivalent.
+<code>*/*</code> is a shorthand for <code>registry.terraform.io/*/*</code>, not for
+<code>*/*/*</code>.</p>
+
+<p>The following are the two supported installation method types:</p>
+
+<ul>
+<li><p><code>direct</code>: request information about the provider directly from its origin
+registry and download over the network from the location that registry
+indicates. This method expects no additional arguments.</p></li>
+<li><p><code>filesystem_mirror</code>: consult a directory on the local disk for copies of
+providers. This method requires the additional argument <code>path</code> to indicate
+which directory to look in.</p>
+
+<p>Terraform expects the given directory to contain a nested directory structure
+where the path segments together provide metadata about the available
+providers. The following two directory structures are supported:</p>
+
+<ul>
+<li>Packed layout: <code>HOSTNAME/NAMESPACE/TYPE/terraform-provider-TYPE_VERSION_TARGET.zip</code>
+is the distribution zip file obtained from the provider's origin registry.</li>
+<li>Unpacked layout: <code>HOSTNAME/NAMESPACE/TYPE/VERSION/TARGET</code> is a directory
+containing the result of extracting the provider's distribution zip file.</li>
+</ul>
+
+<p>In both layouts, the <code>VERSION</code> is a string like <code>2.0.0</code> and the <code>TARGET</code>
+specifies a particular target platform using a format like <code>darwin_amd64</code>,
+<code>linux_arm</code>, <code>windows_amd64</code>, etc.</p>
+
+<p>If you use the unpacked layout, Terraform will attempt to create a symbolic
+link to the mirror directory when installing the provider, rather than
+creating a deep copy of the directory. The packed layout prevents this
+because Terraform must extract the zip file during installation.</p>
+
+<p>You can include multiple <code>filesystem_mirror</code> blocks in order to specify
+several different directories to search.</p></li>
+<li><p><code>network_mirror</code>: consult a particular HTTPS server for copies of providers,
+regardless of which registry host they belong to. This method requires the
+additional argument <code>url</code> to indicate the mirror base URL, which should
+use the <code>https:</code> scheme and end with a trailing slash.</p>
+
+<p></p><p>Terraform expects the given URL to be a base URL for an implementation of
+<a href="../../terraform/internals/provider-network-mirror-protocol.html">the provider network mirror protocol</a>,
+which is designed to be relatively easy to implement using typical static
+website hosting mechanisms.</p></li>
+</ul><p></p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Warning</em>
+    <p>Don't configure <code>network_mirror</code> URLs that you do not trust. Provider mirror servers are subject to TLS certificate checks to verify identity, but a network mirror with a TLS certificate can potentially serve modified copies of upstream providers with malicious content.</p>
+</aside>
+
+<p>Terraform will try all of the specified methods whose include and exclude
+patterns match a given provider, and select the newest version available across
+all of those methods that matches the version constraint given in each
+Terraform configuration. If you have a local mirror of a particular provider
+and intend Terraform to use that local mirror exclusively, you must either
+remove the <code>direct</code> installation method altogether or use its <code>exclude</code>
+argument to disable its use for specific providers.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Implied%20Local%20Mirror%20Directories"></a><h3 id="implied-local-mirror-directories">Implied Local Mirror Directories</h3>
+
+<p>If your CLI configuration does not include a <code>provider_installation</code> block at
+all, Terraform produces an <em>implied</em> configuration. The implied configuration
+includes a selection of <code>filesystem_mirror</code> methods and then the <code>direct</code>
+method.</p>
+
+<p>The set of directories Terraform can select as filesystem mirrors depends on
+the operating system where you are running Terraform:</p>
+
+<ul>
+<li><strong>Windows:</strong> <code>%APPDATA%/terraform.d/plugins</code> and <code>%APPDATA%/HashiCorp/Terraform/plugins</code></li>
+<li><strong>Mac OS X:</strong> <code>$HOME/.terraform.d/plugins</code>,
+<code>~/Library/Application Support/io.terraform/plugins</code>, and
+<code>/Library/Application Support/io.terraform/plugins</code></li>
+<li><strong>Linux and other Unix-like systems</strong>:<code>$HOME/.terraform.d/plugins</code> and
+<code>terraform/plugins</code> located within a valid
+<a href="https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html">XDG Base Directory</a>
+data directory such as <code>$XDG_DATA_HOME/terraform/plugins</code>.
+Without any XDG environment variables set, Terraform will use
+<code>~/.local/share/terraform/plugins</code>,
+<code>/usr/local/share/terraform/plugins</code>, and <code>/usr/share/terraform/plugins</code>.</li>
+</ul>
+
+<p>If a <code>terraform.d/plugins</code> directory exists in the current working directory
+then Terraform will also include that directory, regardless of your operating
+system. This behavior changes when you use the <code>-chdir</code> option with the <code>init</code> command. In that case, Terraform checks for the <code>terraform.d/plugins</code> directory in the launch directory and not in the directory you specified with <code>-chdir</code>.</p>
+
+<p>Terraform will check each of the paths above to see if it exists, and if so
+treat it as a filesystem mirror. The directory structure inside each one must
+therefore match one of the two structures described for <code>filesystem_mirror</code>
+blocks in <a href="#explicit-installation-method-configuration">Explicit Installation Method Configuration</a>.</p>
+
+<p>In addition to the zero or more implied <code>filesystem_mirror</code> blocks, Terraform
+also creates an implied <code>direct</code> block. Terraform will scan all of the
+filesystem mirror directories to see which providers are placed there and
+automatically exclude all of those providers from the implied <code>direct</code> block.
+(This automatic <code>exclude</code> behavior applies only to <em>implicit</em> <code>direct</code> blocks;
+if you use explicit <code>provider_installation</code> you will need to write the intended
+exclusions out yourself.)</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Plugin%20Cache"></a><h3 id="provider-plugin-cache">Provider Plugin Cache</h3>
+
+<p>By default, <code>terraform init</code> downloads plugins into a subdirectory of the
+working directory so that each working directory is self-contained. As a
+consequence, if you have multiple configurations that use the same provider
+then a separate copy of its plugin will be downloaded for each configuration.</p>
+
+<p>Given that provider plugins can be quite large (on the order of hundreds of
+megabytes), this default behavior can be inconvenient for those with slow
+or metered Internet connections. Therefore Terraform optionally allows the
+use of a local directory as a shared plugin cache, which then allows each
+distinct plugin binary to be downloaded only once.</p>
+
+<p>To enable the plugin cache, use the <code>plugin_cache_dir</code> setting in
+the CLI configuration file. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="na">plugin_cache_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"$HOME/.terraform.d/plugin-cache"</span><span class="w"></span>
+</code></pre></div>
+
+<p>This directory must already exist before Terraform will cache plugins;
+Terraform will not create the directory itself.</p>
+
+<p>Please note that on Windows it is necessary to use forward slash separators
+(<code>/</code>) rather than the conventional backslash (<code>\</code>) since the configuration
+file parser considers a backslash to begin an escape sequence.</p>
+
+<p>Setting this in the configuration file is the recommended approach for a
+persistent setting. Alternatively, the <code>TF_PLUGIN_CACHE_DIR</code> environment
+variable can be used to enable caching or to override an existing cache
+directory within a particular shell session:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span> <span class="nv">TF_PLUGIN_CACHE_DIR</span><span class="o">=</span><span class="s2">"</span><span class="nv">$HOME</span><span class="s2">/.terraform.d/plugin-cache"</span>
+</code></pre></div>
+
+<p>When a plugin cache directory is enabled, the <code>terraform init</code> command will
+still use the configured or implied installation methods to obtain metadata
+about which plugins are available, but once a suitable version has been
+selected it will first check to see if the chosen plugin is already available
+in the cache directory. If so, Terraform will use the previously-downloaded
+copy.</p>
+
+<p>If the selected plugin is not already in the cache, Terraform will download
+it into the cache first and then copy it from there into the correct location
+under your current working directory. When possible Terraform will use
+symbolic links to avoid storing a separate copy of a cached plugin in multiple
+directories.</p>
+
+<p>The plugin cache directory <em>must not</em> also be one of the configured or implied
+filesystem mirror directories, since the cache management logic conflicts with
+the filesystem mirror logic when operating on the same directory.</p>
+
+<p>Terraform will never itself delete a plugin from the plugin cache once it has
+been placed there. Over time, as plugins are upgraded, the cache directory may
+grow to contain several unused versions which you must delete manually.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The plugin cache directory is not guaranteed to be concurrency safe. The provider installer's behavior in environments with multiple <code>terraform init</code> calls is undefined.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Allowing%20the%20Provider%20Plugin%20Cache%20to%20break%20the%20dependency%20lock%20file"></a><h3 id="allowing-the-provider-plugin-cache-to-break-the-dependency-lock-file">Allowing the Provider Plugin Cache to break the dependency lock file</h3>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>The option described in is for unusual and exceptional situations only. Do not set this option unless you are sure you need it and you fully understand the consequences of enabling it.</p>
+</aside>
+
+<p>By default Terraform will use packages from the global cache directory only
+if they match at least one of the checksums recorded in the
+<a href="../../terraform/language/files/dependency-lock.html">dependency lock file</a>
+for that provider. This ensures that Terraform can always
+generate a complete and correct dependency lock file entry the first time you
+use a new provider in a particular configuration.</p>
+
+<p>However, we know that in some special situations teams have been unable to use
+the dependency lock file as intended, and so they don't include it in their
+version control as recommended and instead let Terraform re-generate it each
+time it installs providers.</p>
+
+<p>For those teams that don't preserve the dependency lock file in their version
+control systems between runs, Terraform allows an additional CLI Configuration
+setting which tells Terraform to always treat a package in the cache directory
+as valid even if there isn't already an entry in the dependency lock file
+to confirm it:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="na">plugin_cache_may_break_dependency_lock_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+</code></pre></div>
+
+<p>Alternatively, you can set the environment variable
+<code>TF_PLUGIN_CACHE_MAY_BREAK_DEPENDENCY_LOCK_FILE</code> to any value other than the
+empty string or <code>0</code>, which is equivalent to the above setting.</p>
+
+<p>Setting this option gives Terraform CLI permission to create an incomplete
+dependency lock file entry for a provider if that would allow Terraform to
+use the cache to install that provider. In that situation the dependency lock
+file will be valid for use on the current system but may not be valid for use on
+another computer with a different operating system or CPU architecture, because
+it will include only a checksum of the package in the global cache.</p>
+
+<p>We recommend that most users leave this option unset, in which case Terraform
+will always install a provider from upstream the first time you use it with
+a particular configuration, but can then re-use the cache entry on later runs
+once the dependency lock file records valid checksums for the provider package.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>The Terraform team intends to improve the dependency lock file mechanism in future versions so that it will be usable in more situations. At that time this option will become silently ignored. If your workflow relies on the use of this option, please open a GitHub issue to share details about your situation so that we can consider how to support it without breaking the dependency lock file.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Development%20Overrides%20for%20Provider%20Developers"></a><h3 id="development-overrides-for-provider-developers">Development Overrides for Provider Developers</h3>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Development overrides work only in Terraform v0.14 and later. Using a <code>dev_overrides</code> block in your CLI configuration will cause Terraform v0.13 to reject the configuration as invalid.</p>
+</aside>
+
+<p>Normally Terraform verifies version selections and checksums for providers
+in order to help ensure that all operations are made with the intended version
+of a provider, and that authors can gradually upgrade to newer provider versions
+in a controlled manner.</p>
+
+<p>These version and checksum rules are inconvenient when developing a provider
+though, because we often want to try a test configuration against a development
+build of a provider that doesn't even have an associated version number yet,
+and doesn't have an official set of checksums listed in a provider registry.</p>
+
+<p>As a convenience for provider development, Terraform supports a special
+additional block <code>dev_overrides</code> in <code>provider_installation</code> blocks. The contents
+of this block effectively override all of the other configured installation
+methods, so a block of this type must always appear first in the sequence:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">provider_installation</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+
+<span class="c1">  # Use /home/developer/tmp/terraform-null as an overridden package directory</span>
+<span class="c1">  # for the hashicorp/null provider. This disables the version and checksum</span>
+<span class="c1">  # verifications for this provider and forces Terraform to look for the</span>
+<span class="c1">  # null provider plugin in the given directory.</span>
+<span class="w">  </span><span class="nb">dev_overrides</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"hashicorp/null"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/home/developer/tmp/terraform-null"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # For all other providers, install them directly from their origin provider</span>
+<span class="c1">  # registries as normal. If you omit this, Terraform will _only_ use</span>
+<span class="c1">  # the dev_overrides block, and so no other providers will be available.</span>
+<span class="w">  </span><span class="nb">direct</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>With development overrides in effect, the <code>terraform init</code> command will still
+attempt to select a suitable published version of your provider to install and
+record in
+<a href="../../terraform/language/files/dependency-lock.html">the dependency lock file</a>
+for future use, but other commands like
+<code>terraform apply</code> will disregard the lock file's entry for <code>hashicorp/null</code> and
+will use the given directory instead. Once your new changes are included in a
+published release of the provider, you can use <code>terraform init -upgrade</code> to
+select the new version in the dependency lock file and remove your development
+override.</p>
+
+<p>The override path for a particular provider should be a directory similar to
+what would be included in a <code>.zip</code> file when distributing the provider. At
+minimum that includes an executable file named with a prefix like
+<code>terraform-provider-null</code>, where <code>null</code> is the provider type. If your provider
+makes use of other files in its distribution package then you can copy those
+files into the override directory too.</p>
+
+<p>You may wish to enable a development override only for shell sessions where
+you are actively working on provider development. If so, you can write a
+local CLI configuration file with content like the above in your development
+directory, perhaps called <code>dev.tfrc</code> for the sake of example, and then use the
+<code>TF_CLI_CONFIG_FILE</code> environment variable to instruct Terraform to use that
+localized CLI configuration instead of the default one:</p>
+
+<pre><code>export TF_CLI_CONFIG_FILE=/home/developer/tmp/dev.tfrc
+</code></pre>
+
+<p>Development overrides are not intended for general use as a way to have
+Terraform look for providers on the local filesystem. If you wish to put
+copies of <em>released</em> providers in your local filesystem, see
+<a href="#implied-local-mirror-directories">Implied Local Mirror Directories</a>
+or
+<a href="#explicit-installation-method-configuration">Explicit Installation Method Configuration</a>
+instead.</p>
+
+<p>This development overrides mechanism is intended as a pragmatic way to enable
+smoother provider development. The details of how it behaves, how to
+configure it, and how it interacts with the dependency lock file may all evolve
+in future Terraform releases, including possible breaking changes. We therefore
+recommend using development overrides only temporarily during provider
+development work.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Removed%20Settings"></a><h2 id="removed-settings">Removed Settings</h2>
+
+<p>The following settings are supported in Terraform 0.12 and earlier but are
+no longer recommended for use:</p>
+
+<ul>
+<li><code>providers</code> - a configuration block that allows specifying the locations of
+specific plugins for each named provider. This mechanism is deprecated
+because it is unable to specify a version number and source for each provider.
+See <a href="#provider-installation">Provider Installation</a> above for the replacement
+of this setting in Terraform 0.13 and later.</li>
+</ul>
+
+            
+        
+    </body></html>

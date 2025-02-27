@@ -1,0 +1,100 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/service_networking_connection --><head>
+                <title>google_service_networking_connection</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="google_service_networking_connection">google_service_networking_connection</h1>
+
+<p>Manages a private VPC connection with a GCP service provider. For more information see
+<a href="https://cloud.google.com/vpc/docs/configure-private-services-access#creating-connection">the official documentation</a>
+and
+<a href="https://cloud.google.com/service-infrastructure/docs/service-networking/reference/rest/v1/services.connections">API</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20usage"></a><h2 id="example-usage">Example usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Create a VPC network</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"peering_network"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"peering-network"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create an IP address</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_address"</span><span class="w"> </span><span class="nv">"private_ip_alloc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"private-ip-alloc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">purpose</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"VPC_PEERING"</span><span class="w"></span>
+<span class="w">  </span><span class="na">address_type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"INTERNAL"</span><span class="w"></span>
+<span class="w">  </span><span class="na">prefix_length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">16</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.peering_network.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create a private connection</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_service_networking_connection"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.peering_network.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">service</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"servicenetworking.googleapis.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">reserved_peering_ranges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_global_address.private_ip_alloc.name</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># (Optional) Import or export custom routes</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network_peering_routes_config"</span><span class="w"> </span><span class="nv">"peering_routes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">peering</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_service_networking_connection.default.peering</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.peering_network.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">import_custom_routes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">export_custom_routes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>network</code> - (Required) Name of VPC network connected with service producers using VPC peering.</p></li>
+<li><p><code>service</code> - (Required) Provider peering service that is managing peering connectivity for a
+service provider organization. For Google services that support this functionality it is
+'servicenetworking.googleapis.com'.</p></li>
+<li><p><code>reserved_peering_ranges</code> - (Required) Named IP address range(s) of PEERING type reserved for
+this service provider. Note that invoking this method with a different range when connection
+is already established will not reallocate already provisioned service producer subnetworks.</p></li>
+<li><p><code>deletion_policy</code> - (Optional) The deletion policy for the service networking connection. Setting to ABANDON allows the resource to be abandoned rather than deleted. This will enable a successful terraform destroy when destroying CloudSQL instances. Use with care as it can lead to dangling resources.</p></li>
+<li><p><code>update_on_creation_fail</code> - (Optional) When set to true, enforce an update of the reserved peering ranges on the existing service networking connection in case of a new connection creation failure.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to the arguments listed above, the following computed attributes are exported:</p>
+
+<ul>
+<li><code>peering</code> - (Computed) The name of the VPC Network Peering connection that was created by the service producer.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>ServiceNetworkingConnection can be imported using any of these accepted formats</p>
+
+<ul>
+<li><code>{{peering-network}}:{{service}}</code></li>
+<li><code>projects/{{project}}/global/networks/{{peering-network}}:{{service}}</code></li>
+</ul>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import NAME_HERE using one of the formats above. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"projects/{{project}}/global/networks/{{peering-network}}:{{service}}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_service_networking_connection.default</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When using the <a href="https://developer.hashicorp.com/terraform/cli/commands/import"><code>terraform import</code> command</a>, NAME_HERE can be imported using one of the formats above. For example:</p>
+
+<pre><code>$ terraform import google_service_networking_connection.default {{peering-network}}:{{service}}
+$ terraform import google_service_networking_connection.default /projects/{{project}}/global/networks/{{peering-network}}:{{service}}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/User%20Project%20Overrides"></a><h2 id="user-project-overrides">User Project Overrides</h2>
+
+<p>This resource supports <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/provider_reference#user_project_override">User Project Overrides</a>.</p>
+
+            
+        
+    </body></html>

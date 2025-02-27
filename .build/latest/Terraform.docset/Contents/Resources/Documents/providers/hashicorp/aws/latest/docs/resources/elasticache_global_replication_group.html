@@ -1,0 +1,173 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/elasticache_global_replication_group --><head>
+                <title>aws_elasticache_global_replication_group</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_elasticache_global_replication_group">Resource: aws_elasticache_global_replication_group</h1>
+
+<p>Provides an ElastiCache Global Replication Group resource, which manages replication between two or more Replication Groups in different regions. For more information, see the <a href="https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Redis-Global-Datastore.html">ElastiCache User Guide</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Global%20replication%20group%20with%20one%20secondary%20replication%20group"></a><h3 id="global-replication-group-with-one-secondary-replication-group">Global replication group with one secondary replication group</h3>
+
+<p>The global replication group depends on the primary group existing. Secondary replication groups depend on the global replication group. Terraform dependency management will handle this transparently using resource value references.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_elasticache_global_replication_group"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">global_replication_group_id_suffix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">primary_replication_group_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_elasticache_replication_group.primary.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_elasticache_replication_group"</span><span class="w"> </span><span class="nv">"primary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">replication_group_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-primary"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"primary replication group"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">engine</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"redis"</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"5.0.6"</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"cache.m5.large"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">num_cache_clusters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_elasticache_replication_group"</span><span class="w"> </span><span class="nv">"secondary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.other_region</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">replication_group_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-secondary"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"secondary replication group"</span><span class="w"></span>
+<span class="w">  </span><span class="na">global_replication_group_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_elasticache_global_replication_group.example.global_replication_group_id</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">num_cache_clusters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Managing%20Redis%20OOS/Valkey%20Engine%20Versions"></a><h3 id="managing-redis-oosvalkey-engine-versions">Managing Redis OOS/Valkey Engine Versions</h3>
+
+<p>The initial Redis version is determined by the version set on the primary replication group.
+However, once it is part of a Global Replication Group,
+the Global Replication Group manages the version of all member replication groups.</p>
+
+<p>The member replication groups must have <a href="https://www.terraform.io/language/meta-arguments/lifecycle"><code>lifecycle.ignore_changes[engine_version]</code></a> set,
+or Terraform will always return a diff.</p>
+
+<p>In this example,
+the primary replication group will be created with Redis 6.0,
+and then upgraded to Redis 6.2 once added to the Global Replication Group.
+The secondary replication group will be created with Redis 6.2.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_elasticache_global_replication_group"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">global_replication_group_id_suffix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">primary_replication_group_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_elasticache_replication_group.primary.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">engine_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"6.2"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_elasticache_replication_group"</span><span class="w"> </span><span class="nv">"primary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">replication_group_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-primary"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"primary replication group"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">engine</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"redis"</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"6.0"</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"cache.m5.large"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">num_cache_clusters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">ignore_changes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nb">engine_version</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_elasticache_replication_group"</span><span class="w"> </span><span class="nv">"secondary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.other_region</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">replication_group_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-secondary"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"secondary replication group"</span><span class="w"></span>
+<span class="w">  </span><span class="na">global_replication_group_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_elasticache_global_replication_group.example.global_replication_group_id</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">num_cache_clusters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">ignore_changes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nb">engine_version</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>This resource supports the following arguments:</p>
+
+<ul>
+<li><code>automatic_failover_enabled</code> - (Optional) Specifies whether read-only replicas will be automatically promoted to read/write primary if the existing primary fails.
+When creating, by default the Global Replication Group inherits the automatic failover setting of the primary replication group.</li>
+<li><code>cache_node_type</code> - (Optional) The instance class used.
+See AWS documentation for information on <a href="https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/CacheNodes.SupportedTypes.html">supported node types</a>
+and <a href="https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/nodes-select-size.html">guidance on selecting node types</a>.
+When creating, by default the Global Replication Group inherits the node type of the primary replication group.</li>
+<li><code>engine_version</code> - (Optional) Redis version to use for the Global Replication Group.
+When creating, by default the Global Replication Group inherits the version of the primary replication group.
+If a version is specified, the Global Replication Group and all member replication groups will be upgraded to this version.
+Cannot be downgraded without replacing the Global Replication Group and all member replication groups.
+When the version is 7 or higher, the major and minor version should be set, e.g., <code>7.2</code>.
+When the version is 6, the major and minor version can be set, e.g., <code>6.2</code>,
+or the minor version can be unspecified which will use the latest version at creation time, e.g., <code>6.x</code>.
+The actual engine version used is returned in the attribute <code>engine_version_actual</code>, see <a href="#attribute-reference">Attribute Reference</a> below.</li>
+<li><code>global_replication_group_id_suffix</code> – (Required) The suffix name of a Global Datastore. If <code>global_replication_group_id_suffix</code> is changed, creates a new resource.</li>
+<li><code>primary_replication_group_id</code> – (Required) The ID of the primary cluster that accepts writes and will replicate updates to the secondary cluster. If <code>primary_replication_group_id</code> is changed, creates a new resource.</li>
+<li><code>global_replication_group_description</code> – (Optional) A user-created description for the global replication group.</li>
+<li><code>num_node_groups</code> - (Optional) The number of node groups (shards) on the global replication group.</li>
+<li><code>parameter_group_name</code> - (Optional) An ElastiCache Parameter Group to use for the Global Replication Group.
+Required when upgrading a major engine version, but will be ignored if left configured after the upgrade is complete.
+Specifying without a major version upgrade will fail.
+Note that ElastiCache creates a copy of this parameter group for each member replication group.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>id</code> - The ID of the ElastiCache Global Replication Group.</li>
+<li><code>arn</code> - The ARN of the ElastiCache Global Replication Group.</li>
+<li><code>engine_version_actual</code> - The full version number of the cache engine running on the members of this global replication group.</li>
+<li><code>at_rest_encryption_enabled</code> - A flag that indicate whether the encryption at rest is enabled.</li>
+<li><code>auth_token_enabled</code> - A flag that indicate whether AuthToken (password) is enabled.</li>
+<li><code>cluster_enabled</code> - Indicates whether the Global Datastore is cluster enabled.</li>
+<li><code>engine</code> - The name of the cache engine to be used for the clusters in this global replication group.</li>
+<li><code>global_replication_group_id</code> - The full ID of the global replication group.</li>
+<li><code>global_node_groups</code> - Set of node groups (shards) on the global replication group.
+Has the values:
+<ul>
+<li><code>global_node_group_id</code> - The ID of the global node group.</li>
+<li><code>slots</code> - The keyspace for this node group.</li>
+</ul></li>
+<li><code>transit_encryption_enabled</code> - A flag that indicates whether the encryption in transit is enabled.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p><a href="https://developer.hashicorp.com/terraform/language/resources/syntax#operation-timeouts">Configuration options</a>:</p>
+
+<ul>
+<li><code>create</code> - (Default <code>60m</code>)</li>
+<li><code>update</code> - (Default <code>60m</code>)</li>
+<li><code>delete</code> - (Default <code>20m</code>)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import ElastiCache Global Replication Groups using the <code>global_replication_group_id</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_elasticache_global_replication_group.my_global_replication_group</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"okuqm-global-replication-group-1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import ElastiCache Global Replication Groups using the <code>global_replication_group_id</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_elasticache_global_replication_group.my_global_replication_group okuqm-global-replication-group-1
+</code></pre></div>
+
+            
+        
+    </body></html>

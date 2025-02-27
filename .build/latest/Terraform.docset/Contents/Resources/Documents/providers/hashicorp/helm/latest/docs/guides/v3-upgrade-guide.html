@@ -1,0 +1,250 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/helm/latest/docs/guides/v3-upgrade-guide --><head>
+                <title>Upgrading to v3.0.0 of the Helm provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="upgrading-to-v300-of-the-helm-provider">Upgrading to v3.0.0 of the Helm provider</h1>
+
+<p>This guide covers the changes introduced in v3.0.0 of the Helm provider and what you may need to do to upgrade your configuration.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20in%20v3.0.0"></a><h2 id="changes-in-v300">Changes in v3.0.0</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Adoption%20of%20the%20Terraform%20Plugin%20Framework"></a><h3 id="adoption-of-the-terraform-plugin-framework">Adoption of the Terraform Plugin Framework</h3>
+
+<p>The Helm provider has been migrated from the legacy <a href="https://github.com/hashicorp/terraform-plugin-sdk">Terraform Plugin SDKv2</a> to the <a href="https://github.com/hashicorp/terraform-plugin-framework">Terraform Plugin Framework</a>. This migration introduces structural changes to the schema, affecting nested blocks, attribute names, and how configurations are represented. Users must update their configurations to align with the new framework. Key changes include:</p>
+
+<ul>
+<li><strong>Blocks to Nested Objects</strong>: Blocks like <code>kubernetes</code>, <code>registry</code>, and <code>experiments</code> are now represented as nested objects.</li>
+<li><strong>List Syntax for Nested Attributes</strong>: Attributes like <code>set</code>, <code>set_list</code>, and <code>set_sensitive</code> in <code>helm_release</code> and <code>helm_template</code> are now lists of nested objects instead of blocks.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Terraform%20Version%20Compatability"></a><h3 id="terraform-version-compatability">Terraform Version Compatability</h3>
+
+<p>The new framework code uses <a href="https://developer.hashicorp.com/terraform/plugin/terraform-plugin-protocol#protocol-version-6">Terraform Plugin Protocol Version 6</a> which is compatible with Terraform versions 1.0 and aboove. Users of earlier versions of Terraform can continue to use the Helm provider by pinning their configuration to the 2.x version.</p>
+
+<hr/>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20to%20Provider%20Attributes"></a><h3 id="changes-to-provider-attributes">Changes to Provider Attributes</h3>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Kubernetes%20Configuration%20%28kubernetes%29"></a><h4 id="kubernetes-configuration-kubernetes">Kubernetes Configuration (<code>kubernetes</code>)</h4>
+
+<p>The <code>kubernetes</code> block has been updated to a single nested object.</p>
+
+<p><strong>Old SDKv2 Configuration:</strong></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"helm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">kubernetes</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">config_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~/.kube/config"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">registry</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">url</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"oci://localhost:5000"</span><span class="w"></span>
+<span class="w">    </span><span class="na">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"username"</span><span class="w"></span>
+<span class="w">    </span><span class="na">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"password"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">registry</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">url</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"oci://private.registry"</span><span class="w"></span>
+<span class="w">    </span><span class="na">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"username"</span><span class="w"></span>
+<span class="w">    </span><span class="na">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"password"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><strong>New Plugin Framework Configuration:</strong></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"helm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">kubernetes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">config_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~/.kube/config"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">registries</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">url</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"oci://localhost:5000"</span><span class="w"></span>
+<span class="w">      </span><span class="na">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"username"</span><span class="w"></span>
+<span class="w">      </span><span class="na">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"password"</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">url</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"oci://private.registry"</span><span class="w"></span>
+<span class="w">      </span><span class="na">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"username"</span><span class="w"></span>
+<span class="w">      </span><span class="na">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"password"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><strong>What Changed?</strong></p>
+
+<ul>
+<li><code>kubernetes</code> is now a single nested object attribute using <code>{ ... }</code>.</li>
+<li><code>registry</code> blocks have been replaced by a <code>registries</code> list attribute.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Experiments%20Configuration%20%28experiments%29"></a><h4 id="experiments-configuration-experiments">Experiments Configuration (experiments)</h4>
+
+<p>The <code>experiments</code> block has been updated to a list of nested objects.</p>
+
+<p><strong>Old SDKv2 Configuration:</strong></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"helm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">experiments</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">manifest</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><strong>New Plugin Framework Configuration:</strong></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"helm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">experiments</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">manifest</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><strong>What Changed?</strong></p>
+
+<ul>
+<li><code>experiments</code> is now a single nested object attribute using <code>{ ... }</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20to%20helm_release%20Resource"></a><h3 id="changes-to-helm_release-resource">Changes to helm_release Resource</h3>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/set%2C%20set_list%2C%20and%20set_sensitive%20Configuration"></a><h4 id="set-set_list-and-set_sensitive-configuration"><code>set</code>, <code>set_list</code>, and <code>set_sensitive</code> Configuration</h4>
+
+<p>Attributes  <code>set</code>, <code>set_list</code>, and <code>set_sensitive</code> are now represented as lists of nested objects instead of individual blocks.</p>
+
+<p><strong>Old SDKv2 Configuration:</strong></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"helm_release"</span><span class="w"> </span><span class="nv">"nginx_ingress"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"nginx-ingress-controller"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">repository</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://charts.bitnami.com/bitnami"</span><span class="w"></span>
+<span class="w">  </span><span class="na">chart</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"nginx-ingress-controller"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">set</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"service.type"</span><span class="w"></span>
+<span class="w">    </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ClusterIP"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">set_list</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"allowed.hosts"</span><span class="w"></span>
+<span class="w">    </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"host1", "host2"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">set_sensitive</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"api.key"</span><span class="w"></span>
+<span class="w">    </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"super-secret-key"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><strong>New Plugin Framework Configuration:</strong></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"helm_release"</span><span class="w"> </span><span class="nv">"nginx_ingress"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"nginx-ingress-controller"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">repository</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://charts.bitnami.com/bitnami"</span><span class="w"></span>
+<span class="w">  </span><span class="na">chart</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"nginx-ingress-controller"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">set</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"service.type"</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ClusterIP"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">set_list</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"allowed.hosts"</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"host1", "host2"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">set_sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"api.key"</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"super-secret-key"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><strong>What Changed?</strong></p>
+
+<ul>
+<li><code>set</code>, <code>set_list</code>, and <code>set_sensitive</code> is now a list of nested objects using <code>[ { ... } ]</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20to%20helm_template%20Data%20Source"></a><h3 id="changes-to-helm_template-data-source">Changes to helm_template Data Source</h3>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/set%2C%20set_list%2C%20and%20set_sensitive%20Configuration"></a><h4 id="set-set_list-and-set_sensitive-configuration-2"><code>set</code>, <code>set_list</code>, and <code>set_sensitive</code> Configuration</h4>
+
+<p>Attributes  <code>set</code>, <code>set_list</code>, and <code>set_sensitive</code> are now represented as lists of nested objects instead of individual blocks.</p>
+
+<p><strong>Old SDKv2 Configuration:</strong></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"helm_template"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-release"</span><span class="w"></span>
+<span class="w">  </span><span class="na">chart</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-chart"</span><span class="w"></span>
+<span class="w">  </span><span class="na">namespace</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-namespace"</span><span class="w"></span>
+<span class="w">  </span><span class="na">values</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"custom-values.yaml"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">set</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"image.tag"</span><span class="w"></span>
+<span class="w">    </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1.2.3"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">set_list</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"allowed.hosts"</span><span class="w"></span>
+<span class="w">    </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"host1", "host2"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">set_sensitive</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"api.key"</span><span class="w"></span>
+<span class="w">    </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"super-secret-key"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><strong>New Plugin Framework Configuration:</strong></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"helm_template"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-release"</span><span class="w"></span>
+<span class="w">  </span><span class="na">chart</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-chart"</span><span class="w"></span>
+<span class="w">  </span><span class="na">namespace</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-namespace"</span><span class="w"></span>
+<span class="w">  </span><span class="na">values</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"custom-values.yaml"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">set</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"image.tag"</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1.2.3"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">set_list</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"allowed.hosts"</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"host1", "host2"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">set_sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"api.key"</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"super-secret-key"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><strong>What Changed?</strong></p>
+
+<ul>
+<li><code>set</code>, <code>set_list</code>, and <code>set_sensitive</code> is now a list of nested objects using <code>[ { ... } ]</code>.</li>
+</ul>
+
+            
+        
+    </body></html>

@@ -1,0 +1,427 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/codedeploy_deployment_group --><head>
+                <title>aws_codedeploy_deployment_group</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_codedeploy_deployment_group">Resource: aws_codedeploy_deployment_group</h1>
+
+<p>Provides a CodeDeploy Deployment Group for a CodeDeploy Application</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>NOTE on blue/green deployments</em>
+    <p>When using <code>green_fleet_provisioning_option</code> with the <code>COPY_AUTO_SCALING_GROUP</code> action, CodeDeploy will create a new ASG with a different name. This ASG is _not_ managed by terraform and will conflict with existing configuration and state. You may want to use a different approach to managing deployments that involve multiple ASG, such as <code>DISCOVER_EXISTING</code> with separate blue and green ASG.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"assume_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Service"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"codedeploy.amazonaws.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"sts:AssumeRole"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-role"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.assume_role.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role_policy_attachment"</span><span class="w"> </span><span class="nv">"AWSCodeDeployRole"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.example.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_codedeploy_app"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-app"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_sns_topic"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-topic"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_codedeploy_deployment_group"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">app_name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_codedeploy_app.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">deployment_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-group"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_role_arn</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.example.arn</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">ec2_tag_set</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">ec2_tag_filter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">key</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"filterkey1"</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"KEY_AND_VALUE"</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"filtervalue"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">ec2_tag_filter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">key</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"filterkey2"</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"KEY_AND_VALUE"</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"filtervalue"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">trigger_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">trigger_events</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"DeploymentFailure"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">trigger_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-trigger"</span><span class="w"></span>
+<span class="w">    </span><span class="na">trigger_target_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_sns_topic.example.arn</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">auto_rollback_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">events</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"DEPLOYMENT_FAILURE"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">alarm_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">alarms</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"my-alarm-name"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">outdated_instances_strategy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"UPDATE"</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Blue%20Green%20Deployments%20with%20ECS"></a><h3 id="blue-green-deployments-with-ecs">Blue Green Deployments with ECS</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_codedeploy_app"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">compute_platform</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ECS"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_codedeploy_deployment_group"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">app_name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_codedeploy_app.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">deployment_config_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CodeDeployDefault.ECSAllAtOnce"</span><span class="w"></span>
+<span class="w">  </span><span class="na">deployment_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_role_arn</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.example.arn</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">auto_rollback_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">events</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"DEPLOYMENT_FAILURE"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">blue_green_deployment_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">deployment_ready_option</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">action_on_timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CONTINUE_DEPLOYMENT"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">terminate_blue_instances_on_deployment_success</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">action</span><span class="w">                           </span><span class="o">=</span><span class="w"> </span><span class="s2">"TERMINATE"</span><span class="w"></span>
+<span class="w">      </span><span class="na">termination_wait_time_in_minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">deployment_style</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">deployment_option</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"WITH_TRAFFIC_CONTROL"</span><span class="w"></span>
+<span class="w">    </span><span class="na">deployment_type</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"BLUE_GREEN"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">ecs_service</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">cluster_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ecs_cluster.example.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">service_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ecs_service.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">load_balancer_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">target_group_pair_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">prod_traffic_route</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">listener_arns</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_lb_listener.example.arn</span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">      </span><span class="nb">target_group</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_lb_target_group.blue.name</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">      </span><span class="nb">target_group</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_lb_target_group.green.name</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Blue%20Green%20Deployments%20with%20Servers%20and%20Classic%20ELB"></a><h3 id="blue-green-deployments-with-servers-and-classic-elb">Blue Green Deployments with Servers and Classic ELB</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_codedeploy_app"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-app"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_codedeploy_deployment_group"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">app_name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_codedeploy_app.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">deployment_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-group"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_role_arn</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.example.arn</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">deployment_style</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">deployment_option</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"WITH_TRAFFIC_CONTROL"</span><span class="w"></span>
+<span class="w">    </span><span class="na">deployment_type</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"BLUE_GREEN"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">load_balancer_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">elb_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_elb.example.name</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">blue_green_deployment_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">deployment_ready_option</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">action_on_timeout</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"STOP_DEPLOYMENT"</span><span class="w"></span>
+<span class="w">      </span><span class="na">wait_time_in_minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">60</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">green_fleet_provisioning_option</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"DISCOVER_EXISTING"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">terminate_blue_instances_on_deployment_success</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"KEEP_ALIVE"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>This resource supports the following arguments:</p>
+
+<ul>
+<li><code>app_name</code> - (Required) The name of the application.</li>
+<li><code>deployment_group_name</code> - (Required) The name of the deployment group.</li>
+<li><code>service_role_arn</code> - (Required) The service role ARN that allows deployments.</li>
+<li><code>alarm_configuration</code> - (Optional) Configuration block of alarms associated with the deployment group (documented below).</li>
+<li><code>auto_rollback_configuration</code> - (Optional) Configuration block of the automatic rollback configuration associated with the deployment group (documented below).</li>
+<li><code>autoscaling_groups</code> - (Optional) Autoscaling groups associated with the deployment group.</li>
+<li><code>blue_green_deployment_config</code> - (Optional) Configuration block of the blue/green deployment options for a deployment group (documented below).</li>
+<li><code>deployment_config_name</code> - (Optional) The name of the group's deployment config. The default is "CodeDeployDefault.OneAtATime".</li>
+<li><code>deployment_style</code> - (Optional) Configuration block of the type of deployment, either in-place or blue/green, you want to run and whether to route deployment traffic behind a load balancer (documented below).</li>
+<li><code>ec2_tag_filter</code> - (Optional) Tag filters associated with the deployment group. See the AWS docs for details.</li>
+<li><code>ec2_tag_set</code> - (Optional) Configuration block(s) of Tag filters associated with the deployment group, which are also referred to as tag groups (documented below). See the AWS docs for details.</li>
+<li><code>ecs_service</code> - (Optional) Configuration block(s) of the ECS services for a deployment group (documented below).</li>
+<li><code>load_balancer_info</code> - (Optional) Single configuration block of the load balancer to use in a blue/green deployment (documented below).</li>
+<li><code>on_premises_instance_tag_filter</code> - (Optional) On premise tag filters associated with the group. See the AWS docs for details.</li>
+<li><code>trigger_configuration</code> - (Optional) Configuration block(s) of the triggers for the deployment group (documented below).</li>
+<li><code>outdated_instances_strategy</code> - (Optional) Configuration block of Indicates what happens when new Amazon EC2 instances are launched mid-deployment and do not receive the deployed application revision. Valid values are <code>UPDATE</code> and <code>IGNORE</code>. Defaults to <code>UPDATE</code>.</li>
+<li><code>termination_hook_enabled</code> - (Optional)  Indicates whether the deployment group was configured to have CodeDeploy install a termination hook into an Auto Scaling group.</li>
+<li><code>tags</code> - (Optional) Key-value map of resource tags. If configured with a provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a> present, tags with matching keys will overwrite those defined at the provider-level.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/alarm_configuration%20Argument%20Reference"></a><h3 id="alarm_configuration-argument-reference">alarm_configuration Argument Reference</h3>
+
+<p>You can configure a deployment to stop when a <strong>CloudWatch</strong> alarm detects that a metric has fallen below or exceeded a defined threshold. <code>alarm_configuration</code> supports the following:</p>
+
+<ul>
+<li><code>alarms</code> - (Optional) A list of alarms configured for the deployment group.</li>
+<li><code>enabled</code> - (Optional) Indicates whether the alarm configuration is enabled. This option is useful when you want to temporarily deactivate alarm monitoring for a deployment group without having to add the same alarms again later.</li>
+<li><code>ignore_poll_alarm_failure</code> - (Optional) Indicates whether a deployment should continue if information about the current state of alarms cannot be retrieved from CloudWatch. The default value is <code>false</code>.
+<ul>
+<li><code>true</code>: The deployment will proceed even if alarm status information can't be retrieved.</li>
+<li><code>false</code>: The deployment will stop if alarm status information can't be retrieved.</li>
+</ul></li>
+</ul>
+
+<p>_Only one <code>alarm_configuration</code> is allowed_.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/auto_rollback_configuration%20Argument%20Reference"></a><h3 id="auto_rollback_configuration-argument-reference">auto_rollback_configuration Argument Reference</h3>
+
+<p>You can configure a deployment group to automatically rollback when a deployment fails or when a monitoring threshold you specify is met. In this case, the last known good version of an application revision is deployed. <code>auto_rollback_configuration</code> supports the following:</p>
+
+<ul>
+<li><code>enabled</code> - (Optional) Indicates whether a defined automatic rollback configuration is currently enabled for this Deployment Group. If you enable automatic rollback, you must specify at least one event type.</li>
+<li><code>events</code> - (Optional) The event type or types that trigger a rollback. Supported types are <code>DEPLOYMENT_FAILURE</code>, <code>DEPLOYMENT_STOP_ON_ALARM</code> and <code>DEPLOYMENT_STOP_ON_REQUEST</code>.</li>
+</ul>
+
+<p>_Only one <code>auto_rollback_configuration</code> is allowed_.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/blue_green_deployment_config%20Argument%20Reference"></a><h3 id="blue_green_deployment_config-argument-reference">blue_green_deployment_config Argument Reference</h3>
+
+<p>You can configure options for a blue/green deployment. <code>blue_green_deployment_config</code> supports the following:</p>
+
+<ul>
+<li><code>deployment_ready_option</code> - (Optional) Information about the action to take when newly provisioned instances are ready to receive traffic in a blue/green deployment (documented below).</li>
+<li><code>green_fleet_provisioning_option</code> - (Optional) Information about how instances are provisioned for a replacement environment in a blue/green deployment (documented below).</li>
+<li><code>terminate_blue_instances_on_deployment_success</code> - (Optional) Information about whether to terminate instances in the original fleet during a blue/green deployment (documented below).</li>
+</ul>
+
+<p>_Only one <code>blue_green_deployment_config</code> is allowed_.</p>
+
+<p>You can configure how traffic is rerouted to instances in a replacement environment in a blue/green deployment. <code>deployment_ready_option</code> supports the following:</p>
+
+<ul>
+<li><code>action_on_timeout</code> - (Optional) When to reroute traffic from an original environment to a replacement environment in a blue/green deployment.
+<ul>
+<li><code>CONTINUE_DEPLOYMENT</code>: Register new instances with the load balancer immediately after the new application revision is installed on the instances in the replacement environment.</li>
+<li><code>STOP_DEPLOYMENT</code>: Do not register new instances with load balancer unless traffic is rerouted manually. If traffic is not rerouted manually before the end of the specified wait period, the deployment status is changed to Stopped.</li>
+</ul></li>
+<li><code>wait_time_in_minutes</code> - (Optional) The number of minutes to wait before the status of a blue/green deployment changed to Stopped if rerouting is not started manually. Applies only to the <code>STOP_DEPLOYMENT</code> option for <code>action_on_timeout</code>.</li>
+</ul>
+
+<p>You can configure how instances will be added to the replacement environment in a blue/green deployment. <code>green_fleet_provisioning_option</code> supports the following:</p>
+
+<ul>
+<li><code>action</code> - (Optional) The method used to add instances to a replacement environment.
+<ul>
+<li><code>DISCOVER_EXISTING</code>: Use instances that already exist or will be created manually.</li>
+<li><code>COPY_AUTO_SCALING_GROUP</code>: Use settings from a specified <strong>Auto Scaling</strong> group to define and create instances in a new Auto Scaling group. _Exactly one Auto Scaling group must be specified_ when selecting <code>COPY_AUTO_SCALING_GROUP</code>. Use <code>autoscaling_groups</code> to specify the Auto Scaling group.</li>
+</ul></li>
+</ul>
+
+<p>You can configure how instances in the original environment are terminated when a blue/green deployment is successful. <code>terminate_blue_instances_on_deployment_success</code> supports the following:</p>
+
+<ul>
+<li><code>action</code> - (Optional) The action to take on instances in the original environment after a successful blue/green deployment.
+<ul>
+<li><code>TERMINATE</code>: Instances are terminated after a specified wait time.</li>
+<li><code>KEEP_ALIVE</code>: Instances are left running after they are deregistered from the load balancer and removed from the deployment group.</li>
+</ul></li>
+<li><code>termination_wait_time_in_minutes</code> - (Optional) The number of minutes to wait after a successful blue/green deployment before terminating instances from the original environment.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/deployment_style%20Argument%20Reference"></a><h3 id="deployment_style-argument-reference">deployment_style Argument Reference</h3>
+
+<p>You can configure the type of deployment, either in-place or blue/green, you want to run and whether to route deployment traffic behind a load balancer. <code>deployment_style</code> supports the following:</p>
+
+<ul>
+<li><code>deployment_option</code> - (Optional) Indicates whether to route deployment traffic behind a load balancer. Valid Values are <code>WITH_TRAFFIC_CONTROL</code> or <code>WITHOUT_TRAFFIC_CONTROL</code>. Default is <code>WITHOUT_TRAFFIC_CONTROL</code>.</li>
+<li><code>deployment_type</code> - (Optional) Indicates whether to run an in-place deployment or a blue/green deployment. Valid Values are <code>IN_PLACE</code> or <code>BLUE_GREEN</code>. Default is <code>IN_PLACE</code>.</li>
+</ul>
+
+<p>_Only one <code>deployment_style</code> is allowed_.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ec2_tag_filter%20Argument%20Reference"></a><h3 id="ec2_tag_filter-argument-reference">ec2_tag_filter Argument Reference</h3>
+
+<p>The <code>ec2_tag_filter</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>key</code> - (Optional) The key of the tag filter.</li>
+<li><code>type</code> - (Optional) The type of the tag filter, either <code>KEY_ONLY</code>, <code>VALUE_ONLY</code>, or <code>KEY_AND_VALUE</code>.</li>
+<li><code>value</code> - (Optional) The value of the tag filter.</li>
+</ul>
+
+<p>Multiple occurrences of <code>ec2_tag_filter</code> are allowed, where any instance that matches to at least one of the tag filters is selected.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ec2_tag_set%20Argument%20Reference"></a><h3 id="ec2_tag_set-argument-reference">ec2_tag_set Argument Reference</h3>
+
+<p>You can form a tag group by putting a set of tag filters into <code>ec2_tag_set</code>. If multiple tag groups are specified, any instance that matches to at least one tag filter of every tag group is selected.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ecs_service%20Argument%20Reference"></a><h3 id="ecs_service-argument-reference">ecs_service Argument Reference</h3>
+
+<p>Each <code>ecs_service</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>cluster_name</code> - (Required) The name of the ECS cluster.</li>
+<li><code>service_name</code> - (Required) The name of the ECS service.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/load_balancer_info%20Argument%20Reference"></a><h3 id="load_balancer_info-argument-reference">load_balancer_info Argument Reference</h3>
+
+<p>You can configure the <strong>Load Balancer</strong> to use in a deployment. <code>load_balancer_info</code> supports the following:</p>
+
+<ul>
+<li><code>elb_info</code> - (Optional) The Classic Elastic Load Balancer to use in a deployment. Conflicts with <code>target_group_info</code> and <code>target_group_pair_info</code>.</li>
+<li><code>target_group_info</code> - (Optional) The (Application/Network Load Balancer) target group to use in a deployment. Conflicts with <code>elb_info</code> and <code>target_group_pair_info</code>.</li>
+<li><code>target_group_pair_info</code> - (Optional) The (Application/Network Load Balancer) target group pair to use in a deployment. Conflicts with <code>elb_info</code> and <code>target_group_info</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/load_balancer_info%20elb_info%20Argument%20Reference"></a><h4 id="load_balancer_info-elb_info-argument-reference">load_balancer_info elb_info Argument Reference</h4>
+
+<p>The <code>elb_info</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>name</code> - (Optional) The name of the load balancer that will be used to route traffic from original instances to replacement instances in a blue/green deployment. For in-place deployments, the name of the load balancer that instances are deregistered from so they are not serving traffic during a deployment, and then re-registered with after the deployment completes.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/load_balancer_info%20target_group_info%20Argument%20Reference"></a><h4 id="load_balancer_info-target_group_info-argument-reference">load_balancer_info target_group_info Argument Reference</h4>
+
+<p>The <code>target_group_info</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>name</code> - (Optional) The name of the target group that instances in the original environment are deregistered from, and instances in the replacement environment registered with. For in-place deployments, the name of the target group that instances are deregistered from, so they are not serving traffic during a deployment, and then re-registered with after the deployment completes.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/load_balancer_info%20target_group_pair_info%20Argument%20Reference"></a><h4 id="load_balancer_info-target_group_pair_info-argument-reference">load_balancer_info target_group_pair_info Argument Reference</h4>
+
+<p>The <code>target_group_pair_info</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>prod_traffic_route</code> - (Required) Configuration block for the production traffic route (documented below).</li>
+<li><code>target_group</code> - (Required) Configuration blocks for a target group within a target group pair (documented below).</li>
+<li><code>test_traffic_route</code> - (Optional) Configuration block for the test traffic route (documented below).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/load_balancer_info%20target_group_pair_info%20prod_traffic_route%20Argument%20Reference"></a><h5 id="load_balancer_info-target_group_pair_info-prod_traffic_route-argument-reference">load_balancer_info target_group_pair_info prod_traffic_route Argument Reference</h5>
+
+<p>The <code>prod_traffic_route</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>listener_arns</code> - (Required) List of Amazon Resource Names (ARNs) of the load balancer listeners. Must contain exactly one listener ARN.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/load_balancer_info%20target_group_pair_info%20target_group%20Argument%20Reference"></a><h5 id="load_balancer_info-target_group_pair_info-target_group-argument-reference">load_balancer_info target_group_pair_info target_group Argument Reference</h5>
+
+<p>The <code>target_group</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>name</code> - (Required) Name of the target group.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/load_balancer_info%20target_group_pair_info%20test_traffic_route%20Argument%20Reference"></a><h5 id="load_balancer_info-target_group_pair_info-test_traffic_route-argument-reference">load_balancer_info target_group_pair_info test_traffic_route Argument Reference</h5>
+
+<p>The <code>test_traffic_route</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>listener_arns</code> - (Required) List of Amazon Resource Names (ARNs) of the load balancer listeners.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/on_premises_instance_tag_filter%20Argument%20Reference"></a><h3 id="on_premises_instance_tag_filter-argument-reference">on_premises_instance_tag_filter Argument Reference</h3>
+
+<p>The <code>on_premises_instance_tag_filter</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>key</code> - (Optional) The key of the tag filter.</li>
+<li><code>type</code> - (Optional) The type of the tag filter, either <code>KEY_ONLY</code>, <code>VALUE_ONLY</code>, or <code>KEY_AND_VALUE</code>.</li>
+<li><code>value</code> - (Optional) The value of the tag filter.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/trigger_configuration%20Argument%20Reference"></a><h3 id="trigger_configuration-argument-reference">trigger_configuration Argument Reference</h3>
+
+<p>Add triggers to a Deployment Group to receive notifications about events related to deployments or instances in the group. Notifications are sent to subscribers of the <strong>SNS</strong> topic associated with the trigger. _CodeDeploy must have permission to publish to the topic from this deployment group_. <code>trigger_configuration</code> supports the following:</p>
+
+<ul>
+<li><code>trigger_events</code> - (Required) The event type or types for which notifications are triggered. Some values that are supported: <code>DeploymentStart</code>, <code>DeploymentSuccess</code>, <code>DeploymentFailure</code>, <code>DeploymentStop</code>, <code>DeploymentRollback</code>, <code>InstanceStart</code>, <code>InstanceSuccess</code>, <code>InstanceFailure</code>.  See <a href="http://docs.aws.amazon.com/codedeploy/latest/userguide/monitoring-sns-event-notifications-create-trigger.html">the CodeDeploy documentation</a> for all possible values.</li>
+<li><code>trigger_name</code> - (Required) The name of the notification trigger.</li>
+<li><code>trigger_target_arn</code> - (Required) The ARN of the SNS topic through which notifications are sent.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>arn</code> - The ARN of the CodeDeploy deployment group.</li>
+<li><code>id</code> - Application name and deployment group name.</li>
+<li><code>compute_platform</code> - The destination platform type for the deployment.</li>
+<li><code>deployment_group_id</code> - The ID of the CodeDeploy deployment group.</li>
+<li><code>tags_all</code> - A map of tags assigned to the resource, including those inherited from the provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import CodeDeploy Deployment Groups using <code>app_name</code>, a colon, and <code>deployment_group_name</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_codedeploy_deployment_group.example</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-application:my-deployment-group"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import CodeDeploy Deployment Groups using <code>app_name</code>, a colon, and <code>deployment_group_name</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_codedeploy_deployment_group.example my-application:my-deployment-group
+</code></pre></div>
+
+            
+        
+    </body></html>

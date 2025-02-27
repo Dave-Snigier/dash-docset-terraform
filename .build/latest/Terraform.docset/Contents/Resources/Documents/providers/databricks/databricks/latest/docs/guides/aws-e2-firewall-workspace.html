@@ -1,0 +1,603 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/aws-e2-firewall-workspace --><head>
+                <title>Provisioning AWS Databricks workspace with a AWS Firewall</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="provisioning-aws-databricks-workspace-with-a-aws-firewall">Provisioning AWS Databricks workspace with a AWS Firewall</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Refer to the <a href="https://registry.terraform.io/modules/databricks/examples/databricks/latest">Databricks Terraform Registry modules</a> for Terraform modules and examples to deploy Azure Databricks resources.</p>
+</aside>
+
+<p>You can provision multiple Databricks workspaces with Terraform. This example shows how to deploy a Databricks workspace into a VPC, which uses an AWS Network firewall to manage egress out to the public network. For smaller Databricks deployments, this is our recommended configuration; for larger deployments, see <a href="aws-e2-firewall-hub-and-spoke.md">Provisioning AWS Databricks workspace with a Hub &amp; Spoke firewall for data exfiltration protection</a>.</p>
+
+<p>For more information, please visit <a href="https://databricks.com/blog/2021/02/02/data-exfiltration-protection-with-databricks-on-aws.html">Data Exfiltration Protection With Databricks on AWS</a>.</p>
+
+<p><img alt="Data Exfiltration_Workspace" src="https://raw.githubusercontent.com/databricks/terraform-provider-databricks/main/docs/images/aws-e2-firewall-workspace.png"/></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20initialization%20for%20AWS%20workspaces"></a><h2 id="provider-initialization-for-aws-workspaces">Provider initialization for AWS workspaces</h2>
+
+<p>This guide assumes you have the <code>client_id</code>, which is the <code>application_id</code> of the <a href="../resources/service_principal.md">Service Principal</a>, <code>client_secret</code>, which is its secret, and <code>databricks_account_id</code>, which can be found in the top right corner of the <a href="https://accounts.cloud.databricks.com">Account Console</a>. (see <a href="https://docs.databricks.com/dev-tools/authentication-oauth.html#step-2-create-an-oauth-secret-for-a-service-principal">instruction</a>). This guide is provided as is and assumes you will use it as the basis for your setup. If you are using AWS Firewall to block most traffic but allow the URLs that Databricks needs to connect to, please update the configuration based on your region. You can get the configuration details for your region from <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/customer-managed-vpc.html#firewall-appliance-infrastructure">Firewall Appliance</a> document.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"client_id"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"client_secret"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"tags"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"cidr_block"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.4.0.0/16"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"region"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eu-west-2"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"random_string"</span><span class="w"> </span><span class="nv">"naming"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">special</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">upper</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">length</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="m">6</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"whitelisted_urls"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">".pypi.org", ".pythonhosted.org", ".cran.r-project.org"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"db_web_app"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"london.cloud.databricks.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"db_tunnel"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tunnel.eu-west-2.cloud.databricks.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"db_rds"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mdio2468d9025m.c6fvhwk6cqca.eu-west-2.rds.amazonaws.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"db_control_plane"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"18.134.65.240/28"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"prefix"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"demo"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">prefix</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}${random_string.naming.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_subnets_cidr</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">var.cidr_block</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">0</span><span class="p">),</span><span class="w"> </span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">var.cidr_block</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">1</span><span class="p">)]</span><span class="w"></span>
+<span class="w">  </span><span class="na">nat_public_subnets_cidr</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">var.cidr_block</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">),</span><span class="w"> </span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">var.cidr_block</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">)]</span><span class="w"></span>
+<span class="w">  </span><span class="na">firewall_public_subnets_cidr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">var.cidr_block</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">4</span><span class="p">)]</span><span class="w"></span>
+<span class="w">  </span><span class="na">sg_egress_ports</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="m">443</span><span class="p">,</span><span class="w"> </span><span class="m">3306</span><span class="p">,</span><span class="w"> </span><span class="m">6666</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">sg_ingress_protocol</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"tcp", "udp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">sg_egress_protocol</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"tcp", "udp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">availability_zones</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"${var.region}a", "${var.region}b"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">db_root_bucket</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}${random_string.naming.result}-rootbucket.s3.amazonaws.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Before <a href="workspace-management.md">managing workspace</a>, you have to create:</p>
+
+<ul>
+<li><a href="#vpc">VPC</a></li>
+<li><a href="#aws-network-firewall">AWS Network Firewall</a></li>
+<li><a href="aws-workspace.md#root-bucket">Root bucket</a></li>
+<li><a href="aws-workspace.md#cross-account-iam-role">Cross-account role</a></li>
+<li><a href="aws-workspace.md#databricks-workspace">Databricks workspace</a></li>
+<li><a href="aws-workspace.md#provider-configuration">Host and Token outputs</a></li>
+</ul>
+
+<blockquote>
+  <p>Initializing provider with <code>alias = "mws"</code> and using <code>provider = databricks.mws</code> for all <code>databricks_mws_*</code> resources. We require all <code>databricks_mws_*</code> resources to be created within its own dedicated terraform module of your environment. Usually, this module creates VPC and IAM roles as well.</p>
+</blockquote>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">databricks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"databricks/databricks"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 4.15.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// initialize provider in "MWS" mode to provision new workspace</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"mws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://accounts.cloud.databricks.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.client_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.client_secret</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/VPC"></a><h2 id="vpc">VPC</h2>
+
+<p>The very first step is VPC creation. Please consult <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/customer-managed-vpc.html">main documentation page</a> for <strong>the most complete and up-to-date details on networking</strong>. AWS VPC is registered as <a href="../resources/mws_networks.md">databricks_mws_networks</a> resource.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_availability_zones"</span><span class="w"> </span><span class="nv">"available"</span><span class="w"> </span><span class="p">{}</span><span class="cm"></span>
+
+<span class="cm">/* Create VPC */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"db_vpc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">var.cidr_block</span><span class="w"></span>
+<span class="w">  </span><span class="na">enable_dns_hostnames</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">enable_dns_support</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="nv">var.tags</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-db-vpc"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="cm"></span>
+
+<span class="cm">/* Private subnet for Databricks */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_subnet"</span><span class="w"> </span><span class="nv">"db_private_subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.db_vpc.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="nv">local.private_subnets_cidr</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span><span class="nv">local.private_subnets_cidr</span><span class="p">,</span><span class="w"> </span><span class="nv">count.index</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">availability_zone</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span><span class="nv">local.availability_zones</span><span class="p">,</span><span class="w"> </span><span class="nv">count.index</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">map_public_ip_on_launch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="nv">var.tags</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-db-private-${element(local.availability_zones, count.index)}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="cm"></span>
+
+<span class="cm">/* NAT Public subnet */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_subnet"</span><span class="w"> </span><span class="nv">"db_nat_public_subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.db_vpc.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="nv">local.nat_public_subnets_cidr</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span><span class="nv">local.nat_public_subnets_cidr</span><span class="p">,</span><span class="w"> </span><span class="nv">count.index</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">availability_zone</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span><span class="nv">local.availability_zones</span><span class="p">,</span><span class="w"> </span><span class="nv">count.index</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">map_public_ip_on_launch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="nv">var.tags</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-db-nat-public-${element(local.availability_zones, count.index)}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="cm"></span>
+
+<span class="cm">/* Firewall Public subnet */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_subnet"</span><span class="w"> </span><span class="nv">"db_firewall_subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.db_vpc.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="nv">local.firewall_public_subnets_cidr</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span><span class="nv">local.firewall_public_subnets_cidr</span><span class="p">,</span><span class="w"> </span><span class="nv">count.index</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">availability_zone</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span><span class="nv">local.availability_zones</span><span class="p">,</span><span class="w"> </span><span class="nv">count.index</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">map_public_ip_on_launch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="nv">var.tags</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-db-firewall-public-${element(local.availability_zones, count.index)}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="cm"></span>
+
+<span class="cm">/* Internet gateway for the public subnet */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_internet_gateway"</span><span class="w"> </span><span class="nv">"db_igw"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.db_vpc.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="nv">var.tags</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-db-igw"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="cm"></span>
+
+<span class="cm">/* Elastic IP for NAT */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_eip"</span><span class="w"> </span><span class="nv">"db_nat_eip"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_internet_gateway.db_igw</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="cm"></span>
+
+<span class="cm">/* NAT Gateway */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_nat_gateway"</span><span class="w"> </span><span class="nv">"db_nat"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">allocation_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_eip.db_nat_eip.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span><span class="nv">aws_subnet.db_nat_public_subnet</span><span class="p">.</span><span class="err">*</span><span class="p">.</span><span class="err">id</span><span class="p">,</span><span class="w"> </span><span class="m">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_internet_gateway.db_igw</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="nv">var.tags</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-db-nat"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Security%20Group"></a><h3 id="security-group">Security Group</h3>
+
+<p>Databricks must have access to at least one AWS security group and no more than five security groups. You can reuse existing security groups rather than create new ones.
+Security groups must have the following rules:</p>
+
+<p><strong><em>Egress (outbound):</em></strong></p>
+
+<ul>
+<li>Allow all TCP and UDP access to the workspace security group (for internal traffic)</li>
+<li>Allow TCP access to 0.0.0.0/0 for these ports:
+<ul>
+<li>443: for Databricks infrastructure, cloud data sources, and library repositories</li>
+<li>3306: for the metastore</li>
+<li>6666: only required if you use PrivateLink</li>
+</ul></li>
+</ul>
+
+<p><strong><em>Ingress (inbound):</em></strong> Required for all workspaces (these can be separate rules or combined into one):</p>
+
+<ul>
+<li>Allow TCP on all ports when the traffic source uses the same security group</li>
+<li>Allow UDP on all ports when the traffic source uses the same security group</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="cm">/* VPC's Default Security Group */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_security_group"</span><span class="w"> </span><span class="nv">"default_sg"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-default-sg"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Default security group to allow inbound/outbound from the VPC"</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.db_vpc.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_vpc.db_vpc</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="err">dynamic</span><span class="w"> </span><span class="s2">"ingress"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.sg_ingress_protocol</span><span class="w"></span>
+<span class="w">    </span><span class="nb">content</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">from_port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">      </span><span class="na">to_port</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">65535</span><span class="w"></span>
+<span class="w">      </span><span class="na">protocol</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">ingress.value</span><span class="w"></span>
+<span class="w">      </span><span class="na">self</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="err">dynamic</span><span class="w"> </span><span class="s2">"egress"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.sg_egress_protocol</span><span class="w"></span>
+<span class="w">    </span><span class="nb">content</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">from_port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">      </span><span class="na">to_port</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">65535</span><span class="w"></span>
+<span class="w">      </span><span class="na">protocol</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">egress.value</span><span class="w"></span>
+<span class="w">      </span><span class="na">self</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="err">dynamic</span><span class="w"> </span><span class="s2">"egress"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.sg_egress_ports</span><span class="w"></span>
+<span class="w">    </span><span class="nb">content</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">from_port</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">egress.value</span><span class="w"></span>
+<span class="w">      </span><span class="na">to_port</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">egress.value</span><span class="w"></span>
+<span class="w">      </span><span class="na">protocol</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">      </span><span class="na">cidr_blocks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"0.0.0.0/0"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tags</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Register%20AWS%20VPC%20as%20the%20databricks_mws_networks%20resource"></a><h3 id="register-aws-vpc-as-the-databricks_mws_networks-resource">Register AWS VPC as the databricks_mws_networks resource</h3>
+
+<p>Now, we configure VPC &amp; subnets for new workspaces within AWS.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_networks"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_group_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_security_group.default_sg.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_ids</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_subnet.db_private_subnet</span><span class="p">[</span><span class="err">*</span><span class="p">].</span><span class="err">id</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.db_vpc.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Route%20Tables"></a><h3 id="route-tables">Route Tables</h3>
+
+<p>Next, we will create route tables for VPC subnets, NAT gateway, and Internet Gateway and add some routes.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="cm">/* Routing table for private subnet */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route_table"</span><span class="w"> </span><span class="nv">"db_private_rt"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.db_vpc.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="nv">var.tags</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-db-private-rt"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="cm"></span>
+
+<span class="cm">/* Routing table for nat public subnet */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route_table"</span><span class="w"> </span><span class="nv">"db_nat_public_rt"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.db_vpc.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="nv">var.tags</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-db-nat-rt"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="cm"></span>
+
+<span class="cm">/* Routing table for nat public subnet */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route_table"</span><span class="w"> </span><span class="nv">"db_firewall_rt"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.db_vpc.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="nv">var.tags</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-db-firewall-rt"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="cm"></span>
+
+<span class="cm">/* Routing table for internet gateway */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route_table"</span><span class="w"> </span><span class="nv">"db_igw_rt"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.db_vpc.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="nv">var.tags</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-db-igw-rt"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="cm"></span>
+
+<span class="cm">/* Routing table associations */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route_table_association"</span><span class="w"> </span><span class="nv">"db_private"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="nv">local.private_subnets_cidr</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span><span class="nv">aws_subnet.db_private_subnet</span><span class="p">.</span><span class="err">*</span><span class="p">.</span><span class="err">id</span><span class="p">,</span><span class="w"> </span><span class="nv">count.index</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route_table.db_private_rt.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route_table_association"</span><span class="w"> </span><span class="nv">"db_nat"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="nv">local.nat_public_subnets_cidr</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span><span class="nv">aws_subnet.db_nat_public_subnet</span><span class="p">.</span><span class="err">*</span><span class="p">.</span><span class="err">id</span><span class="p">,</span><span class="w"> </span><span class="nv">count.index</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route_table.db_nat_public_rt.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route_table_association"</span><span class="w"> </span><span class="nv">"db_firewall"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="nv">local.firewall_public_subnets_cidr</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span><span class="nv">aws_subnet.db_firewall_subnet</span><span class="p">.</span><span class="err">*</span><span class="p">.</span><span class="err">id</span><span class="p">,</span><span class="w"> </span><span class="nv">count.index</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route_table.db_firewall_rt.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route_table_association"</span><span class="w"> </span><span class="nv">"db_igw"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">gateway_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_internet_gateway.db_igw.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route_table.db_igw_rt.id</span><span class="w"></span>
+<span class="p">}</span><span class="cm"></span>
+
+<span class="cm">/* Adding routes to route tables */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route"</span><span class="w"> </span><span class="nv">"db_private_nat_gtw"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">route_table_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route_table.db_private_rt.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.0.0.0/0"</span><span class="w"></span>
+<span class="w">  </span><span class="na">nat_gateway_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_nat_gateway.db_nat.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route"</span><span class="w"> </span><span class="nv">"db_firewall_gtw"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">route_table_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route_table.db_firewall_rt.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.0.0.0/0"</span><span class="w"></span>
+<span class="w">  </span><span class="na">gateway_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_internet_gateway.db_igw.id</span><span class="w"></span>
+<span class="p">}</span><span class="cm"></span>
+
+<span class="cm">/* Manage the main routing table for VPC  */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_main_route_table_association"</span><span class="w"> </span><span class="nv">"set-worker-default-rt-assoc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.db_vpc.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route_table.db_firewall_rt.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/VPC%20Endpoints"></a><h3 id="vpc-endpoints">VPC Endpoints</h3>
+
+<p>For STS, S3, and Kinesis, it's important to create VPC gateway or interface endpoints such that the relevant in-region traffic from clusters could transit over the secure AWS backbone rather than the public network for more direct connections and reduced cost compared to AWS global endpoints.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">module</span><span class="w"> </span><span class="nv">"vpc_endpoints"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-aws-modules/vpc/aws//modules/vpc-endpoints"</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3.11.0"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.db_vpc.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_group_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_security_group.default_sg.id</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">endpoints</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">s3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">service</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"s3"</span><span class="w"></span>
+<span class="w">      </span><span class="na">service_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Gateway"</span><span class="w"></span>
+<span class="w">      </span><span class="na">route_table_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">flatten</span><span class="p">([</span><span class="w"></span>
+<span class="w">        </span><span class="nv">aws_route_table.db_private_rt.id</span><span class="w"></span>
+<span class="w">      </span><span class="p">])</span><span class="w"></span>
+<span class="w">      </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-s3-vpc-endpoint"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="nb">sts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">service</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"sts"</span><span class="w"></span>
+<span class="w">      </span><span class="na">private_dns_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">      </span><span class="na">subnet_ids</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_subnet.db_private_subnet</span><span class="p">[</span><span class="err">*</span><span class="p">].</span><span class="err">id</span><span class="w"></span>
+<span class="w">      </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-sts-vpc-endpoint"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="nb">kinesis-streams</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">service</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"kinesis-streams"</span><span class="w"></span>
+<span class="w">      </span><span class="na">private_dns_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">      </span><span class="na">subnet_ids</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_subnet.db_private_subnet</span><span class="p">[</span><span class="err">*</span><span class="p">].</span><span class="err">id</span><span class="w"></span>
+<span class="w">      </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-kinesis-vpc-endpoint"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tags</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/AWS%20Network%20Firewall"></a><h2 id="aws-network-firewall">AWS Network Firewall</h2>
+
+<p>Once <a href="#vpc">VPC</a> is ready, create an AWS Network Firewall for your VPC that restricts outbound http/s traffic to an approved set of Fully Qualified Domain Names (FQDNs).</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/AWS%20Firewall%20Rule%20Groups"></a><h3 id="aws-firewall-rule-groups">AWS Firewall Rule Groups</h3>
+
+<p>First, we will create a Firewall Rule group for accessing hive metastore and public repositories.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_networkfirewall_rule_group"</span><span class="w"> </span><span class="nv">"databricks_fqdns_rg"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">capacity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-databricks-fqdns-rg"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"STATEFUL"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">rule_group</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rules_source</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">rules_source_list</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">generated_rules_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ALLOWLIST"</span><span class="w"></span>
+<span class="w">        </span><span class="na">target_types</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"TLS_SNI", "HTTP_HOST"</span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="na">targets</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nf">concat</span><span class="p">([</span><span class="nv">var.db_web_app</span><span class="p">,</span><span class="w"> </span><span class="nv">var.db_tunnel</span><span class="p">,</span><span class="w"> </span><span class="nv">var.db_rds</span><span class="p">,</span><span class="w"> </span><span class="nv">local.db_root_bucket</span><span class="p">],</span><span class="w"> </span><span class="nv">var.whitelisted_urls</span><span class="p">)</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rule_variables</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">ip_sets</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"HOME_NET"</span><span class="w"></span>
+<span class="w">        </span><span class="nb">ip_set</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">definition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">var.cidr_block</span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tags</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>As the next step, we will create a Firewall Rule group that allows control plane traffic from the VPC.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_networkfirewall_rule_group"</span><span class="w"> </span><span class="nv">"allow_db_cpl_protocols_rg"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">capacity</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allows control plane traffic from source"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-allow-db-cpl-protocols-rg"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"STATEFUL"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">rule_group</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rule_variables</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">ip_sets</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"HOME_NET"</span><span class="w"></span>
+<span class="w">        </span><span class="nb">ip_set</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">definition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">var.cidr_block</span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rules_source</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="err">dynamic</span><span class="w"> </span><span class="s2">"stateful_rule"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.protocols_control_plane</span><span class="w"></span>
+<span class="w">        </span><span class="nb">content</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PASS"</span><span class="w"></span>
+<span class="w">          </span><span class="nb">header</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="na">destination</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">var.db_control_plane</span><span class="w"></span>
+<span class="w">            </span><span class="na">destination_port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"443"</span><span class="w"></span>
+<span class="w">            </span><span class="na">protocol</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">stateful_rule.value</span><span class="w"></span>
+<span class="w">            </span><span class="na">direction</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"ANY"</span><span class="w"></span>
+<span class="w">            </span><span class="na">source_port</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"ANY"</span><span class="w"></span>
+<span class="w">            </span><span class="na">source</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"ANY"</span><span class="w"></span>
+<span class="w">          </span><span class="p">}</span><span class="w"></span>
+<span class="w">          </span><span class="nb">rule_option</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="na">keyword</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sid:${stateful_rule.key + 1}"</span><span class="w"></span>
+<span class="w">          </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tags</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocols</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"ICMP", "FTP", "SSH"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocols_control_plane</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"TCP"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Finally, we will add some basic deny rules to cater for common firewall scenarios, such as preventing the use of protocols like SSH/SFTP, FTP, and ICMP.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="cm">/* Firewall Rule group for dropping ICMP, FTP, SSH*/</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_networkfirewall_rule_group"</span><span class="w"> </span><span class="nv">"deny_protocols_rg"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">capacity</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Drops FTP,ICMP, SSH traffic from source"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-deny-protocols-rg"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"STATEFUL"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">rule_group</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rule_variables</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">ip_sets</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"HOME_NET"</span><span class="w"></span>
+<span class="w">        </span><span class="nb">ip_set</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">definition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">var.cidr_block</span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rules_source</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="err">dynamic</span><span class="w"> </span><span class="s2">"stateful_rule"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.protocols</span><span class="w"></span>
+<span class="w">        </span><span class="nb">content</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"DROP"</span><span class="w"></span>
+<span class="w">          </span><span class="nb">header</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="na">destination</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"ANY"</span><span class="w"></span>
+<span class="w">            </span><span class="na">destination_port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ANY"</span><span class="w"></span>
+<span class="w">            </span><span class="na">protocol</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">stateful_rule.value</span><span class="w"></span>
+<span class="w">            </span><span class="na">direction</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"ANY"</span><span class="w"></span>
+<span class="w">            </span><span class="na">source_port</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"ANY"</span><span class="w"></span>
+<span class="w">            </span><span class="na">source</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"ANY"</span><span class="w"></span>
+<span class="w">          </span><span class="p">}</span><span class="w"></span>
+<span class="w">          </span><span class="nb">rule_option</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="na">keyword</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sid:${stateful_rule.key + 1}"</span><span class="w"></span>
+<span class="w">          </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tags</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/AWS%20Network%20Firewall%20Policy"></a><h3 id="aws-network-firewall-policy">AWS Network Firewall Policy</h3>
+
+<p>First, we will create an AWS Firewall Policy and include stateful firewall rule groups created in previous steps.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_networkfirewall_firewall_policy"</span><span class="w"> </span><span class="nv">"egress_policy"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-egress-policy"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">firewall_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">stateless_default_actions</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"aws:forward_to_sfe"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">stateless_fragment_default_actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"aws:forward_to_sfe"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="nb">stateful_rule_group_reference</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">resource_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_networkfirewall_rule_group.databricks_fqdns_rg.arn</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">stateful_rule_group_reference</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">resource_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_networkfirewall_rule_group.deny_protocols_rg.arn</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">stateful_rule_group_reference</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">resource_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_networkfirewall_rule_group.allow_db_cpl_protocols_rg.arn</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tags</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/AWS%20Firewall"></a><h3 id="aws-firewall">AWS Firewall</h3>
+
+<p>As the next step, we will create an AWS Network Firewall with the Firewall Policy we defined in the previous step.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_networkfirewall_firewall"</span><span class="w"> </span><span class="nv">"exfiltration_firewall"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-fw"</span><span class="w"></span>
+<span class="w">  </span><span class="na">firewall_policy_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_networkfirewall_firewall_policy.egress_policy.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.db_vpc.id</span><span class="w"></span>
+<span class="w">  </span><span class="err">dynamic</span><span class="w"> </span><span class="s2">"subnet_mapping"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_subnet.db_firewall_subnet</span><span class="p">[</span><span class="err">*</span><span class="p">].</span><span class="err">id</span><span class="w"></span>
+<span class="w">    </span><span class="nb">content</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">subnet_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">subnet_mapping.value</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tags</span><span class="w"></span>
+<span class="p">}</span><span class="cm"></span>
+
+<span class="cm">/* Get Firewall Endpoint*/</span><span class="w"></span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"firewall"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.db_vpc.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"AWSNetworkFirewallManaged"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"true"</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"Firewall"</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_networkfirewall_firewall.exfiltration_firewall.arn</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_networkfirewall_firewall.exfiltration_firewall</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Finally, the AWS Network Firewall is now deployed and configured - all you need to do now is route traffic to it.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="cm">/* Add Route from Nat Gateway to Firewall */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route"</span><span class="w"> </span><span class="nv">"db_nat_firewall"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">route_table_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route_table.db_nat_public_rt.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.0.0.0/0"</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_vpc_endpoint.firewall.id</span><span class="w"></span>
+<span class="p">}</span><span class="cm"></span>
+
+<span class="cm">/* Add Route from Internet Gateway to Firewall */</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route"</span><span class="w"> </span><span class="nv">"db_igw_nat_firewall"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">route_table_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route_table.db_igw_rt.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="nv">local.nat_public_subnets_cidr</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span><span class="nv">local.nat_public_subnets_cidr</span><span class="p">,</span><span class="w"> </span><span class="nv">count.index</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_vpc_endpoint.firewall.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Troubleshooting"></a><h2 id="troubleshooting">Troubleshooting</h2>
+
+<p>If the Databricks clusters cannot reach DBFS or VPC endpoints do not work as intended, for example if your data sources are inaccessible or if the traffic is bypassing the endpoints please visit <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/customer-managed-vpc.html#troubleshoot-regional-endpoints">Troubleshoot regional endpoints</a></p>
+
+            
+        
+    </body></html>

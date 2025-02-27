@@ -1,0 +1,226 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_principal_policy_simulation --><head>
+                <title>aws_iam_principal_policy_simulation</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="data-source-aws_iam_principal_policy_simulation">Data Source: aws_iam_principal_policy_simulation</h1>
+
+<p>Runs a simulation of the IAM policies of a particular principal against a given hypothetical request.</p>
+
+<p>You can use this data source in conjunction with
+<a href="https://www.terraform.io/language/expressions/custom-conditions#preconditions-and-postconditions">Preconditions and Postconditions</a> so that your configuration can test either whether it should have sufficient access to do its own work, or whether policies your configuration declares itself are sufficient for their intended use elsewhere.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Correctly using this data source requires familiarity with various details of AWS Identity and Access Management, and how various AWS services integrate with it. For general information on the AWS IAM policy simulator, see <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_testing-policies.html">Testing IAM policies with the IAM policy simulator</a>. This data source wraps the <code>iam:SimulatePrincipalPolicy</code> API action described on that page.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Self%20Access-checking%20Example"></a><h3 id="self-access-checking-example">Self Access-checking Example</h3>
+
+<p>The following example raises an error if the credentials passed to the AWS provider do not have access to perform the three actions <code>s3:GetObject</code>, <code>s3:PutObject</code>, and <code>s3:DeleteObject</code> on the S3 bucket with the given ARN. It combines <code>aws_iam_principal_policy_simulation</code> with the core Terraform postconditions feature.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_caller_identity"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_principal_policy_simulation"</span><span class="w"> </span><span class="nv">"s3_object_access"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">action_names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"s3:GetObject"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"s3:PutObject"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"s3:DeleteObject"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_source_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_caller_identity.current.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_arns</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"arn:aws:s3:::my-test-bucket"</span><span class="p">]</span><span class="c1"></span>
+
+<span class="c1">  # The "lifecycle" and "postcondition" block types are part of</span>
+<span class="c1">  # the main Terraform language, not part of this data source.</span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">postcondition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">self.all_allowed</span><span class="w"></span>
+<span class="w">      </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="err">        Given AWS credentials do not have sufficient access to manage ${join(", ", self.resource_arns)}.</span>
+<span class="err">      EOT</span>
+<span class="err">    }</span>
+<span class="err">  }</span>
+<span class="err">}</span>
+<span class="w">        </span><span class="err">Given</span><span class="w"> </span><span class="err">AWS</span><span class="w"> </span><span class="err">credentials</span><span class="w"> </span><span class="err">do</span><span class="w"> </span><span class="err">not</span><span class="w"> </span><span class="err">have</span><span class="w"> </span><span class="err">sufficient</span><span class="w"> </span><span class="err">access</span><span class="w"> </span><span class="err">to</span><span class="w"> </span><span class="err">manage</span><span class="w"> </span><span class="err">$</span><span class="p">{</span><span class="nf">join</span><span class="p">(</span><span class="s2">", "</span><span class="p">,</span><span class="w"> </span><span class="nv">self.resource_arns</span><span class="p">)}.</span><span class="w"></span>
+<span class="w">      </span><span class="err">EOT</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>If you intend to use this data source to quickly raise an error when the given credentials are insufficient then you must use <a href="https://www.terraform.io/language/meta-arguments/depends_on"><code>depends_on</code></a> inside any resource which would require those credentials, to ensure that the policy check will run first:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_object"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-test-bucket"</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">data.aws_iam_principal_policy_simulation.s3_object_access</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Testing%20the%20Effect%20of%20a%20Declared%20Policy"></a><h3 id="testing-the-effect-of-a-declared-policy">Testing the Effect of a Declared Policy</h3>
+
+<p>The following example declares an S3 bucket and a user that should have access to the bucket, and then uses <code>aws_iam_principal_policy_simulation</code> to verify that the user does indeed have access to perform needed operations against the bucket.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_caller_identity"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_user"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-test-bucket"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_user_policy"</span><span class="w"> </span><span class="nv">"s3_access"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example_s3_access"</span><span class="w"></span>
+<span class="w">  </span><span class="na">user</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_user.example.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="na">Version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2012-10-17"</span><span class="w"></span>
+<span class="w">    </span><span class="na">Statement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Action</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"s3:GetObject"</span><span class="w"></span>
+<span class="w">        </span><span class="na">Effect</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">        </span><span class="na">Resource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.example.arn</span><span class="w"></span>
+<span class="w">      </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_policy"</span><span class="w"> </span><span class="nv">"account_access"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.example.bucket</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="na">Version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2012-10-17"</span><span class="w"></span>
+<span class="w">    </span><span class="na">Statement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"s3:*"</span><span class="w"></span>
+<span class="w">        </span><span class="na">Effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">        </span><span class="nb">Principal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">          # Any caller belonging to the current AWS account</span>
+<span class="c1">          # is allowed full access to this S3 bucket.</span>
+<span class="w">          </span><span class="na">AWS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_caller_identity.current.account_id</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="na">Resource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">          </span><span class="nv">aws_s3_bucket.example.arn</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"${aws_s3_bucket.example.arn}/*"</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_principal_policy_simulation"</span><span class="w"> </span><span class="nv">"s3_object_access"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">action_names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"s3:GetObject"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_source_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_user.example.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_arns</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_s3_bucket.example.arn</span><span class="p">]</span><span class="c1"></span>
+
+<span class="c1">  # The IAM policy simulator automatically imports the policies associated</span>
+<span class="c1">  # with the user (policy_source_arn) but cannot automatically import the</span>
+<span class="c1">  # policies from the S3 bucket, because in a real request those would be</span>
+<span class="c1">  # provided by the S3 service itself. Therefore we need to provide the</span>
+<span class="c1">  # same policy that we associated with the S3 bucket above.</span>
+<span class="w">  </span><span class="na">resource_policy_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket_policy.account_access.policy</span><span class="c1"></span>
+
+<span class="c1">  # The policy simulation won't be valid until the user's policy</span>
+<span class="c1">  # has been created or updated.</span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_iam_user_policy.s3_access</span><span class="p">]</span><span class="c1"></span>
+
+<span class="c1">  # The "lifecycle" and "postcondition" block types are part of</span>
+<span class="c1">  # the main Terraform language, not part of this data source.</span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">postcondition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">self.all_allowed</span><span class="w"></span>
+<span class="w">      </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="err">        ${self.policy_source_arn} does not have the expected access to ${join(", ", self.resource_arns)}.</span>
+<span class="err">      EOT</span>
+<span class="err">    }</span>
+<span class="err">  }</span>
+<span class="err">}</span>
+<span class="w">        </span><span class="err">$</span><span class="p">{</span><span class="nv">self.policy_source_arn</span><span class="p">}</span><span class="w"> </span><span class="err">does</span><span class="w"> </span><span class="err">not</span><span class="w"> </span><span class="err">have</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">expected</span><span class="w"> </span><span class="err">access</span><span class="w"> </span><span class="err">to</span><span class="w"> </span><span class="err">$</span><span class="p">{</span><span class="nf">join</span><span class="p">(</span><span class="s2">", "</span><span class="p">,</span><span class="w"> </span><span class="nv">self.resource_arns</span><span class="p">)}.</span><span class="w"></span>
+<span class="w">      </span><span class="err">EOT</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When using <code>aws_iam_principal_policy_simulation</code> to test the effect of a policy declared elsewhere in the same configuration, it's important to use <a href="https://www.terraform.io/language/meta-arguments/depends_on"><code>depends_on</code></a> to make sure that the needed policy has been fully created or updated before running the simulation.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required for any principal policy simulation:</p>
+
+<ul>
+<li><p><code>action_names</code> (Required) - A set of IAM action names to run simulations for. Each entry in this set adds an additional hypothetical request to the simulation.</p>
+
+<p>Action names consist of a service prefix and an action verb separated by a colon, such as <code>s3:GetObject</code>. Refer to <a href="https://docs.aws.amazon.com/service-authorization/latest/reference/reference_policies_actions-resources-contextkeys.html">Actions, resources, and condition keys for AWS services</a> to see the full set of possible IAM action names across all AWS services.</p></li>
+<li><p><code>policy_source_arn</code> (Required) - The <a href="https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html">ARN</a> of the IAM user, group, or role whose policies will be included in the simulation.</p></li>
+</ul>
+
+<p>You must closely match the form of the real service request you are simulating in order to achieve a realistic result. You can use the following additional arguments to specify other characteristics of the simulated requests:</p>
+
+<ul>
+<li><p><code>caller_arn</code> (Optional) - The ARN of an user that will appear as the "caller" of the simulated requests. If you do not specify <code>caller_arn</code> then the simulation will use the <code>policy_source_arn</code> instead, if it contains a user ARN.</p></li>
+<li><p><code>context</code> (Optional) - Each <a href="#context-block-arguments"><code>context</code> block</a> defines an entry in the table of additional context keys in the simulated request.</p>
+
+<p>IAM uses context keys for both custom conditions and for interpolating dynamic request-specific values into policy values. If you use policies that include those features then you will need to provide suitable example values for those keys to achieve a realistic simulation.</p></li>
+<li><p><code>additional_policies_json</code> (Optional) - A set of additional principal policy documents to include in the simulation. The simulator will behave as if each of these policies were associated with the object specified in <code>policy_source_arn</code>, allowing you to test the effect of hypothetical policies not yet created.</p></li>
+<li><p><code>permissions_boundary_policies_json</code> (Optional) - A set of <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html">permissions boundary policy documents</a> to include in the simulation.</p></li>
+<li><p><code>resource_arns</code> (Optional) - A set of ARNs of resources to include in the simulation.</p>
+
+<p>This argument is important for actions that have either required or optional resource types listed in <a href="https://docs.aws.amazon.com/service-authorization/latest/reference/reference_policies_actions-resources-contextkeys.html">Actions, resources, and condition keys for AWS services</a>, and you must provide ARNs that identify AWS objects of the appropriate types for the chosen actions.</p>
+
+<p>The policy simulator only automatically loads policies associated with the <code>policy_source_arn</code>, so if your given resources have their own resource-level policy then you'll also need to provide that explicitly using the <code>resource_policy_json</code> argument to achieve a realistic simulation.</p></li>
+<li><p><code>resource_handling_option</code> (Optional) - Specifies a special simulation type to run. Some EC2 actions require special simulation behaviors and a particular set of resource ARNs to achieve a realistic result.</p>
+
+<p>For more details, see the <code>ResourceHandlingOption</code> request parameter for <a href="https://docs.aws.amazon.com/IAM/latest/APIReference/API_SimulatePrincipalPolicy.html">the underlying <code>iam:SimulatePrincipalPolicy</code> action</a>.</p></li>
+<li><p><code>resource_owner_account_id</code> (Optional) - An AWS account ID to use for any resource ARN in <code>resource_arns</code> that doesn't include its own AWS account ID. If unspecified, the simulator will use the account ID from the <code>caller_arn</code> argument as a placeholder.</p></li>
+<li><p><code>resource_policy_json</code> (Optional) - An IAM policy document representing the resource-level policy of all of the resources specified in <code>resource_arns</code>.</p>
+
+<p>The policy simulator cannot automatically load policies that are associated with individual resources, as described in the documentation for <code>resource_arns</code> above.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/context%20block%20arguments"></a><h3 id="context-block-arguments"><code>context</code> block arguments</h3>
+
+<p>The following arguments are all required in each <code>context</code> block:</p>
+
+<ul>
+<li><p><code>key</code> (Required) - The context _condition key_ to set.</p>
+
+<p>If you have policies containing <code>Condition</code> elements or using dynamic interpolations then you will need to provide suitable values for each condition key your policies use. See <a href="https://docs.aws.amazon.com/service-authorization/latest/reference/reference_policies_actions-resources-contextkeys.html">Actions, resources, and condition keys for AWS services</a> to find the various condition keys that are normally provided for real requests to each action of each AWS service.</p></li>
+<li><p><code>type</code> (Required) - An IAM value type that determines how the policy simulator will interpret the strings given in <code>values</code>.</p>
+
+<p>For more information, see the <code>ContextKeyType</code> field of <a href="https://docs.aws.amazon.com/IAM/latest/APIReference/API_ContextEntry.html"><code>iam.ContextEntry</code></a> in the underlying API.</p></li>
+<li><p><code>values</code> (Required) - A set of one or more values for this context entry.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This data source exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><p><code>all_allowed</code> - <code>true</code> if all of the simulation results have decision "allowed", or <code>false</code> otherwise.</p>
+
+<p>This is a convenient shorthand for the common case of requiring that all of the simulated requests passed in a postcondition associated with the data source. If you need to describe a more granular condition, use the <code>results</code> attribute instead.</p></li>
+<li><p><code>results</code> - A set of result objects, one for each of the simulated requests, with the following nested attributes:</p>
+
+<ul>
+<li><p><code>action_name</code> - The name of the single IAM action used for this particular request.</p></li>
+<li><p><code>decision</code> - The raw decision determined from all of the policies in scope; either "allowed", "explicitDeny", or "implicitDeny".</p></li>
+<li><p><code>allowed</code> - <code>true</code> if <code>decision</code> is "allowed", and <code>false</code> otherwise.</p></li>
+<li><p><code>decision_details</code> - A map of arbitrary metadata entries returned by the policy simulator for this request.</p></li>
+<li><p><code>resource_arn</code> - ARN of the resource that was used for this particular request. When you specify multiple actions and multiple resource ARNs, that causes a separate policy request for each combination of unique action and resource.</p></li>
+<li><p><code>matched_statements</code> - A nested set of objects describing which policies contained statements that were relevant to this simulation request. Each object has attributes <code>source_policy_id</code> and <code>source_policy_type</code> to identify one of the policies.</p></li>
+<li><p><code>missing_context_keys</code> - A set of context keys (or condition keys) that were needed by some of the policies contributing to this result but not specified using a <code>context</code> block in the configuration. Missing or incorrect context keys will typically cause a simulated request to be disallowed.</p></li>
+</ul></li>
+</ul>
+
+            
+        
+    </body></html>

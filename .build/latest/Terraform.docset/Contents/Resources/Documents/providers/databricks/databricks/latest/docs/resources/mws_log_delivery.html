@@ -1,0 +1,192 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_log_delivery --><head>
+                <title>databricks_mws_log_delivery</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_mws_log_delivery-resource">databricks_mws_log_delivery Resource</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Initialize provider with <code>alias = "mws"</code>, <code>host  = "https://accounts.cloud.databricks.com"</code> and use <code>provider = databricks.mws</code></p>
+</aside>
+
+<p>This resource configures the delivery of the two supported log types from Databricks workspaces: <a href="https://docs.databricks.com/administration-guide/account-settings/billable-usage-delivery.html">billable usage logs</a> and <a href="https://docs.databricks.com/administration-guide/account-settings/audit-logs.html">audit logs</a>.</p>
+
+<p>You cannot delete a log delivery configuration, but you can disable it when you no longer need it. This fact is important because there is a limit to the number of enabled log delivery configurations that you can create for an account. You can create a maximum of two enabled configurations that use the account level (no workspace filter) and two enabled configurations for every specific workspace (a workspaceId can occur in the workspace filter for two configurations). You can re-enable a disabled configuration, but the request fails if it violates the limits previously described.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>End-to-end example of usage and audit log delivery:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Account Id that could be found in the top right corner of https://accounts.cloud.databricks.com/"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"logdelivery"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-logdelivery"</span><span class="w"></span>
+<span class="w">  </span><span class="na">acl</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"private"</span><span class="w"></span>
+<span class="w">  </span><span class="na">force_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="nv">var.tags</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-logdelivery"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_public_access_block"</span><span class="w"> </span><span class="nv">"logdelivery"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.logdelivery.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">ignore_public_acls</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_aws_assume_role_policy"</span><span class="w"> </span><span class="nv">"logdelivery"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">external_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_log_delivery</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_versioning"</span><span class="w"> </span><span class="nv">"logdelivery_versioning"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.logdelivery.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">versioning_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Disabled"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"logdelivery"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-logdelivery"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"(${var.prefix}) UsageDelivery role"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_aws_assume_role_policy.logdelivery.json</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tags</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_aws_bucket_policy"</span><span class="w"> </span><span class="nv">"logdelivery"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">full_access_role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.logdelivery.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.logdelivery.bucket</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_policy"</span><span class="w"> </span><span class="nv">"logdelivery"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.logdelivery.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_aws_bucket_policy.logdelivery.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"time_sleep"</span><span class="w"> </span><span class="nv">"wait"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">aws_iam_role.logdelivery</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">create_duration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10s"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_credentials"</span><span class="w"> </span><span class="nv">"log_writer"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">credentials_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Usage Delivery"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_arn</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.logdelivery.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">time_sleep.wait</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_storage_configurations"</span><span class="w"> </span><span class="nv">"log_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_configuration_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Usage Logs"</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.logdelivery.bucket</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_log_delivery"</span><span class="w"> </span><span class="nv">"usage_logs"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">credentials_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_credentials.log_writer.credentials_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_configuration_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_storage_configurations.log_bucket.storage_configuration_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">delivery_path_prefix</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"billable-usage"</span><span class="w"></span>
+<span class="w">  </span><span class="na">config_name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"Usage Logs"</span><span class="w"></span>
+<span class="w">  </span><span class="na">log_type</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"BILLABLE_USAGE"</span><span class="w"></span>
+<span class="w">  </span><span class="na">output_format</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"CSV"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_log_delivery"</span><span class="w"> </span><span class="nv">"audit_logs"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">credentials_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_credentials.log_writer.credentials_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_configuration_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_storage_configurations.log_bucket.storage_configuration_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">delivery_path_prefix</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"audit-logs"</span><span class="w"></span>
+<span class="w">  </span><span class="na">config_name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"Audit Logs"</span><span class="w"></span>
+<span class="w">  </span><span class="na">log_type</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"AUDIT_LOGS"</span><span class="w"></span>
+<span class="w">  </span><span class="na">output_format</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"JSON"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Billable%20Usage"></a><h2 id="billable-usage">Billable Usage</h2>
+
+<p>CSV files are delivered to <code>&lt;delivery_path_prefix&gt;/billable-usage/csv/</code> and are named <code>workspaceId=&lt;workspace-id&gt;-usageMonth=&lt;month&gt;.csv</code>, which are delivered daily by overwriting the month's CSV file for each workspace. Format of CSV file, as well as some usage examples, can be found <a href="https://docs.databricks.com/administration-guide/account-settings/usage.html#download-usage-as-a-csv-file">here</a>.</p>
+
+<p>Common processing scenario is to apply <a href="https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-tags.html">cost allocation tags</a>, that could be enforced by setting <a href="cluster.md#custom_tags">custom_tags</a> on a cluster or through <a href="cluster_policy.md">cluster policy</a>. Report contains <code>clusterId</code> field, that could be joined with data from AWS <a href="https://docs.aws.amazon.com/cur/latest/userguide/cur-create.html">cost and usage reports</a>, that can be joined with <code>user:ClusterId</code> tag from AWS usage report.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_log_delivery"</span><span class="w"> </span><span class="nv">"usage_logs"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">credentials_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_credentials.log_writer.credentials_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_configuration_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_storage_configurations.log_bucket.storage_configuration_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">delivery_path_prefix</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"billable-usage"</span><span class="w"></span>
+<span class="w">  </span><span class="na">config_name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"Usage Logs"</span><span class="w"></span>
+<span class="w">  </span><span class="na">log_type</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"BILLABLE_USAGE"</span><span class="w"></span>
+<span class="w">  </span><span class="na">output_format</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"CSV"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Audit%20Logs"></a><h2 id="audit-logs">Audit Logs</h2>
+
+<p>JSON files with <a href="https://docs.databricks.com/administration-guide/account-settings/audit-logs.html#audit-log-schema">static schema</a> are delivered to <code>&lt;delivery_path_prefix&gt;/workspaceId=&lt;workspaceId&gt;/date=&lt;yyyy-mm-dd&gt;/auditlogs_&lt;internal-id&gt;.json</code>. Logs are available within 15 minutes of activation for audit logs. New JSON files are delivered every few minutes, potentially overwriting existing files for each workspace. Sometimes data may arrive later than 15 minutes. Databricks can overwrite the delivered log files in your bucket at any time. If a file is overwritten, the existing content remains, but there may be additional lines for more auditable events. Overwriting ensures exactly-once semantics without requiring read or delete access to your account.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_log_delivery"</span><span class="w"> </span><span class="nv">"audit_logs"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">credentials_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_credentials.log_writer.credentials_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_configuration_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_storage_configurations.log_bucket.storage_configuration_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">delivery_path_prefix</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"audit-logs"</span><span class="w"></span>
+<span class="w">  </span><span class="na">config_name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"Audit Logs"</span><span class="w"></span>
+<span class="w">  </span><span class="na">log_type</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"AUDIT_LOGS"</span><span class="w"></span>
+<span class="w">  </span><span class="na">output_format</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"JSON"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20reference"></a><h2 id="argument-reference">Argument reference</h2>
+
+<ul>
+<li><code>account_id</code> - Account Id that could be found in the top right corner of <a href="https://accounts.cloud.databricks.com/">Accounts Console</a>.</li>
+<li><code>config_name</code> - The optional human-readable name of the log delivery configuration. Defaults to empty.</li>
+<li><code>log_type</code> - The type of log delivery. <code>BILLABLE_USAGE</code> and <code>AUDIT_LOGS</code> are supported.</li>
+<li><code>output_format</code> - The file type of log delivery. Currently <code>CSV</code> (for <code>BILLABLE_USAGE</code>) and <code>JSON</code> (for <code>AUDIT_LOGS</code>) are supported.</li>
+<li><code>credentials_id</code> - The ID for a Databricks <a href="mws_credentials.md">credential configuration</a> that represents the AWS IAM role <a href="../data-sources/aws_assume_role_policy.md">with policy</a> and <a href="../data-sources/aws_assume_role_policy.md">trust relationship</a> as described in the main billable usage documentation page.</li>
+<li><code>storage_configuration_id</code> - The ID for a Databricks <a href="mws_storage_configurations.md">storage configuration</a> that represents the S3 bucket with <a href="../data-sources/aws_bucket_policy.md">bucket policy</a> as described in the main billable usage documentation page.</li>
+<li><code>status</code> - Status of log delivery configuration. Set to ENABLED or DISABLED. Defaults to ENABLED. This is the only field you can update.</li>
+<li><code>workspace_ids_filter</code> - (Optional) By default, this log configuration applies to all workspaces associated with your account ID. If your account is on the multitenant version of the platform or on a select custom plan that allows multiple workspaces per account, you may have multiple workspaces associated with your account ID. You can optionally set the field as mentioned earlier to an array of workspace IDs. If you plan to use different log delivery configurations for several workspaces, set this explicitly rather than leaving it blank. If you leave this blank and your account ID gets additional workspaces in the future, this configuration will also apply to the new workspaces.</li>
+<li><code>delivery_path_prefix</code> - (Optional) Defaults to empty, which means that logs are delivered to the root of the bucket. The value must be a valid S3 object key. It must not start or end with a slash character.</li>
+<li><code>delivery_start_time</code> - (Optional) The optional start month and year for delivery, specified in YYYY-MM format. Defaults to current year and month. Usage is not available before 2019-03.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20reference"></a><h2 id="attribute-reference">Attribute reference</h2>
+
+<p>Resource exports the following attributes:</p>
+
+<ul>
+<li><code>id</code> - the ID of log delivery configuration in form of <code>account_id|config_id</code>.</li>
+<li><code>config_id</code> - Databricks log delivery configuration ID.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>danger</em>
+    <p>Importing this resource is not currently supported.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are used in the same context:</p>
+
+<ul>
+<li><a href="../guides/aws-workspace.md">Provisioning Databricks on AWS</a> guide.</li>
+<li><a href="mws_credentials.md">databricks_mws_credentials</a> to configure the cross-account role for creation of new workspaces within AWS.</li>
+<li><a href="mws_customer_managed_keys.md">databricks_mws_customer_managed_keys</a> to configure KMS keys for new workspaces within AWS.</li>
+<li><a href="mws_networks.md">databricks_mws_networks</a> to <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/customer-managed-vpc.html">configure VPC</a> &amp; subnets for new workspaces within AWS.</li>
+<li><a href="mws_storage_configurations.md">databricks_mws_storage_configurations</a> to configure root bucket new workspaces within AWS.</li>
+<li><a href="mws_workspaces.md">databricks_mws_workspaces</a> to set up <a href="https://docs.databricks.com/getting-started/overview.html#e2-architecture-1">AWS and GCP workspaces</a>.</li>
+</ul>
+
+            
+        
+    </body></html>

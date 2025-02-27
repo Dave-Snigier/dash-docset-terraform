@@ -1,0 +1,541 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/network_services_lb_route_extension --><head>
+                <title>google_network_services_lb_route_extension</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="google_network_services_lb_route_extension">google_network_services_lb_route_extension</h1>
+
+<p>LbRouteExtension is a resource that lets you control where traffic is routed to for a given request.</p>
+
+<p>To get more information about LbRouteExtension, see:</p>
+
+<ul>
+<li><a href="https://cloud.google.com/service-extensions/docs/reference/rest/v1beta1/projects.locations.lbRouteExtensions">API documentation</a></li>
+<li>How-to Guides
+<ul>
+<li><a href="https://cloud.google.com/service-extensions/docs/configure-callout#configure_a_route_extension">Configure a route extension</a></li>
+</ul></li>
+</ul>
+
+<div class="oics-button" style="float: right; margin: 0 0 -15px">
+  <a href="https://console.cloud.google.com/cloudshell/open?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fterraform-google-modules%2Fdocs-examples.git&amp;cloudshell_image=gcr.io%2Fcloudshell-images%2Fcloudshell%3Alatest&amp;cloudshell_print=.%2Fmotd&amp;cloudshell_tutorial=.%2Ftutorial.md&amp;cloudshell_working_dir=network_services_lb_route_extension_basic&amp;open_in_editor=main.tf" target="_blank">
+    <img alt="Open in Cloud Shell" src="//gstatic.com/cloudssh/images/open-btn.svg" style="max-height: 44px; margin: 32px auto; max-width: 100%;"/>
+  </a>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Network%20Services%20Lb%20Route%20Extension%20Basic"></a><h2 id="example-usage-network-services-lb-route-extension-basic">Example Usage - Network Services Lb Route Extension Basic</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Internal HTTP load balancer with a managed instance group backend</span>
+<span class="c1"># VPC network</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"ilb_network"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># proxy-only subnet</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"proxy_subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-proxy-subnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">purpose</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"REGIONAL_MANAGED_PROXY"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"ACTIVE"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.ilb_network.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># backend subnet</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"ilb_subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-subnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.1.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.ilb_network.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_compute_subnetwork.proxy_subnet</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># forwarding rule</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_forwarding_rule"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-forwarding-rule"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_protocol</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"TCP"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"INTERNAL_MANAGED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_range</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"80"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_region_target_http_proxy.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.ilb_network.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnetwork</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.ilb_subnet.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_tier</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"PREMIUM"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_compute_subnetwork.proxy_subnet</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># HTTP target proxy</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_region_target_http_proxy"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-target-http-proxy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">url_map</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_region_url_map.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># URL map</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_region_url_map"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-test-l7-ilb-regional-url-map%{random_suffix}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_region_backend_service.default.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">host_rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">hosts</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"service-extensions.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">path_matcher</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"callouts"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">path_matcher</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"callouts"</span><span class="w"></span>
+<span class="w">    </span><span class="na">default_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_region_backend_service.callouts_backend.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># backend service</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_region_backend_service"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-backend-subnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"HTTP"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"INTERNAL_MANAGED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="na">health_checks</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_region_health_check.default.id</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">backend</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_region_instance_group_manager.mig.instance_group</span><span class="w"></span>
+<span class="w">    </span><span class="na">balancing_mode</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"UTILIZATION"</span><span class="w"></span>
+<span class="w">    </span><span class="na">capacity_scaler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">1.0</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># instance template</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_template"</span><span class="w"> </span><span class="nv">"instance_template"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-mig-template"</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"e2-small"</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"http-server"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">network_interface</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.ilb_network.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnetwork</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.ilb_subnet.id</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">access_config</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">      # add external ip to fetch packages</span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source_image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud/debian-12"</span><span class="w"></span>
+<span class="w">    </span><span class="na">auto_delete</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">boot</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # install nginx and serve a simple web page</span>
+<span class="w">  </span><span class="nb">metadata</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">startup-script</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;-</span><span class="dl">EOF1</span><span class="sh"></span>
+<span class="sh">      #! /bin/bash</span>
+<span class="sh">      set -euo pipefail</span>
+
+<span class="sh">      export DEBIAN_FRONTEND=noninteractive</span>
+<span class="sh">      apt-get update</span>
+<span class="sh">      apt-get install -y nginx-light jq</span>
+
+<span class="sh">      NAME=$(curl -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/hostname")</span>
+<span class="sh">      IP=$(curl -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip")</span>
+<span class="sh">      METADATA=$(curl -f -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/?recursive=True" | jq 'del(.["startup-script"])')</span>
+
+<span class="sh">      cat &lt;&lt;EOF &gt; /var/www/html/index.html</span>
+<span class="sh">      &lt;pre&gt;</span>
+<span class="sh">      Name: $NAME</span>
+<span class="sh">      IP: $IP</span>
+<span class="sh">      Metadata: $METADATA</span>
+<span class="sh">      &lt;/pre&gt;</span>
+<span class="sh">      EOF</span>
+<span class="dl">    EOF1</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create_before_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># health check</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_region_health_check"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-hc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west1"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">http_health_check</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">port_specification</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"USE_SERVING_PORT"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># MIG</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_region_instance_group_manager"</span><span class="w"> </span><span class="nv">"mig"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-mig1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west1"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">base_instance_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"vm"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_size</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">version</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance_template.instance_template.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"primary"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># allow all access from IAP and health check ranges</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_firewall"</span><span class="w"> </span><span class="nv">"fw_iap"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-fw-allow-iap-hc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">direction</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"INGRESS"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.ilb_network.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_ranges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"130.211.0.0/22", "35.191.0.0/16", "35.235.240.0/20"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">allow</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">protocol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># allow http from proxy subnet to backends</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_firewall"</span><span class="w"> </span><span class="nv">"fw_ilb_to_backends"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-fw-allow-ilb-to-backends"</span><span class="w"></span>
+<span class="w">  </span><span class="na">direction</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"INGRESS"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.ilb_network.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_ranges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"10.0.0.0/24"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_tags</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"http-server"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">allow</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">protocol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">    </span><span class="na">ports</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"80", "443", "8080"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_compute_firewall.fw_iap</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_network_services_lb_route_extension"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-route-ext"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"my route extension"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"INTERNAL_MANAGED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">forwarding_rules</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_forwarding_rule.default.self_link</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">extension_chains</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"chain1"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">match_condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">cel_expression</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"request.path.startsWith('/extensions')"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">extensions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"ext11"</span><span class="w"></span>
+<span class="w">        </span><span class="na">authority</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ext11.com"</span><span class="w"></span>
+<span class="w">        </span><span class="na">service</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_region_backend_service.callouts_backend.self_link</span><span class="w"></span>
+<span class="w">        </span><span class="na">timeout</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.1s"</span><span class="w"></span>
+<span class="w">        </span><span class="na">fail_open</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+
+<span class="w">        </span><span class="na">forward_headers</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"custom-header"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">labels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">foo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"bar"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># test instance</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance"</span><span class="w"> </span><span class="nv">"vm_test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-test-vm"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west1-b"</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"e2-small"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">network_interface</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.ilb_network.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnetwork</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.ilb_subnet.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">boot_disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">initialize_params</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud/debian-11"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Route Extension Backend Instance</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance"</span><span class="w"> </span><span class="nv">"callouts_instance"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-callouts-ins"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west1-a"</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"e2-small"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">labels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"container-vm"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"cos-stable-109-17800-147-54"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"allow-ssh","load-balanced-backend"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">network_interface</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.ilb_network.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnetwork</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.ilb_subnet.id</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">access_config</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">      # add external ip to fetch packages</span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">boot_disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">auto_delete</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">initialize_params</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"pd-standard"</span><span class="w"></span>
+<span class="w">      </span><span class="na">size</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">      </span><span class="na">image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://www.googleapis.com/compute/v1/projects/cos-cloud/global/images/cos-stable-109-17800-147-54"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # Initialize an Envoy's Ext Proc gRPC API based on a docker container</span>
+<span class="w">  </span><span class="nb">metadata</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">startup-script</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;-</span><span class="dl">EOF1</span><span class="sh"></span>
+<span class="sh">      #! /bin/bash</span>
+<span class="sh">      apt-get update</span>
+<span class="sh">      apt-get install apache2 -y</span>
+<span class="sh">      a2ensite default-ssl</span>
+<span class="sh">      a2enmod ssl</span>
+<span class="sh">      echo "Page served from second backend service" | tee /var/www/html/index.html</span>
+<span class="sh">      systemctl restart apache2'</span>
+<span class="dl">    EOF1</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create_before_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">deletion_protection</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_compute_instance.vm_test</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// callouts instance group</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_group"</span><span class="w"> </span><span class="nv">"callouts_instance_group"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-callouts-ins-group"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Terraform test instance group"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west1-a"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">instances</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_compute_instance.callouts_instance.id</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">named_port</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"http"</span><span class="w"></span>
+<span class="w">    </span><span class="na">port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"80"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">named_port</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"grpc"</span><span class="w"></span>
+<span class="w">    </span><span class="na">port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"443"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># callout health check</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_region_health_check"</span><span class="w"> </span><span class="nv">"callouts_health_check"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-callouts-hc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west1"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">http_health_check</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">80</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_compute_region_health_check.default</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># callout backend service</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_region_backend_service"</span><span class="w"> </span><span class="nv">"callouts_backend"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-ilb-callouts-backend"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"HTTP2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"INTERNAL_MANAGED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"grpc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">health_checks</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_region_health_check.callouts_health_check.id</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">backend</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance_group.callouts_instance_group.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">balancing_mode</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"UTILIZATION"</span><span class="w"></span>
+<span class="w">    </span><span class="na">capacity_scaler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">1.0</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_compute_region_backend_service.default</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>forwarding_rules</code> -
+(Required)
+A list of references to the forwarding rules to which this service extension is attached to.
+At least one forwarding rule is required. There can be only one LbRouteExtension resource per forwarding rule.</p></li>
+<li><p><code>extension_chains</code> -
+(Required)
+A set of ordered extension chains that contain the match conditions and extensions to execute.
+Match conditions for each extension chain are evaluated in sequence for a given request.
+The first extension chain that has a condition that matches the request is executed.
+Any subsequent extension chains do not execute. Limited to 5 extension chains per resource.
+Structure is <a href="#nested_extension_chains">documented below</a>.</p></li>
+<li><p><code>load_balancing_scheme</code> -
+(Required)
+All backend services and forwarding rules referenced by this extension must share the same load balancing scheme.
+For more information, refer to <a href="https://cloud.google.com/load-balancing/docs/backend-service">Choosing a load balancer</a> and
+<a href="https://cloud.google.com/service-extensions/docs/callouts-overview#supported-lbs">Supported application load balancers</a>.
+Possible values are: <code>INTERNAL_MANAGED</code>, <code>EXTERNAL_MANAGED</code>.</p></li>
+<li><p><code>location</code> -
+(Required)
+The location of the route extension</p></li>
+<li><p><code>name</code> -
+(Required)
+Name of the LbRouteExtension resource in the following format: projects/{project}/locations/{location}/lbRouteExtensions/{lbRouteExtension}</p></li>
+</ul>
+
+<p><a name="nested_extension_chains"></a>The <code>extension_chains</code> block supports:</p>
+
+<ul>
+<li><p><code>name</code> -
+(Required)
+The name for this extension chain. The name is logged as part of the HTTP request logs.
+The name must conform with RFC-1034, is restricted to lower-cased letters, numbers and hyphens,
+and can have a maximum length of 63 characters. Additionally, the first character must be a letter
+and the last character must be a letter or a number.</p></li>
+<li><p><code>match_condition</code> -
+(Required)
+Conditions under which this chain is invoked for a request.
+Structure is <a href="#nested_extension_chains_extension_chains_match_condition">documented below</a>.</p></li>
+<li><p><code>extensions</code> -
+(Required)
+A set of extensions to execute for the matching request.
+At least one extension is required. Up to 3 extensions can be defined for each extension chain for
+LbTrafficExtension resource. LbRouteExtension chains are limited to 1 extension per extension chain.
+Structure is <a href="#nested_extension_chains_extension_chains_extensions">documented below</a>.</p></li>
+</ul>
+
+<p><a name="nested_extension_chains_extension_chains_match_condition"></a>The <code>match_condition</code> block supports:</p>
+
+<ul>
+<li><code>cel_expression</code> -
+(Required)
+A Common Expression Language (CEL) expression that is used to match requests for which the extension chain is executed.</li>
+</ul>
+
+<p><a name="nested_extension_chains_extension_chains_extensions"></a>The <code>extensions</code> block supports:</p>
+
+<ul>
+<li><p><code>name</code> -
+(Required)
+The name for this extension. The name is logged as part of the HTTP request logs.
+The name must conform with RFC-1034, is restricted to lower-cased letters, numbers and hyphens,
+and can have a maximum length of 63 characters. Additionally, the first character must be a letter
+and the last a letter or a number.</p></li>
+<li><p><code>authority</code> -
+(Optional)
+The :authority header in the gRPC request sent from Envoy to the extension service.</p></li>
+<li><p><code>service</code> -
+(Required)
+The reference to the service that runs the extension. Must be a reference to a backend service</p></li>
+<li><p><code>timeout</code> -
+(Optional)
+Specifies the timeout for each individual message on the stream. The timeout must be between 10-1000 milliseconds.
+A duration in seconds with up to nine fractional digits, ending with 's'. Example: "3.5s".</p></li>
+<li><p><code>fail_open</code> -
+(Optional)
+Determines how the proxy behaves if the call to the extension fails or times out.
+When set to TRUE, request or response processing continues without error.
+Any subsequent extensions in the extension chain are also executed.
+When set to FALSE: * If response headers have not been delivered to the downstream client,
+a generic 500 error is returned to the client. The error response can be tailored by
+configuring a custom error response in the load balancer.</p></li>
+<li><p><code>forward_headers</code> -
+(Optional)
+List of the HTTP headers to forward to the extension (from the client or backend).
+If omitted, all headers are sent. Each element is a string indicating the header name.</p></li>
+</ul>
+
+<hr/>
+
+<ul>
+<li><p><code>description</code> -
+(Optional)
+A human-readable description of the resource.</p></li>
+<li><p><code>labels</code> -
+(Optional)
+Set of labels associated with the LbRouteExtension resource.
+<strong>Note</strong>: This field is non-authoritative, and will only manage the labels present in your configuration.
+Please refer to the field <code>effective_labels</code> for all of the labels present on the resource.</p></li>
+<li><p><code>project</code> - (Optional) The ID of the project in which the resource belongs.
+If it is not provided, the provider project is used.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to the arguments listed above, the following computed attributes are exported:</p>
+
+<ul>
+<li><p><code>id</code> - an identifier for the resource with format <code>projects/{{project}}/locations/{{location}}/lbRouteExtensions/{{name}}</code></p></li>
+<li><p><code>terraform_labels</code> -
+The combination of labels configured directly on the resource
+and default labels configured on the provider.</p></li>
+<li><p><code>effective_labels</code> -
+All of labels (key/value pairs) present on the resource in GCP, including the labels configured through Terraform, other clients and services.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p>This resource provides the following
+<a href="https://developer.hashicorp.com/terraform/plugin/sdkv2/resources/retries-and-customizable-timeouts">Timeouts</a> configuration options:</p>
+
+<ul>
+<li><code>create</code> - Default is 20 minutes.</li>
+<li><code>update</code> - Default is 20 minutes.</li>
+<li><code>delete</code> - Default is 20 minutes.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>LbRouteExtension can be imported using any of these accepted formats:</p>
+
+<ul>
+<li><code>projects/{{project}}/locations/{{location}}/lbRouteExtensions/{{name}}</code></li>
+<li><code>{{project}}/{{location}}/{{name}}</code></li>
+<li><code>{{location}}/{{name}}</code></li>
+</ul>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import LbRouteExtension using one of the formats above. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"projects/{{project}}/locations/{{location}}/lbRouteExtensions/{{name}}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_network_services_lb_route_extension.default</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When using the <a href="https://developer.hashicorp.com/terraform/cli/commands/import"><code>terraform import</code> command</a>, LbRouteExtension can be imported using one of the formats above. For example:</p>
+
+<pre><code>$ terraform import google_network_services_lb_route_extension.default projects/{{project}}/locations/{{location}}/lbRouteExtensions/{{name}}
+$ terraform import google_network_services_lb_route_extension.default {{project}}/{{location}}/{{name}}
+$ terraform import google_network_services_lb_route_extension.default {{location}}/{{name}}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/User%20Project%20Overrides"></a><h2 id="user-project-overrides">User Project Overrides</h2>
+
+<p>This resource supports <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/provider_reference#user_project_override">User Project Overrides</a>.</p>
+
+            
+        
+    </body></html>

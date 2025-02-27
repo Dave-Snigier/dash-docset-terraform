@@ -1,0 +1,156 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_invocation --><head>
+                <title>aws_lambda_invocation</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_lambda_invocation">Resource: aws_lambda_invocation</h1>
+
+<p>Use this resource to invoke a lambda function. The lambda function is invoked with the <a href="https://docs.aws.amazon.com/lambda/latest/dg/API_Invoke.html#API_Invoke_RequestSyntax">RequestResponse</a> invocation type.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>By default this resource _only_ invokes the function when the arguments call for a create or replace. In other words, after an initial invocation on _apply_, if the arguments do not change, a subsequent _apply_ does not invoke the function again. To dynamically invoke the function, see the <code>triggers</code> example below. To always invoke a function on each _apply_, see the <a href="../data-sources/lambda_invocation.html"><code>aws_lambda_invocation</code></a> data source. To invoke the lambda function when the terraform resource is updated and deleted, see the <a href="#crud-lifecycle-scope">CRUD Lifecycle Scope</a> example below.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>If you get a <code>KMSAccessDeniedException: Lambda was unable to decrypt the environment variables because KMS access was denied</code> error when invoking an <a href="../resources/lambda_function.html"><code>aws_lambda_function</code></a> with environment variables, the IAM role associated with the function may have been deleted and recreated _after_ the function was created. You can fix the problem two ways: 1) updating the function's role to another role and then updating it back again to the recreated role, or 2) by using Terraform to <code>taint</code> the function and <code>apply</code> your configuration again to recreate the function. (When you create a function, Lambda grants permissions on the KMS key to the function's IAM role. If the IAM role is recreated, the grant is no longer valid. Changing the function's role or recreating the function causes Lambda to update the grant.)</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Basic%20Example"></a><h3 id="basic-example">Basic Example</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lambda_invocation"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">function_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_lambda_function.lambda_function_test.function_name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="na">key1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"value1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"value2"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"result_entry"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsondecode</span><span class="p">(</span><span class="nv">aws_lambda_invocation.example.result</span><span class="p">)[</span><span class="s2">"key1"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Dynamic%20Invocation%20Example%20Using%20Triggers"></a><h3 id="dynamic-invocation-example-using-triggers">Dynamic Invocation Example Using Triggers</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lambda_invocation"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">function_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_lambda_function.lambda_function_test.function_name</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">triggers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">redeployment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">sha1</span><span class="p">(</span><span class="nf">jsonencode</span><span class="p">([</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_lambda_function.example.environment</span><span class="w"></span>
+<span class="w">    </span><span class="p">]))</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="na">key1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"value1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"value2"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/CRUD%20Lifecycle%20Scope"></a><h3 id="crud-lifecycle-scope">CRUD Lifecycle Scope</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lambda_invocation"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">function_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_lambda_function.lambda_function_test.function_name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="na">key1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"value1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"value2"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">lifecycle_scope</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CRUD"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p><code>lifecycle_scope = "CRUD"</code> will inject a key <code>tf</code> in the input event to pass lifecycle information! This allows the lambda function to handle different lifecycle transitions uniquely.  If you need to use a key <code>tf</code> in your own input JSON, the default key name can be overridden with the <code>terraform_key</code> argument.</p>
+</aside>
+
+<p>The key <code>tf</code> gets added with subkeys:</p>
+
+<ul>
+<li><code>action</code> - Action Terraform performs on the resource. Values are <code>create</code>, <code>update</code>, or <code>delete</code>.</li>
+<li><code>prev_input</code> - Input JSON payload from the previous invocation. This can be used to handle update and delete events.</li>
+</ul>
+
+<p>When the resource from the example above is created, the Lambda will get following JSON payload:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"key1"</span><span class="p">:</span><span class="w"> </span><span class="s2">"value1"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"key2"</span><span class="p">:</span><span class="w"> </span><span class="s2">"value2"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"tf"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"create"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"prev_input"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>If the input value of <code>key1</code> changes to "valueB", then the lambda will be invoked again with the following JSON payload:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"key1"</span><span class="p">:</span><span class="w"> </span><span class="s2">"valueB"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"key2"</span><span class="p">:</span><span class="w"> </span><span class="s2">"value2"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"tf"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"update"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"prev_input"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"key1"</span><span class="p">:</span><span class="w"> </span><span class="s2">"value1"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"key2"</span><span class="p">:</span><span class="w"> </span><span class="s2">"value2"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When the invocation resource is removed, the final invocation will have the following JSON payload:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"key1"</span><span class="p">:</span><span class="w"> </span><span class="s2">"valueB"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"key2"</span><span class="p">:</span><span class="w"> </span><span class="s2">"value2"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"tf"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"delete"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"prev_input"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"key1"</span><span class="p">:</span><span class="w"> </span><span class="s2">"valueB"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"key2"</span><span class="p">:</span><span class="w"> </span><span class="s2">"value2"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>function_name</code> - (Required) Name of the lambda function.</li>
+<li><code>input</code> - (Required) JSON payload to the lambda function.</li>
+</ul>
+
+<p>The following arguments are optional:</p>
+
+<ul>
+<li><code>lifecycle_scope</code> - (Optional) Lifecycle scope of the resource to manage. Valid values are <code>CREATE_ONLY</code> and <code>CRUD</code>. Defaults to <code>CREATE_ONLY</code>. <code>CREATE_ONLY</code> will invoke the function only on creation or replacement. <code>CRUD</code> will invoke the function on each lifecycle event, and augment the input JSON payload with additional lifecycle information.</li>
+<li><code>qualifier</code> - (Optional) Qualifier (i.e., version) of the lambda function. Defaults to <code>$LATEST</code>.</li>
+<li><code>terraform_key</code> - (Optional) The JSON key used to store lifecycle information in the input JSON payload. Defaults to <code>tf</code>. This additional key is only included when <code>lifecycle_scope</code> is set to <code>CRUD</code>.</li>
+<li><code>triggers</code> - (Optional) Map of arbitrary keys and values that, when changed, will trigger a re-invocation. To force a re-invocation without changing these keys/values, use the <a href="https://www.terraform.io/docs/commands/taint.html"><code>terraform taint</code> command</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>result</code> - String result of the lambda function invocation.</li>
+</ul>
+
+            
+        
+    </body></html>

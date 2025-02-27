@@ -1,0 +1,402 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mount --><head>
+                <title>databricks_mount</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_mount-resource">databricks_mount Resource</h1>
+
+<p>This resource will <a href="https://docs.databricks.com/data/databricks-file-system.html#mount-object-storage-to-dbfs">mount your cloud storage</a> on <code>dbfs:/mnt/name</code>. Right now it supports mounting AWS S3, Azure (Blob Storage, ADLS Gen1 &amp; Gen2), Google Cloud Storage.  It is important to understand that this will start up the <a href="cluster.md">cluster</a> if the cluster is terminated. The read and refresh terraform command will require a cluster and may take some time to validate the mount.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>When <code>cluster_id</code> is not specified, it will create the smallest possible cluster in the default availability zone with name equal to or starting with <code>terraform-mount</code> for the shortest possible amount of time. To avoid mount failure due to potentially quota or capacity issues with the default cluster, we recommend specifying a cluster to use for mounting.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>CRUD operations on a databricks mount require a running cluster. Due to limitations of terraform and the databricks mounts APIs, if the cluster the mount was most recently created / updated using no longer exists AND the mount is destroyed as a part of a terraform apply, we mark it as deleted without cleaning it up from the workspace.</p>
+</aside>
+
+<p>This resource provides two ways of mounting a storage account:</p>
+
+<ol>
+<li>Use a storage-specific configuration block - this could be used for the most cases, as it will fill most of the necessary details. Currently we support following configuration blocks:</li>
+</ol>
+
+<ul>
+<li><code>s3</code> - to <a href="https://docs.databricks.com/data/data-sources/aws/amazon-s3.html">mount AWS S3</a></li>
+<li><code>gs</code> - to <a href="https://docs.gcp.databricks.com/data/data-sources/google/gcs.html">mount Google Cloud Storage</a></li>
+<li><code>abfs</code> - to <a href="https://docs.microsoft.com/en-us/azure/databricks/data/data-sources/azure/adls-gen2/">mount ADLS Gen2</a> using Azure Blob Filesystem (ABFS) driver</li>
+<li><code>adl</code> - to <a href="https://docs.microsoft.com/en-us/azure/databricks/data/data-sources/azure/azure-datalake">mount ADLS Gen1</a> using Azure Data Lake (ADL) driver</li>
+<li><code>wasb</code>  - to <a href="https://docs.microsoft.com/en-us/azure/databricks/data/data-sources/azure/azure-storage">mount Azure Blob Storage</a> using Windows Azure Storage Blob (WASB) driver</li>
+</ul>
+
+<ol>
+<li>Use generic arguments - you have a responsibility for providing all necessary parameters that are required to mount specific storage. This is most flexible option</li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Common%20arguments"></a><h2 id="common-arguments">Common arguments</h2>
+
+<ul>
+<li><code>cluster_id</code> - (Optional, String) Cluster to use for mounting. If no cluster is specified, a new cluster will be created and will mount the bucket for all of the clusters in this workspace. If the cluster is not running - it's going to be started, so be aware to set auto-termination rules on it.</li>
+<li><code>name</code> - (Optional, String) Name, under which mount will be accessible in <code>dbfs:/mnt/&lt;MOUNT_NAME&gt;</code>. If not specified, provider will try to infer it from depending on the resource type:
+<ul>
+<li><code>bucket_name</code> for AWS S3 and Google Cloud Storage</li>
+<li><code>container_name</code> for ADLS Gen2 and Azure Blob Storage</li>
+<li><code>storage_resource_name</code> for ADLS Gen1</li>
+</ul></li>
+<li><code>uri</code> - (Optional, String) the URI for accessing specific storage (<code>s3a://....</code>, <code>abfss://....</code>, <code>gs://....</code>, etc.)</li>
+<li><code>extra_configs</code> - (Optional, String map) configuration parameters that are necessary for mounting of specific storage</li>
+<li><code>resource_id</code> - (Optional, String) resource ID for a given storage account. Could be used to fill defaults, such as storage account &amp; container names on Azure.</li>
+<li><code>encryption_type</code> - (Optional, String) encryption type. Currently used only for <a href="https://docs.databricks.com/data/data-sources/aws/amazon-s3.html#encrypt-data-in-s3-buckets">AWS S3 mounts</a></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20mounting%20ADLS%20Gen2%20using%20uri%20and%20extra_configs"></a><h3 id="example-mounting-adls-gen2-using-uri-and-extra_configs">Example mounting ADLS Gen2 using uri and extra_configs</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">tenant_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-1111-2222-3333-444444444444"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"55555555-6666-7777-8888-999999999999"</span><span class="w"></span>
+<span class="w">  </span><span class="na">secret_scope</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"some-kv"</span><span class="w"></span>
+<span class="w">  </span><span class="na">secret_key</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"some-sp-secret"</span><span class="w"></span>
+<span class="w">  </span><span class="na">container</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"test"</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_acc</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"lrs"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mount"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-abfss"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">uri</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"abfss://${local.container}@${local.storage_acc}.dfs.core.windows.net"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">extra_configs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"fs.azure.account.auth.type"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"OAuth"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"fs.azure.account.oauth.provider.type"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"fs.azure.account.oauth2.client.id"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nv">local.client_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"fs.azure.account.oauth2.client.secret"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"{{secrets/${local.secret_scope}/${local.secret_key}}}"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"fs.azure.account.oauth2.client.endpoint"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"https://login.microsoftonline.com/${local.tenant_id}/oauth2/token"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"fs.azure.createRemoteFileSystemDuringInitialization"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"false"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20mounting%20ADLS%20Gen2%20with%20AAD%20passthrough"></a><h3 id="example-mounting-adls-gen2-with-aad-passthrough">Example mounting ADLS Gen2 with AAD passthrough</h3>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>AAD passthrough is considered a legacy data access pattern. Use Unity Catalog for fine-grained data access control.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Mounts using AAD passthrough cannot be created using a service principal.</p>
+</aside>
+
+<p>To mount ALDS Gen2 with Azure Active Directory Credentials passthrough we need to execute the mount commands using the cluster configured with AAD Credentials passthrough &amp; provide necessary configuration parameters (see <a href="https://docs.microsoft.com/en-us/azure/databricks/security/credential-passthrough/adls-passthrough#--mount-azure-data-lake-storage-to-dbfs-using-credential-passthrough">documentation</a> for more details).</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"resource_group"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Resource group for Databricks Workspace"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"workspace_name"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Name of the Databricks Workspace"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"azurerm_databricks_workspace"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">var.workspace_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.resource_group</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># it works only with AAD token!</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_databricks_workspace.this.workspace_url</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_node_type"</span><span class="w"> </span><span class="nv">"smallest"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">local_disk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_spark_version"</span><span class="w"> </span><span class="nv">"latest"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_cluster"</span><span class="w"> </span><span class="nv">"shared_passthrough"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"Shared Passthrough for mount"</span><span class="w"></span>
+<span class="w">  </span><span class="na">spark_version</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_spark_version.latest.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_type_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_node_type.smallest.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">autotermination_minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="na">num_workers</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">spark_conf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"spark.databricks.cluster.profile"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"serverless"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"spark.databricks.repl.allowedLanguages"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"python,sql"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"spark.databricks.passthrough.enabled"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"true"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"spark.databricks.pyspark.enableProcessIsolation"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"true"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">custom_tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"ResourceClass"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"Serverless"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"storage_acc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Name of the ADLS Gen2 storage container"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"container"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Name of container inside storage account"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mount"</span><span class="w"> </span><span class="nv">"passthrough"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"passthrough-test"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_cluster.shared_passthrough.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">uri</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"abfss://${var.container}@${var.storage_acc}.dfs.core.windows.net"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">extra_configs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"fs.azure.account.auth.type"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"CustomAccessToken"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"fs.azure.account.custom.token.provider.class"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"{{sparkconf/spark.databricks.passthrough.adls.gen2.tokenProviderClassName}}"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/s3%20block"></a><h2 id="s3-block">s3 block</h2>
+
+<p>This block allows specifying parameters for mounting of the ADLS Gen2. The following arguments are required inside the <code>s3</code> block:</p>
+
+<ul>
+<li><code>instance_profile</code> - (Optional) (String) ARN of registered <a href="instance_profile.md">instance profile</a> for data access.  If it's not specified, then the <code>cluster_id</code> should be provided, and the cluster should have an instance profile attached to it. If both <code>cluster_id</code> &amp; <code>instance_profile</code> are specified, then <code>cluster_id</code> takes precedence.</li>
+<li><code>bucket_name</code> - (Required) (String) S3 bucket name to be mounted.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20of%20mounting%20S3"></a><h3 id="example-of-mounting-s3">Example of mounting S3</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// now you can do `%fs ls /mnt/experiments` in notebooks</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mount"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"experiments"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">s3</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_instance_profile.ds.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">bucket_name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.this.bucket</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/abfs%20block"></a><h2 id="abfs-block">abfs block</h2>
+
+<p>This block allows specifying parameters for mounting of the ADLS Gen2. The following arguments are required inside the <code>abfs</code> block:</p>
+
+<ul>
+<li><code>client_id</code> - (Required) (String) This is the client_id (Application Object ID) for the enterprise application for the service principal.</li>
+<li><code>tenant_id</code> - (Optional) (String) This is your azure directory tenant id. It is required for creating the mount. (Could be omitted if Azure authentication is used, and we can extract <code>tenant_id</code> from it).</li>
+<li><code>client_secret_key</code> - (Required) (String) This is the secret key in which your service principal/enterprise app client secret will be stored.</li>
+<li><code>client_secret_scope</code> - (Required) (String) This is the secret scope in which your service principal/enterprise app client secret will be stored.</li>
+<li><code>container_name</code> - (Required) (String) ADLS gen2 container name. (Could be omitted if <code>resource_id</code> is provided)</li>
+<li><code>storage_account_name</code> - (Required) (String) The name of the storage resource in which the data is. (Could be omitted if <code>resource_id</code> is provided)</li>
+<li><code>directory</code> - (Computed) (String) This is optional if you don't want to add an additional directory that you wish to mount. This must start with a "/".</li>
+<li><code>initialize_file_system</code> - (Required) (Bool) either or not initialize FS for the first use</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20mount%20for%20ADLS%20Gen2%20using%20abfs%20block"></a><h3 id="creating-mount-for-adls-gen2-using-abfs-block">Creating mount for ADLS Gen2 using abfs block</h3>
+
+<p>In this example, we're using Azure authentication, so we can omit some parameters (<code>tenant_id</code>, <code>storage_account_name</code>, and <code>container_name</code>) that will be detected automatically.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_secret_scope"</span><span class="w"> </span><span class="nv">"terraform"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="s2">"application"</span><span class="w"></span>
+<span class="w">  </span><span class="na">initial_manage_principal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_secret"</span><span class="w"> </span><span class="nv">"service_principal_key"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">key</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"service_principal_key"</span><span class="w"></span>
+<span class="w">  </span><span class="na">string_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.ARM_CLIENT_SECRET}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_secret_scope.terraform.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_storage_account"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}datalake"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">var.resource_group_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">var.resource_group_location</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_tier</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"Standard"</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_replication_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"GRS"</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_kind</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageV2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">is_hns_enabled</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_role_assignment"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_storage_account.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_definition_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Storage Blob Data Contributor"</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_client_config.current.object_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_storage_container"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"marketing"</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_account_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_storage_account.this.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">container_access_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"private"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mount"</span><span class="w"> </span><span class="nv">"marketing"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"marketing"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_storage_container.this.resource_manager_id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">abfs</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_client_config.current.client_id</span><span class="w"></span>
+<span class="w">    </span><span class="na">client_secret_scope</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_secret_scope.terraform.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">client_secret_key</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_secret.service_principal_key.key</span><span class="w"></span>
+<span class="w">    </span><span class="na">initialize_file_system</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/gs%20block"></a><h2 id="gs-block">gs block</h2>
+
+<p>This block allows specifying parameters for mounting of the Google Cloud Storage. The following arguments are required inside the <code>gs</code> block:</p>
+
+<ul>
+<li><code>service_account</code> - (Optional) (String) email of registered <a href="https://docs.gcp.databricks.com/data/data-sources/google/gcs.html#step-1-set-up-google-cloud-service-account-using-google-cloud-console">Google Service Account</a> for data access.  If it's not specified, then the <code>cluster_id</code> should be provided, and the cluster should have a Google service account attached to it.</li>
+<li><code>bucket_name</code> - (Required) (String) GCS bucket name to be mounted.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20mounting%20Google%20Cloud%20Storage"></a><h3 id="example-mounting-google-cloud-storage">Example mounting Google Cloud Storage</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mount"</span><span class="w"> </span><span class="nv">"this_gs"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gs-mount"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">gs</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">service_account</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"acc@company.iam.gserviceaccount.com"</span><span class="w"></span>
+<span class="w">    </span><span class="na">bucket_name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"mybucket"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/adl%20block"></a><h2 id="adl-block">adl block</h2>
+
+<p>This block allows specifying parameters for mounting of the ADLS Gen1. The following arguments are required inside the <code>adl</code> block:</p>
+
+<ul>
+<li><code>client_id</code> - (Required) (String) This is the client_id for the enterprise application for the service principal.</li>
+<li><code>tenant_id</code> - (Optional) (String) This is your azure directory tenant id. It is required for creating the mount. (Could be omitted if Azure authentication is used, and we can extract <code>tenant_id</code> from it)</li>
+<li><code>client_secret_key</code> - (Required) (String) This is the secret key in which your service principal/enterprise app client secret will be stored.</li>
+<li><p><code>client_secret_scope</code> - (Required) (String) This is the secret scope in which your service principal/enterprise app client secret will be stored.</p></li>
+<li><p><code>storage_resource_name</code> - (Required) (String) The name of the storage resource in which the data is for ADLS gen 1. This is what you are trying to mount. (Could be omitted if <code>resource_id</code> is provided)</p></li>
+<li><code>spark_conf_prefix</code> - (Optional) (String) This is the spark configuration prefix for adls gen 1 mount. The options are <code>fs.adl</code>, <code>dfs.adls</code>. Use <code>fs.adl</code> for runtime 6.0 and above for the clusters. Otherwise use <code>dfs.adls</code>. The default value is: <code>fs.adl</code>.</li>
+<li><code>directory</code> - (Computed) (String) This is optional if you don't want to add an additional directory that you wish to mount. This must start with a "/".</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20mounting%20ADLS%20Gen1"></a><h3 id="example-mounting-adls-gen1">Example mounting ADLS Gen1</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mount"</span><span class="w"> </span><span class="nv">"mount"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"{var.RANDOM}"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">adl</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_resource_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"{env.TEST_STORAGE_ACCOUNT_NAME}"</span><span class="w"></span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_client_config.current.tenant_id</span><span class="w"></span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_client_config.current.client_id</span><span class="w"></span>
+<span class="w">    </span><span class="na">client_secret_scope</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_secret_scope.terraform.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">client_secret_key</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_secret.service_principal_key.key</span><span class="w"></span>
+<span class="w">    </span><span class="na">spark_conf_prefix</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"fs.adl"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/wasb%20block"></a><h2 id="wasb-block">wasb block</h2>
+
+<p>This block allows specifying parameters for mounting of the Azure Blob Storage. The following arguments are required inside the <code>wasb</code> block:</p>
+
+<ul>
+<li><code>auth_type</code> - (Required) (String) This is the auth type for blob storage. This can either be SAS tokens (<code>SAS</code>) or account access keys (<code>ACCESS_KEY</code>).</li>
+<li><code>token_secret_scope</code> - (Required) (String) This is the secret scope in which your auth type token is stored.</li>
+<li><code>token_secret_key</code> - (Required) (String) This is the secret key in which your auth type token is stored.</li>
+<li><code>container_name</code> - (Required) (String) The container in which the data is. This is what you are trying to mount. (Could be omitted if <code>resource_id</code> is provided)</li>
+<li><code>storage_account_name</code> - (Required) (String) The name of the storage resource in which the data is. (Could be omitted if <code>resource_id</code> is provided)</li>
+<li><code>directory</code> - (Computed) (String) This is optional if you don't want to add an additional directory that you wish to mount. This must start with a "/".</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20mounting%20Azure%20Blob%20Storage"></a><h3 id="example-mounting-azure-blob-storage">Example mounting Azure Blob Storage</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_storage_account"</span><span class="w"> </span><span class="nv">"blobaccount"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}blob"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">var.resource_group_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">var.resource_group_location</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_tier</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"Standard"</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_replication_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"LRS"</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_kind</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageV2"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_storage_container"</span><span class="w"> </span><span class="nv">"marketing"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"marketing"</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_account_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_storage_account.blobaccount.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">container_access_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"private"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_secret_scope"</span><span class="w"> </span><span class="nv">"terraform"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="s2">"application"</span><span class="w"></span>
+<span class="w">  </span><span class="na">initial_manage_principal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_secret"</span><span class="w"> </span><span class="nv">"storage_key"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">key</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"blob_storage_key"</span><span class="w"></span>
+<span class="w">  </span><span class="na">string_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_storage_account.blobaccount.primary_access_key</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_secret_scope.terraform.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mount"</span><span class="w"> </span><span class="nv">"marketing"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"marketing"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">wasb</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_storage_container.marketing.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_storage_account.blobaccount.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">auth_type</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"ACCESS_KEY"</span><span class="w"></span>
+<span class="w">    </span><span class="na">token_secret_scope</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_secret_scope.terraform.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">token_secret_key</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_secret.storage_key.key</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Migration%20from%20other%20mount%20resources"></a><h2 id="migration-from-other-mount-resources">Migration from other mount resources</h2>
+
+<p>Migration from the specific mount resource is straightforward:</p>
+
+<ul>
+<li>rename <code>mount_name</code> to <code>name</code></li>
+<li>wrap storage-specific settings (<code>container_name</code>, ...) into corresponding block (<code>adl</code>, <code>abfs</code>, <code>s3</code>, <code>wasbs</code>)</li>
+<li>for S3 mounts, rename <code>s3_bucket_name</code> to <code>bucket_name</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - mount name</li>
+<li><code>source</code> - (String) HDFS-compatible url</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>danger</em>
+    <p>Importing this resource is not currently supported.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are often used in the same context:</p>
+
+<ul>
+<li><a href="../guides/workspace-management.md">End to end workspace management</a> guide.</li>
+<li><a href="../data-sources/aws_bucket_policy.md">databricks_aws_bucket_policy</a> data to configure a simple access policy for AWS S3 buckets, so that Databricks can access data in it.</li>
+<li><a href="cluster.md">databricks_cluster</a> to create <a href="https://docs.databricks.com/clusters/index.html">Databricks Clusters</a>.</li>
+<li><a href="../data-sources/dbfs_file.md">databricks_dbfs_file</a> data to get file content from <a href="https://docs.databricks.com/data/databricks-file-system.html">Databricks File System (DBFS)</a>.</li>
+<li><a href="../data-sources/dbfs_file_paths.md">databricks_dbfs_file_paths</a> data to get list of file names from get file content from <a href="https://docs.databricks.com/data/databricks-file-system.html">Databricks File System (DBFS)</a>.</li>
+<li><a href="dbfs_file.md">databricks_dbfs_file</a> to manage relatively small files on <a href="https://docs.databricks.com/data/databricks-file-system.html">Databricks File System (DBFS)</a>.</li>
+<li><a href="instance_profile.md">databricks_instance_profile</a> to manage AWS EC2 instance profiles that users can launch <a href="cluster.md">databricks_cluster</a> and access data, like <a href="mount.md">databricks_mount</a>.</li>
+<li><a href="library.md">databricks_library</a> to install a <a href="https://docs.databricks.com/libraries/index.html">library</a> on <a href="cluster.md">databricks_cluster</a>.</li>
+</ul>
+
+            
+        
+    </body></html>

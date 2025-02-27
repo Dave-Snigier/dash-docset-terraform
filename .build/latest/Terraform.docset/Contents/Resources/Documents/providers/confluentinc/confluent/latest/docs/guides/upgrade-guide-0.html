@@ -1,0 +1,433 @@
+<html><!-- Online page at https://registry.terraform.io/providers/confluentinc/confluent/latest/docs/guides/upgrade-guide-0 --><head>
+                <title>Confluent Provider 0.11.0: Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="confluent-provider-0110-upgrade-guide">Confluent Provider 0.11.0: Upgrade Guide</h1>
+
+<p>This guide is intended to help with the upgrading process and focuses only on the changes necessary to upgrade to
+version <code>0.11.0</code> of Confluent Provider from version <code>0.10.0</code> of Confluent Provider.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you're upgrading from a version that's earlier than <code>0.10.0</code>, upgrade to version <code>0.10.0</code> before starting this guide. For more information, see <a href="https://registry.terraform.io/providers/confluentinc/confluent/latest/docs/guides/upgrade-guide-0.7.0">Confluent Provider 0.7.0: Upgrade Guide</a>.</p>
+</aside>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>Warning</em>
+    <p>Don't forget to create backups of the <code>terraform.tfstate</code> state file and your TF configuration (for example, <code>main.tf</code>) before upgrading.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrade%20Notes"></a><h2 id="upgrade-notes">Upgrade Notes</h2>
+
+<ul>
+<li><a href="#provider-version-configuration">Provider Version Configuration</a></li>
+<li><a href="#upgrade-terraform-configuration">Upgrade Terraform Configuration</a></li>
+<li><a href="#upgrade-state-file-using-sed-command">Upgrade State File Using sed Command</a></li>
+<li><a href="#upgrade-state-file-using-import-command">Upgrade State File Using import Command</a></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Version%20Configuration"></a><h2 id="provider-version-configuration">Provider Version Configuration</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This guide uses <a href="https://github.com/confluentinc/terraform-provider-confluent/tree/v0.10.0/examples/configurations/basic-kafka-acls">basic-kafka-acls</a> Terraform configuration as an example of a Terraform configuration that has a Kafka cluster and multiple ACLs.</p>
+</aside>
+
+<p>Before upgrading to version <code>0.11.0</code>, ensure that your environment successfully
+runs <a href="https://www.terraform.io/docs/commands/plan.html"><code>terraform plan</code></a>
+without unexpected changes. Run the following command:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform plan
+</code></pre></div>
+
+<p>Your output should resemble:</p>
+
+<pre><code>confluentcloud_service_account.test-sa: Refreshing state... [id=sa-xyz123]
+confluentcloud_environment.test-env: Refreshing state... [id=env-dge456]
+confluentcloud_kafka_cluster.test-basic-cluster: Refreshing state... [id=lkc-abc123]
+confluentcloud_kafka_acl.describe-test-basic-cluster: Refreshing state... [id=lkc-abc123/CLUSTER#kafka-cluster#LITERAL#User:12345#*#DESCRIBE#ALLOW]
+confluentcloud_kafka_topic.orders: Refreshing state... [id=lkc-abc123/orders]
+confluentcloud_kafka_acl.describe-orders: Refreshing state... [id=lkc-n2kvd/TOPIC#orders#LITERAL#User:12345#*#DESCRIBE#ALLOW]
+...
+No changes. Infrastructure is up-to-date.
+</code></pre>
+
+<p>The next step is to set the latest <code>0.11.0</code> version in a <code>required_providers</code> block of your Terraform configuration.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Before"></a><h4 id="before">Before</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ...</span>
+<span class="w">    </span><span class="nb">confluent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"confluentinc/confluent"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.10.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"confluent"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/After"></a><h4 id="after">After</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ...</span>
+<span class="w">    </span><span class="nb">confluent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"confluentinc/confluent"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.11.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"confluent"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrade%20Terraform%20Configuration"></a><h2 id="upgrade-terraform-configuration">Upgrade Terraform Configuration</h2>
+
+<ul>
+<li><p><code>api_key</code>, <code>api_secret</code> attributes were renamed to <code>cloud_api_key</code>, <code>cloud_api_secret</code>, respectively. Update your TF
+configuration accordingly.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Before"></a><h4 id="before-2">Before</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"confluent"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">api_key</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">var.confluent_cloud_api_key</span><span class="c1">    # optionally use CONFLUENT_CLOUD_API_KEY env var</span>
+<span class="w">  </span><span class="na">api_secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.confluent_cloud_api_secret</span><span class="c1"> # optionally use CONFLUENT_CLOUD_API_SECRET env var</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/After"></a><h4 id="after-2">After</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"confluent"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cloud_api_key</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">var.confluent_cloud_api_key</span><span class="c1">    # optionally use CONFLUENT_CLOUD_API_KEY env var</span>
+<span class="w">  </span><span class="na">cloud_api_secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.confluent_cloud_api_secret</span><span class="c1"> # optionally use CONFLUENT_CLOUD_API_SECRET env var</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you don't use <code>api_key</code> and <code>api_secret</code> attributes and use environment variables instead (i.e., your <code>provider</code> block is empty: <code>provider "confluent" {}</code>) then no changes are necessary.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20to%20confluentcloud_kafka_acl%20resource"></a><h3 id="changes-to-confluentcloud_kafka_acl-resource">Changes to <code>confluentcloud_kafka_acl</code> resource</h3>
+
+<ul>
+<li><p><code>http_endpoint</code> attribute was renamed to <code>rest_endpoint</code>. Update your TF configuration accordingly.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Before"></a><h4 id="before-3">Before</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"confluentcloud_kafka_acl"</span><span class="w"> </span><span class="nv">"describe-orders"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">http_endpoint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"lkc-abc123"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/After"></a><h4 id="after-3">After</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"confluentcloud_kafka_acl"</span><span class="w"> </span><span class="nv">"describe-orders"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">rest_endpoint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"lkc-abc123"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20to%20confluentcloud_kafka_topic%20resource"></a><h3 id="changes-to-confluentcloud_kafka_topic-resource">Changes to <code>confluentcloud_kafka_topic</code> resource</h3>
+
+<ul>
+<li><p><code>http_endpoint</code> attribute was renamed to <code>rest_endpoint</code>. Update your TF configuration accordingly.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Before"></a><h4 id="before-4">Before</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"confluentcloud_kafka_topic"</span><span class="w"> </span><span class="nv">"orders"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">http_endpoint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"lkc-abc123"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/After"></a><h4 id="after-4">After</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"confluentcloud_kafka_topic"</span><span class="w"> </span><span class="nv">"orders"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">rest_endpoint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"lkc-abc123"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20to%20confluentcloud_kafka_cluster%20resource"></a><h3 id="changes-to-confluentcloud_kafka_cluster-resource">Changes to <code>confluentcloud_kafka_cluster</code> resource</h3>
+
+<ul>
+<li><code>http_endpoint</code> attribute was renamed to <code>rest_endpoint</code>. No changes in your TF configuration are necessary since the
+attribute is <a href="https://www.terraform.io/plugin/sdkv2/schemas/schema-behaviors#computed">computed</a>.</li>
+</ul>
+
+<p>You might find it helpful to run</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Replaces http_endpoint with rest_endpoint in main.tf</span>
+sed -i <span class="s1">''</span> <span class="s1">'s/http_endpoint/rest_endpoint/g'</span> main.tf
+</code></pre></div>
+
+<p>instead of updating your TF configuration file (for example, called <code>main.tf</code>) manually.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20to%20all%20resources%20and%20data%20sources"></a><h3 id="changes-to-all-resources-and-data-sources">Changes to all resources and data sources</h3>
+
+<p>All resources and data sources have been renamed to include corresponding API versions. For
+example, <code>confluent_environment</code> resource was renamed to <code>confluent_environment_v2</code> (since the
+corresponding <a href="https://docs.confluent.io/cloud/current/api.html#operation/getOrgV2Environment">API version</a> is <code>org/v2</code>)
+.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resources"></a><h3 id="resources">Resources</h3>
+
+<table>
+<thead>
+<tr>
+  <th>Old Name</th>
+  <th>New Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>confluent_api_key</td>
+  <td>confluent_api_key_v2</td>
+</tr>
+<tr>
+  <td>confluent_connector</td>
+  <td>confluent_connector_v1</td>
+</tr>
+<tr>
+  <td>confluent_environment</td>
+  <td>confluent_environment_v2</td>
+</tr>
+<tr>
+  <td>confluent_kafka_acl</td>
+  <td>confluent_kafka_acl_v3</td>
+</tr>
+<tr>
+  <td>confluent_kafka_cluster</td>
+  <td>confluent_kafka_cluster_v2</td>
+</tr>
+<tr>
+  <td>confluent_kafka_topic</td>
+  <td>confluent_kafka_topic_v3</td>
+</tr>
+<tr>
+  <td>confluent_network</td>
+  <td>confluent_network_v1</td>
+</tr>
+<tr>
+  <td>confluent_peering</td>
+  <td>confluent_peering_v1</td>
+</tr>
+<tr>
+  <td>confluent_private_link_access</td>
+  <td>confluent_private_link_access_v1</td>
+</tr>
+<tr>
+  <td>confluent_role_binding</td>
+  <td>confluent_role_binding_v2</td>
+</tr>
+<tr>
+  <td>confluent_service_account</td>
+  <td>confluent_service_account_v2</td>
+</tr>
+</tbody>
+</table>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Sources"></a><h3 id="data-sources">Data Sources</h3>
+
+<table>
+<thead>
+<tr>
+  <th>Old Name</th>
+  <th>New Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>confluent_environment</td>
+  <td>confluent_environment_v2</td>
+</tr>
+<tr>
+  <td>confluent_kafka_cluster</td>
+  <td>confluent_kafka_cluster_v2</td>
+</tr>
+<tr>
+  <td>confluent_kafka_topic</td>
+  <td>confluent_kafka_topic_v3</td>
+</tr>
+<tr>
+  <td>confluent_network</td>
+  <td>confluent_network_v1</td>
+</tr>
+<tr>
+  <td>confluent_organization</td>
+  <td>confluent_organization_v2</td>
+</tr>
+<tr>
+  <td>confluent_peering</td>
+  <td>confluent_peering_v1</td>
+</tr>
+<tr>
+  <td>confluent_private_link_access</td>
+  <td>confluent_private_link_access_v1</td>
+</tr>
+<tr>
+  <td>confluent_role_binding</td>
+  <td>confluent_role_binding_v2</td>
+</tr>
+<tr>
+  <td>confluent_service_account</td>
+  <td>confluent_service_account_v2</td>
+</tr>
+<tr>
+  <td>confluent_user</td>
+  <td>confluent_user_v2</td>
+</tr>
+</tbody>
+</table>
+
+<p>Therefore, run the following commands to update your TF configuration file.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Replaces confluent_environment with confluent_environment_v2 (and others in a similar fashion) in main.tf</span>
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_api_key/confluent_api_key_v2/g'</span> main.tf
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_connector/confluent_connector_v1/g'</span> main.tf
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_environment/confluent_environment_v2/g'</span> main.tf
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_kafka_acl/confluent_kafka_acl_v3/g'</span> main.tf
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_kafka_cluster/confluent_kafka_cluster_v2/g'</span> main.tf
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_kafka_topic/confluent_kafka_topic_v3/g'</span> main.tf
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_network/confluent_network_v1/g'</span> main.tf
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_organization/confluent_organization_v2/g'</span> main.tf
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_peering/confluent_peering_v1/g'</span> main.tf
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_private_link_access/confluent_private_link_access_v1/g'</span> main.tf
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_role_binding/confluent_role_binding_v2/g'</span> main.tf
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_service_account/confluent_service_account_v2/g'</span> main.tf
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_user/confluent_user_v2/g'</span> main.tf
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrade%20State%20File%20Using%20sed%20Command"></a><h2 id="upgrade-state-file-using-sed-command">Upgrade State File Using sed Command</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you have a remote backend configured, skip this section and continue reading at <a href="#upgrade-state-file-using-import-command">Upgrade State File Using import Command</a>.</p>
+</aside>
+
+<p>Similarly, you need to rename</p>
+
+<ul>
+<li><code>http_endpoint</code> attribute to <code>rest_endpoint</code></li>
+<li>all resources and data sources</li>
+</ul>
+
+<p>in your TF state file. You can do it by running the following commands:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Replaces http_endpoint with rest_endpoint in main.tf</span>
+sed -i <span class="s1">''</span> <span class="s1">'s/http_endpoint/rest_endpoint/g'</span> terraform.tfstate
+
+<span class="c1"># Replaces confluent_environment with confluent_environment_v2 (and others in a similar fashion) in terraform.tfstate</span>
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_api_key/confluent_api_key_v2/g'</span> terraform.tfstate
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_connector/confluent_connector_v1/g'</span> terraform.tfstate
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_environment/confluent_environment_v2/g'</span> terraform.tfstate
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_kafka_acl/confluent_kafka_acl_v3/g'</span> terraform.tfstate
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_kafka_cluster/confluent_kafka_cluster_v2/g'</span> terraform.tfstate
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_kafka_topic/confluent_kafka_topic_v3/g'</span> terraform.tfstate
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_network/confluent_network_v1/g'</span> terraform.tfstate
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_peering/confluent_peering_v1/g'</span> terraform.tfstate
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_private_link_access/confluent_private_link_access_v1/g'</span> terraform.tfstate
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_role_binding/confluent_role_binding_v2/g'</span> terraform.tfstate
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_service_account/confluent_service_account_v2/g'</span> terraform.tfstate
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_organization/confluent_organization_v2/g'</span> terraform.tfstate
+sed -i <span class="s1">''</span> <span class="s1">'s/confluent_user/confluent_user_v2/g'</span> terraform.tfstate
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Sanity%20Check"></a><h3 id="sanity-check">Sanity Check</h3>
+
+<p>Check that the upgrade was successful by ensuring that your environment successfully
+runs <a href="https://www.terraform.io/docs/commands/plan.html"><code>terraform plan</code></a>
+without unexpected changes. Run the following command:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform plan
+</code></pre></div>
+
+<p>Your output should resemble:</p>
+
+<pre><code>confluent_service_account_v2.test-sa: Refreshing state... [id=sa-xyz123]
+confluent_environment_v2.test-env: Refreshing state... [id=env-dge456]
+confluent_kafka_cluster_v2.test-basic-cluster: Refreshing state... [id=lkc-abc123]
+confluent_kafka_acl_v3.describe-test-basic-cluster: Refreshing state... [id=lkc-abc123/CLUSTER#kafka-cluster#LITERAL#User:sa-xyz123#*#DESCRIBE#ALLOW]
+confluent_kafka_topic_v3.orders: Refreshing state... [id=lkc-abc123/orders]
+confluent_kafka_acl_v3.describe-orders: Refreshing state... [id=lkc-abc123/TOPIC#orders#LITERAL#User:sa-xyz123#*#DESCRIBE#ALLOW]
+...
+No changes. Infrastructure is up-to-date.
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrade%20State%20File%20Using%20import%20Command"></a><h2 id="upgrade-state-file-using-import-command">Upgrade State File Using import Command</h2>
+
+<p>Another way to upgrade the Terraform state file is to reimport resources manually, which is especially useful if the remote backend is configured.</p>
+
+<p>Run the <code>terraform state list</code> command to display the full list of managed resources to import:</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform state list
+confluent_service_account.test-sa
+confluent_environment.test-env
+...
+</code></pre></div>
+
+<p>To migrate from the old resource to the new resource, remove the old resource from the state, and then use Terraform's <code>import</code> <a href="https://www.terraform.io/cli/import#import">command</a> command to migrate to the new resource.</p>
+
+<p>To import a resource in Terraform, you need its Resource ID, which you can get by running the following command.</p>
+
+<div class="codehilite"><pre><span></span><code>$ <span class="nb">echo</span> confluent_service_account.test-sa.id <span class="p">|</span> terraform console 
+<span class="s2">"sa-xyz123"</span>
+</code></pre></div>
+
+<p>Now you can remove the existing resource:</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform state rm confluent_service_account.test-sa
+Removed confluent_service_account.test-sa
+Successfully removed <span class="m">1</span> resource instance<span class="o">(</span>s<span class="o">)</span>.
+</code></pre></div>
+
+<p>With the old resource removed from Terraform's state file, run the following command to import it into the Terraform state file as the new resource.</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform import confluent_service_account_v2.test-sa <span class="s2">"sa-xyz123"</span>
+confluent_service_account_v2.test-sa: Importing from ID <span class="s2">"sa-xyz123"</span>...
+confluent_service_account_v2.test-sa: Import prepared!
+  Prepared confluent_service_account_v2 <span class="k">for</span> import
+confluent_service_account_v2.test-sa: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>sa-xyz123<span class="o">]</span>
+
+Import successful!
+
+The resources that were imported are shown above. These resources are now <span class="k">in</span>
+your Terraform state and will henceforth be managed by Terraform.
+</code></pre></div>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Some resources might require you to set environment variables before running <code>terraform import</code>, which is why it might be useful to check out _Import_ <a href="https://registry.terraform.io/providers/confluentinc/confluent/latest/docs/resources/confluent_kafka_acl_v3#import">section</a> on a corresponding doc page.</p>
+</aside>
+
+<p>Once this has been done for all the managed resources, the <code>terraform plan</code> command should show no changes:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform plan                                                       
+...
+confluent_service_account_v2.test-sa: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>sa-xyz123<span class="o">]</span>
+
+No changes. Infrastructure is up-to-date.
+
+This means that Terraform did not detect any differences between your
+configuration and real physical resources that exist. As a result, no
+actions need to be performed.
+</code></pre></div>
+
+<p>If you run into any problems,
+please <a href="https://github.com/confluentinc/terraform-provider-confluent/issues">report an issue</a>.</p>
+
+            
+        
+    </body></html>

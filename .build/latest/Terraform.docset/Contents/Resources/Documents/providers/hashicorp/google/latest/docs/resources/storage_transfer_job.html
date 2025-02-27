@@ -1,0 +1,331 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/storage_transfer_job --><head>
+                <title>google_storage_transfer_job</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="google_storage_transfer_job">google_storage_transfer_job</h1>
+
+<p>Creates a new Transfer Job in Google Cloud Storage Transfer.</p>
+
+<p>To get more information about Google Cloud Storage Transfer, see:</p>
+
+<ul>
+<li><a href="https://cloud.google.com/storage-transfer/docs/overview">Overview</a></li>
+<li><a href="https://cloud.google.com/storage-transfer/docs/reference/rest/v1/transferJobs">API documentation</a></li>
+<li>How-to Guides
+<ul>
+<li><a href="https://cloud.google.com/storage-transfer/docs/configure-access">Configuring Access to Data Sources and Sinks</a></li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>Example creating a nightly Transfer Job from an AWS S3 Bucket to a GCS bucket.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"google_storage_transfer_project_service_account"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.project</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_storage_bucket"</span><span class="w"> </span><span class="nv">"s3-backup-bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.aws_s3_bucket}-backup"</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_class</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"NEARLINE"</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">var.project</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"US"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_storage_bucket_iam_member"</span><span class="w"> </span><span class="nv">"s3-backup-bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">google_storage_bucket.s3-backup-bucket.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"roles/storage.admin"</span><span class="w"></span>
+<span class="w">  </span><span class="na">member</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"serviceAccount:${data.google_storage_transfer_project_service_account.default.email}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_storage_bucket.s3-backup-bucket</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_pubsub_topic"</span><span class="w"> </span><span class="nv">"topic"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.pubsub_topic_name}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_pubsub_topic_iam_member"</span><span class="w"> </span><span class="nv">"notification_config"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">topic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_pubsub_topic.topic.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"roles/pubsub.publisher"</span><span class="w"></span>
+<span class="w">  </span><span class="na">member</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"serviceAccount:${data.google_storage_transfer_project_service_account.default.email}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_storage_transfer_job"</span><span class="w"> </span><span class="nv">"s3-bucket-nightly-backup"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Nightly backup of S3 bucket"</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.project</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">transfer_spec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">object_conditions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">max_time_elapsed_since_last_modification</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"600s"</span><span class="w"></span>
+<span class="w">      </span><span class="na">exclude_prefixes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"requests.gz"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">transfer_options</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">delete_objects_unique_in_sink</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws_s3_data_source</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">bucket_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.aws_s3_bucket</span><span class="w"></span>
+<span class="w">      </span><span class="nb">aws_access_key</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">access_key_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.aws_access_key</span><span class="w"></span>
+<span class="w">        </span><span class="na">secret_access_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.aws_secret_key</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">gcs_data_sink</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">bucket_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_storage_bucket.s3-backup-bucket.name</span><span class="w"></span>
+<span class="w">      </span><span class="na">path</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"foo/bar/"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">schedule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">schedule_start_date</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">year</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="m">2018</span><span class="w"></span>
+<span class="w">      </span><span class="na">month</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">      </span><span class="na">day</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">schedule_end_date</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">year</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="m">2019</span><span class="w"></span>
+<span class="w">      </span><span class="na">month</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">      </span><span class="na">day</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">15</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">start_time_of_day</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">hours</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">23</span><span class="w"></span>
+<span class="w">      </span><span class="na">minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">30</span><span class="w"></span>
+<span class="w">      </span><span class="na">seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">      </span><span class="na">nanos</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="na">repeat_interval</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"604800s"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">notification_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">pubsub_topic</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">google_pubsub_topic.topic.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">event_types</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"TRANSFER_OPERATION_SUCCESS"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"TRANSFER_OPERATION_FAILED"</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">payload_format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"JSON"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_storage_bucket_iam_member.s3-backup-bucket</span><span class="p">,</span><span class="w"> </span><span class="nv">google_pubsub_topic_iam_member.notification_config</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>name</code> - (Optional) The name of the Transfer Job. This name must start with "transferJobs/" prefix and end with a letter or a number, and should be no more than 128 characters ( <code>transferJobs/^(?!OPI)[A-Za-z0-9-._~]*[A-Za-z0-9]$</code> ). For transfers involving PosixFilesystem, this name must start with transferJobs/OPI specifically ( <code>transferJobs/OPI^[A-Za-z0-9-._~]*[A-Za-z0-9]$</code> ). For all other transfer types, this name must not start with transferJobs/OPI. Default the provider will assign a random unique name with <code>transferJobs/{{name}}</code> format, where <code>name</code> is a numeric value.</p></li>
+<li><p><code>description</code> - (Required) Unique description to identify the Transfer Job.</p></li>
+<li><p><code>transfer_spec</code> - (Optional) Transfer specification. Structure <a href="#nested_transfer_spec">documented below</a>. One of <code>transfer_spec</code>, or <code>replication_spec</code> can be specified.</p></li>
+<li><p><code>replication_spec</code> - (Optional) Replication specification. Structure <a href="#nested_replication_spec">documented below</a>. User should not configure <code>schedule</code>, <code>event_stream</code> with this argument. One of <code>transfer_spec</code>, or <code>replication_spec</code> must be specified.</p></li>
+</ul>
+
+<hr/>
+
+<ul>
+<li><p><code>schedule</code> - (Optional) Schedule specification defining when the Transfer Job should be scheduled to start, end and what time to run. Structure <a href="#nested_schedule">documented below</a>. Either <code>schedule</code> or <code>event_stream</code> must be set.</p></li>
+<li><p><code>event_stream</code> - (Optional) Specifies the Event-driven transfer options. Event-driven transfers listen to an event stream to transfer updated files. Structure <a href="#nested_event_stream">documented below</a> Either <code>event_stream</code> or <code>schedule</code> must be set.</p></li>
+<li><p><code>project</code> - (Optional) The project in which the resource belongs. If it
+is not provided, the provider project is used.</p></li>
+<li><p><code>status</code> - (Optional) Status of the job. Default: <code>ENABLED</code>. <strong>NOTE: The effect of the new job status takes place during a subsequent job run. For example, if you change the job status from ENABLED to DISABLED, and an operation spawned by the transfer is running, the status change would not affect the current operation.</strong></p></li>
+<li><p><code>notification_config</code> - (Optional) Notification configuration. This is not supported for transfers involving PosixFilesystem. Structure <a href="#nested_notification_config">documented below</a>.</p></li>
+</ul>
+
+<p><a name="nested_transfer_spec"></a>The <code>transfer_spec</code> block supports:</p>
+
+<ul>
+<li><p><code>source_agent_pool_name</code> - (Optional) Specifies the agent pool name associated with the posix data source. When unspecified, the default name is used.</p></li>
+<li><p><code>sink_agent_pool_name</code> - (Optional) Specifies the agent pool name associated with the posix data sink. When unspecified, the default name is used.</p></li>
+<li><p><code>gcs_data_sink</code> - (Optional) A Google Cloud Storage data sink. Structure <a href="#nested_gcs_data_sink">documented below</a>.</p></li>
+<li><p><code>posix_data_sink</code> - (Optional) A POSIX data sink. Structure <a href="#nested_posix_data_sink">documented below</a>.</p></li>
+<li><p><code>object_conditions</code> - (Optional) Only objects that satisfy these object conditions are included in the set of data source and data sink objects. Object conditions based on objects' <code>last_modification_time</code> do not exclude objects in a data sink. Structure <a href="#nested_object_conditions">documented below</a>.</p></li>
+<li><p><code>transfer_options</code> - (Optional) Characteristics of how to treat files from datasource and sink during job. If the option <code>delete_objects_unique_in_sink</code> is true, object conditions based on objects' <code>last_modification_time</code> are ignored and do not exclude objects in a data source or a data sink. Structure <a href="#nested_transfer_options">documented below</a>.</p></li>
+<li><p><code>gcs_data_source</code> - (Optional) A Google Cloud Storage data source. Structure <a href="#nested_gcs_data_source">documented below</a>.</p></li>
+<li><p><code>posix_data_source</code> - (Optional) A POSIX filesystem data source. Structure <a href="#nested_posix_data_source">documented below</a>.</p></li>
+<li><p><code>aws_s3_data_source</code> - (Optional) An AWS S3 data source. Structure <a href="#nested_aws_s3_data_source">documented below</a>.</p></li>
+<li><p><code>http_data_source</code> - (Optional) A HTTP URL data source. Structure <a href="#nested_http_data_source">documented below</a>.</p></li>
+<li><p><code>azure_blob_storage_data_source</code> - (Optional) An Azure Blob Storage data source. Structure <a href="#nested_azure_blob_storage_data_source">documented below</a>.</p></li>
+<li><p><code>hdfs_data_source</code> - (Optional) An HDFS data source. Structure <a href="#nested_hdfs_data_source">documented below</a>.</p></li>
+</ul>
+
+<p><a name="nested_replication_spec"></a>The <code>replication_spec</code> block supports:</p>
+
+<ul>
+<li><p><code>gcs_data_sink</code> - (Optional) A Google Cloud Storage data sink. Structure <a href="#nested_gcs_data_sink">documented below</a>.</p></li>
+<li><p><code>gcs_data_source</code> - (Optional) A Google Cloud Storage data source. Structure <a href="#nested_gcs_data_source">documented below</a>.</p></li>
+<li><p><code>object_conditions</code> - (Optional) Only objects that satisfy these object conditions are included in the set of data source and data sink objects. Object conditions based on objects' <code>last_modification_time</code> do not exclude objects in a data sink. Structure <a href="#nested_object_conditions">documented below</a>.</p></li>
+<li><p><code>transfer_options</code> - (Optional) Characteristics of how to treat files from datasource and sink during job. If the option <code>delete_objects_unique_in_sink</code> is true, object conditions based on objects' <code>last_modification_time</code> are ignored and do not exclude objects in a data source or a data sink. Structure <a href="#nested_transfer_options">documented below</a>.</p></li>
+</ul>
+
+<p><a name="nested_schedule"></a>The <code>schedule</code> block supports:</p>
+
+<ul>
+<li><p><code>schedule_start_date</code> - (Required) The first day the recurring transfer is scheduled to run. If <code>schedule_start_date</code> is in the past, the transfer will run for the first time on the following day. Structure <a href="#nested_schedule_start_end_date">documented below</a>.</p></li>
+<li><p><code>schedule_end_date</code> - (Optional) The last day the recurring transfer will be run. If <code>schedule_end_date</code> is the same as <code>schedule_start_date</code>, the transfer will be executed only once. Structure <a href="#nested_schedule_start_end_date">documented below</a>.</p></li>
+<li><p><code>start_time_of_day</code> - (Optional) The time in UTC at which the transfer will be scheduled to start in a day. Transfers may start later than this time. If not specified, recurring and one-time transfers that are scheduled to run today will run immediately; recurring transfers that are scheduled to run on a future date will start at approximately midnight UTC on that date. Note that when configuring a transfer with the Cloud Platform Console, the transfer's start time in a day is specified in your local timezone. Structure <a href="#nested_start_time_of_day">documented below</a>.</p></li>
+<li><p><code>repeat_interval</code> - (Optional) Interval between the start of each scheduled transfer. If unspecified, the default value is 24 hours. This value may not be less than 1 hour. A duration in seconds with up to nine fractional digits, terminated by 's'. Example: "3.5s".</p></li>
+</ul>
+
+<p><a name="nested_event_stream"></a>The <code>event_stream</code> block supports:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) Specifies a unique name of the resource such as AWS SQS ARN in the form 'arn:aws:sqs:region:account_id:queue_name', or Pub/Sub subscription resource name in the form 'projects/{project}/subscriptions/{sub}'.</p></li>
+<li><p><code>event_stream_start_time</code> - (Optional) Specifies the date and time that Storage Transfer Service starts listening for events from this stream. If no start time is specified or start time is in the past, Storage Transfer Service starts listening immediately. A timestamp in RFC3339 UTC "Zulu" format, with nanosecond resolution and up to nine fractional digits. Examples: "2014-10-02T15:01:23Z" and "2014-10-02T15:01:23.045123456Z".</p></li>
+<li><p><code>event_stream_expiration_time</code> - (Optional) Specifies the data and time at which Storage Transfer Service stops listening for events from this stream. After this time, any transfers in progress will complete, but no new transfers are initiated.A timestamp in RFC3339 UTC "Zulu" format, with nanosecond resolution and up to nine fractional digits. Examples: "2014-10-02T15:01:23Z" and "2014-10-02T15:01:23.045123456Z".</p></li>
+</ul>
+
+<p><a name="nested_object_conditions"></a>The <code>object_conditions</code> block supports:</p>
+
+<ul>
+<li><p><code>max_time_elapsed_since_last_modification</code> - (Optional) A duration in seconds with up to nine fractional digits, terminated by 's'. Example: "3.5s".</p></li>
+<li><p><code>min_time_elapsed_since_last_modification</code> - (Optional)
+A duration in seconds with up to nine fractional digits, terminated by 's'. Example: "3.5s".</p></li>
+<li><p><code>include_prefixes</code> - (Optional) If <code>include_prefixes</code> is specified, objects that satisfy the object conditions must have names that start with one of the <code>include_prefixes</code> and that do not start with any of the <code>exclude_prefixes</code>. If <code>include_prefixes</code> is not specified, all objects except those that have names starting with one of the <code>exclude_prefixes</code> must satisfy the object conditions. See <a href="https://cloud.google.com/storage-transfer/docs/reference/rest/v1/TransferSpec#ObjectConditions">Requirements</a>.</p></li>
+<li><p><code>exclude_prefixes</code> - (Optional) <code>exclude_prefixes</code> must follow the requirements described for <code>include_prefixes</code>. See <a href="https://cloud.google.com/storage-transfer/docs/reference/rest/v1/TransferSpec#ObjectConditions">Requirements</a>.</p></li>
+<li><p><code>last_modified_since</code> - (Optional) If specified, only objects with a "last modification time" on or after this timestamp and objects that don't have a "last modification time" are transferred. A timestamp in RFC3339 UTC "Zulu" format, with nanosecond resolution and up to nine fractional digits. Examples: "2014-10-02T15:01:23Z" and "2014-10-02T15:01:23.045123456Z".</p></li>
+<li><p><code>last_modified_before</code> - (Optional) If specified, only objects with a "last modification time" before this timestamp and objects that don't have a "last modification time" are transferred. A timestamp in RFC3339 UTC "Zulu" format, with nanosecond resolution and up to nine fractional digits. Examples: "2014-10-02T15:01:23Z" and "2014-10-02T15:01:23.045123456Z".</p></li>
+</ul>
+
+<p><a name="nested_transfer_options"></a>The <code>transfer_options</code> block supports:</p>
+
+<ul>
+<li><p><code>overwrite_objects_already_existing_in_sink</code> - (Optional) Whether overwriting objects that already exist in the sink is allowed.</p></li>
+<li><p><code>delete_objects_unique_in_sink</code> - (Optional) Whether objects that exist only in the sink should be deleted. Note that this option and
+<code>delete_objects_from_source_after_transfer</code> are mutually exclusive.</p></li>
+<li><p><code>delete_objects_from_source_after_transfer</code> - (Optional) Whether objects should be deleted from the source after they are transferred to the sink. Note that this option and <code>delete_objects_unique_in_sink</code> are mutually exclusive.</p></li>
+<li><p><code>overwrite_when</code> - (Optional) When to overwrite objects that already exist in the sink. If not set, overwrite behavior is determined by <code>overwrite_objects_already_existing_in_sink</code>. Possible values: ALWAYS, DIFFERENT, NEVER.</p></li>
+</ul>
+
+<p><a name="nested_gcs_data_sink"></a>The <code>gcs_data_sink</code> block supports:</p>
+
+<ul>
+<li><p><code>bucket_name</code> - (Required) Google Cloud Storage bucket name.</p></li>
+<li><p><code>path</code> - (Optional) Root path to transfer objects. Must be an empty string or full path name that ends with a '/'. This field is treated as an object prefix. As such, it should generally not begin with a '/'.</p></li>
+</ul>
+
+<p><a name="nested_gcs_data_source"></a>The <code>gcs_data_source</code> block supports:</p>
+
+<ul>
+<li><p><code>bucket_name</code> - (Required) Google Cloud Storage bucket name.</p></li>
+<li><p><code>path</code> - (Optional) Root path to transfer objects. Must be an empty string or full path name that ends with a '/'. This field is treated as an object prefix. As such, it should generally not begin with a '/'.</p></li>
+</ul>
+
+<p><a name="nested_posix_data_sink"></a>The <code>posix_data_sink</code> block supports:</p>
+
+<ul>
+<li><code>root_directory</code> - (Required) Root directory path to the filesystem.</li>
+</ul>
+
+<p><a name="nested_posix_data_source"></a>The <code>posix_data_source</code> block supports:</p>
+
+<ul>
+<li><code>root_directory</code> - (Required) Root directory path to the filesystem.</li>
+</ul>
+
+<p><a name="nested_hdfs_data_source"></a>The <code>hdfs_data_source</code> block supports:</p>
+
+<ul>
+<li><code>path</code> - (Required) Root directory path to the filesystem.</li>
+</ul>
+
+<p><a name="nested_aws_s3_data_source"></a>The <code>aws_s3_data_source</code> block supports:</p>
+
+<ul>
+<li><p><code>bucket_name</code> - (Required) S3 Bucket name.</p></li>
+<li><p><code>path</code> - (Optional) Root path to transfer objects. Must be an empty string or full path name that ends with a '/'. This field is treated as an object prefix. As such, it should generally not begin with a '/'.</p></li>
+<li><p><code>aws_access_key</code> - (Optional) AWS credentials block.</p></li>
+<li><p><code>role_arn</code> - (Optional) The Amazon Resource Name (ARN) of the role to support temporary credentials via 'AssumeRoleWithWebIdentity'. For more information about ARNs, see <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_identifiers.html#identifiers-arns">IAM ARNs</a>. When a role ARN is provided, Transfer Service fetches temporary credentials for the session using a 'AssumeRoleWithWebIdentity' call for the provided role using the [GoogleServiceAccount][] for this project.</p></li>
+</ul>
+
+<p>The <code>aws_access_key</code> block supports:</p>
+
+<ul>
+<li><p><code>access_key_id</code> - (Required) AWS Key ID.</p></li>
+<li><p><code>secret_access_key</code> - (Required) AWS Secret Access Key.</p></li>
+</ul>
+
+<p><a name="nested_http_data_source"></a>The <code>http_data_source</code> block supports:</p>
+
+<ul>
+<li><code>list_url</code> - (Required) The URL that points to the file that stores the object list entries. This file must allow public access. Currently, only URLs with HTTP and HTTPS schemes are supported.</li>
+</ul>
+
+<p><a name="nested_azure_blob_storage_data_source"></a>The <code>azure_blob_storage_data_source</code> block supports:</p>
+
+<ul>
+<li><p><code>storage_account</code> - (Required) The name of the Azure Storage account.</p></li>
+<li><p><code>container</code> - (Required) The container to transfer from the Azure Storage account.`</p></li>
+<li><p><code>path</code> - (Required) Root path to transfer objects. Must be an empty string or full path name that ends with a '/'. This field is treated as an object prefix. As such, it should generally not begin with a '/'.</p></li>
+<li><p><code>credentials_secret</code> - (Optional, <a href="https://terraform.io/docs/providers/google/guides/provider_versions.html">Beta</a>) Full Resource name of a secret in Secret Manager containing <a href="https://cloud.google.com/storage-transfer/docs/reference/rest/v1/TransferSpec#azureblobstoragedata:~:text=begin%20with%20a%20%27/%27.-,credentialsSecret,-string">SAS Credentials in JSON form</a>. Service Agent for Storage Transfer must have permissions to access secret. If credentials_secret is specified, do not specify azure_credentials.`,</p></li>
+<li><p><code>azure_credentials</code> - (Required in GA, Optional in <a href="https://terraform.io/docs/providers/google/guides/provider_versions.html">Beta</a>) Credentials used to authenticate API requests to Azure block.</p></li>
+</ul>
+
+<p>The <code>azure_credentials</code> block supports:</p>
+
+<ul>
+<li><code>sas_token</code> - (Required) Azure shared access signature. See <a href="https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview">Grant limited access to Azure Storage resources using shared access signatures (SAS)</a>.</li>
+</ul>
+
+<p><a name="nested_schedule_start_end_date"></a>The <code>schedule_start_date</code> and <code>schedule_end_date</code> blocks support:</p>
+
+<ul>
+<li><p><code>year</code> - (Required) Year of date. Must be from 1 to 9999.</p></li>
+<li><p><code>month</code> - (Required) Month of year. Must be from 1 to 12.</p></li>
+<li><p><code>day</code> - (Required) Day of month. Must be from 1 to 31 and valid for the year and month.</p></li>
+</ul>
+
+<p><a name="nested_start_time_of_day"></a>The <code>start_time_of_day</code> blocks support:</p>
+
+<ul>
+<li><p><code>hours</code> - (Required) Hours of day in 24 hour format. Should be from 0 to 23</p></li>
+<li><p><code>minutes</code> - (Required) Minutes of hour of day. Must be from 0 to 59.</p></li>
+<li><p><code>seconds</code> - (Required) Seconds of minutes of the time. Must normally be from 0 to 59.</p></li>
+<li><p><code>nanos</code> - (Required) Fractions of seconds in nanoseconds. Must be from 0 to 999,999,999.</p></li>
+</ul>
+
+<p><a name="nested_notification_config"></a>The <code>notification_config</code> block supports:</p>
+
+<ul>
+<li><p><code>pubsub_topic</code> - (Required) The Topic.name of the Pub/Sub topic to which to publish notifications. Must be of the format: projects/{project}/topics/{topic}. Not matching this format results in an INVALID_ARGUMENT error.</p></li>
+<li><p><code>event_types</code> - (Optional) Event types for which a notification is desired. If empty, send notifications for all event types. The valid types are "TRANSFER_OPERATION_SUCCESS", "TRANSFER_OPERATION_FAILED", "TRANSFER_OPERATION_ABORTED".</p></li>
+<li><p><code>payload_format</code> - (Required) The desired format of the notification message payloads. One of "NONE" or "JSON".</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to the arguments listed above, the following computed attributes are
+exported:</p>
+
+<ul>
+<li><p><code>name</code> - The name of the Transfer Job.</p></li>
+<li><p><code>creation_time</code> - When the Transfer Job was created.</p></li>
+<li><p><code>last_modification_time</code> - When the Transfer Job was last modified.</p></li>
+<li><p><code>deletion_time</code> - When the Transfer Job was deleted.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Storage Transfer Jobs can be imported using the Transfer Job's <code>project</code> and <code>name</code> (without the <code>transferJob/</code> prefix), e.g.</p>
+
+<ul>
+<li><code>{{project_id}}/{{name}}</code>, where <code>name</code> is a numeric value.</li>
+</ul>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import Storage Transfer Jobs using one of the formats above. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"{{project_id}}/{{name}}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_storage_transfer_job.default</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When using the <a href="https://developer.hashicorp.com/terraform/cli/commands/import"><code>terraform import</code> command</a>, Storage Transfer Jobs can be imported using one of the formats above. For example:</p>
+
+<pre><code>$ terraform import google_storage_transfer_job.default {{project_id}}/123456789
+</code></pre>
+
+            
+        
+    </body></html>

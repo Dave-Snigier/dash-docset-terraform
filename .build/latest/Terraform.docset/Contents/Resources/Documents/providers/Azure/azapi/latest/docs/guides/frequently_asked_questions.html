@@ -1,0 +1,109 @@
+<html><!-- Online page at https://registry.terraform.io/providers/Azure/azapi/latest/docs/guides/frequently_asked_questions --><head>
+                <title>AzAPI Provider: Frequently asked questions</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <a class="dashAnchor" name="//apple_ref/cpp/Section/After%20applying%20the%20configuration%2C%20running%20terraform%20plan%20found%20there%27s%20still%20a%20change%3F"></a><h2 id="after-applying-the-configuration-running-terraform-plan-found-theres-still-a-change">After applying the configuration, running terraform plan found there's still a change?</h2>
+
+<p>More context:</p>
+
+<div class="codehilite"><pre><span></span><code>Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:
+  ~ update <span class="k">in</span>-place
+
+Terraform will perform the following actions:
+
+  <span class="c1"># azapi_resource.test will be updated in-place</span>
+  ~ resource <span class="s2">"azapi_resource"</span> <span class="s2">"test"</span> <span class="o">{</span>
+      ~ <span class="nv">body</span>                            <span class="o">=</span> jsonencode<span class="o">(</span>
+          ~ <span class="o">{</span>
+              ~ <span class="nv">properties</span> <span class="o">=</span> <span class="o">{</span>
+                  + <span class="nv">accountKey</span>  <span class="o">=</span> <span class="s2">"TOI************QqA=="</span>
+                    <span class="c1"># (2 unchanged elements hidden)</span>
+      ~ <span class="nv">output</span>                          <span class="o">=</span> jsonencode<span class="o">({})</span> -&gt; <span class="o">(</span>known after apply<span class="o">)</span>
+        <span class="nv">tags</span>                            <span class="o">=</span> <span class="o">{}</span>
+        <span class="c1"># (5 unchanged attributes hidden)</span>
+    <span class="o">}</span>
+
+Plan: <span class="m">0</span> to add, <span class="m">1</span> to change, <span class="m">0</span> to destroy.
+</code></pre></div>
+
+<p>In some cases, when <code>body</code> refers to some sensitive properties, user may not get a clear plan as above. This happens when a property contains sensitive credential like a storage account's access key, the value won't be returned by design. </p>
+
+<p>Please add <code>ignore_missing_property = true</code> to the resource block and apply it.</p>
+
+<p>Similarly, values in incorrect casing might be returned and cause a diff. Please use <code>ignore_casing = true</code> to suppress it.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/How%20to%20manage%20resources%20which%20can%20be%20managed%20by%20both%20parent%20resource%20API%20and%20its%20own%20API%20like%20Microsoft.Network/virtualNetworks/subnets%3F"></a><h2 id="how-to-manage-resources-which-can-be-managed-by-both-parent-resource-api-and-its-own-api-like-microsoftnetworkvirtualnetworkssubnets">How to manage resources which can be managed by both parent resource API and its own API like <code>Microsoft.Network/virtualNetworks/subnets</code>?</h2>
+
+<p>For example, <code>Microsoft.Network/virtualNetworks/subnets</code> has its own API and it can also be managed by <code>Microsoft.Network/virtualNetworks</code> API.</p>
+
+<p>It's recommendded to manage <code>Microsoft.Network/virtualNetworks/subnets</code> in <code>Microsoft.Network/virtualNetworks</code> instead of using its own API.</p>
+
+<p>The reason is, if subnets are defined separately, when update the vnet which has no definition of its subnets, 
+its request body won't contain any subnets definitions, so existing subnets will be removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/How%20to%20use%20API/properties%20which%20is%20not%20in%20embeded%20schema%3F"></a><h2 id="how-to-use-apiproperties-which-is-not-in-embeded-schema">How to use API/properties which is not in embeded schema?</h2>
+
+<p><code>AzApi</code> provider will use embedded schema to verify the inputs, to skip the validation, please add <code>schema_validation_enabled = false</code> to the resource block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/How%20to%20manage%20properties%20which%20can%20only%20be%20set%20during%20update%3F"></a><h2 id="how-to-manage-properties-which-can-only-be-set-during-update">How to manage properties which can only be set during update?</h2>
+
+<p>More context: Properties like CMK(customer managed key) can't be set when create this resource. Because CMK depends on key vault key which depends on this resource's identity.</p>
+
+<p>It can be solved by using <code>azapi_update_resource</code> to perform a multi-steps deployment, here's an <a href="https://github.com/Azure/terraform-provider-azapi/tree/main/examples/Microsoft.ServiceBus/ServiceBusNamespace-CMK/main.tf">example</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/What%20are%20the%20types%20for%20the%20resource%20group%2C%20subscription%20and%20tenant%3F"></a><h2 id="what-are-the-types-for-the-resource-group-subscription-and-tenant">What are the types for the resource group, subscription and tenant?</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Resource Type</th>
+  <th>Type</th>
+  <th>Example</th>
+  <th>Comment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>resource group</td>
+  <td><code>Microsoft.Resources/resourceGroups</code></td>
+  <td><code>/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg</code></td>
+  <td></td>
+</tr>
+<tr>
+  <td>subscription</td>
+  <td><code>Microsoft.Resources/subscriptions</code></td>
+  <td><code>/subscriptions/00000000-0000-0000-0000-000000000000</code></td>
+  <td></td>
+</tr>
+<tr>
+  <td>tenant</td>
+  <td><code>Microsoft.Resources/tenants</code></td>
+  <td><code>/tenants/00000000-0000-0000-0000-000000000000</code></td>
+  <td></td>
+</tr>
+<tr>
+  <td>management group</td>
+  <td><code>Microsoft.Management/managementGroups</code></td>
+  <td><code>/providers/Microsoft.Management/managementGroups/00000000-0000-0000-0000-000000000000</code></td>
+  <td></td>
+</tr>
+<tr>
+  <td>generic provider</td>
+  <td><code>Microsoft.Resources/providers</code></td>
+  <td><code>&lt;scope&gt;/providers/&lt;RP&gt;</code></td>
+  <td>This is the generic provider resource type whose operations are defined by ARM, and is supported by all of Azure RPs (e.g. actions like <code>register</code>, <code>providerPermissions</code>, etc.)</td>
+</tr>
+<tr>
+  <td>concrete provider</td>
+  <td><code>Microsoft.Resources/providers</code></td>
+  <td><code>&lt;scope&gt;/providers/Microsoft.Storage</code></td>
+  <td>This is the concrete provider whose operations are only defined for this provider itself</td>
+</tr>
+</tbody>
+</table>
+
+            
+        
+    </body></html>

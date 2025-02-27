@@ -1,0 +1,112 @@
+<html><!-- Online page at https://registry.terraform.io/providers/auth0/auth0/latest/docs/guides/quickstart --><head>
+                <title>Getting started</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="getting-started">Getting started</h1>
+
+<p>In this guide we'll go through setting up an Auth0 Application for our provider to authenticate against and manage
+resources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Create%20a%20Machine%20to%20Machine%20Application"></a><h2 id="create-a-machine-to-machine-application">Create a Machine to Machine Application</h2>
+
+<p>For Terraform to be able to create resources in Auth0, you'll need to manually create an Auth0 Machine-to-Machine
+Application that allows Terraform to communicate with Auth0.</p>
+
+<p>Head to the Applications section of your <a href="https://manage.auth0.com/#/applications">Auth0 Dashboard</a> and click the
+"Create Application" button on the top right.</p>
+
+<p><img alt="create_app1" src="https://user-images.githubusercontent.com/28300158/183633275-88a5ae17-64e4-4352-8b9c-f8f62ba50a97.png"/></p>
+
+<p>In the form that pops up, give your app a name like "Terraform Provider Auth0" and select 
+"Machine to Machine Application" as the type. Click the "Create" button to be taken to the next screen.</p>
+
+<p><img alt="create_app2" src="https://user-images.githubusercontent.com/28300158/183634949-cabdfe6e-93cf-42f1-bfdb-b0f216c2642c.png"/></p>
+
+<p>You'll need to authorize your new app to call the Auth0 Management API. Select it in the dropdown and then authorize all
+scopes by clicking "All" in the top right of the scopes selection area. Click the "Authorize" button to continue.</p>
+
+<p><img alt="create_app3" src="https://user-images.githubusercontent.com/28300158/183635167-724ea60e-117d-47a5-a18c-746f402ee52a.png"/></p>
+
+<p>You'll be taken to the details page for your new application. Open the "Settings" tab and copy the Domain, Client ID,
+and Client Secret values - you'll need them in the next step for configuring the Auth0 Provider.</p>
+
+<p><img alt="create_app4" src="https://user-images.githubusercontent.com/28300158/183635366-bee78296-cb7f-4586-b0a5-067aaa3ea578.png"/></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configure%20the%20Provider"></a><h2 id="configure-the-provider">Configure the Provider</h2>
+
+<p>Although you can put passwords, secrets, and other credentials directly into Terraform configuration files, hard-coding
+credentials into any Terraform configuration is not recommended, and risks secret leakage should this file ever be 
+committed to a public version control system. Because of this you'll set your Auth0 Application credentials as
+environment variables instead.</p>
+
+<p>In the terminal window where you're running Terraform, run the following commands, substituting <code>AUTHO_DOMAIN</code>,
+<code>CLIENT_ID</code>, and <code>CLIENT_SECRET</code> for your M2M app's values:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span> <span class="nv">AUTH0_DOMAIN</span><span class="o">=</span>***********
+<span class="nb">export</span> <span class="nv">AUTH0_CLIENT_ID</span><span class="o">=</span>***********
+<span class="nb">export</span> <span class="nv">AUTH0_CLIENT_SECRET</span><span class="o">=</span>***********
+</code></pre></div>
+
+<p>After you've set your environment variables, head back to your text editor, and add the following in <code>main.tf</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">auth0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"auth0/auth0"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&gt;= 1.0.0"</span><span class="c1"> # Refer to docs for latest version</span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"auth0"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The Auth0 Provider will communicate with the Auth0 Management API using the M2M credentials you've provided. 
+Moreover, we specify the version range that we want to allow for the provider, to prevent an uncontrolled update.</p>
+
+<p>Now run the following to initialize your terraform configuration:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform init
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Manage%20resources%20through%20the%20Provider"></a><h2 id="manage-resources-through-the-provider">Manage resources through the Provider</h2>
+
+<p>Now you can start adding the Auth0 resources you want to manage through terraform. As an example let's create a new
+Web Application in our Auth0 Tenant.</p>
+
+<p>In our <code>main.tf</code> from above, let's append the following:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// We are appending on main.tf</span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"auth0_client"</span><span class="w"> </span><span class="nv">"my_client"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"WebAppExample"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"My Web App Created Through Terraform"</span><span class="w"></span>
+<span class="w">  </span><span class="na">app_type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"regular_web"</span><span class="w"></span>
+<span class="w">  </span><span class="na">callbacks</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"http://localhost:3000/callback"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">oidc_conformant</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">jwt_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">alg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"RS256"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>With the new resource in place, you can run the following terminal commands to apply your configuration:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform apply
+</code></pre></div>
+
+<p>After apply finishes, you can verify that the application was created by going to the
+<a href="https://manage.auth0.com/#/applications">Auth0 Dashboard Applications page</a>. You should see a new application called
+"WebAppExample", as specified in the name argument passed to the resource.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Auto-generate%20Terraform%20config%20files%20from%20Auth0%20Tenant"></a><h3 id="auto-generate-terraform-config-files-from-auth0-tenant">Auto-generate Terraform config files from Auth0 Tenant</h3>
+
+<p>If you're adopting Terraform on an already configured Auth0 tenant, it is possible to auto-generate that tenant's Terraform configuration by following the
+<a href="https://registry.terraform.io/providers/auth0/auth0/latest/docs/guides/generate_terraform_config">Terraform Configuration Generation Guide</a>.</p>
+
+            
+        
+    </body></html>

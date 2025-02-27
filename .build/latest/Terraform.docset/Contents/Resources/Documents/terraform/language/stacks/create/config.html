@@ -1,0 +1,93 @@
+<html><!-- Online page at https://www.terraform.io/language/stacks/create/config --><head>
+                <title>Define configuration</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="define-configuration">Define configuration</h1>
+
+<p>In the Stack configuration file, you declare what infrastructure components are part of the Stack.</p>
+
+<p>Your Stack configuration file defines multiple components that share a lifecycle you can repeatedly deploy. This helps ensure consistency across environments and reduces the complexity of provisioning at scale.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Background"></a><h2 id="background">Background</h2>
+
+<p>You declare the infrastructure that makes up your Stack in the Stack configuration file. Stack configuration files replace Terraform’s traditional root module and serve as the blueprint for what your Stack deploys.</p>
+
+<p>Stack configuration files use a new file type, <code>tfstack.hcl</code>, to define everything that shares your Stack’s lifecycle. After writing your Stack configuration, you can write a deployment configuration to dictate how HCP Terraform deploys your Stack’s infrastructure. </p>
+
+<p>As with Terraform configuration files, HCP Terraform processes all of the blocks in your Stack configuration and deployment configuration files in your Stack's root directory in dependency order. You can organize your Stack configuration into multiple files as in traditional Terraform configurations.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Requirements"></a><h3 id="requirements">Requirements</h3>
+
+<p>Before you begin writing your Stack configuration, ensure you have the <code>terraform-stacks-cli</code> for initializing and validating your Stack configurations. For installation guidance, refer to the <a href="../../../terraform/language/stacks/reference/tfstacks-cli.html">Stacks CLI reference</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Define%20your%20Stack%20configuration"></a><h2 id="define-your-stack-configuration">Define your Stack configuration</h2>
+
+<p>We recommend <a href="../../../terraform/language/stacks/design.html">designing your Stack</a> before you begin writing your configuration files. </p>
+
+<p>All of your Stack’s configuration files must use the <code>.tfstack.hcl</code> file type. You can set up your Stack configuration into multiple files as in traditional Terraform configurations. For example, you can have <code>variables.tfstack.hcl</code>, <code>providers.tfstack.hcl</code>, and we recommend creating one root-level file for your <code>component</code> blocks, such as <code>components.tfstack.hcl</code>. </p>
+
+<p>The <code>component</code> block defines the pieces that make up your Stack. Add a <code>component</code> block for each top-level module you want to include in the Stack. Specify the source module, inputs, and providers for each component. </p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># components.tfstack.hcl</span>
+
+<span class="err">component</span><span class="w"> </span><span class="s2">"cluster"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./eks"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws_region</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">var.aws_region</span><span class="w"></span>
+<span class="w">        </span><span class="na">cluster_name_prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.prefix</span><span class="w"></span>
+<span class="w">        </span><span class="na">instance_type</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"t2.medium"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">providers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">provider.aws.this</span><span class="w"></span>
+<span class="w">        </span><span class="na">random</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">provider.random.this</span><span class="w"></span>
+<span class="w">        </span><span class="na">tls</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">provider.tls.this</span><span class="w"></span>
+<span class="w">        </span><span class="na">cloudinit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">provider.cloudinit.this</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After establishing your top-level modules, you can use child modules without adding additional <code>component</code> blocks.</p>
+
+<p>The Stack configuration file type accepts most classic Terraform configuration blocks but with some key differences. For more details on declaring providers in Stacks, refer to <a href="../../../terraform/language/stacks/create/declare-providers.html">Declare providers</a>. For more information on the Stack configuration file type and all the blocks and attributes it accepts, refer to the <a href="../../../terraform/language/stacks/reference/tfstack.html">Configuration file reference</a>. </p>
+
+<p>The <code>component</code> block supports the <code>for_each</code> meta-argument if you need to replicate components across multiple instances. For example, the following configuration uses <code>for_each</code> to provision modules in multiple AWS regions for a given environment.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># components.tfstack.hcl</span>
+
+<span class="err">component</span><span class="w"> </span><span class="s2">"s3"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.regions</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./s3"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">providers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">provider.aws.configurations[each.value</span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="na">random</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">provider.random.this</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After writing your Stack configuration, use the Terraform Stacks CLI to validate it.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Validate%20your%20configuration"></a><h2 id="validate-your-configuration">Validate your configuration</h2>
+
+<p>Once you have finished your Stack configuration, use the <code>terraform-stacks-cli</code> tool to validate your configuration and generate the necessary provider lock files.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">$ </span>tfstacks init
+<span class="gp">$ </span>tfstacks validate
+</code></pre></div>
+
+<p>For installation guidance and more details, refer to the <a href="../../../terraform/language/stacks/reference/tfstacks-cli.html">Stacks CLI</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Next%20steps"></a><h2 id="next-steps">Next steps</h2>
+
+<p>If you have not yet defined the providers for your Stack, proceed to <a href="../../../terraform/language/stacks/create/declare-providers.html">Declare providers</a>. You can also learn how to <a href="../../../terraform/language/stacks/deploy/authenticate.html">Authenticate your Stack</a> to ensure your providers are properly set up.</p>
+
+            
+        
+    </body></html>

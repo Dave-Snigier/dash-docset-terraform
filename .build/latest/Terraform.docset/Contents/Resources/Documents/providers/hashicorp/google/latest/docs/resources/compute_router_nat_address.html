@@ -1,0 +1,162 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_router_nat_address --><head>
+                <title>google_compute_router_nat_address</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="google_compute_router_nat_address">google_compute_router_nat_address</h1>
+
+<p>A resource used to set the list of IP addresses to be used in a NAT service and manage the draining of destroyed IPs.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This resource is to be used alongside a <code>google_compute_router_nat</code> resource, the router nat resource must have no defined <code>nat_ips</code> or <code>drain_nat_ips</code> parameters, instead using the <code>initial_nat_ips</code> parameter to set at least one IP for the creation of the resource.</p>
+</aside>
+
+<p>To get more information about RouterNatAddress, see:</p>
+
+<ul>
+<li><a href="https://cloud.google.com/compute/docs/reference/rest/v1/routers">API documentation</a></li>
+<li>How-to Guides
+<ul>
+<li><a href="https://cloud.google.com/router/docs/">Google Cloud Router</a></li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Router%20Nat%20Address%20Count"></a><h2 id="example-usage-router-nat-address-count">Example Usage - Router Nat Address Count</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"net"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-network"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-subnetwork"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.net.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_router"</span><span class="w"> </span><span class="nv">"router"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-router"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.subnet.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.net.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_address"</span><span class="w"> </span><span class="nv">"address"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"nat-manual-ip-${count.index}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.subnet.region</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create_before_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_router_nat_address"</span><span class="w"> </span><span class="nv">"nat_address"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">nat_ips</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_address.address</span><span class="p">.</span><span class="err">*</span><span class="p">.</span><span class="err">self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">router</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_router.router.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">router_nat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_router_nat.router_nat.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_router_nat.router_nat.region</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_router_nat"</span><span class="w"> </span><span class="nv">"router_nat"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-router-nat"</span><span class="w"></span>
+<span class="w">  </span><span class="na">router</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_router.router.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_router.router.region</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">nat_ip_allocate_option</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MANUAL_ONLY"</span><span class="w"></span>
+<span class="w">  </span><span class="na">initial_nat_ips</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_address.address[0].self_link</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">source_subnetwork_ip_ranges_to_nat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"LIST_OF_SUBNETWORKS"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">subnetwork</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.subnet.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">source_ip_ranges_to_nat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"ALL_IP_RANGES"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>nat_ips</code> -
+(Required)
+Self-links of NAT IPs to be used in a Nat service. Only valid if the referenced RouterNat
+natIpAllocateOption is set to MANUAL_ONLY.</p></li>
+<li><p><code>router</code> -
+(Required)
+The name of the Cloud Router in which the referenced NAT service is configured.</p></li>
+<li><p><code>router_nat</code> -
+(Required)
+The name of the Nat service in which this address will be configured.</p></li>
+</ul>
+
+<hr/>
+
+<ul>
+<li><p><code>drain_nat_ips</code> -
+(Optional)
+A list of URLs of the IP resources to be drained. These IPs must be
+valid static external IPs that have been assigned to the NAT.</p></li>
+<li><p><code>region</code> -
+(Optional)
+Region where the NAT service reside.</p></li>
+<li><p><code>project</code> - (Optional) The ID of the project in which the resource belongs.
+If it is not provided, the provider project is used.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to the arguments listed above, the following computed attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - an identifier for the resource with format <code>projects/{{project}}/regions/{{region}}/routers/{{router}}/{{router_nat}}</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p>This resource provides the following
+<a href="https://developer.hashicorp.com/terraform/plugin/sdkv2/resources/retries-and-customizable-timeouts">Timeouts</a> configuration options:</p>
+
+<ul>
+<li><code>create</code> - Default is 20 minutes.</li>
+<li><code>update</code> - Default is 20 minutes.</li>
+<li><code>delete</code> - Default is 20 minutes.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>RouterNatAddress can be imported using any of these accepted formats:</p>
+
+<ul>
+<li><code>projects/{{project}}/regions/{{region}}/routers/{{router}}/{{router_nat}}</code></li>
+<li><code>{{project}}/{{region}}/{{router}}/{{router_nat}}</code></li>
+<li><code>{{region}}/{{router}}/{{router_nat}}</code></li>
+<li><code>{{router}}/{{router_nat}}</code></li>
+</ul>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import RouterNatAddress using one of the formats above. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"projects/{{project}}/regions/{{region}}/routers/{{router}}/{{router_nat}}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_router_nat_address.default</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When using the <a href="https://developer.hashicorp.com/terraform/cli/commands/import"><code>terraform import</code> command</a>, RouterNatAddress can be imported using one of the formats above. For example:</p>
+
+<pre><code>$ terraform import google_compute_router_nat_address.default projects/{{project}}/regions/{{region}}/routers/{{router}}/{{router_nat}}
+$ terraform import google_compute_router_nat_address.default {{project}}/{{region}}/{{router}}/{{router_nat}}
+$ terraform import google_compute_router_nat_address.default {{region}}/{{router}}/{{router_nat}}
+$ terraform import google_compute_router_nat_address.default {{router}}/{{router_nat}}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/User%20Project%20Overrides"></a><h2 id="user-project-overrides">User Project Overrides</h2>
+
+<p>This resource supports <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/provider_reference#user_project_override">User Project Overrides</a>.</p>
+
+            
+        
+    </body></html>

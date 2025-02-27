@@ -1,0 +1,231 @@
+<html><!-- Online page at https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/guides/version-3-upgrade --><head>
+                <title>Terraform Cloudflare Provider Version 3 Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-cloudflare-provider-version-3-upgrade-guide">Terraform Cloudflare Provider Version 3 Upgrade Guide</h1>
+
+<p>Version 3 of the Cloudflare Terraform Provider is introducing several breaking
+changes largely to accommodate the underlying upgrade of the <code>terraform-sdk-plugin</code>
+to version 2.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Version%20Configuration"></a><h2 id="provider-version-configuration">Provider Version Configuration</h2>
+
+<p>If you are not ready to make a move to version 3 of the Cloudflare provider,
+you may keep the 2.x branch active for your Terraform project by specifying:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"cloudflare"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 2.0"</span><span class="c1"></span>
+<span class="c1">  # ... any other configuration</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>We highly recommend reviewing this guide, make necessary changes and move to
+3.x branch, as further 2.x releases are unlikely to happen.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Before attempting to upgrade to version 3, you should first upgrade to the latest version of 2 to ensure any transitional updates are applied to your existing configuration.</p>
+</aside>
+
+<p>Once ready, make the following change to use the latest 3.x release:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"cloudflare"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 3.0"</span><span class="c1"></span>
+<span class="c1">  # ... any other configuration</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>To rewrite your HCL configurations, you could use a combination of <code>grep</code>/<code>ripgrep</code>
+and <code>sed</code> for simple replacements however we will be providing examples using
+[comby] which is a more advanced tool for searching and changing code
+structure. NB: the attached examples are intentionally simple and you may want
+to make them more specific to suit your use case or environment.</p>
+
+<p>As some schema changes have been made, state migrators have been included in the
+newer versions. As the majority of the changes are <code>TypeMap</code> =&gt; <code>TypeList</code> we
+recommend verifying the upgrade yourself on a non-production resource first
+as <code>TypeMap</code> did include some undocumented behaviour which has been removed in
+<code>terraform-sdk-plugin</code> v2 and will not be the same across the versions.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Terraform%200.13%20and%20older%20versions%20no%20longer%20supported"></a><h2 id="terraform-013-and-older-versions-no-longer-supported">Terraform 0.13 and older versions no longer supported</h2>
+
+<p>In line with [HashiCorp's Terraform 1.x compatibility promises],
+we will be dropping support for Terraform 0.13 and older within in the
+Cloudflare provider. This will allow us to focus on moving the provider forward
+with Terraform core. Please be aware, should you raise an issue with the
+Cloudflare provider using Terraform core &lt; 0.14, you will be asked to replicate
+on a newer version before the issue is triaged by maintainers.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/HTTP%20user%20agent%20changes"></a><h2 id="http-user-agent-changes">HTTP user agent changes</h2>
+
+<p>While generally treated as internal, we do know of customers having specific
+network policies associated with the HTTP user agent produced by the Cloudflare
+Terraform Provider. In version 3, the format has changed.</p>
+
+<p>Before: <code>HashiCorp Terraform/1.0.5 (+https://www.terraform.io) Terraform Plugin SDK/1.17.0 terraform-provider-cloudflare/2.26.1</code></p>
+
+<p>After: <code>terraform/1.0.5 terraform-plugin-sdk/2.7.1 terraform-provider-cloudflare/2.26.1</code></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_access_rule"></a><h2 id="cloudflare_access_rule">cloudflare_access_rule</h2>
+
+<ul>
+<li><code>configuration</code> is now a <code>TypeList</code> instead of a <code>TypeMap</code>.</li>
+</ul>
+
+<p>Before:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">resource</span><span class="w"> </span><span class="s2">"cloudflare_access_rule" "..."</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">configuration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">    </span><span class="na">value</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">resource</span><span class="w"> </span><span class="s2">"cloudflare_access_rule" "..."</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">    </span><span class="na">value</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><a href="https://bit.ly/3ChB8uh">comby.live playground URL</a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_custom_hostname"></a><h2 id="cloudflare_custom_hostname">cloudflare_custom_hostname</h2>
+
+<ul>
+<li><code>status</code> is now <code>Computed</code> as the value isn't managed by an end user.</li>
+<li><code>settings</code> is now <code>Optional</code>/<code>Computed</code> to reflect the stricter schema
+validation introduced in terraform-plugin-sdk v2.</li>
+<li><code>settings.ciphers</code> is now a <code>TypeSet</code> internally to handle suppress ordering
+changes. Schema representation remains the same.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_custom_ssl"></a><h2 id="cloudflare_custom_ssl">cloudflare_custom_ssl</h2>
+
+<ul>
+<li><code>custom_ssl_options</code> is now a <code>TypeList</code> instead of <code>TypeMap</code>.</li>
+</ul>
+
+<p>Before:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">resource</span><span class="w"> </span><span class="s2">"cloudflare_custom_ssl" ""</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="nb">custom_ssl_options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">certificate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n"</span><span class="w"></span>
+<span class="w">    </span><span class="na">private_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n"</span><span class="w"></span>
+<span class="w">    </span><span class="na">bundle_method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ubiquitous"</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"legacy_custom"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">resource</span><span class="w"> </span><span class="s2">"cloudflare_custom_ssl" "..."</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="nb">custom_ssl_options</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">certificate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n"</span><span class="w"></span>
+<span class="w">    </span><span class="na">private_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n"</span><span class="w"></span>
+<span class="w">    </span><span class="na">bundle_method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ubiquitous"</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"legacy_custom"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><a href="https://bit.ly/3C9kEUX">comby.live playground URL</a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_load_balancer"></a><h2 id="cloudflare_load_balancer">cloudflare_load_balancer</h2>
+
+<ul>
+<li><code>fixed_response</code> is now a <code>TypeList</code> instead of a <code>TypeMap</code>.</li>
+<li><code>fixed_response.status_code</code> is now a <code>TypeInt</code> instead of a <code>TypeString</code>.</li>
+</ul>
+
+<p>Before:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">resource</span><span class="w"> </span><span class="s2">"cloudflare_load_balancer" "..."</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">rules</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">    </span><span class="nb">fixed_response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">message_body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hello"</span><span class="w"></span>
+<span class="w">      </span><span class="na">status_code</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"200"</span><span class="w"></span>
+<span class="w">      </span><span class="na">content_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"html"</span><span class="w"></span>
+<span class="w">      </span><span class="na">location</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"www.example.com"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">resource</span><span class="w"> </span><span class="s2">"cloudflare_load_balancer" "..."</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">rules</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">    </span><span class="nb">fixed_response</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">message_body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hello"</span><span class="w"></span>
+<span class="w">      </span><span class="na">status_code</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="m">200</span><span class="w"></span>
+<span class="w">      </span><span class="na">content_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"html"</span><span class="w"></span>
+<span class="w">      </span><span class="na">location</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"www.example.com"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><a href="https://bit.ly/3EkySnS">comby.live playground URL</a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_record"></a><h2 id="cloudflare_record">cloudflare_record</h2>
+
+<ul>
+<li><code>data</code> is now a <code>TypeList</code> instead of a <code>TypeMap</code>.</li>
+</ul>
+
+<p>Before:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">resource</span><span class="w"> </span><span class="s2">"cloudflare_record" "..."</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">service</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">    </span><span class="na">proto</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">resource</span><span class="w"> </span><span class="s2">"cloudflare_record" "..."</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">data</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">service</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">    </span><span class="na">proto</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><a href="https://bit.ly/3C9zfj6">comby.live playground URL</a></p>
+
+            
+        
+    </body></html>

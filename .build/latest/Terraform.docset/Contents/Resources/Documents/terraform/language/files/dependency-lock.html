@@ -1,0 +1,423 @@
+<html><!-- Online page at https://www.terraform.io/language/files/dependency-lock --><head>
+                <title>Dependency Lock File</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="dependency-lock-file">Dependency Lock File</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This page is about a feature of Terraform 0.14 and later. Prior versions of Terraform did not track dependency selections at all, so the information here is not relevant to those versions.</p>
+</aside>
+
+<blockquote>
+  <p><strong>Hands-on:</strong> Try the <a href="../../terraform/tutorials/configuration-language/provider-versioning?utm_source=WEBSITE&amp;utm_medium=WEB_IO&amp;utm_offer=ARTICLE_PAGE&amp;utm_content=DOCS.html">Lock and Upgrade Provider Versions</a> tutorial.</p>
+</blockquote>
+
+<p>A Terraform configuration may refer to two different kinds of external
+dependency that come from outside of its own codebase:</p>
+
+<ul>
+<li><a href="../../terraform/language/providers/requirements.html">Providers</a>, which are plugins for Terraform
+that extend it with support for interacting with various external systems.</li>
+<li><a href="../../terraform/language/modules.html">Modules</a>, which allow
+splitting out groups of Terraform configuration constructs (written in the
+Terraform language) into reusable abstractions.</li>
+</ul>
+
+<p>Both of these dependency types can be published and updated independently from
+Terraform itself and from the configurations that depend on them. For that
+reason, Terraform must determine which versions of those dependencies are
+potentially compatible with the current configuration and which versions are
+currently selected for use.</p>
+
+<p><a href="../../terraform/language/expressions/version-constraints.html">Version constraints</a> within the configuration
+itself determine which versions of dependencies are <em>potentially</em> compatible,
+but after selecting a specific version of each dependency Terraform remembers
+the decisions it made in a <em>dependency lock file</em> so that it can (by default)
+make the same decisions again in future.</p>
+
+<p>At present, the dependency lock file tracks only <em>provider</em> dependencies.
+Terraform does not remember version selections for remote modules, and so
+Terraform will always select the newest available module version that meets
+the specified version constraints. You can use an <em>exact</em> version constraint
+to ensure that Terraform will always select the same module version.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Lock%20File%20Location"></a><h2 id="lock-file-location">Lock File Location</h2>
+
+<p>The dependency lock file is a file that belongs to the configuration as a
+whole, rather than to each separate module in the configuration. For that reason
+Terraform creates it and expects to find it in your current working directory
+when you run Terraform, which is also the directory containing the <code>.tf</code> files
+for the root module of your configuration.</p>
+
+<p>The lock file is always named <code>.terraform.lock.hcl</code>, and this name is intended
+to signify that it is a lock file for various items that Terraform caches in
+the <code>.terraform</code> subdirectory of your working directory.</p>
+
+<p>Terraform automatically creates or updates the dependency lock file each time
+you run <a href="../../terraform/cli/commands/init.html">the <code>terraform init</code> command</a>. You should
+include this file in your version control repository so that you can discuss
+potential changes to your external dependencies via code review, just as you
+would discuss potential changes to your configuration itself.</p>
+
+<p>The dependency lock file uses the same low-level syntax as the main Terraform
+language, but the dependency lock file is not itself a Terraform language
+configuration file. It is named with the suffix <code>.hcl</code> instead of <code>.tf</code> in
+order to signify that difference.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Dependency%20Installation%20Behavior"></a><h2 id="dependency-installation-behavior">Dependency Installation Behavior</h2>
+
+<p>When <code>terraform init</code> is working on installing all of the providers needed for
+a configuration, Terraform considers both the version constraints in the
+configuration <em>and</em> the version selections recorded in the lock file.</p>
+
+<p>If a particular provider has no existing recorded selection, Terraform will
+select the newest available version that matches the given version constraint,
+and then update the lock file to include that selection.</p>
+
+<p>If a particular provider already has a selection recorded in the lock file,
+Terraform will always re-select that version for installation, even if a
+newer version has become available. You can override that behavior by adding
+the <code>-upgrade</code> option when you run <code>terraform init</code>, in which case Terraform
+will disregard the existing selections and once again select the newest
+available version matching the version constraint.</p>
+
+<p>If a particular <code>terraform init</code> call makes changes to the lock file, Terraform
+will mention that as part of its output:</p>
+
+<pre><code>Terraform has made some changes to the provider dependency selections recorded
+in the .terraform.lock.hcl file. Review those changes and commit them to your
+version control system if they represent changes you intended to make.
+</code></pre>
+
+<p>When you see this message, you can use your version control system to
+<a href="#understanding-lock-file-changes">review the changes Terraform has proposed in the file</a>,
+and if they represent changes you made intentionally you can send the change
+through your team's usual code review process.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Checksum%20verification"></a><h3 id="checksum-verification">Checksum verification</h3>
+
+<p>Terraform will also verify that each package it installs matches at least one
+of the checksums it previously recorded in the lock file, if any, returning an
+error if none of the checksums match:</p>
+
+<pre><code>Error: Failed to install provider
+
+Error while installing hashicorp/azurerm v2.1.0: the current package for
+registry.terraform.io/hashicorp/azurerm 2.1.0 doesn't match any of the
+checksums previously recorded in the dependency lock file.
+</code></pre>
+
+<p>This checksum verification is intended to represent a
+<em><a href="https://en.wikipedia.org/wiki/Trust_on_first_use">trust on first use</a></em>
+approach. When you add a new provider for the first time you can verify it
+in whatever way you choose or any way you are required to by relevant
+regulations, and then trust that Terraform will raise an error if a future
+run of <code>terraform init</code> encounters a non-matching package for the same
+provider version.</p>
+
+<p>There are two special considerations with the "trust on first use" model:</p>
+
+<ul>
+<li><p>If you install a provider from an origin registry which provides checksums
+that are signed with a cryptographic signature, Terraform will treat all
+of the signed checksums as valid as long as one checksum matches. The lock
+file will therefore include checksums for both the package you installed for
+your current platform <em>and</em> any other packages that might be available for
+other platforms.</p>
+
+<p>In this case, the <code>terraform init</code> output will include the fingerprint of
+the key that signed the checksums, with a message like
+<code>(signed by a HashiCorp partner, key ID DC9FC6B1FCE47986)</code>. You may wish to
+confirm that you trust the holder of the given key before committing the
+lock file containing the signed checksums, or to retrieve and verify the
+full set of available packages for the given provider version.</p></li>
+<li><p>If you install a provider for the first time using an alternative
+installation method, such as a filesystem or network mirror, Terraform will
+not be able to verify the checksums for any platform other than the one
+where you ran <code>terraform init</code>, and so it will not record the checksums
+for other platforms and so the configuration will not be usable on any other
+platform.</p>
+
+<p>To avoid this problem you can pre-populate checksums for a variety of
+different platforms in your lock file using
+<a href="../../terraform/cli/commands/providers/lock.html">the <code>terraform providers lock</code> command</a>,
+which will then allow future calls to <code>terraform init</code> to verify that the
+packages available in your chosen mirror match the official packages from
+the provider's origin registry.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Understanding%20Lock%20File%20Changes"></a><h2 id="understanding-lock-file-changes">Understanding Lock File Changes</h2>
+
+<p>Because the dependency lock file is primarily maintained automatically by
+Terraform itself, rather than being updated manually by you or your team,
+your version control system may show you that the file has changed.</p>
+
+<p>There are a few different types of changes that Terraform can potentially make
+to your lock file, which you may need to understand in order to review the
+proposed changes. The following sections will describe these common situations.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Dependency%20on%20a%20new%20provider"></a><h3 id="dependency-on-a-new-provider">Dependency on a new provider</h3>
+
+<p>If you add a new entry to the
+<a href="../../terraform/language/providers/requirements.html">provider requirements</a> for any module in your
+configuration, or if you add an external module that includes a new provider
+dependency itself, <code>terraform init</code> will respond to that by selecting the
+newest version of that provider which meets all of the version constraints
+in the configuration, and it will record its decision as a new <code>provider</code>
+block in the dependency lock file.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gd">--- .terraform.lock.hcl 2020-10-07 16:12:07.539570634 -0700</span><span class="w"></span>
+<span class="gi">+++ .terraform.lock.hcl 2020-10-07 16:12:15.267487237 -0700</span><span class="w"></span>
+<span class="gu">@@ -6,6 +6,26 @@</span><span class="w"></span>
+<span class="w"> </span>  ]<span class="w"></span>
+<span class="w"> </span>}<span class="w"></span>
+
+<span class="gi">+provider "registry.terraform.io/hashicorp/azurerm" {</span><span class="w"></span>
+<span class="gi">+  version     = "2.30.0"</span><span class="w"></span>
+<span class="gi">+  constraints = "~&gt; 2.12"</span><span class="w"></span>
+<span class="gi">+  hashes = [</span><span class="w"></span>
+<span class="gi">+    "h1:FJwsuowaG5CIdZ0WQyFZH9r6kIJeRKts9+GcRsTz1+Y=",</span><span class="w"></span>
+<span class="gi">+    "h1:c/ntSXrDYM1mUir2KufijYebPcwKqS9CRGd3duDSGfY=",</span><span class="w"></span>
+<span class="gi">+    "h1:yre4Ph76g9H84MbuhZ2z5MuldjSA4FsrX6538O7PCcY=",</span><span class="w"></span>
+<span class="gi">+    "zh:04f0a50bb2ba92f3bea6f0a9e549ace5a4c13ef0cbb6975494cac0ef7d4acb43",</span><span class="w"></span>
+<span class="gi">+    "zh:2082e12548ebcdd6fd73580e83f626ed4ed13f8cdfd51205d8696ffe54f30734",</span><span class="w"></span>
+<span class="gi">+    "zh:246bcc449e9a92679fb30f3c0a77f05513886565e2dcc66b16c4486f51533064",</span><span class="w"></span>
+<span class="gi">+    "zh:24de3930625ac9014594d79bfa42d600eca65e9022b9668b54bfd0d924e21d14",</span><span class="w"></span>
+<span class="gi">+    "zh:2a22893a576ff6f268d9bf81cf4a56406f7ba79f77826f6df51ee787f6d2840a",</span><span class="w"></span>
+<span class="gi">+    "zh:2b27485e19c2aaa9f15f29c4cff46154a9720647610171e30fc6c18ddc42ec28",</span><span class="w"></span>
+<span class="gi">+    "zh:435f24ce1fb2b63f7f02aa3c84ac29c5757cd29ec4d297ed0618423387fe7bd4",</span><span class="w"></span>
+<span class="gi">+    "zh:7d99725923de5240ff8b34b5510569aa4ebdc0bdb27b7bac2aa911a8037a3893",</span><span class="w"></span>
+<span class="gi">+    "zh:7e3b5d0af3b7411dd9dc65ec9ab6caee8c191aee0fa7f20fc4f51716e67f50c0",</span><span class="w"></span>
+<span class="gi">+    "zh:da0af4552bef5a29b88f6a0718253f3bf71ce471c959816eb7602b0dadb469ca",</span><span class="w"></span>
+<span class="gi">+  ]</span><span class="w"></span>
+<span class="gi">+}</span><span class="w"></span>
+<span class="gi">+</span><span class="w"></span>
+<span class="w"> </span>provider "registry.terraform.io/newrelic/newrelic" {<span class="w"></span>
+<span class="w"> </span>  version     = "2.1.2"<span class="w"></span>
+<span class="w"> </span>  constraints = "~&gt; 2.1.1"<span class="w"></span>
+</code></pre></div>
+
+<p>The new lock file entry records several pieces of information:</p>
+
+<ul>
+<li><code>version</code>: the exact version that Terraform selected based on the version
+constraints in the configuration.</li>
+<li><code>constraints</code>: all of the version constraints that Terraform considered when
+making this selection. (Terraform doesn't actually use this information to
+make installation decisions, but includes it to help explain to human readers
+how the previous decision was made.)</li>
+<li><code>hashes</code>: a number of checksums that are all considered to be valid for
+packages implementing the selected version of this provider on different
+platforms. The meaning of these hashes is explained more under
+<em><a href="#new-provider-package-checksums">New provider package checksums</a></em> below.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20version%20of%20an%20existing%20provider"></a><h3 id="new-version-of-an-existing-provider">New version of an existing provider</h3>
+
+<p>If you run <code>terraform init -upgrade</code> to ask Terraform to consider newer provider
+versions that still match the configured version constraints, Terraform may
+then select a newer version for a provider and update its existing <code>provider</code>
+block to reflect that change.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gd">--- .terraform.lock.hcl 2020-10-07 16:44:25.819579509 -0700</span><span class="w"></span>
+<span class="gi">+++ .terraform.lock.hcl 2020-10-07 16:43:42.785665945 -0700</span><span class="w"></span>
+<span class="gu">@@ -7,22 +7,22 @@</span><span class="w"></span>
+<span class="w"> </span>}<span class="w"></span>
+
+<span class="w"> </span>provider "registry.terraform.io/hashicorp/azurerm" {<span class="w"></span>
+<span class="gd">-  version     = "2.1.0"</span><span class="w"></span>
+<span class="gd">-  constraints = "~&gt; 2.1.0"</span><span class="w"></span>
+<span class="gi">+  version     = "2.0.0"</span><span class="w"></span>
+<span class="gi">+  constraints = "2.0.0"</span><span class="w"></span>
+<span class="w"> </span>  hashes      = [<span class="w"></span>
+<span class="gd">-    "h1:EOJImaEaVThWasdqnJjfYc6/P8N/MRAq1J7avx5ZbV4=",</span><span class="w"></span>
+<span class="gd">-    "zh:0015b491cf9151235e57e35ea6b89381098e61bd923f56dffc86026d58748880",</span><span class="w"></span>
+<span class="gd">-    "zh:4c5682ba1e0fc7e2e602d3f103af1638f868c31fe80cc1a884a97f6dad6e1c11",</span><span class="w"></span>
+<span class="gd">-    "zh:57bac885b108c91ade4a41590062309c832c9ab6bf6a68046161636fcaef1499",</span><span class="w"></span>
+<span class="gd">-    "zh:5810d48f574c0e363c969b3f45276369c8f0a35b34d6202fdfceb7b85b3ac597",</span><span class="w"></span>
+<span class="gd">-    "zh:5c6e37a44462b8662cf9bdd29ce30523712a45c27c5d4711738705be0785db41",</span><span class="w"></span>
+<span class="gd">-    "zh:64548940a3387aa3a752e709ee9eb9982fa820fe60eb60e5f212cc1d2c58549e",</span><span class="w"></span>
+<span class="gd">-    "zh:7f46749163da17330bbb5293dc825333c86304baa0a7c6256650ac536b4567c8",</span><span class="w"></span>
+<span class="gd">-    "zh:8f8970f2df75ac43ffdd112055ee069d8bd1030f7eb4367cc4cf494a1fa802c3",</span><span class="w"></span>
+<span class="gd">-    "zh:9ad693d00dc5d7d455d06faba70e716bce727c6706f7293288e87fd7956b8fe0",</span><span class="w"></span>
+<span class="gd">-    "zh:b6e3cb55e6aec62b47edd0d2bd5e14bd6a2bcfdac65930a6e9e819934734c57b",</span><span class="w"></span>
+<span class="gd">-    "zh:d6a3f3b9b05c28ecf3919e9e7afa185805a6d7442fc4b3eedba749c2731d1f0e",</span><span class="w"></span>
+<span class="gd">-    "zh:d81fb624a357c57c7ea457ce543d865b39b12f26c2edd58a2f7cd43326c91010",</span><span class="w"></span>
+<span class="gi">+    "h1:bigGXBoRbp7dv79bEEn+aaju8575qEXHQ57XHVPJeB8=",</span><span class="w"></span>
+<span class="gi">+    "zh:09c603c8904ca4a5bc19e82335afbc2837dcc4bee81e395f9daccef2f2cba1c8",</span><span class="w"></span>
+<span class="gi">+    "zh:194a919d4836d6c6d4ce598d0c66cce00ddc0d0b5c40d01bb32789964d818b42",</span><span class="w"></span>
+<span class="gi">+    "zh:1f269627df4e266c4e0ef9ee2486534caa3c8bea91a201feda4bca525005aa0a",</span><span class="w"></span>
+<span class="gi">+    "zh:2bae3071bd5f8e553355c4b3a547d6efe1774a828142b762e9a4e85f79be7f63",</span><span class="w"></span>
+<span class="gi">+    "zh:6c98dfa5c3468e8d02e2b3af7c4a8a14a5d469ce5a642909643b413a17ca338b",</span><span class="w"></span>
+<span class="gi">+    "zh:7af78f61666fd45fbf428161c061ea2623162d601b79dc71d6a5158756853ffa",</span><span class="w"></span>
+<span class="gi">+    "zh:883c2df86ae9ba2a5c167cf5c2c7deca0239171a224d6d335f0fd6dd9c283830",</span><span class="w"></span>
+<span class="gi">+    "zh:a2028379078577d8ff5ecfca6e8a8b25a25ffb1686de0ee52a7fe8011783488b",</span><span class="w"></span>
+<span class="gi">+    "zh:abe6ef399552fd3861a454a839cd978c1d15735658fdc00f9054435aff0f4620",</span><span class="w"></span>
+<span class="gi">+    "zh:c30b1bf14077913c3cdf34979b1434dbb1353cb5995eb3956b191c50538b64a9",</span><span class="w"></span>
+<span class="gi">+    "zh:ca64ae2ad9793e5631e3b0b9327f7cb22cb5d8e9de57be7d85821791b1d5a375",</span><span class="w"></span>
+<span class="gi">+    "zh:fffe56904a38109bb8d613b02808a177c3ddfac19f03b3aac799281fea38f475",</span><span class="w"></span>
+<span class="w"> </span>  ]<span class="w"></span>
+<span class="w"> </span>}<span class="w"></span>
+</code></pre></div>
+
+<p>The primary effect of selecting a new provider version is to change the
+value of <code>version</code> in the <code>provider</code> block. If the upgrade came along with
+a change to the configured version constraints, Terraform will also record
+that change in the <code>constraints</code> value.</p>
+
+<p>Because each version has its own set of distribution packages, switching to
+a new version will also tend to replace all of the values in <code>hashes</code>, to
+reflect the checksums of the packages for the new version.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20provider%20package%20checksums"></a><h3 id="new-provider-package-checksums">New provider package checksums</h3>
+
+<p>A more subtle change you may see in a <code>provider</code> block is the addition of
+new checksums that were not previously recorded, even though nothing else
+in the <code>provider</code> block has changed:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gd">--- .terraform.lock.hcl 2020-10-07 17:24:23.397892140 -0700</span><span class="w"></span>
+<span class="gi">+++ .terraform.lock.hcl 2020-10-07 17:24:57.423130253 -0700</span><span class="w"></span>
+<span class="gu">@@ -10,6 +10,7 @@</span><span class="w"></span>
+<span class="w"> </span>  version     = "2.1.0"<span class="w"></span>
+<span class="w"> </span>  constraints = "~&gt; 2.1.0"<span class="w"></span>
+<span class="w"> </span>  hashes = [<span class="w"></span>
+<span class="gi">+    "h1:1xvaS5D8B8t6J6XmXxX8spo97tAzjhacjedFX1B47Fk=",</span><span class="w"></span>
+<span class="w"> </span>    "h1:EOJImaEaVThWasdqnJjfYc6/P8N/MRAq1J7avx5ZbV4=",<span class="w"></span>
+<span class="w"> </span>    "zh:0015b491cf9151235e57e35ea6b89381098e61bd923f56dffc86026d58748880",<span class="w"></span>
+<span class="w"> </span>    "zh:4c5682ba1e0fc7e2e602d3f103af1638f868c31fe80cc1a884a97f6dad6e1c11",<span class="w"></span>
+</code></pre></div>
+
+<p>The addition of a new checksum into the <code>hashes</code> value represents Terraform
+gradually transitioning between different <em>hashing schemes</em>. The <code>h1:</code> and
+<code>zh:</code> prefixes on these values represent different hashing schemes, each
+of which represents calculating a checksum using a different algorithm.
+We may occasionally introduce new hashing schemes if we learn of limitations
+in the existing schemes or if a new scheme offers some considerable
+additional benefit.</p>
+
+<p>The two hashing schemes currently supported are:</p>
+
+<ul>
+<li><p><code>zh:</code>: a mnemonic for "zip hash", this is a legacy hash format which is
+part of the Terraform provider registry protocol and is therefore used for
+providers that you install directly from an origin registry.</p>
+
+<p>This hashing scheme captures a SHA256 hash of each of the official <code>.zip</code>
+packages indexed in the origin registry. This is an effective scheme for
+verifying the official release packages when installed from a registry, but
+it's not suitable for verifying packages that come from other
+<a href="../../terraform/cli/config/config-file.html#provider-installation">provider installation methods</a>,
+such as filesystem mirrors using the unpacked directory layout.</p></li>
+<li><p><code>h1:</code>: a mnemonic for "hash scheme 1", which is the current preferred hashing
+scheme.</p>
+
+<p>Hash scheme 1 is also a SHA256 hash, but is one computed from the <em>contents</em>
+of the provider distribution package, rather than of the <code>.zip</code> archive
+it's contained within. This scheme therefore has the advantage that it can
+be calculated for an official <code>.zip</code> file, an unpacked directory with the
+same contents, or a recompressed <code>.zip</code> file which contains the same files
+but potentially different metadata or compression schemes.</p>
+
+<p>Due to the limited scope of the <code>zh:</code> scheme, Terraform will
+opportunistically add in the corresponding <code>h1:</code> checksums as it learns
+of them, which is what caused the addition of a second <code>h1:</code> checksum
+in the example change shown above.</p></li>
+</ul>
+
+<p>Terraform will add a new hash to an existing provider only if the hash is
+calculated from a package that <em>also</em> matches one of the existing hashes. In
+the above example, Terraform installed a <code>hashicorp/azurerm</code> package for a
+different platform than that which produced the original <code>h1:</code> checksum, but was
+able to match it against one of the <code>zh:</code> checksums recorded previously.
+After confirming the <code>zh:</code> checksum match, Terraform then recorded the
+corresponding <code>h1:</code> checksum in order to gradually migrate from the old scheme
+to the new scheme.</p>
+
+<p>When installing a particular provider for the first time (where there is no
+existing <code>provider</code> block for it), Terraform will pre-populate the <code>hashes</code>
+value with any checksums that are covered by the provider developer's
+cryptographic signature, which usually covers all of the available packages
+for that provider version across all supported platforms. However, because
+the provider registry protocol still uses the <code>zh:</code> scheme, the initial set
+will consist primarily of hashes using that scheme, which Terraform will then
+upgrade opportunistically as you install the packages on different platforms.</p>
+
+<p>If you wish to avoid ongoing additions of new <code>h1:</code> hashes as you work with
+your configuration on new target platforms, or if you are installing providers
+from a mirror that therefore can't provide official signed checksums, you
+can ask Terraform to pre-populate hashes for a chosen set of platforms
+using
+<a href="../../terraform/cli/commands/providers/lock.html">the <code>terraform providers lock</code> command</a>:</p>
+
+<pre><code>terraform providers lock \
+  -platform=linux_arm64 \
+  -platform=linux_amd64 \
+  -platform=darwin_amd64 \
+  -platform=windows_amd64
+</code></pre>
+
+<p>The above command will download and verify the official packages for all of
+the required providers across all four of the given platforms, and then record
+both <code>zh:</code> and <code>h1:</code> checksums for each of them in the lock file, thus avoiding
+the case where Terraform will learn about a <code>h1:</code> equivalent only at a later
+time. See the <code>terraform providers lock</code> documentation for more information on
+this command.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Providers%20that%20are%20no%20longer%20required"></a><h3 id="providers-that-are-no-longer-required">Providers that are no longer required</h3>
+
+<p>To determine whether there still exists a dependency on a given provider,
+Terraform uses two sources of truth: the configuration itself, and the state.
+If you remove the last dependency on a particular provider from both your
+configuration and state, then <code>terraform init</code> will remove any existing lock
+file entry for that provider.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gd">--- .terraform.lock.hcl 2020-10-07 16:12:07.539570634 -0700</span><span class="w"></span>
+<span class="gi">+++ .terraform.lock.hcl 2020-10-07 16:12:15.267487237 -0700</span><span class="w"></span>
+<span class="gu">@@ -6,26 +6,6 @@</span><span class="w"></span>
+<span class="w"> </span>  ]<span class="w"></span>
+<span class="w"> </span>}<span class="w"></span>
+
+<span class="gd">-provider "registry.terraform.io/hashicorp/azurerm" {</span><span class="w"></span>
+<span class="gd">-  version     = "2.30.0"</span><span class="w"></span>
+<span class="gd">-  constraints = "~&gt; 2.12"</span><span class="w"></span>
+<span class="gd">-  hashes = [</span><span class="w"></span>
+<span class="gd">-    "h1:FJwsuowaG5CIdZ0WQyFZH9r6kIJeRKts9+GcRsTz1+Y=",</span><span class="w"></span>
+<span class="gd">-    "h1:c/ntSXrDYM1mUir2KufijYebPcwKqS9CRGd3duDSGfY=",</span><span class="w"></span>
+<span class="gd">-    "h1:yre4Ph76g9H84MbuhZ2z5MuldjSA4FsrX6538O7PCcY=",</span><span class="w"></span>
+<span class="gd">-    "zh:04f0a50bb2ba92f3bea6f0a9e549ace5a4c13ef0cbb6975494cac0ef7d4acb43",</span><span class="w"></span>
+<span class="gd">-    "zh:2082e12548ebcdd6fd73580e83f626ed4ed13f8cdfd51205d8696ffe54f30734",</span><span class="w"></span>
+<span class="gd">-    "zh:246bcc449e9a92679fb30f3c0a77f05513886565e2dcc66b16c4486f51533064",</span><span class="w"></span>
+<span class="gd">-    "zh:24de3930625ac9014594d79bfa42d600eca65e9022b9668b54bfd0d924e21d14",</span><span class="w"></span>
+<span class="gd">-    "zh:2a22893a576ff6f268d9bf81cf4a56406f7ba79f77826f6df51ee787f6d2840a",</span><span class="w"></span>
+<span class="gd">-    "zh:2b27485e19c2aaa9f15f29c4cff46154a9720647610171e30fc6c18ddc42ec28",</span><span class="w"></span>
+<span class="gd">-    "zh:435f24ce1fb2b63f7f02aa3c84ac29c5757cd29ec4d297ed0618423387fe7bd4",</span><span class="w"></span>
+<span class="gd">-    "zh:7d99725923de5240ff8b34b5510569aa4ebdc0bdb27b7bac2aa911a8037a3893",</span><span class="w"></span>
+<span class="gd">-    "zh:7e3b5d0af3b7411dd9dc65ec9ab6caee8c191aee0fa7f20fc4f51716e67f50c0",</span><span class="w"></span>
+<span class="gd">-    "zh:da0af4552bef5a29b88f6a0718253f3bf71ce471c959816eb7602b0dadb469ca",</span><span class="w"></span>
+<span class="gd">-  ]</span><span class="w"></span>
+<span class="gd">-}</span><span class="w"></span>
+<span class="gd">-</span><span class="w"></span>
+<span class="w"> </span>provider "registry.terraform.io/newrelic/newrelic" {<span class="w"></span>
+<span class="w"> </span>  version     = "2.1.2"<span class="w"></span>
+<span class="w"> </span>  constraints = "~&gt; 2.1.1"<span class="w"></span>
+</code></pre></div>
+
+<p>If you add a new requirement for the same provider at a later date and run
+<code>terraform init</code> again, Terraform will treat it as if it were
+<a href="#dependency-on-a-new-provider">an entirely new provider</a>
+and so will not necessarily select the same version that was previously
+selected and will not be able to verify that the checksums remained unchanged.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>In Terraform v1.0 and earlier, <code>terraform init</code> does not automatically remove now-unneeded providers from the lock file, and instead just ignores them. If you removed a provider dependency while using an earlier version of Terraform and then upgraded to Terraform v1.1 or later then you may see the error "missing or corrupted provider plugins", referring to the stale lock file entries. If so, run <code>terraform init</code> with the new Terraform version to tidy those unneeded entries and then retry the previous operation.</p>
+</aside>
+
+            
+        
+    </body></html>

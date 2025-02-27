@@ -1,0 +1,227 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/google-continuous-validation --><head>
+                <title>Using HCP Terraform's Continuous Validation feature with the Google Provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="using-hcp-terraforms-continuous-validation-feature-with-the-google-provider">Using HCP Terraform's Continuous Validation feature with the Google Provider</h1>
+
+<p>The Continuous Validation feature in HCP Terraform allows users to make assertions about their infrastructure between applied runs. This helps users to identify issues at the time they first appear and avoid situations where a change is only identified during a future terraform plan/apply or once it causes a user-facing problem.</p>
+
+<p>Users can add checks to their Terraform configuration using an HCL language feature called <a href="https://developer.hashicorp.com/terraform/language/checks">check{} blocks</a>. Check blocks contain assertions that are defined with a custom condition expression and an error message. When the condition expression evaluates to true the check passes, but when the expression evaluates to false Terraform will show a warning message that includes the user-defined error message.</p>
+
+<p>Custom conditions can be created using data from Terraform providers’ resources and data sources. Data can also be combined from multiple sources; for example, you can use checks to monitor expirable resources by comparing a resource’s expiration date attribute to the current time returned by Terraform’s built-in time functions. These include the <a href="https://developer.hashicorp.com/terraform/language/functions/plantimestamp">plantimestamp function</a>, which was added in Terraform 1.5.</p>
+
+<p>For more information about continuous validation visit the <a href="https://developer.hashicorp.com/terraform/cloud-docs/workspaces/health#continuous-validation">Workspace Health page in the HCP Terraform documentation</a>.</p>
+
+<p>Below, this guide shows examples of how data returned by the Google provider can be used to define checks in your Terraform configuration. In each example it is assumed that the Google provider is configured with a default project, region, and zone.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Check blocks and the plantime function are available in Terraform 1.5 and later</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20-%20Assert%20a%20VM%20is%20in%20a%20running%20state%20%28google_compute_instance%29"></a><h2 id="example-assert-a-vm-is-in-a-running-state-google_compute_instance">Example - Assert a VM is in a running state (<code>google_compute_instance</code>)</h2>
+
+<p>VM instances provisioned using Compute Engine can pass through several states as part of the <a href="https://cloud.google.com/compute/docs/instances/instance-life-cycle">VM instance lifecycle</a>. Once a VM is provisioned it could experience an error, or a user could suspend or stop that VM in the Google Cloud console, without that change being detected until the next Terraform plan is generated. Continuous validation can be used to assert the state of a VM and detect if there are any unexpected status changes that occur out-of-band.</p>
+
+<p>The example below shows how a check block can be used to assert that a VM is in the running state.</p>
+
+<p>You can force the check to fail in this example by provisioning the VM, manually stopping it in the Google Cloud console, and then triggering a health check in HCP Terraform. The check will fail and report that the VM is not running.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"default"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance"</span><span class="w"> </span><span class="nv">"vm_instance"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-instance"</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"f1-micro"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">boot_disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">initialize_params</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud/debian-11"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">network_interface</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.google_compute_network.default.name</span><span class="w"></span>
+<span class="w">    </span><span class="nb">access_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="err">check</span><span class="w"> </span><span class="s2">"check_vm_status"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">data</span><span class="w"> </span><span class="nc">"google_compute_instance"</span><span class="w"> </span><span class="nv">"vm_instance"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance.vm_instance.name</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.google_compute_instance.vm_instance.current_status</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"RUNNING"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"Provisioned VMs should be in a RUNNING status, instead the VM `%s` has status: %s"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">data.google_compute_instance.vm_instance.name</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">data.google_compute_instance.vm_instance.current_status</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20-%20Check%20if%20a%20certificate%20will%20expire%20within%20a%20certain%20timeframe%20%28google_privateca_certificate%29"></a><h2 id="example-check-if-a-certificate-will-expire-within-a-certain-timeframe-google_privateca_certificate">Example - Check if a certificate will expire within a certain timeframe (<code>google_privateca_certificate</code>)</h2>
+
+<p>Certificates can be provisioned using either the Certificate Manager, Certificate Authority Service (‘Private CA’), and Compute Engine APIs. In this example we provision a certificate via the Certificate Authority Service that has a user-supplied <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/privateca_certificate#lifetime">lifetime argument</a>. After the lifetime duration passes the certificate is automatically deleted in GCP. By creating a check that asserts the certificate’s expiration date is more than 30 days away we can be notified by HCP Terraform health checks when the certificate is approaching expiration and needs manual intervention.</p>
+
+<p>In the example below we provision a certificate with a lifetime of 30 days and 2 minutes (see <code>local.month_and_2min_in_second_duration</code>) and create a check that asserts certificates should be valid for the next month (see <code>local.month_in_hour_duration</code>).</p>
+
+<p>We can see the check begin to fail by waiting 2 minutes after the certificate is provisioned and then triggering a health check in HCP Terraform. The check will fail and report that the certificate is due to expire in less than a month.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">month_in_hour_duration</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"${24 * 30}h"</span><span class="w"></span>
+<span class="w">  </span><span class="na">month_and_2min_in_second_duration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${(60 * 60 * 24 * 30) + (60 * 2)}s"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tls_private_key"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">algorithm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"RSA"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tls_cert_request"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_key_pem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">tls_private_key.example.private_key_pem</span><span class="w"></span>
+<span class="w">  </span><span class="nb">subject</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">common_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"example.com"</span><span class="w"></span>
+<span class="w">    </span><span class="na">organization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ACME Examples, Inc"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_privateca_ca_pool"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-ca-pool"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">tier</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"ENTERPRISE"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">publishing_options</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">publish_ca_cert</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">publish_crl</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">labels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">terraform</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">issuance_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">baseline_values</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">ca_options</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">is_ca</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="nb">key_usage</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nb">base_key_usage</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">digital_signature</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">          </span><span class="na">key_encipherment</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nb">extended_key_usage</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">server_auth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_privateca_certificate_authority"</span><span class="w"> </span><span class="nv">"test-ca"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">Deletion_protection</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">certificate_authority_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-authority"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">google_privateca_ca_pool.default.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">pool</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="nv">google_privateca_ca_pool.default.name</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">subject_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">subject</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">country_code</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us"</span><span class="w"></span>
+<span class="w">        </span><span class="na">organization</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"google"</span><span class="w"></span>
+<span class="w">        </span><span class="na">organizational_unit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"enterprise"</span><span class="w"></span>
+<span class="w">        </span><span class="na">locality</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"mountain view"</span><span class="w"></span>
+<span class="w">        </span><span class="na">province</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"california"</span><span class="w"></span>
+<span class="w">        </span><span class="na">street_address</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"1600 amphitheatre parkway"</span><span class="w"></span>
+<span class="w">        </span><span class="na">postal_code</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"94109"</span><span class="w"></span>
+<span class="w">        </span><span class="na">common_name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-certificate-authority"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">x509_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">ca_options</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">is_ca</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="nb">key_usage</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nb">base_key_usage</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">cert_sign</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">          </span><span class="na">crl_sign</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nb">extended_key_usage</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">server_auth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SELF_SIGNED"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">key_spec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">algorithm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"RSA_PKCS1_4096_SHA256"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_privateca_certificate"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-certificate"</span><span class="w"></span>
+<span class="w">  </span><span class="na">pool</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">google_privateca_ca_pool.default.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">certificate_authority</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_privateca_certificate_authority.test-ca.certificate_authority_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">google_privateca_ca_pool.default.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">lifetime</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">local.month_and_2min_in_second_duration</span><span class="c1"> # lifetime is 2mins over the threshold in the check block below</span>
+<span class="w">  </span><span class="na">pem_csr</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">tls_cert_request.example.cert_request_pem</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="err">check</span><span class="w"> </span><span class="s2">"check_certificate_state"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">timecmp</span><span class="p">(</span><span class="err">plan</span><span class="nf">timestamp</span><span class="p">(),</span><span class="w"> </span><span class="nf">timeadd</span><span class="p">(</span><span class="w"></span>
+<span class="w">      </span><span class="nv">google_privateca_certificate.default.certificate_description[0].subject_description[0].not_after_time</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"-${local.month_in_hour_duration}"</span><span class="p">))</span><span class="w"> </span><span class="err">&lt;</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"Provisioned certificates should be valid for at least 30 days, but `%s`is due to expire on `%s`."</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">google_privateca_certificate.default.name</span><span class="p">,</span><span class="w"></span>
+
+<span class="w">      </span><span class="nv">google_privateca_certificate.default.certificate_description[0].subject_description[0].not_after_time</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20-%20Validate%20the%20status%20of%20a%20Cloud%20Function%20%28google_cloudfunctions2_function%29"></a><h2 id="example-validate-the-status-of-a-cloud-function-google_cloudfunctions2_function">Example - Validate the status of a Cloud Function (<code>google_cloudfunctions2_function</code>)</h2>
+
+<p>Cloud Functions can have multiple statuses depending on issues that occur during deployment or triggering the function. These are: ACTIVE, FAILED, DEPLOYING, DELETING</p>
+
+<p>In the example below we create a 2nd generation cloud function that uses source code stored as a .zip file in a GCS bucket. A .zip file containing the files needed by the function is uploaded by Terraform from the local machine. In the check we use the <code>google_cloudfunctions2_function</code> data source’s <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/cloudfunctions2_function#state">state attribute</a> to access the function’s state and assert that the function is active.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_storage_bucket"</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                        </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-bucket"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"US"</span><span class="w"></span>
+<span class="w">  </span><span class="na">uniform_bucket_level_access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_storage_bucket_object"</span><span class="w"> </span><span class="nv">"object"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"function-source.zip"</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_storage_bucket.bucket.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./function-source.zip"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_cloudfunctions2_function"</span><span class="w"> </span><span class="nv">"my-function"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-function"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"a new function"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">build_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">runtime</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"nodejs12"</span><span class="w"></span>
+<span class="w">    </span><span class="na">entry_point</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"helloHttp"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">source</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">storage_source</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_storage_bucket.bucket.name</span><span class="w"></span>
+<span class="w">        </span><span class="na">object</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_storage_bucket_object.object.name</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">service_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">max_instance_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">    </span><span class="na">available_memory</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"1536Mi"</span><span class="w"></span>
+<span class="w">    </span><span class="na">timeout_seconds</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">30</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="err">check</span><span class="w"> </span><span class="s2">"check_cf_state"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">data</span><span class="w"> </span><span class="nc">"google_cloudfunctions2_function"</span><span class="w"> </span><span class="nv">"my-function"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">google_cloudfunctions2_function.my-function.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_cloudfunctions2_function.my-function.location</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.google_cloudfunctions2_function.my-function.state</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"ACTIVE"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"Provisioned Cloud Functions should be in an ACTIVE state, instead the function `%s` has state: %s"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">data.google_cloudfunctions2_function.my-function.name</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">data.google_cloudfunctions2_function.my-function.state</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

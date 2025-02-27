@@ -1,0 +1,84 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/token --><head>
+                <title>databricks_token</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_token-resource">databricks_token Resource</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This resource can only be used with a workspace-level provider!</p>
+</aside>
+
+<p>This resource creates <a href="https://docs.databricks.com/sql/user/security/personal-access-tokens.html">Personal Access Tokens</a> for the same user that is authenticated with the provider. Most likely you should use <a href="obo_token.md">databricks_obo_token</a> to create <a href="https://docs.databricks.com/administration-guide/users-groups/service-principals.html#manage-personal-access-tokens-for-a-service-principal">On-Behalf-Of tokens</a> for a <a href="service_principal.md">databricks_service_principal</a> in Databricks workspaces on AWS. Databricks workspaces on other clouds use their own native OAuth token flows.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// initialize provider in normal mode</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"created_workspace"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">host</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_workspaces.this.workspace_url</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// create PAT token to provision entities within workspace</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_token"</span><span class="w"> </span><span class="nv">"pat"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.created_workspace</span><span class="w"></span>
+<span class="w">  </span><span class="na">comment</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"Terraform Provisioning"</span><span class="c1"></span>
+<span class="c1">  // 100 day token</span>
+<span class="w">  </span><span class="na">lifetime_seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">8640000</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// output token for other modules</span>
+<span class="kr">output</span><span class="w"> </span><span class="nv">"databricks_token"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_token.pat.token_value</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>A token can be automatically rotated by taking a dependency on the <code>time_rotating</code> resource:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"time_rotating"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">rotation_days</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">30</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_token"</span><span class="w"> </span><span class="nv">"pat"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">comment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Terraform (created: ${time_rotating.this.rfc3339})"</span><span class="c1"></span>
+
+<span class="c1">  # Token is valid for 60 days but is rotated after 30 days.</span>
+<span class="c1">  # Run `terraform apply` within 60 days to refresh before it expires.</span>
+<span class="w">  </span><span class="na">lifetime_seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">60</span><span class="w"> </span><span class="err">*</span><span class="w"> </span><span class="m">24</span><span class="w"> </span><span class="err">*</span><span class="w"> </span><span class="m">60</span><span class="w"> </span><span class="err">*</span><span class="w"> </span><span class="m">60</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are available:</p>
+
+<ul>
+<li><code>lifetime_seconds</code> - (Optional) (Integer) The lifetime of the token, in seconds. If no lifetime is specified, then expire time will be set to maximum allowed by the workspace configuration or platform.</li>
+<li><code>comment</code> - (Optional) (String) Comment that will appear on the user’s settings page for this token.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - Canonical unique identifier for the token.</li>
+<li><code>token_value</code> - <strong>Sensitive</strong> value of the newly-created token.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>danger</em>
+    <p>Importing this resource is not currently supported.</p>
+</aside>
+
+            
+        
+    </body></html>

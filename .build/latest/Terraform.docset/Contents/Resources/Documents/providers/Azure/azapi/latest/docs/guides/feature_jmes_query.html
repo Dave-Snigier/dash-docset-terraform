@@ -1,0 +1,224 @@
+<html><!-- Online page at https://registry.terraform.io/providers/Azure/azapi/latest/docs/guides/feature_jmes_query --><head>
+                <title>Feature: Query Azure Resources with JMESPath</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <p>The AzAPI resources and data sources use the <code>response_export_values</code> attribute to execute a <a href="http://jmespath.org/">JMESPath query</a> on the response body. JMESPath is a query language for JSON, giving you the ability to select and modify data from the response. The result of the query is then stored in the <code>output</code> attribute.</p>
+
+<p>This article covers how to use the features of JMESPath and gives examples of queries. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Prerequisites"></a><h2 id="prerequisites">Prerequisites</h2>
+
+<ul>
+<li><a href="https://registry.terraform.io/providers/azure/azapi">Terraform AzAPI provider</a> version 2.0.1 or later</li>
+</ul>
+
+<p>Before introducing queries, take a look at the unmodified respone body of the <code>azapi_resource</code> data source, and we will use this response to demonstrate the queries.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"additionalCapabilities"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"availabilitySet"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"diagnosticsProfile"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"bootDiagnostics"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"enabled"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"storageUri"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://xxxxxx.blob.core.windows.net/"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">},</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"osProfile"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"adminPassword"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"adminUsername"</span><span class="p">:</span><span class="w"> </span><span class="s2">"azureuser"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"allowExtensionOperations"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"computerName"</span><span class="p">:</span><span class="w"> </span><span class="s2">"TestVM"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"customData"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"linuxConfiguration"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"disablePasswordAuthentication"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"provisionVmAgent"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"ssh"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nt">"publicKeys"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">          </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nt">"keyData"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ssh-rsa AA***V stramer@contoso"</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/home/azureuser/.ssh/authorized_keys"</span><span class="w"></span>
+<span class="w">          </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"secrets"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"windowsConfiguration"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="w"></span>
+<span class="w">  </span><span class="p">},</span><span class="w"></span>
+<span class="w">  </span><span class="c1">// more properties</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Rename%20the%20properties"></a><h2 id="rename-the-properties">Rename the properties</h2>
+
+<p>The <code>response_export_values</code> accepts a map where the key is the name for the result and the value is a JMESPath query string to filter the response. The following example renames the <code>osProfile.adminUsername</code> property to <code>admin</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"virtualMachine"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Compute/virtualMachines@2020-06-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"myVirtualMachine"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroup"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">response_export_values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">admin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"osProfile.adminUsername"</span><span class="w"></span>
+<span class="w">    </span><span class="na">ssh_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"osProfile.linuxConfiguration.ssh.publicKeys[0].keyData"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The <code>output</code> attribute contains the result of the queries:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">admin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azureuser"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ssh_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ssh-rsa AA***V stramer@contoso"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Working with HCL object results, you can access properties from the top level with just the key. The <code>.</code> (subexpression) character is used to access properties of nested HCL objects. And the <code>[]</code> (index) character is used to access elements of an array.</p>
+
+<p>For example, to use the <code>admin</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">output</span><span class="w"> </span><span class="nv">"admin"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azapi_resource.virtualMachine.output.admin</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Export%20entire%20response"></a><h2 id="export-entire-response">Export entire response</h2>
+
+<p>You can use the <code>@</code> character to export the entire response body. This is useful when you want to inspect the entire response or store it for later use.</p>
+
+<p>Terraform configuration to export entire response:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"virtualMachine"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Compute/virtualMachines@2020-06-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"myVirtualMachine"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroup"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">response_export_values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">all</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"@"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The <code>output</code> attribute contains the result of the queries:</p>
+
+<pre><code>{
+  all = {
+    "additionalCapabilities": null,
+    "availabilitySet": null,
+    "diagnosticsProfile": {
+      "bootDiagnostics": {
+        "enabled": true,
+        "storageUri": "https://xxxxxx.blob.core.windows.net/"
+      }
+    },
+    "osProfile": {
+      "adminPassword": null,
+      "adminUsername": "azureuser",
+      "allowExtensionOperations": true,
+      "computerName": "TestVM",
+      "customData": null,
+      "linuxConfiguration": {
+        "disablePasswordAuthentication": true,
+        "provisionVmAgent": true,
+        "ssh": {
+          "publicKeys": [
+            {
+              "keyData": "ssh-rsa AA***V stramer@contoso",
+              "path": "/home/azureuser/.ssh/authorized_keys"
+            }
+          ]
+        }
+      },
+      "secrets": [],
+      "windowsConfiguration": null
+    },
+    // more properties
+  }
+}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Get%20properties%20from%20an%20array"></a><h2 id="get-properties-from-an-array">Get properties from an array</h2>
+
+<p>Flattening an array is done with the <code>[]</code> JMESPath operator. All expressions after the <code>[]</code> operator are applied to each element in the current array.</p>
+
+<p>For example, the following query gets the <code>Name</code> and <code>OS</code> properties from all virtual machines in a subscription:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"azapi_resource_list"</span><span class="w"> </span><span class="nv">"listVirtualMachinesBySubscription"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Compute/virtualMachines@2020-06-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/subscriptions/00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">response_export_values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"value[].{Name:name, OS:properties.storageProfile.osDisk.osType, admin:properties.osProfile.adminUsername}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The <code>output</code> attribute contains the result of the query:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myVirtualMachine"</span><span class="w"></span>
+<span class="w">      </span><span class="na">OS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Linux"</span><span class="w"></span>
+<span class="w">      </span><span class="na">admin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azureuser"</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myVirtualMachine2"</span><span class="w"></span>
+<span class="w">      </span><span class="na">OS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Windows"</span><span class="w"></span>
+<span class="w">      </span><span class="na">admin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"admin"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Filter%20arrays%20with%20boolean%20expressions"></a><h2 id="filter-arrays-with-boolean-expressions">Filter arrays with boolean expressions</h2>
+
+<p>The other operation used to get data from an array is filtering. Filtering is done with the <code>[?...]</code> JMESPath operator. This operator takes a predicate as its contents. A predicate is any statement (including Boolean properties) that can be evaluated to either <code>true</code> or <code>false</code>. Expressions where the predicate evaluates to <code>true</code> are included in the output.</p>
+
+<p>For example, the following query gets the <code>Name</code> and <code>admin</code> properties from all Linux virtual machines in a subscription:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"azapi_resource_list"</span><span class="w"> </span><span class="nv">"listLinuxVirtualMachinesBySubscription"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Compute/virtualMachines@2020-06-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/subscriptions/00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">response_export_values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"value[?properties.storageProfile.osDisk.osType=='Linux'].{Name:name, admin:properties.osProfile.adminUsername}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The <code>output</code> attribute contains the result of the query:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myVirtualMachine"</span><span class="w"></span>
+<span class="w">      </span><span class="na">admin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azureuser"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Here is another example which demonstrates how to get the <code>id</code> of the <code>Contributor</code> role definition for a storage account, and then assign the role to a virtual machine:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"azapi_resource_list"</span><span class="w"> </span><span class="nv">"roleDefinitions"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Authorization/roleDefinitions@2022-04-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.storageAccount.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">response_export_values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">contributorRoleDefinitionId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"value[?properties.roleName == 'Contributor'].id | [0]"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"roleAssignment"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Authorization/roleAssignments@2022-04-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.storageAccount.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"a08c80d9-771f-4769-bb4e-5c1a2873a189"</span><span class="c1"> // Random GUID</span>
+<span class="w">  </span><span class="nb">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">properties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">principalId</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.windowsVirtualMachine.identity[0].principal_id</span><span class="w"></span>
+<span class="w">      </span><span class="na">roleDefinitionId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azapi_resource_list.roleDefinitions.output.contributorRoleDefinitionId</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

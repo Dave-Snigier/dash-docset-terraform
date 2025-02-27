@@ -1,0 +1,258 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/guides/service_principal_oidc --><head>
+                <title>Azure Provider: Authenticating using a Service Principal with Open ID Connect</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="azure-provider-authenticating-using-a-service-principal-with-open-id-connect">Azure Provider: Authenticating using a Service Principal with Open ID Connect</h1>
+
+<p>Terraform supports a number of different methods for authenticating to Azure:</p>
+
+<ul>
+<li><a href="azure_cli.html">Authenticating to Azure using the Azure CLI</a></li>
+<li><a href="managed_service_identity.html">Authenticating to Azure using Managed Service Identity</a></li>
+<li><a href="service_principal_client_certificate.html">Authenticating to Azure using a Service Principal and a Client Certificate</a></li>
+<li><a href="service_principal_client_secret.html">Authenticating to Azure using a Service Principal and a Client Secret</a></li>
+<li>Authenticating to Azure using a Service Principal and OpenID Connect (which is covered in this guide)</li>
+<li><a href="aks_workload_identity.html">Authenticating to Azure using AKS Workload Identity</a></li>
+</ul>
+
+<hr/>
+
+<p>We recommend using either a Service Principal or Managed Service Identity when running Terraform non-interactively (such as when running Terraform in a CI server) - and authenticating using the Azure CLI when running Terraform locally.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Setting%20up%20an%20Application%20and%20Service%20Principal%20in%20Azure"></a><h2 id="setting-up-an-application-and-service-principal-in-azure">Setting up an Application and Service Principal in Azure</h2>
+
+<p>A Service Principal is a security principal within Azure Active Directory which can be granted access to resources within Azure Subscriptions. To authenticate with a Service Principal, you will need to create an Application object within Azure Active Directory, which you will use as a means of authentication, either <a href="service_principal_client_secret.html">using a Client Secret</a>, <a href="service_principal_client_certificate.html">a Client Certificate</a>, or OpenID Connect (which is documented in this guide). This can be done using the Azure Portal.</p>
+
+<p>This guide will cover how to create an Application and linked Service Principal, and then how to assign federated identity credentials to the Application so that it can be used for authentication via OpenID Connect. Once that's done finally we're going to grant the Service Principal permission to manage resources in the Subscription - to do this we're going to assign <code>Contributor</code> rights to the Subscription - however, <a href="https://azure.microsoft.com/documentation/articles/role-based-access-built-in-roles/">it's possible to assign other permissions</a> depending on your configuration.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20the%20Application%20and%20Service%20Principal"></a><h3 id="creating-the-application-and-service-principal">Creating the Application and Service Principal</h3>
+
+<p>We're going to create the Application in the Azure Portal - to do this navigate to <a href="https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/Overview">the <strong>Azure Active Directory</strong> overview</a> within the Azure Portal - <a href="https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RegisteredApps/RegisteredApps/Overview">then select the <strong>App Registration</strong> blade</a>. Click the <strong>New registration</strong> button at the top to add a new Application within Azure Active Directory. On this page, set the following values then press <strong>Create</strong>:</p>
+
+<ul>
+<li><strong>Name</strong> - this is a friendly identifier and can be anything (e.g. "Terraform")</li>
+<li><strong>Supported Account Types</strong> - this should be set to "Accounts in this organizational directory only (single-tenant)"</li>
+<li><strong>Redirect URI</strong> - you should choose "Web" for the URI type. the actual value can be left blank</li>
+</ul>
+
+<p>At this point the newly created Azure Active Directory application should be visible on-screen - if it's not, navigate to the <a href="https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RegisteredApps/RegisteredApps/Overview">the <strong>App Registration</strong> blade</a> and select the Azure Active Directory application.</p>
+
+<p>At the top of this page, you'll need to take note of the "Application (client) ID" and the "Directory (tenant) ID", which you can use for the values of <code>client_id</code> and <code>tenant_id</code> respectively.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configure%20Azure%20Active%20Directory%20Application%20to%20Trust%20a%20GitHub%20Repository"></a><h3 id="configure-azure-active-directory-application-to-trust-a-github-repository">Configure Azure Active Directory Application to Trust a GitHub Repository</h3>
+
+<p>An application will need a federated credential specified for each GitHub Environment, Branch Name, Pull Request, or Tag based on your use case. For this example, we'll give permission to <code>main</code> branch workflow runs.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Tip</em>
+    <p>You can also configure the Application using the <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/application">azuread_application</a> and <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/application_federated_identity_credential">azuread_application_federated_identity_credential</a> resources in the AzureAD Terraform Provider.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Via%20the%20Portal"></a><h4 id="via-the-portal">Via the Portal</h4>
+
+<p>On the Azure Active Directory application page, go to <strong>Certificates and secrets</strong>.</p>
+
+<p>In the Federated credentials tab, select Add credential. The Add a credential blade opens. In the <strong>Federated credential scenario</strong> drop-down box select <strong>GitHub actions deploying Azure resources</strong>.</p>
+
+<p>Specify the <strong>Organization</strong> and <strong>Repository</strong> for your GitHub Actions workflow. For <strong>Entity type</strong>, select <strong>Environment</strong>, <strong>Branch</strong>, <strong>Pull request</strong>, or <strong>Tag</strong> and specify the value. The values must exactly match the configuration in the GitHub workflow. For our example, let's select <strong>Branch</strong> and specify <code>main</code>.</p>
+
+<p>Add a <strong>Name</strong> for the federated credential.</p>
+
+<p>The <strong>Issuer</strong>, <strong>Audiences</strong>, and <strong>Subject identifier</strong> fields autopopulate based on the values you entered.</p>
+
+<p>Click <strong>Add</strong> to configure the federated credential.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Via%20the%20Azure%20API"></a><h4 id="via-the-azure-api">Via the Azure API</h4>
+
+<div class="codehilite"><pre><span></span><code>az rest --method POST <span class="se">\</span>
+        --uri https://graph.microsoft.com/beta/applications/<span class="si">${</span><span class="nv">APP_OBJ_ID</span><span class="si">}</span>/federatedIdentityCredentials <span class="se">\</span>
+        --headers Content-Type<span class="o">=</span><span class="s1">'application/json'</span> <span class="se">\</span>
+        --body @body.json
+</code></pre></div>
+
+<p>Where the body is:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"name"</span><span class="p">:</span><span class="s2">"${REPO_NAME}-pull-request"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"issuer"</span><span class="p">:</span><span class="s2">"https://token.actions.githubusercontent.com"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"subject"</span><span class="p">:</span><span class="s2">"repo:${REPO_OWNER}/${REPO_NAME}:refs:refs/heads/main"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"description"</span><span class="p">:</span><span class="s2">"${REPO_OWNER} PR"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"audiences"</span><span class="p">:[</span><span class="s2">"api://AzureADTokenExchange"</span><span class="p">],</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>See the <a href="https://docs.microsoft.com/en-us/azure/active-directory/develop/workload-identity-federation-create-trust-github">official documentation</a> for more details.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configure%20Azure%20Active%20Directory%20Application%20/%20Managed%20Identity%20to%20Trust%20an%20Azure%20DevOps%20Service%20Connection"></a><h3 id="configure-azure-active-directory-application-managed-identity-to-trust-an-azure-devops-service-connection">Configure Azure Active Directory Application / Managed Identity to Trust an Azure DevOps Service Connection</h3>
+
+<p>An application or managed identity requires a federated credential for each Azure DevOps service connection. In common scenarios, there will be one registration/identity per environment with one credential for the environment's service connection.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Automatic%20configuration%20-%20App%20registration"></a><h4 id="automatic-configuration-app-registration">Automatic configuration - App registration</h4>
+
+<p>The simplest method for setting up federation is to create a new <strong>Workload Identity federation (automatic)</strong> in Azure DevOps. This will automatically create a new app registration in your tenant. Alternatively, if you want to retain your existing connection, you can convert an existing secret-based connection to a federated one using the provided <code>Convert</code> option in the service connection overview. This may have some implications for your pipelines, but there is a rollback option available.</p>
+
+<p>For more details, refer to <a href="https://learn.microsoft.com/en-gb/azure/devops/pipelines/library/connect-to-azure?view=azure-devops#create-a-new-workload-identity-federation-service-connection">the official documentation</a> for more details.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Manual%20Configuration%20-%20Managed%20Identity%20/%20App%20Registration"></a><h4 id="manual-configuration-managed-identity-app-registration">Manual Configuration - Managed Identity / App Registration</h4>
+
+<p>To configure a Managed Identity for federation, select the <strong>Workload Identity federation (manual)</strong> option in the creation wizard. After providing a name for the new connection, you will be presented with the issuer URL and subject identifier values required to configure federated credentials in the Managed Identity resource.</p>
+
+<p>In Azure Managed Identity resource settings, select <strong>Other</strong> from the <strong>Federated credential scenario</strong> options and provide the issuer URL, subject identifier provided by Azure DevOps, and a display name for your credentials. Then, proceed with the <strong>Verify and save</strong> option in the Azure DevOps <code>New Azure service connection</code> wizard.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Terraform%20Configuration%20-%20Managed%20Identity%20/%20App%20registration"></a><h4 id="terraform-configuration-managed-identity-app-registration">Terraform Configuration - Managed Identity / App registration</h4>
+
+<p>Please refer to examples in <a href="https://registry.terraform.io/providers/microsoft/azuredevops/latest/docs/resources/serviceendpoint_azurerm#workload-identity-federation-manual-azurerm-service-endpoint-subscription-scoped">azuredevops_serviceendpoint_azurerm</a> resource documentation.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Granting%20the%20Application%20access%20to%20manage%20resources%20in%20your%20Azure%20Subscription"></a><h3 id="granting-the-application-access-to-manage-resources-in-your-azure-subscription">Granting the Application access to manage resources in your Azure Subscription</h3>
+
+<p>Once the Application exists in Azure Active Directory - we can grant it permissions to modify resources in the Subscription. To do this, <a href="https://portal.azure.com/#blade/Microsoft_Azure_Billing/SubscriptionsBlade">navigate to the <strong>Subscriptions</strong> blade within the Azure Portal</a>, then select the Subscription you wish to use, then click <strong>Access Control (IAM)</strong>, and finally <strong>Add</strong> &gt; <strong>Add role assignment</strong>.</p>
+
+<p>Firstly, specify a Role which grants the appropriate permissions needed for the Service Principal (for example, <code>Contributor</code> will grant Read/Write on all resources in the Subscription). There's more information about <a href="https://azure.microsoft.com/en-gb/documentation/articles/role-based-access-built-in-roles/">the built in roles available here</a>.</p>
+
+<p>Secondly, search for and select the name of the Service Principal created in Azure Active Directory to assign it this role - then press <strong>Save</strong>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configure%20Azure%20Active%20Directory%20Application%20to%20Trust%20a%20Generic%20Issuer"></a><h3 id="configure-azure-active-directory-application-to-trust-a-generic-issuer">Configure Azure Active Directory Application to Trust a Generic Issuer</h3>
+
+<p>On the Azure Active Directory application page, go to <strong>Certificates and secrets</strong>.</p>
+
+<p>In the Federated credentials tab, select <strong>Add credential</strong>. The 'Add a credential' blade opens. Refer to the instructions from your OIDC provider for completing the form, before choosing a <strong>Name</strong> for the federated credential and clicking the <strong>Add</strong> button.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20the%20Service%20Principal%20in%20Terraform"></a><h2 id="configuring-the-service-principal-in-terraform">Configuring the Service Principal in Terraform</h2>
+
+<p>As we've obtained the credentials for this Service Principal - it's possible to configure them in a few different ways.</p>
+
+<p>When storing the credentials as Environment Variables, for example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span> <span class="nv">ARM_CLIENT_ID</span><span class="o">=</span><span class="s2">"00000000-0000-0000-0000-000000000000"</span>
+<span class="nb">export</span> <span class="nv">ARM_SUBSCRIPTION_ID</span><span class="o">=</span><span class="s2">"00000000-0000-0000-0000-000000000000"</span>
+<span class="nb">export</span> <span class="nv">ARM_TENANT_ID</span><span class="o">=</span><span class="s2">"00000000-0000-0000-0000-000000000000"</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/OIDC%20token"></a><h3 id="oidc-token">OIDC token</h3>
+
+<p>The provider will use the <code>ARM_OIDC_TOKEN</code> environment variable as an OIDC token. You can use this variable to specify the token provided by your OIDC provider.</p>
+
+<p><strong>GitHub Actions</strong></p>
+
+<p>When running Terraform in GitHub Actions, the provider will detect the <code>ACTIONS_ID_TOKEN_REQUEST_URL</code> and <code>ACTIONS_ID_TOKEN_REQUEST_TOKEN</code> environment variables set by the GitHub Actions runtime. You can also specify the <code>ARM_OIDC_REQUEST_TOKEN</code> and <code>ARM_OIDC_REQUEST_URL</code> environment variables.</p>
+
+<p>For GitHub Actions workflows, you'll need to ensure the workflow has <code>write</code> permissions for the <code>id-token</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nt">permissions</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">id-token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span><span class="w"></span>
+<span class="w">  </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span><span class="w"></span>
+</code></pre></div>
+
+<p>For more information about OIDC in GitHub Actions, see <a href="https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-cloud-providers">official documentation</a>.</p>
+
+<p><strong>Azure DevOps Pipelines</strong></p>
+
+<p>When running Terraform in Azure DevOps Pipelines, the provider use <code>ARM_OIDC_REQUEST_TOKEN</code> and <code>ARM_OIDC_REQUEST_URL</code> environment variables, if these are absent, it will attempt to fall back on <code>SYSTEM_ACCESSTOKEN</code> and <code>SYSTEM_OIDCREQUESTURI</code> environment variables respectively.</p>
+
+<p>The ADO service connection ID is required in combination with these and can be specified via environment variable <code>ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID</code>, or in the provider configuration directly via <code>ado_pipeline_service_connection_id</code>. For users of the AzAPI provider AzureRM will also fall back on <code>ARM_OIDC_AZURE_SERVICE_CONNECTION_ID</code> for compatibility.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>If the <code>ado_pipeline_service_connection_id</code> value is not set, either directly via config or by environment variable, the presence of the remaining OIDC configuration will result in the provider falling back on the GitHub OIDC authoriser instead.</p>
+</aside>
+
+<p>For Azure DevOps Pipelines, at least one task in the pipeline has Service Connection support and has your service connection specified. Without this, the agent will fail to load the Service Connection and results in a <code>No service connection found with identifier "..."</code>  error.</p>
+
+<p>It is recommend to use the <code>AzureCLI@2</code> task as below (note the <code>azureSubscription</code> input parameter):</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AzureCLI@2</span><span class="w"></span>
+<span class="w">  </span><span class="nt">inputs</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="nt">azureSubscription</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$(SERVICE_CONNECTION_ID)</span><span class="w"></span>
+<span class="w">    </span><span class="nt">scriptType</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span><span class="w"></span>
+<span class="w">    </span><span class="nt">scriptLocation</span><span class="p">:</span><span class="w"> </span><span class="s">"inlineScript"</span><span class="w"></span>
+<span class="w">    </span><span class="nt">inlineScript</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span><span class="w"></span>
+<span class="w">      </span><span class="no"># Terraform commands</span><span class="w"></span>
+<span class="w">  </span><span class="nt">env</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="c1">#...</span><span class="w"></span>
+<span class="w">    </span><span class="nt">ARM_USE_OIDC</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w"></span>
+<span class="w">    </span><span class="nt">SYSTEM_ACCESSTOKEN</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$(System.AccessToken)</span><span class="w"></span>
+<span class="w">    </span><span class="nt">SYSTEM_OIDCREQUESTURI</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$(System.OidcRequestUri)</span><span class="w"></span>
+<span class="w">    </span><span class="nt">ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$(SERVICE_CONNECTION_ID)</span><span class="w"></span>
+</code></pre></div>
+
+<hr/>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Support for OpenID Connect was added in version 3.7.0 of the Terraform AzureRM provider.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>If using the AzureRM Backend you may also need to configure OIDC there too, see <a href="https://www.terraform.io/language/settings/backends/azurerm">the documentation for the AzureRM Backend</a> for more information.</p>
+</aside>
+
+<p>More information on <a href="../index.html#argument-reference">the fields supported in the Provider block can be found here</a>.</p>
+
+<hr/>
+
+<p>At this point running either <code>terraform plan</code> or <code>terraform apply</code> should allow Terraform to run using the Service Principal to authenticate.</p>
+
+<p>It's also possible to configure these variables either in-line or from using variables in Terraform (as the <code>oidc_token</code>, <code>oidc_token_file_path</code>, or <code>oidc_request_token</code>, <code>oidc_request_url</code> and <code>ado_pipeline_service_connection_id</code> are in this example), like so:</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>We'd recommend not defining these variables in-line since they could easily be checked into Source Control.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"oidc_token"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"oidc_token_file_path"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"oidc_request_token"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"oidc_request_url"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"ado_pipeline_service_connection_id"</span><span class="w"> </span><span class="p">{}</span><span class="c1"></span>
+
+<span class="c1"># We strongly recommend using the required_providers block to set the</span>
+<span class="c1"># Azure Provider source and version being used</span>
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azurerm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azurerm"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=4.1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Configure the Microsoft Azure Provider</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">subscription_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="w">  </span><span class="na">use_oidc</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1"></span>
+
+<span class="c1">  # for GitHub Actions or Azure DevOps Pipelines</span>
+<span class="w">  </span><span class="na">oidc_request_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.oidc_request_token</span><span class="w"></span>
+<span class="w">  </span><span class="na">oidc_request_url</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.oidc_request_url</span><span class="c1"></span>
+
+<span class="c1">  # for Azure DevOps Pipelines</span>
+<span class="w">  </span><span class="na">ado_pipeline_service_connection_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.ado_pipeline_service_connection_id</span><span class="c1"></span>
+
+<span class="c1">  # for other generic OIDC providers, providing token directly</span>
+<span class="w">  </span><span class="na">oidc_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.oidc_token</span><span class="c1"></span>
+
+<span class="c1">  # for other generic OIDC providers, reading token from a file</span>
+<span class="w">  </span><span class="na">oidc_token_file_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.oidc_token_file_path</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">tenant_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>More information on <a href="../index.html#argument-reference">the fields supported in the Provider block can be found here</a>.</p>
+
+<p>At this point running either <code>terraform plan</code> or <code>terraform apply</code> should allow Terraform to run using the Service Principal to authenticate.</p>
+
+            
+        
+    </body></html>

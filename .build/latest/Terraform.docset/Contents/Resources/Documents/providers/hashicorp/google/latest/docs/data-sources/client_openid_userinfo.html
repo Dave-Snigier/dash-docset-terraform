@@ -1,0 +1,86 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/client_openid_userinfo --><head>
+                <title>google_client_openid_userinfo</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="google_client_openid_userinfo">google_client_openid_userinfo</h1>
+
+<p>Get OpenID userinfo about the credentials used with the Google provider,
+specifically the email.</p>
+
+<p>This datasource enables you to export the email of the account you've
+authenticated the provider with; this can be used alongside
+<code>data.google_client_config</code>'s <code>access_token</code> to perform OpenID Connect
+authentication with GKE and configure an RBAC role for the email used.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This resource will only work as expected if the provider is configured to use the <code>https://www.googleapis.com/auth/userinfo.email</code> scope! You will receive an error otherwise. The provider uses this scope by default.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20exporting%20an%20email"></a><h2 id="example-usage-exporting-an-email">Example Usage - exporting an email</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"google_client_openid_userinfo"</span><span class="w"> </span><span class="nv">"me"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"my-email"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.google_client_openid_userinfo.me.email</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20OpenID%20Connect%20w/%20Kubernetes%20provider%20%2B%20RBAC%20IAM%20role"></a><h2 id="example-usage-openid-connect-w-kubernetes-provider-rbac-iam-role">Example Usage - OpenID Connect w/ Kubernetes provider + RBAC IAM role</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"google_client_openid_userinfo"</span><span class="w"> </span><span class="nv">"provider_identity"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"google_client_config"</span><span class="w"> </span><span class="nv">"provider"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"my_cluster"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east1-a"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"kubernetes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://${data.google_container_cluster.my_cluster.endpoint}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.google_client_config.provider.access_token</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_ca_certificate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">base64decode</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="nv">data.google_container_cluster.my_cluster.master_auth[0].cluster_ca_certificate</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"kubernetes_cluster_role_binding"</span><span class="w"> </span><span class="nv">"user"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">metadata</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"provider-user-admin"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">role_ref</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">api_group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"rbac.authorization.k8s.io"</span><span class="w"></span>
+<span class="w">    </span><span class="na">kind</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"ClusterRole"</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"cluster-admin"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">subject</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">kind</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"User"</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.google_client_openid_userinfo.provider_identity.email</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>There are no arguments available for this data source.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>The following attributes are exported:</p>
+
+<ul>
+<li><code>email</code> - The email of the account used by the provider to authenticate with GCP.</li>
+</ul>
+
+            
+        
+    </body></html>

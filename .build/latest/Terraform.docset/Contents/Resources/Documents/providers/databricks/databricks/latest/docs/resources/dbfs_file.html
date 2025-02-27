@@ -1,0 +1,99 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/dbfs_file --><head>
+                <title>databricks_dbfs_file</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_dbfs_file-resource">databricks_dbfs_file Resource</h1>
+
+<p>This is a resource that lets you manage relatively small files on <a href="https://docs.databricks.com/data/databricks-file-system.html">Databricks File System (DBFS)</a>. The best use cases are libraries for <a href="cluster.md">databricks_cluster</a> or <a href="job.md">databricks_job</a>. You can also use <a href="../data-sources/dbfs_file.md">databricks_dbfs_file</a> and <a href="../data-sources/dbfs_file_paths.md">databricks_dbfs_file_paths</a> data sources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>In order to manage a file on Databricks File System with Terraform, you must specify the <code>source</code> attribute containing the full path to the file on the local filesystem.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_dbfs_file"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${path.module}/main.tf"</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"/tmp/main.tf"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Alternatively, you can create DBFS files with custom content, using <a href="https://www.terraform.io/docs/language/functions/templatefile.html">filesystem functions</a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_dbfs_file"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">content_base64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">base64encode</span><span class="p">(</span><span class="o">&lt;&lt;-</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="sh">    Hello, world!</span>
+<span class="sh">    Module is ${abspath(path.module)}</span>
+<span class="dl">    EOT</span>
+<span class="w">  </span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/tmp/this.txt"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Install <a href="library.md">databricks_library</a> on all <a href="../data-sources/clusters.md">databricks_clusters</a>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_clusters"</span><span class="w"> </span><span class="nv">"all"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_dbfs_file"</span><span class="w"> </span><span class="nv">"app"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${path.module}/baz.whl"</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"/FileStore/baz.whl"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_library"</span><span class="w"> </span><span class="nv">"app"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_clusters.all.ids</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.key</span><span class="w"></span>
+<span class="w">  </span><span class="na">whl</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_dbfs_file.app.dbfs_path</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>DBFS files would only be changed, if Terraform stage did change. This means that any manual changes to managed file won't be overwritten by Terraform, if there's no local change.</p>
+</aside>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>source</code> - The full absolute path to the file. Conflicts with <code>content_base64</code>.</li>
+<li><code>content_base64</code> - Encoded file contents. Conflicts with <code>source</code>. Use of <code>content_base64</code> is discouraged, as it's increasing memory footprint of Terraform state and should only be used in exceptional circumstances, like creating a data pipeline configuration file.</li>
+<li><code>path</code> - (Required) The path of the file in which you wish to save.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - Same as <code>path</code>.</li>
+<li><code>file_size</code> - The file size of the file that is being tracked by this resource in bytes.</li>
+<li><code>dbfs_path</code> - Path, but with <code>dbfs:</code> prefix.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>The resource dbfs file can be imported using the path of the file:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform import databricks_dbfs_file.this &lt;path&gt;
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are often used in the same context:</p>
+
+<ul>
+<li><a href="../guides/workspace-management.md">End to end workspace management</a> guide.</li>
+<li><a href="../data-sources/dbfs_file.md">databricks_dbfs_file</a> data to get file content from <a href="https://docs.databricks.com/data/databricks-file-system.html">Databricks File System (DBFS)</a>.</li>
+<li><a href="../data-sources/dbfs_file_paths.md">databricks_dbfs_file_paths</a> data to get list of file names from get file content from <a href="https://docs.databricks.com/data/databricks-file-system.html">Databricks File System (DBFS)</a>.</li>
+<li><a href="global_init_script.md">databricks_global_init_script</a> to manage <a href="https://docs.databricks.com/clusters/init-scripts.html#global-init-scripts">global init scripts</a>, which are run on all <a href="cluster.md#init_scripts">databricks_cluster</a> and <a href="job.md#new_cluster">databricks_job</a>.</li>
+<li><a href="library.md">databricks_library</a> to install a <a href="https://docs.databricks.com/libraries/index.html">library</a> on <a href="cluster.md">databricks_cluster</a>.</li>
+<li><a href="mount.md">databricks_mount</a> to <a href="https://docs.databricks.com/data/databricks-file-system.html#mount-object-storage-to-dbfs">mount your cloud storage</a> on <code>dbfs:/mnt/name</code>.</li>
+<li><a href="workspace_conf.md">databricks_workspace_conf</a> to manage workspace configuration for expert usage.</li>
+</ul>
+
+            
+        
+    </body></html>

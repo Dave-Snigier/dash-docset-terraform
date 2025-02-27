@@ -1,0 +1,286 @@
+<html><!-- Online page at https://registry.terraform.io/providers/PagerDuty/pagerduty/latest/docs/resources/event_orchestration_service --><head>
+                <title>pagerduty_event_orchestration_service</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="pagerduty_event_orchestration_service">pagerduty_event_orchestration_service</h1>
+
+<p>A <a href="https://support.pagerduty.com/docs/event-orchestration#service-orchestrations">Service Orchestration</a> allows you to create a set of Event Rules. The Service Orchestration evaluates Events sent to this Service against each of its rules, beginning with the rules in the "start" set. When a matching rule is found, it can modify and enhance the event and can route the event to another set of rules within this Service Orchestration for further processing.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you have a Service that uses <a href="https://support.pagerduty.com/docs/rulesets#service-event-rules">Service Event Rules</a>, you can switch to <a href="https://support.pagerduty.com/docs/event-orchestration#service-orchestrations">Service Orchestrations</a> at any time setting the attribute <code>enable_event_orchestration_for_service</code> to <code>true</code>. Please read the <a href="https://support.pagerduty.com/docs/event-orchestration#switch-to-service-orchestrations">Switch to Service Orchestrations</a> instructions for more information.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20of%20configuring%20a%20Service%20Orchestration"></a><h2 id="example-of-configuring-a-service-orchestration">Example of configuring a Service Orchestration</h2>
+
+<p>This example shows creating <code>Team</code>, <code>User</code>, <code>Escalation Policy</code>, and <code>Service</code> resources followed by creating a Service Orchestration to handle Events sent to that Service.</p>
+
+<p>This example also shows using the <a href="https://registry.terraform.io/providers/PagerDuty/pagerduty/latest/docs/data-sources/priority">pagerduty_priority</a> and <a href="https://registry.terraform.io/providers/PagerDuty/pagerduty/latest/docs/data-sources/escalation_policy">pagerduty_escalation_policy</a> data sources to configure <code>priority</code> and <code>escalation_policy</code> actions for a rule.</p>
+
+<p>This example shows a Service Orchestration that has nested sets: a rule in the "start" set has a <code>route_to</code> action pointing at the "step-two" set.</p>
+
+<p>The <code>catch_all</code> actions will be applied if an Event reaches the end of any set without matching any rules in that set. In this example the <code>catch_all</code> doesn't have any <code>actions</code> so it'll leave events as-is.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"pagerduty_team"</span><span class="w"> </span><span class="nv">"engineering"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"pagerduty_user"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"Earline Greenholt"</span><span class="w"></span>
+<span class="w">  </span><span class="na">email</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"125.greenholt.earline@graham.name"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"pagerduty_team_membership"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">user_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">pagerduty_user.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">team_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">pagerduty_team.engineering.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"manager"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"pagerduty_escalation_policy"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering Escalation Policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">num_loops</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">escalation_delay_in_minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">    </span><span class="nb">target</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"user_reference"</span><span class="w"></span>
+<span class="w">      </span><span class="na">id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">pagerduty_user.example.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"pagerduty_service"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"My Web App"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_resolve_timeout</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">14400</span><span class="w"></span>
+<span class="w">  </span><span class="na">acknowledgement_timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">600</span><span class="w"></span>
+<span class="w">  </span><span class="na">escalation_policy</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">pagerduty_escalation_policy.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">alert_creation</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"create_alerts_and_incidents"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"pagerduty_incident_custom_field"</span><span class="w"> </span><span class="nv">"cs_impact"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"impact"</span><span class="w"></span>
+<span class="w">  </span><span class="na">data_type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"string"</span><span class="w"></span>
+<span class="w">  </span><span class="na">field_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"single_value"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"pagerduty_priority"</span><span class="w"> </span><span class="nv">"p1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"P1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"pagerduty_escalation_policy"</span><span class="w"> </span><span class="nv">"sre_esc_policy"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SRE Escalation Policy"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"pagerduty_event_orchestration_service"</span><span class="w"> </span><span class="nv">"www"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">pagerduty_service.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">enable_event_orchestration_for_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="nb">set</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"start"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">label</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Always apply some consistent event transformations to all events"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">actions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nb">variable</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hostname"</span><span class="w"></span>
+<span class="w">          </span><span class="na">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"event.component"</span><span class="w"></span>
+<span class="w">          </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hostname: (.*)"</span><span class="w"></span>
+<span class="w">          </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"regex"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nb">extraction</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">          # Demonstrating a template-style extraction</span>
+<span class="w">          </span><span class="na">template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"{{variables.hostname}}"</span><span class="w"></span>
+<span class="w">          </span><span class="na">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"event.custom_details.hostname"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="nb">extraction</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">          # Demonstrating a regex-style extraction</span>
+<span class="w">          </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"event.source"</span><span class="w"></span>
+<span class="w">          </span><span class="na">regex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"www (.*) service"</span><span class="w"></span>
+<span class="w">          </span><span class="na">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"event.source"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="c1"></span>
+<span class="c1">        # Id of the next set</span>
+<span class="w">        </span><span class="na">route_to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"step-two"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">set</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"step-two"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">label</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"All critical alerts should be treated as P1 incident"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">expression</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"event.severity matches 'critical'"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="nb">actions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">annotate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Please use our P1 runbook: https://docs.test/p1-runbook"</span><span class="w"></span>
+<span class="w">        </span><span class="na">priority</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.pagerduty_priority.p1.id</span><span class="w"></span>
+<span class="w">        </span><span class="nb">incident_custom_field_update</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">pagerduty_incident_custom_field.cs_impact.id</span><span class="w"></span>
+<span class="w">          </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"High Impact"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">label</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"If any of the API apps are unavailable, page the SRE team"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">expression</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"event.custom_details.service_name matches part '-api' and event.custom_details.status_code matches '502'"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="nb">actions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">escalation_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.pagerduty_escalation_policy.sre_esc_policy.id</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">label</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"If there's something wrong on the canary let the team know about it in our deployments Slack channel"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">expression</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"event.custom_details.hostname matches part 'canary'"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="c1"></span>
+<span class="c1">      # create webhook action with parameters and headers</span>
+<span class="w">      </span><span class="nb">actions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nb">automation_action</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Canary Slack Notification"</span><span class="w"></span>
+<span class="w">          </span><span class="na">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://our-slack-listerner.test/canary-notification"</span><span class="w"></span>
+<span class="w">          </span><span class="na">auto_send</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">          </span><span class="nb">parameter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="na">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"channel"</span><span class="w"></span>
+<span class="w">            </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"#my-team-channel"</span><span class="w"></span>
+<span class="w">          </span><span class="p">}</span><span class="w"></span>
+<span class="w">          </span><span class="nb">parameter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="na">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"message"</span><span class="w"></span>
+<span class="w">            </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"something is wrong with the canary deployment"</span><span class="w"></span>
+<span class="w">          </span><span class="p">}</span><span class="w"></span>
+<span class="w">          </span><span class="nb">header</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="na">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"X-Notification-Source"</span><span class="w"></span>
+<span class="w">            </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PagerDuty Incident Webhook"</span><span class="w"></span>
+<span class="w">          </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">label</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Never bother the on-call for info-level events outside of work hours"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">expression</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"event.severity matches 'info' and not (now in Mon,Tue,Wed,Thu,Fri 09:00:00 to 17:00:00 America/Los_Angeles)"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="nb">actions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">suppress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">catch_all</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">actions</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>service</code> - (Required) ID of the Service to which this Service Orchestration belongs to.</li>
+<li><code>enable_event_orchestration_for_service</code> - (Optional) Opt-in/out for switching the Service to <a href="https://support.pagerduty.com/docs/event-orchestration#service-orchestrations">Service Orchestrations</a>.</li>
+<li><code>set</code> - (Required) A Service Orchestration must contain at least a "start" set, but can contain any number of additional sets that are routed to by other rules to form a directional graph.</li>
+<li><code>catch_all</code> - (Required) the <code>catch_all</code> actions will be applied if an Event reaches the end of any set without matching any rules in that set.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Set%20%28set%29%20supports%20the%20following%3A"></a><h3 id="set-set-supports-the-following">Set (<code>set</code>) supports the following:</h3>
+
+<ul>
+<li><code>id</code> - (Required) The ID of this set of rules. Rules in other sets can route events into this set using the rule's <code>route_to</code> property.</li>
+<li><code>rule</code> - (Optional) The service orchestration evaluates Events against these Rules, one at a time, and applies all the actions for first rule it finds where the event matches the rule's conditions. If no rules are provided as part of Terraform configuration, the API returns empty list of rules.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Rule%20%28rule%29%20supports%20the%20following%3A"></a><h3 id="rule-rule-supports-the-following">Rule (<code>rule</code>) supports the following:</h3>
+
+<ul>
+<li><code>label</code> - (Optional) A description of this rule's purpose.</li>
+<li><code>condition</code> - (Optional) Each of these conditions is evaluated to check if an event matches this rule. The rule is considered a match if any of these conditions match. If none are provided, the event will <code>always</code> match against the rule.</li>
+<li><code>actions</code> - (Required) Actions that will be taken to change the resulting alert and incident, when an event matches this rule.</li>
+<li><code>disabled</code> - (Optional) Indicates whether the rule is disabled and would therefore not be evaluated.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Condition%20%28condition%29%20supports%20the%20following%3A"></a><h3 id="condition-condition-supports-the-following">Condition (<code>condition</code>) supports the following:</h3>
+
+<ul>
+<li><code>expression</code>- (Required) A <a href="https://developer.pagerduty.com/docs/ZG9jOjM1NTE0MDc0-pcl-overview">PCL condition</a> string.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Actions%20%28actions%29%20supports%20the%20following%3A"></a><h3 id="actions-actions-supports-the-following">Actions (<code>actions</code>) supports the following:</h3>
+
+<ul>
+<li><code>route_to</code> - (Optional) The ID of a Set from this Service Orchestration whose rules you also want to use with events that match this rule.</li>
+<li><code>suppress</code> - (Optional) Set whether the resulting alert is suppressed. Suppressed alerts will not trigger an incident.</li>
+<li><code>suspend</code> - (Optional) The number of seconds to suspend the resulting alert before triggering. This effectively pauses incident notifications. If a <code>resolve</code> event arrives before the alert triggers then PagerDuty won't create an incident for this alert.</li>
+<li><code>priority</code> - (Optional) The ID of the priority you want to set on resulting incident. Consider using the <a href="https://registry.terraform.io/providers/PagerDuty/pagerduty/latest/docs/data-sources/priority"><code>pagerduty_priority</code></a> data source.</li>
+<li><code>escalation_policy</code> - (Optional) The ID of the Escalation Policy you want to assign incidents to. Event rules with this action will override the Escalation Policy already set on a Service's settings, with what is configured by this action.</li>
+<li><code>annotate</code> - (Optional) Add this text as a note on the resulting incident.</li>
+<li><code>incident_custom_field_update</code> - (Optional) Assign a custom field to the resulting incident.
+<ul>
+<li><code>id</code> - (Required) The custom field id</li>
+<li><code>value</code> - (Required) The value to assign to this custom field</li>
+</ul></li>
+<li><code>pagerduty_automation_action</code> - (Optional) Configure a <a href="https://support.pagerduty.com/docs/event-orchestration#process-automation">Process Automation</a> associated with the resulting incident.
+<ul>
+<li><code>action_id</code> - (Required) Id of the Process Automation action to be triggered.</li>
+</ul></li>
+<li><code>automation_action</code> - (Optional) Create a <a href="https://support.pagerduty.com/docs/event-orchestration#webhooks">Webhook</a> associated with the resulting incident.
+<ul>
+<li><code>name</code> - (Required) Name of this Webhook.</li>
+<li><code>url</code> - (Required) The API endpoint where PagerDuty's servers will send the webhook request.</li>
+<li><code>auto_send</code> - (Optional) When true, PagerDuty's servers will automatically send this webhook request as soon as the resulting incident is created. When false, your incident responder will be able to manually trigger the Webhook via the PagerDuty website and mobile app.</li>
+<li><code>header</code> - (Optional) Specify custom key/value pairs that'll be sent with the webhook request as request headers.</li>
+<li><code>key</code> - (Required) Name to identify the header</li>
+<li><code>value</code> - (Required) Value of this header</li>
+<li><code>parameter</code> - (Optional) Specify custom key/value pairs that'll be included in the webhook request's JSON payload.</li>
+<li><code>key</code> - (Required) Name to identify the parameter</li>
+<li><code>value</code> - (Required) Value of this parameter</li>
+</ul></li>
+<li><code>severity</code> - (Optional) sets Severity of the resulting alert. Allowed values are: <code>info</code>, <code>error</code>, <code>warning</code>, <code>critical</code></li>
+<li><code>event_action</code> - (Optional) sets whether the resulting alert status is trigger or resolve. Allowed values are: <code>trigger</code>, <code>resolve</code></li>
+<li><code>variable</code> - (Optional) Populate variables from event payloads and use those variables in other event actions.
+<ul>
+<li><code>name</code> - (Required) The name of the variable</li>
+<li><code>path</code> - (Required) Path to a field in an event, in dot-notation. This supports both PagerDuty Common Event Format <a href="https://support.pagerduty.com/docs/pd-cef">PD-CEF</a> and non-CEF fields. Eg: Use <code>event.summary</code> for the <code>summary</code> CEF field. Use <code>raw_event.fieldname</code> to read from the original event <code>fieldname</code> data. You can use any valid <a href="https://developer.pagerduty.com/docs/ZG9jOjM1NTE0MDc0-pcl-overview#paths">PCL path</a>.</li>
+<li><code>type</code> - (Required) Only <code>regex</code> is supported</li>
+<li><code>value</code> - (Required) The Regex expression to match against. Must use valid <a href="https://github.com/google/re2/wiki/Syntax">RE2 regular expression</a> syntax.</li>
+</ul></li>
+<li><code>extraction</code> - (Optional) Replace any CEF field or Custom Details object field using custom variables.
+<ul>
+<li><code>target</code> - (Required) The PagerDuty Common Event Format <a href="https://support.pagerduty.com/docs/pd-cef">PD-CEF</a> field that will be set with the value from the <code>template</code> or based on <code>regex</code> and <code>source</code> fields.</li>
+<li><code>template</code> - (Optional) A string that will be used to populate the <code>target</code> field. You can reference variables or event data within your template using double curly braces. For example:
+<ul>
+<li>Use variables named <code>ip</code> and <code>subnet</code> with a template like: <code>{{variables.ip}}/{{variables.subnet}}</code></li>
+<li>Combine the event severity &amp; summary with template like: <code>{{event.severity}}:{{event.summary}}</code></li>
+</ul></li>
+<li><code>regex</code> - (Optional) A <a href="https://github.com/google/re2/wiki/Syntax">RE2 regular expression</a> that will be matched against field specified via the <code>source</code> argument. If the regex contains one or more capture groups, their values will be extracted and appended together. If it contains no capture groups, the whole match is used. This field can be ignored for <code>template</code> based extractions.</li>
+<li><code>source</code> - (Optional) The path to the event field where the <code>regex</code> will be applied to extract a value. You can use any valid <a href="https://developer.pagerduty.com/docs/ZG9jOjM1NTE0MDc0-pcl-overview#paths">PCL path</a> like <code>event.summary</code> and you can reference previously-defined variables using a path like <code>variables.hostname</code>. This field can be ignored for <code>template</code> based extractions.</li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Catch%20All%20%28catch_all%29%20supports%20the%20following%3A"></a><h3 id="catch-all-catch_all-supports-the-following">Catch All (<code>catch_all</code>) supports the following:</h3>
+
+<ul>
+<li><code>actions</code> - (Required) These are the actions that will be taken to change the resulting alert and incident. <code>catch_all</code> supports all actions described above for <code>rule</code> _except_ <code>route_to</code> action.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>The following attributes are exported:</p>
+
+<ul>
+<li><code>self</code> - The URL at which the Service Orchestration is accessible.</li>
+<li><code>rule</code>
+<ul>
+<li><code>id</code> - The ID of the rule within the set.</li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Service Orchestration can be imported using the <code>id</code> of the Service, e.g.</p>
+
+<pre><code>$ terraform import pagerduty_event_orchestration_service.service PFEODA7
+</code></pre>
+
+            
+        
+    </body></html>

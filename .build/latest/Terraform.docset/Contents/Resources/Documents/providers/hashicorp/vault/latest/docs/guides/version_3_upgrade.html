@@ -1,0 +1,354 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/vault/latest/docs/guides/version_3_upgrade --><head>
+                <title>Terraform Vault Provider 3.0.0 Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-vault-provider-300-upgrade-guide">Terraform Vault Provider 3.0.0 Upgrade Guide</h1>
+
+<p>Version <code>3.0.0</code> of the Vault provider for Terraform is a major release and
+includes some changes that you will need to consider when upgrading. This guide
+is intended to help with that process and focuses only on the changes necessary
+to upgrade from version <code>2.24.0</code> to <code>3.0.0</code>.</p>
+
+<p>Most of the changes outlined in this guide have been previously marked as
+deprecated in the Terraform <code>plan</code>/<code>apply</code> output throughout previous provider
+releases, up to and including 2.24.0. These changes, such as deprecation notices,
+can always be found in the <a href="https://github.com/hashicorp/terraform-provider-vault/blob/master/CHANGELOG.md">CHANGELOG</a>.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you are upgrading from <code>1.9.x</code>. Please follow the <a href="./version_2_upgrade.html">2.0.0 Upgrade Guide</a> before proceeding any further.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Why%20version%203.0.0%3F"></a><h2 id="why-version-300">Why version 3.0.0?</h2>
+
+<p>We introduced version <code>3.0.0</code> of the Vault provider in order to upgrade to the
+<a href="https://www.terraform.io/docs/extend/sdkv2-intro.html">Terraform Plugin SDKv2</a>.
+The change was deemed significant enough to warrant the major version bump.
+In addition to the aforementioned SDK upgrade all previously deprecated fields,
+and resources have been removed.</p>
+
+<p>While you may see some small changes in your configurations as a result of
+these changes, we don't expect you'll need to make any major refactorings.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Which%20Terraform%20versions%20are%20supported%3F"></a><h2 id="which-terraform-versions-are-supported">Which Terraform versions are supported?</h2>
+
+<p>Terraform versions <code>0.12.x</code> and greater are fully supported. Support for <code>0.11.x</code> has been removed.
+If you are still on one of the <code>0.11.x</code> versions we recommend upgrading to the latest stable release of Terraform.</p>
+
+<p>Please see the <a href="https://www.terraform.io/upgrade-guides/index.html">Terraform Upgrade Guide</a>
+for more info about upgrading Terraform.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/I%20accidentally%20upgraded%20to%203.0.0%2C%20how%20do%20I%20downgrade%20to%202.X%3F"></a><h2 id="i-accidentally-upgraded-to-300-how-do-i-downgrade-to-2x">I accidentally upgraded to 3.0.0, how do I downgrade to <code>2.X</code>?</h2>
+
+<p>If you've inadvertently upgraded to <code>3.0.0</code>, first see the
+<a href="#provider-version-configuration">Provider Version Configuration Guide</a> to lock
+your provider version; if you've constrained the provider to a lower version
+such as shown in the previous version example in that guide, Terraform will pull
+in a <code>2.X</code> series release on <code>terraform init</code>.</p>
+
+<p>If you've only run <code>terraform init</code> or <code>terraform plan</code>, your state will not
+have been modified and downgrading your provider is sufficient.</p>
+
+<p>If you've run <code>terraform refresh</code> or <code>terraform apply</code>, Terraform may have made
+state changes in the meantime.</p>
+
+<ul>
+<li>If you're using a <em>local</em> state, <code>terraform refresh</code> with a downgraded
+provider is likely sufficient to revert your state.</li>
+<li>If you're using a <em>remote</em> state backend
+<ul>
+<li>That does not support versioning, see the local state instructions above</li>
+<li>That supports <em>versioning</em> you can revert the Terraform state file to a previous
+version by hand. If you do so and Terraform created resources as part of a
+<code>terraform apply</code>, you'll need to either <code>terraform import</code> them or delete
+them by hand.</li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrade%20Topics"></a><h2 id="upgrade-topics">Upgrade Topics</h2>
+
+<!-- TOC depthFrom:2 depthTo:2 -->
+
+<ul>
+<li><p><a href="#provider-version-configuration">Provider Version Configuration</a></p></li>
+<li><p><a href="#data-source-vault_kubernetes_auth_backend_role">Data Source: <code>vault_kubernetes_auth_backend_role</code></a></p></li>
+<li><p><a href="#resource-vault_approle_auth_backend_role">Resource: <code>vault_approle_auth_backend_role</code></a></p></li>
+<li><a href="#resource-vault_auth_backend">Resource: <code>vault_auth_backend</code></a></li>
+<li><a href="#resource-vault_aws_auth_backend_role">Resource: <code>vault_aws_auth_backend_role</code></a></li>
+<li><a href="#resource-vault_azure_auth_backend_role">Resource: <code>vault_azure_auth_backend_role</code></a></li>
+<li><a href="#resource-vault_cert_auth_backend_role">Resource: <code>vault_cert_auth_backend_role</code></a></li>
+<li><a href="#resource-vault_consul_secret_backend_role">Resource: <code>vault_consul_secret_backend_role</code></a></li>
+<li><a href="#resource-vault_gcp_auth_backend_role">Resource: <code>vault_gcp_auth_backend_role</code></a></li>
+<li><a href="#resource-vault_generic_secret">Resource: <code>vault_generic_secret</code></a></li>
+<li><a href="#resource-vault_github_auth_backend">Resource: <code>vault_github_auth_backend</code></a></li>
+<li><a href="#resource-vault_jwt_auth_backend_role">Resource: <code>vault_jwt_auth_backend_role</code></a></li>
+<li><a href="#resource-vault_kubernetes_auth_backend_role">Resource: <code>vault_kubernetes_auth_backend_role</code></a></li>
+<li><a href="#resource-vault_pki_secret_backend">Resource: <code>vault_pki_secret_backend</code></a></li>
+<li><a href="#resource-vault_token">Resource: <code>vault_token</code></a></li>
+<li><a href="#resource-vault_token_auth_backend_role">Resource: <code>vault_token_auth_backend_role</code></a></li>
+</ul>
+
+<!-- /TOC -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Version%20Configuration"></a><h2 id="provider-version-configuration">Provider Version Configuration</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Before upgrading to version <code>3.0.0</code>, it is recommended to upgrade to the most recent version of the provider (<code>2.24.0</code>) and ensure that your environment successfully runs <a href="https://www.terraform.io/docs/commands/plan.html"><code>terraform plan</code></a> without unexpected changes or deprecation notices.</p>
+</aside>
+
+<p>It is recommended to use <a href="https://www.terraform.io/docs/configuration/providers.html#provider-versions">version constraints</a>
+when configuring Terraform providers. If you are following that recommendation,
+update the version constraints in your Terraform configuration and run
+<a href="https://www.terraform.io/docs/commands/init.html"><code>terraform init</code></a> to download
+the new version.</p>
+
+<p>If you aren't using version constraints, you can use <code>terraform init -upgrade</code>
+in order to upgrade your provider to the latest released version.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"vault"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 2.24.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"vault"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 3.0.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20vault_kubernetes_auth_backend_role"></a><h2 id="data-source-vault_kubernetes_auth_backend_role">Data Source: <code>vault_kubernetes_auth_backend_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed:</p>
+
+<ul>
+<li><p><code>bound_cidrs</code> - use <code>token_bound_cidrs</code> instead.</p></li>
+<li><p><code>ttl</code> - use <code>token_ttl</code> instead.</p></li>
+<li><p><code>max_ttl</code> - use <code>token_max_ttl</code> instead.</p></li>
+<li><p><code>policies</code> - use <code>token_policies</code> instead.</p></li>
+<li><p><code>period</code> - use <code>token_period</code> instead.</p></li>
+<li><p><code>num_uses</code> - use <code>token_num_uses</code> instead.</p></li>
+</ul>
+
+<p>_Specifying any of the fields above in your config or trying to interpolate them in your config will raise an error._</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_approle_auth_backend_role"></a><h2 id="resource-vault_approle_auth_backend_role">Resource: <code>vault_approle_auth_backend_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed-2">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed:</p>
+
+<ul>
+<li><p><code>bound_cidr_list</code> - use <code>secret_id_bound_cidrs</code> instead.</p></li>
+<li><p><code>policies</code> - use <code>token_policies</code> instead.</p></li>
+<li><p><code>period</code> - use <code>token_period</code> instead.</p></li>
+</ul>
+
+<p>_Specifying any of the fields above in your config or trying to interpolate them in your config will raise an error._</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_auth_backend"></a><h2 id="resource-vault_auth_backend">Resource: <code>vault_auth_backend</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed-3">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed:</p>
+
+<ul>
+<li><p><code>default_lease_ttl_seconds</code> - use <code>tune.default_lease_ttl</code> instead.</p></li>
+<li><p><code>max_lease_ttl_seconds</code> - use <code>tune.max_lease_ttl</code> instead.</p></li>
+<li><p><code>listing_visibility</code> - use <code>tune.listing_visibility</code> instead.</p></li>
+</ul>
+
+<p>_Specifying any of the fields above in your config or trying to interpolate them in your config will raise an error._</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_aws_auth_backend_role"></a><h2 id="resource-vault_aws_auth_backend_role">Resource: <code>vault_aws_auth_backend_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed-4">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed:</p>
+
+<ul>
+<li><p><code>ttl</code> - use <code>token_ttl</code> instead.</p></li>
+<li><p><code>max_ttl</code> - use <code>token_max_ttl</code> instead.</p></li>
+<li><p><code>policies</code> - use <code>token_policies</code> instead.</p></li>
+<li><p><code>period</code> - use <code>token_period</code> instead.</p></li>
+</ul>
+
+<p>_Specifying any of the fields above in your config or trying to interpolate them in your config will raise an error._</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_azure_auth_backend_role"></a><h2 id="resource-vault_azure_auth_backend_role">Resource: <code>vault_azure_auth_backend_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed-5">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed:</p>
+
+<ul>
+<li><p><code>ttl</code> - use <code>token_ttl</code> instead.</p></li>
+<li><p><code>max_ttl</code> - use <code>token_max_ttl</code> instead.</p></li>
+<li><p><code>policies</code> - use <code>token_policies</code> instead.</p></li>
+<li><p><code>period</code> - use <code>token_period</code> instead.</p></li>
+</ul>
+
+<p>_Specifying any of the fields above in your config or trying to interpolate them in your config will raise an error._</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_cert_auth_backend_role"></a><h2 id="resource-vault_cert_auth_backend_role">Resource: <code>vault_cert_auth_backend_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed-6">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed:</p>
+
+<ul>
+<li><p><code>bound_cidrs</code> - use <code>token_bound_cidrs</code> instead.</p></li>
+<li><p><code>ttl</code> - use <code>token_ttl</code> instead.</p></li>
+<li><p><code>max_ttl</code> - use <code>token_max_ttl</code> instead.</p></li>
+<li><p><code>policies</code> - use <code>token_policies</code> instead.</p></li>
+<li><p><code>period</code> - use <code>token_period</code> instead.</p></li>
+</ul>
+
+<p>_Specifying any of the fields above in your config or trying to interpolate them in your config will raise an error._</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_consul_secret_backend_role"></a><h2 id="resource-vault_consul_secret_backend_role">Resource: <code>vault_consul_secret_backend_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed-7">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed:</p>
+
+<ul>
+<li><code>path</code> - use <code>backend</code> instead.</li>
+</ul>
+
+<p>_Specifying any of the fields above in your config or trying to interpolate them in your config will raise an error._</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_gcp_auth_backend_role"></a><h2 id="resource-vault_gcp_auth_backend_role">Resource: <code>vault_gcp_auth_backend_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed-8">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed:</p>
+
+<ul>
+<li><code>project_id</code> - use <code>bound_projects</code> instead.</li>
+</ul>
+
+<p>_Specifying any of the fields above in your config or trying to interpolate them in your config will raise an error._</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_generic_secret"></a><h2 id="resource-vault_generic_secret">Resource: <code>vault_generic_secret</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed-9">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed:</p>
+
+<ul>
+<li><code>allow_read</code> - use <code>disable_read</code> instead.</li>
+</ul>
+
+<p>_Specifying any of the fields above in your config or trying to interpolate them in your config will raise an error._</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_github_auth_backend"></a><h2 id="resource-vault_github_auth_backend">Resource: <code>vault_github_auth_backend</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed-10">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed:</p>
+
+<ul>
+<li><p><code>ttl</code> - use <code>token_ttl</code> instead.</p></li>
+<li><p><code>max_ttl</code> - use <code>token_max_ttl</code> instead.</p></li>
+</ul>
+
+<p>_Specifying any of the fields above in your config or trying to interpolate them in your config will raise an error._</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_jwt_auth_backend_role"></a><h2 id="resource-vault_jwt_auth_backend_role">Resource: <code>vault_jwt_auth_backend_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed-11">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed:</p>
+
+<ul>
+<li><code>groups_claim_delimiter_pattern</code> - no alternate exists.</li>
+</ul>
+
+<p>_Specifying any of the fields above in your config or trying to interpolate them in your config will raise an error._</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_kubernetes_auth_backend_role"></a><h2 id="resource-vault_kubernetes_auth_backend_role">Resource: <code>vault_kubernetes_auth_backend_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed-12">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed:</p>
+
+<ul>
+<li><p><code>num_uses</code> - use <code>token_num_uses</code> instead.</p></li>
+<li><p><code>ttl</code> - use <code>token_ttl</code> instead.</p></li>
+<li><p><code>max_ttl</code> - use <code>token_max_ttl</code> instead.</p></li>
+<li><p><code>policies</code> - use <code>token_policies</code> instead.</p></li>
+<li><p><code>period</code> - use <code>token_period</code> instead.</p></li>
+<li><p><code>bound_cidrs</code> - use <code>token_bound_cidrs</code> instead.</p></li>
+</ul>
+
+<p>_Specifying any of the fields above in your config or trying to interpolate them in your config will raise an error._</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_pki_secret_backend"></a><h2 id="resource-vault_pki_secret_backend">Resource: <code>vault_pki_secret_backend</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20resource"></a><h3 id="deprecated-resource">Deprecated resource</h3>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This resource has been replaced by <a href="../r/mount.html">vault_mount</a>.</p>
+</aside>
+
+<p>A replacement might look like:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"vault_mount"</span><span class="w"> </span><span class="nv">"pki-example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"pki-example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"pki"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"This is an example PKI mount"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">default_lease_ttl_seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3600</span><span class="w"></span>
+<span class="w">  </span><span class="na">max_lease_ttl_seconds</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">86400</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>_Attempting to provision a <code>vault_pki_secret_backend</code> resource will raise an error._</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_token"></a><h2 id="resource-vault_token">Resource: <code>vault_token</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Removed%20fields"></a><h3 id="removed-fields">Removed fields</h3>
+
+<p>The following fields have been removed as they are no longer supported by the <a href="https://www.terraform.io/docs/extend/guides/v2-upgrade-guide.html#removal-of-helper-encryption-package">Terraform Plugin SDK</a>.
+Please see <a href="https://www.terraform.io/docs/extend/best-practices/sensitive-state.html#don-39-t-encrypt-state">Sensitive State Best Practices</a> for more info.</p>
+
+<ul>
+<li><p><code>encrypted_client_token</code> - removed.</p></li>
+<li><p><code>pgp_key</code> - removed</p></li>
+</ul>
+
+<p>_Specifying any of the fields above in your config or trying to interpolate them in your config will raise an error._</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20vault_token_auth_backend_role"></a><h2 id="resource-vault_token_auth_backend_role">Resource: <code>vault_token_auth_backend_role</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20fields%20have%20been%20removed"></a><h3 id="deprecated-fields-have-been-removed-13">Deprecated fields have been removed</h3>
+
+<p>The following deprecated fields have been removed:</p>
+
+<ul>
+<li><p><code>explicit_max_ttl</code> use <code>token_explicit_max_ttl</code> instead.</p></li>
+<li><p><code>period</code> - use <code>token_period</code> instead.</p></li>
+<li><p><code>bound_cidrs</code> - use <code>token_bound_cidrs</code> instead.</p></li>
+</ul>
+
+<p>_Specifying any of the fields above in your config or trying to interpolate them in your config will raise an error._</p>
+
+            
+        
+    </body></html>

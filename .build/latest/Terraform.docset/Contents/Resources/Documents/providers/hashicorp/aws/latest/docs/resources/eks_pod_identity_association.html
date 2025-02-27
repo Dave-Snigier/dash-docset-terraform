@@ -1,0 +1,101 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eks_pod_identity_association --><head>
+                <title>aws_eks_pod_identity_association</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_eks_pod_identity_association">Resource: aws_eks_pod_identity_association</h1>
+
+<p>Terraform resource for managing an AWS EKS (Elastic Kubernetes) Pod Identity Association.</p>
+
+<p>Creates an EKS Pod Identity association between a service account in an Amazon EKS cluster and an IAM role with EKS Pod Identity. Use EKS Pod Identity to give temporary IAM credentials to pods and the credentials are rotated automatically.</p>
+
+<p>Amazon EKS Pod Identity associations provide the ability to manage credentials for your applications, similar to the way that EC2 instance profiles provide credentials to Amazon EC2 instances.</p>
+
+<p>If a pod uses a service account that has an association, Amazon EKS sets environment variables in the containers of the pod. The environment variables configure the Amazon Web Services SDKs, including the Command Line Interface, to use the EKS Pod Identity credentials.</p>
+
+<p>Pod Identity is a simpler method than IAM roles for service accounts, as this method doesn’t use OIDC identity providers. Additionally, you can configure a role for Pod Identity once, and reuse it across clusters.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Basic%20Usage"></a><h3 id="basic-usage">Basic Usage</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"assume_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Service"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"pods.eks.amazonaws.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"sts:AssumeRole"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"sts:TagSession"</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"eks-pod-identity-example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.assume_role.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role_policy_attachment"</span><span class="w"> </span><span class="nv">"example_s3"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.example.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_eks_pod_identity_association"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_eks_cluster.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">namespace</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_account</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-sa"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_arn</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.example.arn</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>cluster_name</code> - (Required) The name of the cluster to create the association in.</li>
+<li><code>namespace</code> - (Required) The name of the Kubernetes namespace inside the cluster to create the association in. The service account and the pods that use the service account must be in this namespace.</li>
+<li><code>role_arn</code> - (Required) The Amazon Resource Name (ARN) of the IAM role to associate with the service account. The EKS Pod Identity agent manages credentials to assume this role for applications in the containers in the pods that use this service account.</li>
+<li><code>service_account</code> - (Required) The name of the Kubernetes service account inside the cluster to associate the IAM credentials with.</li>
+</ul>
+
+<p>The following arguments are optional:</p>
+
+<ul>
+<li><code>tags</code> - (Optional) Key-value map of resource tags. If configured with a provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a> present, tags with matching keys will overwrite those defined at the provider-level.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>association_arn</code> - The Amazon Resource Name (ARN) of the association.</li>
+<li><code>association_id</code> - The ID of the association.</li>
+<li><code>tags_all</code> - A map of tags assigned to the resource, including those inherited from the provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import EKS (Elastic Kubernetes) Pod Identity Association using the <code>cluster_name</code> and <code>association_id</code> separated by a comma (<code>,</code>). For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_eks_pod_identity_association.example</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example,a-12345678"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import EKS (Elastic Kubernetes) Pod Identity Association using the <code>cluster_name</code> and <code>association_id</code> separated by a comma (<code>,</code>). For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_eks_pod_identity_association.example example,a-12345678
+</code></pre></div>
+
+            
+        
+    </body></html>

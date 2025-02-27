@@ -1,0 +1,442 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_function --><head>
+                <title>aws_lambda_function</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_lambda_function">Resource: aws_lambda_function</h1>
+
+<p>Provides a Lambda Function resource. Lambda allows you to trigger execution of code in response to events in AWS, enabling serverless backend solutions. The Lambda Function itself includes source code and runtime configuration.</p>
+
+<p>For information about Lambda and how to use it, see <a href="https://docs.aws.amazon.com/lambda/latest/dg/welcome.html">What is AWS Lambda?</a></p>
+
+<p>For a detailed example of setting up Lambda and API Gateway, see <a href="https://learn.hashicorp.com/terraform/aws/lambda-api-gateway">Serverless Applications with AWS Lambda and API Gateway.</a></p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Due to <a href="https://aws.amazon.com/blogs/compute/announcing-improved-vpc-networking-for-aws-lambda-functions/">AWS Lambda improved VPC networking changes that began deploying in September 2019</a>, EC2 subnets and security groups associated with Lambda Functions can take up to 45 minutes to successfully delete. Terraform AWS Provider version 2.31.0 and later automatically handles this increased timeout, however prior versions require setting the customizable deletion timeouts of those Terraform resources to 45 minutes (<code>delete = "45m"</code>). AWS and HashiCorp are working together to reduce the amount of time required for resource deletion and updates can be tracked in this <a href="https://github.com/hashicorp/terraform-provider-aws/issues/10329">GitHub issue</a>.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>If you get a <code>KMSAccessDeniedException: Lambda was unable to decrypt the environment variables because KMS access was denied</code> error when invoking an <a href="../resources/lambda_function.html"><code>aws_lambda_function</code></a> with environment variables, the IAM role associated with the function may have been deleted and recreated _after_ the function was created. You can fix the problem two ways: 1) updating the function's role to another role and then updating it back again to the recreated role, or 2) by using Terraform to <code>taint</code> the function and <code>apply</code> your configuration again to recreate the function. (When you create a function, Lambda grants permissions on the KMS key to the function's IAM role. If the IAM role is recreated, the grant is no longer valid. Changing the function's role or recreating the function causes Lambda to update the grant.)</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>To give an external source (like an EventBridge Rule, SNS, or S3) permission to access the Lambda function, use the <a href="lambda_permission.html"><code>aws_lambda_permission</code></a> resource. See [Lambda Permission Model][4] for more details. On the other hand, the <code>role</code> argument of this resource is the function's execution role for identity and access to AWS services and resources.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Basic%20Example"></a><h3 id="basic-example">Basic Example</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"assume_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Service"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"lambda.amazonaws.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"sts:AssumeRole"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"iam_for_lambda"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"iam_for_lambda"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.assume_role.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"archive_file"</span><span class="w"> </span><span class="nv">"lambda"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"zip"</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"lambda.js"</span><span class="w"></span>
+<span class="w">  </span><span class="na">output_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"lambda_function_payload.zip"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lambda_function"</span><span class="w"> </span><span class="nv">"test_lambda"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # If the file is not in the current working directory you will need to include a</span>
+<span class="c1">  # path.module in the filename.</span>
+<span class="w">  </span><span class="na">filename</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"lambda_function_payload.zip"</span><span class="w"></span>
+<span class="w">  </span><span class="na">function_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"lambda_function_name"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.iam_for_lambda.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">handler</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"index.test"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">source_code_hash</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.archive_file.lambda.output_base64sha256</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">runtime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"nodejs18.x"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">environment</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">variables</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">foo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"bar"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Lambda%20Layers"></a><h3 id="lambda-layers">Lambda Layers</h3>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>The <code>aws_lambda_layer_version</code> attribute values for <code>arn</code> and <code>layer_arn</code> were swapped in version 2.0.0 of the Terraform AWS Provider. For version 1.x, use <code>layer_arn</code> references. For version 2.x, use <code>arn</code> references.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lambda_layer_version"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lambda_function"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+<span class="w">  </span><span class="na">layers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_lambda_layer_version.example.arn</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Lambda%20Ephemeral%20Storage"></a><h3 id="lambda-ephemeral-storage">Lambda Ephemeral Storage</h3>
+
+<p>Lambda Function Ephemeral Storage(<code>/tmp</code>) allows you to configure the storage upto <code>10</code> GB. The default value set to <code>512</code> MB.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"assume_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Service"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"lambda.amazonaws.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"sts:AssumeRole"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"iam_for_lambda"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"iam_for_lambda"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.assume_role.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lambda_function"</span><span class="w"> </span><span class="nv">"test_lambda"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">filename</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"lambda_function_payload.zip"</span><span class="w"></span>
+<span class="w">  </span><span class="na">function_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"lambda_function_name"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.iam_for_lambda.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">handler</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"index.test"</span><span class="w"></span>
+<span class="w">  </span><span class="na">runtime</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"nodejs18.x"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">ephemeral_storage</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10240</span><span class="c1"> # Min 512 MB and the Max 10240 MB</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Lambda%20File%20Systems"></a><h3 id="lambda-file-systems">Lambda File Systems</h3>
+
+<p>Lambda File Systems allow you to connect an Amazon Elastic File System (EFS) file system to a Lambda function to share data across function invocations, access existing data including large files, and save function state.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># A lambda function connected to an EFS file system</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lambda_function"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">file_system_config</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # EFS file system access point ARN</span>
+<span class="w">    </span><span class="na">arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_efs_access_point.access_point_for_lambda.arn</span><span class="c1"></span>
+
+<span class="c1">    # Local mount path inside the lambda function. Must start with '/mnt/'.</span>
+<span class="w">    </span><span class="na">local_mount_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/mnt/efs"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">vpc_config</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # Every subnet should be able to reach an EFS mount target in the same Availability Zone. Cross-AZ mounts are not permitted.</span>
+<span class="w">    </span><span class="na">subnet_ids</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_subnet.subnet_for_lambda.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">security_group_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_security_group.sg_for_lambda.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # Explicitly declare dependency on EFS mount target.</span>
+<span class="c1">  # When creating or updating Lambda functions, mount target must be in 'available' lifecycle state.</span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_efs_mount_target.alpha</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># EFS file system</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_efs_file_system"</span><span class="w"> </span><span class="nv">"efs_for_lambda"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"efs_for_lambda"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Mount target connects the file system to the subnet</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_efs_mount_target"</span><span class="w"> </span><span class="nv">"alpha"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">file_system_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_efs_file_system.efs_for_lambda.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_subnet.subnet_for_lambda.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_groups</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_security_group.sg_for_lambda.id</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># EFS access point used by lambda file system</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_efs_access_point"</span><span class="w"> </span><span class="nv">"access_point_for_lambda"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">file_system_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_efs_file_system.efs_for_lambda.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">root_directory</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/lambda"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">creation_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">owner_gid</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">1000</span><span class="w"></span>
+<span class="w">      </span><span class="na">owner_uid</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">1000</span><span class="w"></span>
+<span class="w">      </span><span class="na">permissions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"777"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">posix_user</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">gid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1000</span><span class="w"></span>
+<span class="w">    </span><span class="na">uid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1000</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Lambda%20retries"></a><h3 id="lambda-retries">Lambda retries</h3>
+
+<p>Lambda Functions allow you to configure error handling for asynchronous invocation. The settings that it supports are <code>Maximum age of event</code> and <code>Retry attempts</code> as stated in <a href="https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html#invocation-async-errors">Lambda documentation for Configuring error handling for asynchronous invocation</a>. To configure these settings, refer to the <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_function_event_invoke_config">aws_lambda_function_event_invoke_config resource</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/CloudWatch%20Logging%20and%20Permissions"></a><h2 id="cloudwatch-logging-and-permissions">CloudWatch Logging and Permissions</h2>
+
+<p>For more information about CloudWatch Logs for Lambda, see the <a href="https://docs.aws.amazon.com/lambda/latest/dg/monitoring-functions-logs.html">Lambda User Guide</a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"lambda_function_name"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"lambda_function_name"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lambda_function"</span><span class="w"> </span><span class="nv">"test_lambda"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">function_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.lambda_function_name</span><span class="c1"></span>
+
+<span class="c1">  # Advanced logging controls (optional)</span>
+<span class="w">  </span><span class="nb">logging_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">log_format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Text"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # ... other configuration ...</span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">aws_iam_role_policy_attachment.lambda_logs</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nv">aws_cloudwatch_log_group.example</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># This is to optionally manage the CloudWatch Log Group for the Lambda Function.</span>
+<span class="c1"># If skipping this resource configuration, also add "logs:CreateLogGroup" to the IAM policy below.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_cloudwatch_log_group"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"/aws/lambda/${var.lambda_function_name}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">retention_in_days</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">14</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># See also the following AWS managed policy: AWSLambdaBasicExecutionRole</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"lambda_logging"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"logs:CreateLogGroup"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"logs:CreateLogStream"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"logs:PutLogEvents"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">resources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"arn:aws:logs:*:*:*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_policy"</span><span class="w"> </span><span class="nv">"lambda_logging"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"lambda_logging"</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"/"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"IAM policy for logging from a lambda"</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.lambda_logging.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role_policy_attachment"</span><span class="w"> </span><span class="nv">"lambda_logs"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.iam_for_lambda.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_policy.lambda_logging.arn</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Specifying%20the%20Deployment%20Package"></a><h2 id="specifying-the-deployment-package">Specifying the Deployment Package</h2>
+
+<p>AWS Lambda expects source code to be provided as a deployment package whose structure varies depending on which <code>runtime</code> is in use. See <a href="https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime">Runtimes</a> for the valid values of <code>runtime</code>. The expected structure of the deployment package can be found in <a href="https://docs.aws.amazon.com/lambda/latest/dg/deployment-package-v2.html">the AWS Lambda documentation for each runtime</a>.</p>
+
+<p>Once you have created your deployment package you can specify it either directly as a local file (using the <code>filename</code> argument) or indirectly via Amazon S3 (using the <code>s3_bucket</code>, <code>s3_key</code> and <code>s3_object_version</code> arguments). When providing the deployment package via S3 it may be useful to use <a href="s3_object.html">the <code>aws_s3_object</code> resource</a> to upload it.</p>
+
+<p>For larger deployment packages it is recommended by Amazon to upload via S3, since the S3 API has better support for uploading large files efficiently.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>function_name</code> - (Required) Unique name for your Lambda Function.</li>
+<li><code>role</code> - (Required) Amazon Resource Name (ARN) of the function's execution role. The role provides the function's identity and access to AWS services and resources.</li>
+</ul>
+
+<p>The following arguments are optional:</p>
+
+<ul>
+<li><code>architectures</code> - (Optional) Instruction set architecture for your Lambda function. Valid values are <code>["x86_64"]</code> and <code>["arm64"]</code>. Default is <code>["x86_64"]</code>. Removing this attribute, function's architecture stay the same.</li>
+<li><code>code_signing_config_arn</code> - (Optional) To enable code signing for this function, specify the ARN of a code-signing configuration. A code-signing configuration includes a set of signing profiles, which define the trusted publishers for this function.</li>
+<li><code>dead_letter_config</code> - (Optional) Configuration block. Detailed below.</li>
+<li><code>description</code> - (Optional) Description of what your Lambda Function does.</li>
+<li><code>environment</code> - (Optional) Configuration block. Detailed below.</li>
+<li><code>ephemeral_storage</code> - (Optional) The amount of Ephemeral storage(<code>/tmp</code>) to allocate for the Lambda Function in MB. This parameter is used to expand the total amount of Ephemeral storage available, beyond the default amount of <code>512</code>MB. Detailed below.</li>
+<li><code>file_system_config</code> - (Optional) Configuration block. Detailed below.</li>
+<li><code>filename</code> - (Optional) Path to the function's deployment package within the local filesystem. Exactly one of <code>filename</code>, <code>image_uri</code>, or <code>s3_bucket</code> must be specified.</li>
+<li><code>handler</code> - (Optional) Function <a href="https://docs.aws.amazon.com/lambda/latest/dg/walkthrough-custom-events-create-test-function.html">entrypoint</a> in your code.</li>
+<li><code>image_config</code> - (Optional) Configuration block. Detailed below.</li>
+<li><code>image_uri</code> - (Optional) ECR image URI containing the function's deployment package. Exactly one of <code>filename</code>, <code>image_uri</code>,  or <code>s3_bucket</code> must be specified.</li>
+<li><code>kms_key_arn</code> - (Optional) Amazon Resource Name (ARN) of the AWS Key Management Service (KMS) key that is used to encrypt environment variables. If this configuration is not provided when environment variables are in use, AWS Lambda uses a default service key. If this configuration is provided when environment variables are not in use, the AWS Lambda API does not save this configuration and Terraform will show a perpetual difference of adding the key. To fix the perpetual difference, remove this configuration.</li>
+<li><code>layers</code> - (Optional) List of Lambda Layer Version ARNs (maximum of 5) to attach to your Lambda Function. See <a href="https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html">Lambda Layers</a></li>
+<li><code>logging_config</code> - (Optional) Configuration block used to specify advanced logging settings. Detailed below.</li>
+<li><code>memory_size</code> - (Optional) Amount of memory in MB your Lambda Function can use at runtime. Defaults to <code>128</code>. See <a href="https://docs.aws.amazon.com/lambda/latest/dg/limits.html">Limits</a></li>
+<li><code>package_type</code> - (Optional) Lambda deployment package type. Valid values are <code>Zip</code> and <code>Image</code>. Defaults to <code>Zip</code>.</li>
+<li><code>publish</code> - (Optional) Whether to publish creation/change as new Lambda Function Version. Defaults to <code>false</code>.</li>
+<li><code>reserved_concurrent_executions</code> - (Optional) Amount of reserved concurrent executions for this lambda function. A value of <code>0</code> disables lambda from being triggered and <code>-1</code> removes any concurrency limitations. Defaults to Unreserved Concurrency Limits <code>-1</code>. See <a href="https://docs.aws.amazon.com/lambda/latest/dg/concurrent-executions.html">Managing Concurrency</a></li>
+<li><code>replace_security_groups_on_destroy</code> - (Optional) Whether to replace the security groups on the function's VPC configuration prior to destruction.
+Removing these security group associations prior to function destruction can speed up security group deletion times of AWS's internal cleanup operations.
+By default, the security groups will be replaced with the <code>default</code> security group in the function's configured VPC.
+Set the <code>replacement_security_group_ids</code> attribute to use a custom list of security groups for replacement.</li>
+<li><code>replacement_security_group_ids</code> - (Optional) List of security group IDs to assign to the function's VPC configuration prior to destruction.
+<code>replace_security_groups_on_destroy</code> must be set to <code>true</code> to use this attribute.</li>
+<li><code>runtime</code> - (Optional) Identifier of the function's runtime. See <a href="https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime">Runtimes</a> for valid values.</li>
+<li><code>s3_bucket</code> - (Optional) S3 bucket location containing the function's deployment package. This bucket must reside in the same AWS region where you are creating the Lambda function. Exactly one of <code>filename</code>, <code>image_uri</code>, or <code>s3_bucket</code> must be specified. When <code>s3_bucket</code> is set, <code>s3_key</code> is required.</li>
+<li><code>s3_key</code> - (Optional) S3 key of an object containing the function's deployment package. When <code>s3_bucket</code> is set, <code>s3_key</code> is required.</li>
+<li><code>s3_object_version</code> - (Optional) Object version containing the function's deployment package. Conflicts with <code>filename</code> and <code>image_uri</code>.</li>
+<li><code>skip_destroy</code> - (Optional) Set to true if you do not wish the function to be deleted at destroy time, and instead just remove the function from the Terraform state.</li>
+<li><code>source_code_hash</code> - (Optional) Virtual attribute used to trigger replacement when source code changes. Must be set to a base64-encoded SHA256 hash of the package file specified with either <code>filename</code> or <code>s3_key</code>. The usual way to set this is <code>filebase64sha256("file.zip")</code> (Terraform 0.11.12 and later) or <code>base64sha256(file("file.zip"))</code> (Terraform 0.11.11 and earlier), where "file.zip" is the local filename of the lambda function source archive.</li>
+<li><code>snap_start</code> - (Optional) Snap start settings block. Detailed below.</li>
+<li><code>tags</code> - (Optional) Map of tags to assign to the object. If configured with a provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a> present, tags with matching keys will overwrite those defined at the provider-level.</li>
+<li><code>timeout</code> - (Optional) Amount of time your Lambda Function has to run in seconds. Defaults to <code>3</code>. See <a href="https://docs.aws.amazon.com/lambda/latest/dg/limits.html">Limits</a>.</li>
+<li><code>tracing_config</code> - (Optional) Configuration block. Detailed below.</li>
+<li><code>vpc_config</code> - (Optional) Configuration block. Detailed below.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/dead_letter_config"></a><h3 id="dead_letter_config">dead_letter_config</h3>
+
+<p>Dead letter queue configuration that specifies the queue or topic where Lambda sends asynchronous events when they fail processing. For more information, see <a href="https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html#dlq">Dead Letter Queues</a>.</p>
+
+<ul>
+<li><code>target_arn</code> - (Required) ARN of an SNS topic or SQS queue to notify when an invocation fails. If this option is used, the function's IAM role must be granted suitable access to write to the target object, which means allowing either the <code>sns:Publish</code> or <code>sqs:SendMessage</code> action on this ARN, depending on which service is targeted.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/environment"></a><h3 id="environment">environment</h3>
+
+<ul>
+<li><code>variables</code> - (Optional) Map of environment variables that are accessible from the function code during execution. If provided at least one key must be present.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ephemeral_storage"></a><h3 id="ephemeral_storage">ephemeral_storage</h3>
+
+<ul>
+<li><code>size</code> - (Required) The size of the Lambda function Ephemeral storage(<code>/tmp</code>) represented in MB. The minimum supported <code>ephemeral_storage</code> value defaults to <code>512</code>MB and the maximum supported value is <code>10240</code>MB.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/file_system_config"></a><h3 id="file_system_config">file_system_config</h3>
+
+<p>Connection settings for an EFS file system. Before creating or updating Lambda functions with <code>file_system_config</code>, EFS mount targets must be in available lifecycle state. Use <code>depends_on</code> to explicitly declare this dependency. See <a href="https://docs.aws.amazon.com/lambda/latest/dg/services-efs.html">Using Amazon EFS with Lambda</a>.</p>
+
+<ul>
+<li><code>arn</code> - (Required) Amazon Resource Name (ARN) of the Amazon EFS Access Point that provides access to the file system.</li>
+<li><code>local_mount_path</code> - (Required) Path where the function can access the file system, starting with /mnt/.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/image_config"></a><h3 id="image_config">image_config</h3>
+
+<p>Container image configuration values that override the values in the container image Dockerfile.</p>
+
+<ul>
+<li><code>command</code> - (Optional) Parameters that you want to pass in with <code>entry_point</code>.</li>
+<li><code>entry_point</code> - (Optional) Entry point to your application, which is typically the location of the runtime executable.</li>
+<li><code>working_directory</code> - (Optional) Working directory.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/logging_config"></a><h3 id="logging_config">logging_config</h3>
+
+<p>Advanced logging settings. See <a href="https://docs.aws.amazon.com/lambda/latest/dg/monitoring-cloudwatchlogs.html#monitoring-cloudwatchlogs-advanced">Configuring advanced logging controls for your Lambda function</a>.</p>
+
+<ul>
+<li><code>application_log_level</code> - (Optional) for JSON structured logs, choose the detail level of the logs your application sends to CloudWatch when using supported logging libraries.</li>
+<li><code>log_format</code> - (Required) select between <code>Text</code> and structured <code>JSON</code> format for your function's logs.</li>
+<li><code>log_group</code> - (Optional) the CloudWatch log group your function sends logs to.</li>
+<li><code>system_log_level</code> - (optional) for JSON structured logs, choose the detail level of the Lambda platform event logs sent to CloudWatch, such as <code>ERROR</code>, <code>DEBUG</code>, or <code>INFO</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/snap_start"></a><h3 id="snap_start">snap_start</h3>
+
+<p>Snap start settings for low-latency startups. This feature is currently only supported for specific runtimes, see <a href="https://docs.aws.amazon.com/lambda/latest/dg/snapstart.html#snapstart-runtimes">Supported features and limitations</a>.
+Remove this block to delete the associated settings (rather than setting <code>apply_on = "None"</code>).</p>
+
+<ul>
+<li><code>apply_on</code> - (Required) Conditions where snap start is enabled. Valid values are <code>PublishedVersions</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/tracing_config"></a><h3 id="tracing_config">tracing_config</h3>
+
+<ul>
+<li><code>mode</code> - (Required) Whether to sample and trace a subset of incoming requests with AWS X-Ray. Valid values are <code>PassThrough</code> and <code>Active</code>. If <code>PassThrough</code>, Lambda will only trace the request from an upstream service if it contains a tracing header with "sampled=1". If <code>Active</code>, Lambda will respect any tracing header it receives from an upstream service. If no tracing header is received, Lambda will call X-Ray for a tracing decision.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/vpc_config"></a><h3 id="vpc_config">vpc_config</h3>
+
+<p>For network connectivity to AWS resources in a VPC, specify a list of security groups and subnets in the VPC. When you connect a function to a VPC, it can only access resources and the internet through that VPC. See <a href="https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html">VPC Settings</a>.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>If <code>subnet_ids</code>, <code>security_group_ids</code> and <code>ipv6_allowed_for_dual_stack</code> are empty then <code>vpc_config</code> is considered to be empty or unset.</p>
+</aside>
+
+<ul>
+<li><code>ipv6_allowed_for_dual_stack</code> - (Optional) Allows outbound IPv6 traffic on VPC functions that are connected to dual-stack subnets. Default is <code>false</code>.</li>
+<li><code>security_group_ids</code> - (Required) List of security group IDs associated with the Lambda function.</li>
+<li><code>subnet_ids</code> - (Required) List of subnet IDs associated with the Lambda function.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>arn</code> - Amazon Resource Name (ARN) identifying your Lambda Function.</li>
+<li><code>code_sha256</code> - Base64-encoded representation of raw SHA-256 sum of the zip file.</li>
+<li><code>invoke_arn</code> - ARN to be used for invoking Lambda Function from API Gateway - to be used in <a href="../resources/api_gateway_integration.html"><code>aws_api_gateway_integration</code></a>'s <code>uri</code>.</li>
+<li><code>last_modified</code> - Date this resource was last modified.</li>
+<li><code>qualified_arn</code> - ARN identifying your Lambda Function Version (if versioning is enabled via <code>publish = true</code>).</li>
+<li><code>qualified_invoke_arn</code> - Qualified ARN (ARN with lambda version number) to be used for invoking Lambda Function from API Gateway - to be used in <a href="../resources/api_gateway_integration.html"><code>aws_api_gateway_integration</code></a>'s <code>uri</code>.</li>
+<li><code>signing_job_arn</code> - ARN of the signing job.</li>
+<li><code>signing_profile_version_arn</code> - ARN of the signing profile version.</li>
+<li><code>snap_start.optimization_status</code> - Optimization status of the snap start configuration. Valid values are <code>On</code> and <code>Off</code>.</li>
+<li><code>source_code_size</code> - Size in bytes of the function .zip file.</li>
+<li><code>tags_all</code> - A map of tags assigned to the resource, including those inherited from the provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a>.</li>
+<li><code>version</code> - Latest published version of your Lambda Function.</li>
+<li><code>vpc_config.vpc_id</code> - ID of the VPC.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p><a href="https://developer.hashicorp.com/terraform/language/resources/syntax#operation-timeouts">Configuration options</a>:</p>
+
+<ul>
+<li><code>create</code> - (Default <code>10m</code>)</li>
+<li><code>update</code> - (Default <code>10m</code>)</li>
+<li><code>delete</code> - (Default <code>10m</code>)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import Lambda Functions using the <code>function_name</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_lambda_function.test_lambda</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_test_lambda_function"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import Lambda Functions using the <code>function_name</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_lambda_function.test_lambda my_test_lambda_function
+</code></pre></div>
+
+            
+        
+    </body></html>

@@ -1,0 +1,222 @@
+<html><!-- Online page at https://www.terraform.io/language/modules/syntax --><head>
+                <title>Module Blocks</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="module-blocks">Module Blocks</h1>
+
+<blockquote>
+  <p><strong>Hands-on:</strong> Try the <a href="../../terraform/tutorials/modules?utm_source=WEBSITE&amp;utm_medium=WEB_IO&amp;utm_offer=ARTICLE_PAGE&amp;utm_content=DOCS.html">Reuse Configuration with Modules</a> tutorials.</p>
+</blockquote>
+
+<p>A <em>module</em> is a container for multiple resources that are used together.</p>
+
+<p>Every Terraform configuration has at least one module, known as its
+<em>root module</em>, which consists of the resources defined in the <code>.tf</code> files in
+the main working directory.</p>
+
+<p>A module can call other modules, which lets you include the child module's
+resources into the configuration in a concise way. Modules
+can also be called multiple times, either within the same configuration or
+in separate configurations, allowing resource configurations to be packaged
+and re-used.</p>
+
+<p>This page describes how to call one module from another. For more information
+about creating re-usable child modules, see <a href="../../terraform/language/modules/develop.html">Module Development</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Calling%20a%20Child%20Module"></a><h2 id="calling-a-child-module">Calling a Child Module</h2>
+
+<p>To <em>call</em> a module means to include the contents of that module into the
+configuration with specific values for its
+<a href="../../terraform/language/values/variables.html">input variables</a>. Modules are called
+from within other modules using <code>module</code> blocks:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">module</span><span class="w"> </span><span class="nv">"servers"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./app-cluster"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">servers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>A module that includes a <code>module</code> block like this is the <em>calling module</em> of the
+child module.</p>
+
+<p>The label immediately after the <code>module</code> keyword is a local name, which the
+calling module can use to refer to this instance of the module.</p>
+
+<p>Within the block body (between <code>{</code> and <code>}</code>) are the arguments for the module.
+Module calls use the following kinds of arguments:</p>
+
+<ul>
+<li><p>The <code>source</code> argument is mandatory for all modules.</p></li>
+<li><p>The <code>version</code> argument is recommended for modules from a registry.</p></li>
+<li><p>Most other arguments correspond to <a href="../../terraform/language/values/variables.html">input variables</a>
+defined by the module. (The <code>servers</code> argument in the example above is one of
+these.)</p></li>
+<li><p>Terraform defines a few other meta-arguments that can be used with all
+modules, including <code>for_each</code> and <code>depends_on</code>.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Source"></a><h3 id="source">Source</h3>
+
+<p>All modules <strong>require</strong> a <code>source</code> argument, which is a meta-argument defined by
+Terraform. Its value is either the path to a local directory containing the
+module's configuration files, or a remote module source that Terraform should
+download and use. This value must be a literal string with no template
+sequences; arbitrary expressions are not allowed. For more information on
+possible values for this argument, see <a href="../../terraform/language/modules/sources.html">Module Sources</a>.</p>
+
+<p>The same source address can be specified in multiple <code>module</code> blocks to create
+multiple copies of the resources defined within, possibly with different
+variable values.</p>
+
+<p>After adding, removing, or modifying <code>module</code> blocks, you must re-run
+<code>terraform init</code> to allow Terraform the opportunity to adjust the installed
+modules. By default this command will not upgrade an already-installed module;
+use the <code>-upgrade</code> option to instead upgrade to the newest available version.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Version"></a><h3 id="version">Version</h3>
+
+<p>When using modules installed from a module registry, we recommend explicitly
+constraining the acceptable version numbers to avoid unexpected or unwanted
+changes.</p>
+
+<p>Use the <code>version</code> argument in the <code>module</code> block to specify versions:</p>
+
+<div class="codehilite"><pre><span></span><code>module <span class="s2">"consul"</span> <span class="o">{</span>
+  <span class="nb">source</span>  <span class="o">=</span> <span class="s2">"hashicorp/consul/aws"</span>
+  <span class="nv">version</span> <span class="o">=</span> <span class="s2">"0.0.5"</span>
+
+  <span class="nv">servers</span> <span class="o">=</span> <span class="m">3</span>
+<span class="o">}</span>
+</code></pre></div>
+
+<p>The <code>version</code> argument accepts a <a href="../../terraform/language/expressions/version-constraints.html">version constraint string</a>.
+Terraform will use the newest installed version of the module that meets the
+constraint; if no acceptable versions are installed, it will download the newest
+version that meets the constraint.</p>
+
+<p>Version constraints are supported only for modules installed from a module
+registry, such as the public <a href="https://registry.terraform.io/">Terraform Registry</a>
+or <a href="../../terraform/cloud-docs/registry.html">HCP Terraform's private module registry</a>.
+Other module sources can provide their own versioning mechanisms within the
+source string itself, or might not support versions at all. In particular,
+modules sourced from local file paths do not support <code>version</code>; since
+they're loaded from the same source repository, they always share the same
+version as their caller.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Meta-arguments"></a><h3 id="meta-arguments">Meta-arguments</h3>
+
+<p>Along with <code>source</code> and <code>version</code>, Terraform defines a few more
+optional meta-arguments that have special meaning across all modules,
+described in more detail in the following pages:</p>
+
+<ul>
+<li><p><code>count</code> - Creates multiple instances of a module from a single <code>module</code> block.
+See <a href="../../terraform/language/meta-arguments/count.html">the <code>count</code> page</a>
+for details.</p></li>
+<li><p><code>for_each</code> - Creates multiple instances of a module from a single <code>module</code>
+block. See
+<a href="../../terraform/language/meta-arguments/for_each.html">the <code>for_each</code> page</a>
+for details.</p></li>
+<li><p><code>providers</code> - Passes provider configurations to a child module. See
+<a href="../../terraform/language/meta-arguments/module-providers.html">the <code>providers</code> page</a>
+for details. If not specified, the child module inherits all of the default
+(un-aliased) provider configurations from the calling module.</p></li>
+<li><p><code>depends_on</code> - Creates explicit dependencies between the entire
+module and the listed targets. See
+<a href="../../terraform/language/meta-arguments/depends_on.html">the <code>depends_on</code> page</a>
+for details.</p></li>
+</ul>
+
+<p>Terraform does not use the <code>lifecycle</code> argument. However, the <code>lifecycle</code> block is reserved for future versions.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Accessing%20Module%20Output%20Values"></a><h2 id="accessing-module-output-values">Accessing Module Output Values</h2>
+
+<p>The resources defined in a module are encapsulated, so the calling module
+cannot access their attributes directly. However, the child module can
+declare <a href="../../terraform/language/values/outputs.html">output values</a> to selectively
+export certain values to be accessed by the calling module.</p>
+
+<p>For example, if the <code>./app-cluster</code> module referenced in the example above
+exported an output value named <code>instance_ids</code> then the calling module
+can reference that result using the expression <code>module.servers.instance_ids</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_elb"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+
+<span class="w">  </span><span class="na">instances</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">module.servers.instance_ids</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>For more information about referring to named values, see
+<a href="../../terraform/language/expressions.html">Expressions</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Transferring%20Resource%20State%20Into%20Modules"></a><h2 id="transferring-resource-state-into-modules">Transferring Resource State Into Modules</h2>
+
+<p>Moving <code>resource</code> blocks from one module into several child modules causes
+Terraform to see the new location as an entirely different resource. As a
+result, Terraform plans to destroy all resource instances at the old address
+and create new instances at the new address.</p>
+
+<p>To preserve existing objects, you can use
+<a href="../../terraform/language/modules/develop/refactoring.html">refactoring blocks</a> to record the old and new
+addresses for each resource instance. This directs Terraform to treat existing
+objects at the old addresses as if they had originally been created at the
+corresponding new addresses.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Replacing%20resources%20within%20a%20module"></a><h2 id="replacing-resources-within-a-module">Replacing resources within a module</h2>
+
+<p>You may have an object that needs to be replaced with a new object for a reason
+that isn't automatically visible to Terraform, such as if a particular virtual
+machine is running on degraded underlying hardware. In this case, you can use
+<a href="../../terraform/cli/commands/plan.html#replace-address">the <code>-replace=...</code> planning option</a>
+to force Terraform to propose replacing that object.</p>
+
+<p>If the object belongs to a resource within a nested module, specify the full
+path to that resource including all of the nested module steps leading to it.
+For example:</p>
+
+<pre><code>$ terraform plan -replace=module.example.aws_instance.example
+</code></pre>
+
+<p>The above selects a <code>resource "aws_instance" "example"</code> declared inside a
+<code>module "example"</code> child module declared inside your root module.</p>
+
+<p>Because replacing is a very disruptive action, Terraform only allows selecting
+individual resource instances. There is no syntax to force replacing <em>all</em>
+resource instances belonging to a particular module.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Removing%20Modules"></a><h2 id="removing-modules">Removing Modules</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The <code>removed</code> block is available in Terraform v1.7 and later. For earlier Terraform versions, you can use the <a href="../../terraform/cli/commands/state/rm.html"><code>terraform state rm</code> CLI command</a> as a separate step.</p>
+</aside>
+
+<p>To remove a module from Terraform, simply delete the module call from your Terraform configuration.</p>
+
+<p>By default, after you remove the <code>module</code> block, Terraform will plan to destroy any resources it is managing that were declared in that module. This is because when you remove the module call, that module's configuration is no longer included in your Terraform configuration.</p>
+
+<p>Sometimes you may wish to remove a module from your Terraform configuration without destroying the real infrastructure objects it manages. In this case, the resources will be removed from the <a href="../../terraform/language/state.html">Terraform state</a>, but the real infrastructure objects will not be destroyed.</p>
+
+<p>To declare that a module was removed from Terraform configuration but that its managed objects should not be destroyed, remove the <code>module</code> block from your configuration and replace it with a <code>removed</code> block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">removed</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">module.example</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The <code>from</code> argument is the address of the module you want to remove, without any instance keys (such as "module.example[1]").</p>
+
+<p>The <code>lifecycle</code> block is required. The <code>destroy</code> argument determines whether Terraform will attempt to destroy the objects managed by the module or not. A value of <code>false</code> means that Terraform will remove the resources from state without destroying them.</p>
+
+            
+        
+    </body></html>

@@ -1,0 +1,140 @@
+<html><!-- Online page at https://www.terraform.io/language/resources/provisioners/file --><head>
+                <title>File Provisioner</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="file-provisioner">File Provisioner</h1>
+
+<p>The <code>file</code> provisioner copies files or directories from the machine
+running Terraform to the newly created resource. The <code>file</code> provisioner
+supports both <code>ssh</code> and <code>winrm</code> type <a href="../../../terraform/language/resources/provisioners/connection.html">connections</a>.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Important</em>
+    <p>Use provisioners as a last resort. There are better alternatives for most situations. Refer to <a href="../../../terraform/language/resources/provisioners/syntax.html">Declaring Provisioners</a> for more details.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20usage"></a><h2 id="example-usage">Example usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+
+<span class="c1">  # Copies the myapp.conf file to /etc/myapp.conf</span>
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"file"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"conf/myapp.conf"</span><span class="w"></span>
+<span class="w">    </span><span class="na">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/etc/myapp.conf"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # Copies the string in content into /tmp/file.log</span>
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"file"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">content</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"ami used: ${self.ami}"</span><span class="w"></span>
+<span class="w">    </span><span class="na">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/tmp/file.log"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # Copies the configs.d folder to /etc/configs.d</span>
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"file"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"conf/configs.d"</span><span class="w"></span>
+<span class="w">    </span><span class="na">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/etc"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # Copies all files and folders in apps/app1 to D:/IIS/webapp1</span>
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"file"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"apps/app1/"</span><span class="w"></span>
+<span class="w">    </span><span class="na">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"D:/IIS/webapp1"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>When the <code>file</code> provisioner communicates with a Windows system over SSH, you must configure OpenSSH to run the commands with <code>cmd.exe</code> and not PowerShell. PowerShell causes file parsing errors because it is incompatible with both Unix shells and the Windows command interpreter.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>source</code> - The source file or directory. Specify it either relative to the
+current working directory or as an absolute path.
+This argument cannot be combined with <code>content</code>.</p></li>
+<li><p><code>content</code> - The direct content to copy on the destination.
+If destination is a file, the content will be written on that file. In case
+of a directory, a file named <code>tf-file-content</code> is created inside that
+directory. We recommend using a file as the destination when using <code>content</code>.
+This argument cannot be combined with <code>source</code>.</p></li>
+<li><p><code>destination</code> - (Required) The destination path to write to on the remote
+system. See <a href="#destination-paths">Destination Paths</a> below for more
+information.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Destination%20Paths"></a><h2 id="destination-paths">Destination Paths</h2>
+
+<p>The path you provide in the <code>destination</code> argument will be evaluated by the
+remote system, rather than by Terraform itself. Therefore the valid values
+for that argument can vary depending on the operating system and remote access
+software running on the target.</p>
+
+<p>When connecting over SSH, the <code>file</code> provisioner passes the given destination
+path verbatim to the <code>scp</code> program on the remote host. By default, OpenSSH's
+<code>scp</code> implementation runs in the remote user's home directory and so you can
+specify a relative path to upload into that home directory, or an absolute
+path to upload to some other location. The remote <code>scp</code> process will run with
+the access level of the user specified in the <code>connection</code> block, and so
+permissions may prevent writing directly to locations outside of the home
+directory.</p>
+
+<p>Because WinRM has no corresponding file transfer protocol, for WinRM
+connections the <code>file</code> provisioner uses a more complex process:</p>
+
+<ol>
+<li>Generate a temporary filename in the directory given in the remote system's
+<code>TEMP</code> environment variable, using a pseudorandom UUID for uniqueness.</li>
+<li>Use sequential generated <code>echo</code> commands over WinRM to gradually append
+base64-encoded chunks of the source file to the chosen temporary file.</li>
+<li>Use an uploaded PowerShell script to read the temporary file, base64-decode,
+and write the raw result into the destination file.</li>
+</ol>
+
+<p>In the WinRM case, the destination path is therefore interpreted by PowerShell
+and so you must take care not to use any meta-characters that PowerShell might
+interpret. In particular, avoid including any untrusted external input in
+your <code>destination</code> argument when using WinRM, because it can serve as a vector
+for arbitrary PowerShell code execution on the remote system.</p>
+
+<p>Modern Windows systems support running an OpenSSH server, so we strongly
+recommend choosing SSH over WinRM whereever possible, and using WinRM only as
+a last resort when working with obsolete Windows versions.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Directory%20Uploads"></a><h2 id="directory-uploads">Directory Uploads</h2>
+
+<p>The <code>file</code> provisioner can upload a complete directory to the remote machine.
+When uploading a directory, there are some additional considerations.</p>
+
+<p>When using the <code>ssh</code> connection type the destination directory must already
+exist. If you need to create it, use a remote-exec provisioner just prior to
+the file provisioner in order to create the directory</p>
+
+<p>When using the <code>winrm</code> connection type the destination directory will be
+created for you if it doesn't already exist.</p>
+
+<p>The existence of a trailing slash on the source path will determine whether the
+directory name will be embedded within the destination, or whether the
+destination will be created. For example:</p>
+
+<ul>
+<li><p>If the source is <code>/foo</code> (no trailing slash), and the destination is <code>/tmp</code>,
+then the contents of <code>/foo</code> on the local machine will be uploaded to
+<code>/tmp/foo</code> on the remote machine. The <code>foo</code> directory on the remote machine
+will be created by Terraform.</p></li>
+<li><p>If the source, however, is <code>/foo/</code> (a trailing slash is present), and the
+destination is <code>/tmp</code>, then the contents of <code>/foo</code> will be uploaded directly
+into <code>/tmp</code>.</p></li>
+</ul>
+
+            
+        
+    </body></html>

@@ -1,0 +1,129 @@
+<html><!-- Online page at https://www.terraform.io/language/checks --><head>
+                <title>Checks</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="checks">Checks</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Check blocks are only available in Terraform v1.5.0 and later.</p>
+</aside>
+
+<p>The <code>check</code> block can validate your infrastructure outside the usual resource lifecycle. Check blocks address a gap between post-apply and functional validation of infrastructure.</p>
+
+<blockquote>
+  <p><strong>Hands-on:</strong> Try the <a href="../../terraform/tutorials/configuration-language/checks.html">Validate Infrastructure Using Checks</a> tutorial.</p>
+</blockquote>
+
+<p>Check blocks allow you to define <a href="../../terraform/language/expressions/custom-conditions.html">custom conditions</a> that execute on every Terraform plan or apply operation without affecting the overall status of an operation. Check blocks execute as the last step of a plan or apply after Terraform has planned or provisioned your infrastructure.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Syntax"></a><h2 id="syntax">Syntax</h2>
+
+<p>You can declare a <code>check</code> block with a local name, zero-to-one scoped <a href="#scoped-data-sources">data sources</a>, and one-to-many <a href="#assertions">assertions</a>.</p>
+
+<p>The following example loads the Terraform website and validates that it returns the expected status code <code>200</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">check</span><span class="w"> </span><span class="s2">"health_check"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">data</span><span class="w"> </span><span class="nc">"http"</span><span class="w"> </span><span class="nv">"terraform_io"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://www.terraform.io"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.http.terraform_io.status_code</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="m">200</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.http.terraform_io.url} returned an unhealthy status code"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Scoped%20data%20sources"></a><h3 id="scoped-data-sources">Scoped data sources</h3>
+
+<p>You can use any data source from any provider as a scoped data source within a <code>check</code> block.</p>
+
+<p>A <code>check</code> block can optionally contain a nested (a.k.a. scoped) data source. This <code>data</code> block behaves like an external <a href="../../terraform/language/data-sources.html">data source</a>, except you can not reference it outside its enclosing <code>check</code> block. Additionally, if a scoped data source's provider raises any errors, they are masked as warnings and do not prevent Terraform from continuing operation execution.</p>
+
+<p>You can use a scoped data source to validate the status of a piece of infrastructure outside of the usual Terraform resource lifecycle. <a href="#checks-syntax">In the above example</a>, if the <code>terraform_io</code> data source fails to load, you receive a warning instead of a blocking error, which would occur if you declared this data source outside of a <code>check</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Meta-Arguments"></a><h4 id="meta-arguments">Meta-Arguments</h4>
+
+<p>Scoped data sources support the <code>depends_on</code> and <code>provider</code> <a href="../../terraform/language/resources/syntax.html#meta-arguments">meta-arguments</a>. Scoped data sources do not support the <code>count</code> or<code>for_each</code> meta-arguments.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/depends_on"></a><h5 id="depends_on"><code>depends_on</code></h5>
+
+<p>The <code>depends_on</code> meta-argument can be particularly powerful when used within scoped data sources.</p>
+
+<p>The first time Terraform creates the <em>initial</em> plan for our <a href="#checks-syntax">previous example</a>, the plan fails because Terraform has not applied its configuration yet. Meaning this test fails because Terraform must still create the resources to make this website exist. Therefore, the first time Terraform runs this check, it always throws a potentially distracting error message.</p>
+
+<p>You can fix this by adding <a href="../../terraform/language/meta-arguments/depends_on.html"><code>depends_on</code></a> to your scoped data source, ensuring it depends on an essential piece of your site's infrastructure, such as the load balancer. The check returns  <code>known after apply</code> until that crucial piece of your website is ready. This strategy avoids producing unnecessary warnings during setup, and the check executes during subsequent plans and applies.</p>
+
+<p>One problem with this strategy is that if the resource your scoped data source <code>depends_on</code> changes, the check block returns <code>known after apply</code> until Terraform has updated that resource. Depending on your use case, this behavior could be acceptable or problematic.</p>
+
+<p>We recommend implementing the <code>depends_on</code> meta-argument if your scoped data source depends on the existence of another resource without referencing it directly.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Assertions"></a><h3 id="assertions">Assertions</h3>
+
+<p>Check blocks validate your custom assertions using <code>assert</code> blocks. Each <code>check</code> block must have at least one, but potentially many, <code>assert</code> blocks. Each <code>assert</code> block has a <a href="../../terraform/language/expressions/custom-conditions.html#condition-expressions"><code>condition</code> attribute</a> and an <a href="../../terraform/language/expressions/custom-conditions.html#error-messages"><code>error_message</code> attribute</a>.</p>
+
+<p>Unlike other <a href="../../terraform/language/expressions/custom-conditions.html">custom conditions</a>, assertions do not affect Terraform's execution of an operation. A failed assertion reports a warning without halting the ongoing operation. This contrasts with other custom conditions, such as a postcondition, where Terraform produces an error immediately, halting the operation and blocking the application or planning of future resources.</p>
+
+<p>Condition arguments within <code>assert</code> blocks can refer to scoped data sources within the enclosing <code>check</code> block and any variables, resources, data sources, or module outputs within the current module.</p>
+
+<p><a href="../../terraform/language/expressions/custom-conditions.html#checks-with-assertions">Learn more about assertions</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Meta-Arguments"></a><h3 id="meta-arguments-2">Meta-Arguments</h3>
+
+<p>Check blocks do not currently support <a href="../../terraform/language/resources/syntax.html#meta-arguments">meta-arguments</a>. We are still collecting feedback on this feature, so if your use case would benefit from check blocks supporting meta-arguments, please <a href="https://github.com/hashicorp/terraform/issues/new/choose">let us know</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Continuous%20validation%20in%20HCP%20Terraform"></a><h2 id="continuous-validation-in-hcp-terraform">Continuous validation in HCP Terraform</h2>
+
+<p>HCP Terraform can automatically validate whether checks in a workspace’s configuration continue to pass after Terraform provisions new infrastructure. See <a href="../../terraform/cloud-docs/workspaces/health.html#continuous-validation">Continuous Validation</a> for details.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Choosing%20Checks%20or%20other%20Custom%20Conditions"></a><h2 id="choosing-checks-or-other-custom-conditions">Choosing Checks or other Custom Conditions</h2>
+
+<p>Check blocks offer the most <em>flexible</em> validation solution within Terraform. You can reference outputs, variables, resources, and data sources within check assertions. You can also use checks to model every alternate <a href="../../terraform/language/expressions/custom-conditions.html">Custom Condition</a>. However, that does not mean you should replace all your custom conditions with check blocks.</p>
+
+<p>There are major behavioral differences between check block assertions and other custom conditions, the main one being that check blocks do <em>not</em> affect Terraform's execution of an operation. You can use this non-blocking behavior to decide the best type of validation for your use case.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Outputs%20and%20variables"></a><h3 id="outputs-and-variables">Outputs and variables</h3>
+
+<p><a href="../../terraform/language/expressions/custom-conditions.html#outputs">Output postconditions</a> and <a href="../../terraform/language/expressions/custom-conditions.html#input-variable-validation">variable validations</a> both make assertions around inputs and outputs.</p>
+
+<p>This is one of the cases where you might want Terraform to block further execution. </p>
+
+<p>For example, it is not helpful for Terraform to warn that an input variable is invalid after it applies an entire configuration with that input variable. In this case, a check block would warn of the invalid input variable <em>without</em> interrupting the operation. A validation block for the same input variable would alert you of the invalid variable and halt the plan or apply operation.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%20Preconditions%20and%20Postconditions"></a><h3 id="resource-preconditions-and-postconditions">Resource Preconditions and Postconditions</h3>
+
+<p>The difference between <a href="../../terraform/language/expressions/custom-conditions.html#preconditions-and-postconditions">preconditions and postconditions</a> and check blocks is more nuanced.</p>
+
+<p>Preconditions are unique amongst the custom conditions in that they execute <em>before</em> a resource change is applied or planned. <a href="../../terraform/language/expressions/custom-conditions.html#choosing-between-preconditions-and-postconditions">Choosing Between Preconditions and Postconditions</a> offers guidance on choosing between a precondition and a postcondition, and the same topics also apply to choosing between a precondition and a check block.</p>
+
+<p>You can often use postconditions interchangeably with check blocks to validate resources and data sources.</p>
+
+<p>For example, you can <a href="#syntax">rewrite the above <code>check</code> block example</a> to use a postcondition instead. The below code uses a <code>postcondition</code> block to validate that the Terraform website returns the expected status code of <code>200</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"http"</span><span class="w"> </span><span class="nv">"terraform_io"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://www.terraform.io"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">postcondition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">self.status_code</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="m">200</span><span class="w"></span>
+<span class="w">        </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${self.url} returned an unhealthy status code"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Both the <code>check</code> and <code>postcondition</code> block examples validate that the Terraform website returns a <code>200</code> status code during a plan or an apply operation. The difference between the two blocks is how each handles failure.</p>
+
+<p>If a <code>postcondition</code> block fails, it <em>blocks</em> Terraform from executing the current operation. If a <code>check</code> block fails, it <em>does not</em> block Terraform from executing an operation.</p>
+
+<p>If the above example's postcondition fails, it is impossible to recover from. Terraform blocks any future plan or apply operations if your postcondition is unsatisfied during the planning stage. This problem occurs because the postcondition does not directly depend on Terraform configuration, but instead on the complex interactions between multiple resources.</p>
+
+<p>We recommend using check blocks to validate the status of infrastructure as a whole. We only recommend using postconditions when you want a guarantee on a single resource based on that resource's configuration.</p>
+
+            
+        
+    </body></html>

@@ -1,0 +1,359 @@
+<html><!-- Online page at https://www.terraform.io/language/tests/mocking --><head>
+                <title>Mocks</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="mocks">Mocks</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>: Test mocking is available in Terraform v1.7.0 and later.</p>
+</aside>
+
+<p>Terraform lets you mock providers, resources, and data sources for your tests. This allows you to test parts of your module without creating infrastructure or requiring credentials. In a Terraform test, a mocked provider or resource will generate fake data for all computed attributes that would normally be provided by the underlying provider APIs.</p>
+
+<p>Mocking functionality can only be used with the <a href="../../terraform/language/tests.html"><code>terraform test</code> language</a>. Readers of this documentation should be familiar with the testing syntax and language features.</p>
+
+<p>In addition, the more advanced features of the mocking framework require knowledge about the following Terraform provider features:</p>
+
+<ul>
+<li>The difference between <a href="../../terraform/plugin/framework/handling-data/attributes.html">attributes, nested attributes,</a> and <a href="https://developer.hashicorp.com/terraform/plugin/framework/handling-data/blocks">blocks</a>.</li>
+<li>Definitions of <a href="../../terraform/plugin/framework/handling-data/attributes/string.html#configurability">optional, required, and computed attributes</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Mock%20Providers"></a><h2 id="mock-providers">Mock Providers</h2>
+
+<p>In Terraform tests, you can mock a provider with the <code>mock_provider</code> block. Mock providers return the same schema as the original provider and you can pass the mocked provider to your tests in place of the matching provider. All resources and data sources retrieved by a mock provider will set the relevant values from the configuration, and generate fake data for any computed attributes.</p>
+
+<p>Mock providers can be used directly in place of traditional <code>provider</code> blocks and they share the same global namespace. During the execution of the <code>terraform test</code> command, Terraform does not distinguish between a real and a mocked provider.</p>
+
+<p>The following example creates an AWS S3 bucket and then uses a mocked provider to test the configuration without requiring an AWS account.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tf</span>
+
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"bucket_name"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"my_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.bucket_name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># bucket_name.tftest.hcl</span>
+
+<span class="err">mock_</span><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"sets_correct_name"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">variables</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">bucket_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-bucket-name"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.my_bucket.bucket</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"my-bucket-name"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"incorrect bucket name"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>From the perspective of a <code>plan</code> or <code>apply</code> operation executed in a Terraform test file, the mocked provider is creating actual resources with values that match the configuration. These resources are stored in the Terraform state files that <code>terraform test</code> creates and holds in memory during test executions.</p>
+
+<p>You can use mocked providers and real providers simulating in a Terraform test. The following example defines two AWS providers, one real and one mocked. You must provide an alias to one of them, as they share the same global <code>aws</code> provider namespace. You can then use the <code>providers</code> attribute in test <code>run</code> blocks to customize which AWS provider to use for each <code>run</code> block. </p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># mocked_providers.tftest.hcl</span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="err">mock_</span><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"fake"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"use_real_provider"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">providers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">aws</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"use_mocked_provider"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">providers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.fake</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Generated%20data"></a><h3 id="generated-data">Generated data</h3>
+
+<p>A mocked provider will generate data for any computed attributes in referenced data sources or attributes. For example, the <code>arn</code> attribute is a unique identifier generated by AWS for most resources. A mocked <code>aws</code> provider will provide a value for this attribute in any resources it creates.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>: Mocked providers do not have any information about the expected format of the computed attributes, so the generated data will rarely match any expected syntax that real providers would return for those attributes.</p>
+</aside>
+
+<p>Mocked providers only generate data for computed attributes. All required resource attributes must be set when you use a mocked provider. If you do not provide a value for an optional computed attribute, Terraform will automatically generate one. The values that Terraform generates depends on the data type:</p>
+
+<ul>
+<li>Numbers will be 0.</li>
+<li>Booleans will be false.</li>
+<li>Strings will be a random 8 character alphanumeric string.</li>
+<li>Collections, including sets, lists, and maps, will be empty collections.</li>
+<li>Objects will contain all required sub-attributes generated using this same set of rules recursively.</li>
+</ul>
+
+<p>An example of this is the <code>bucket</code> attribute in the <code>aws_s3_bucket</code> resource. A real AWS provider will generate a bucket name if one is not specified. A mocked AWS provider will do the same, and only generate a value if one is not already specified in the configuration.</p>
+
+<p>By default, Terraform generates data during the <code>apply</code> operation and returns <code>(known after apply)</code> values during the <code>plan</code> operation. You can override this behavior with the <code>override_during</code> attribute in the <code>mock_provider</code> block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">mock_</span><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">override_during</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">plan</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The above <code>aws</code> provider generates the data during the <code>plan</code> operation and reuses the same data during the <code>apply</code> operation. The <code>override_during</code> attribute accepts either <code>plan</code> or <code>apply</code> as values.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Mock%20Provider%20data"></a><h3 id="mock-provider-data">Mock Provider data</h3>
+
+<p>You can specify specific values for targeted resources and data sources. In a <code>mock_provider</code> block, you can write any number of <code>mock_resource</code> and <code>mock_data</code> blocks. Both the <code>mock_resource</code> and <code>mock_data</code> blocks accept a type argument that should match the resource or data source you want to provide values for. They also accept a <code>defaults</code> object attribute that you can use to specify the values that should be returned for specific attributes.</p>
+
+<p>The following example demonstrates providing a set <code>arn</code> value for all AWS S3 bucket resources and data sources:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">mock_</span><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="err">mock_</span><span class="kr">resource</span><span class="w"> </span><span class="nv">"aws_s3_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">defaults</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:s3:::name"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="err">mock_</span><span class="kr">data</span><span class="w"> </span><span class="nv">"aws_s3_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">defaults</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:s3:::name"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In the above example, Terraform uses the supplied value for <code>arn</code> attributes in S3 buckets instead of generating a random string. Computed attributes not provided an explicit default will simply fall back to the generic data generation rules. You can also use the <code>override_during</code> attribute in the <code>mock_resource</code> and <code>mock_data</code> blocks to specify when Terraform should generate the values for an individual resource. If you do not not specify the <code>override_during</code> attribute, Terraform generates the values using the rules inherited from the <code>mock_provider</code> block. If specified, the local value overrides any value specified in the <code>mock_provider</code> block.</p>
+
+<p>You can also share mock provider data between tests by writing dedicated mock data files and using the <code>source</code> attribute in the <code>mock_provider</code> block. Mock data files have <code>.tfmock.hcl</code> or <code>.tfmock.json</code> extension, and can contain <code>mock_resource</code> and <code>mock_data</code> blocks as if they were defined in the <code>mock_provider</code> block directly.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># ./testing/aws/data.tfmock.hcl</span>
+
+<span class="err">mock_</span><span class="kr">resource</span><span class="w"> </span><span class="nv">"aws_s3_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">defaults</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:s3:::name"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">mock_</span><span class="kr">data</span><span class="w"> </span><span class="nv">"aws_s3_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">defaults</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:s3:::name"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="err">mock_</span><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./testing/aws"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The above example defines <code>mock_resource</code> and <code>mock_data</code> blocks in a mock data file located at <code>./testing/aws</code>. You can load multiple test files and share the same mock provider data without copying the same definitions across multiple files.</p>
+
+<p>You can combine the <code>source</code> attribute with directly nested <code>mock_resource</code> and <code>mock_data</code> blocks. If the source location and a directly nested block describe the same resource or data source then the directly nested block takes precedence.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Overrides"></a><h2 id="overrides">Overrides</h2>
+
+<p>In addition to mocking providers, you can use the following block types to override specific resources, data sources, and modules: </p>
+
+<ul>
+<li><code>override_resource</code>: Override the values of a resource. Terraform does not call the underlying provider.</li>
+<li><code>override_data</code>: Override the values of a data source. Terraform does not call the underlying provider.</li>
+<li><code>override_module</code>: Override the outputs of a module. Terraform does not create any resource in the module.</li>
+</ul>
+
+<p>All three blocks can be placed at the root level of Terraform test files and in Terraform test file <code>run</code> blocks. In addition, the <code>override_resource</code> and <code>override_data</code> blocks can be nested in <code>mock_provider</code> blocks and in Terraform mock data files. </p>
+
+<p>Overrides can be used with both real and mocked providers and will provide the computed values instead of the underlying provider.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Overrides%20Syntax"></a><h3 id="overrides-syntax">Overrides Syntax</h3>
+
+<p>All override blocks contain a <code>target</code> attribute, which should specify the resource, data source, or module to override. The <code>override_module</code> blocks contain an <code>outputs</code> attribute, while the <code>override_resource</code> and <code>override_data</code> blocks contain a <code>values</code> attribute. The override blocks also support the <code>override_during</code> attribute.</p>
+
+<p>The <code>outputs</code> and <code>values</code> attributes are optional and if not specified, Terraform will generate values for them automatically. The <code>override_during</code> attribute is also optional, and if specified it will override the <code>override_during</code> attribute in the <code>mock_provider</code> block. If not specified, Terraform inherits the behavior from the <code>mock_provider</code> block.</p>
+
+<p>The following example demonstrates the override blocks at various different scopes and levels. The main configuration calls the <code>./modules/s3_data</code> module to read a file from an S3 bucket, and then creates a <code>local_file</code> from the data returned from the module.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tf</span>
+
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">module</span><span class="w"> </span><span class="nv">"credentials"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./modules/s3_data"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">data_bucket_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_company_bucket_name"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"local_file"</span><span class="w"> </span><span class="nv">"credentials_json"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">filename</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"credentials.json"</span><span class="w"></span>
+<span class="w">  </span><span class="na">content</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">(</span><span class="nv">module.credentials.data</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># ./modules/s3_data/main.tf</span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"data_bucket_name"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_s3_object"</span><span class="w"> </span><span class="nv">"data_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.data_bucket_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">key</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"credentials.json"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"data"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsondecode</span><span class="p">(</span><span class="nv">data.aws_s3_object.data_bucket.body</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Firstly, you can override the <code>aws_s3_bucket_object</code> in the module directly in a mock provider. The following example defines an <code>override_data</code> block in the <code>mock_provider</code> block. In this case, Terraform will only override the target data source if the mock provider creates it.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tftest.hcl</span>
+
+<span class="err">mock_</span><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">override_data</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">module.credentials.data.aws_s3_object.data_bucket</span><span class="w"></span>
+<span class="w">    </span><span class="nb">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"{\"username\":\"username\",\"password\"</span><span class="o">:</span><span class="err">\</span><span class="s2">"password\"}"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nf">jsondecode</span><span class="p">(</span><span class="nv">local_file.credentials_json.content</span><span class="p">).</span><span class="na">username</span><span class="w"> </span><span class="o">=</span><span class="p">=</span><span class="w"> </span><span class="s2">"username"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"incorrect username"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Alternatively, you could also override the same <code>aws_s3_bucket_object</code> in the test file itself, or in a <code>run</code> block. In this case, the underlying provider doesn't matter since Terraform overrides the data source at the target address regardless of the provider. The following example still mocks the provider so that Terraform can run the test without AWS credentials. Override blocks can override resources provided by real providers.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tftest.hcl</span>
+
+<span class="err">mock_</span><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="nb">override_data</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">module.credentials.data.aws_s3_object.data_bucket</span><span class="w"></span>
+<span class="w">  </span><span class="nb">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"{\"username\":\"username\",\"password\"</span><span class="o">:</span><span class="err">\</span><span class="s2">"password\"}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"test_file_override"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nf">jsondecode</span><span class="p">(</span><span class="nv">local_file.credentials_json.content</span><span class="p">).</span><span class="na">username</span><span class="w"> </span><span class="o">=</span><span class="p">=</span><span class="w"> </span><span class="s2">"username"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"incorrect username"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"test_run_override"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # The value in this local override block takes precedence over the</span>
+<span class="c1">  # alternate defined in the file.</span>
+<span class="w">  </span><span class="nb">override_data</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">module.credentials.data.aws_s3_object.data_bucket</span><span class="w"></span>
+<span class="w">    </span><span class="nb">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"{\"username\":\"a_different_username\",\"password\"</span><span class="o">:</span><span class="err">\</span><span class="s2">"password\"}"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nf">jsondecode</span><span class="p">(</span><span class="nv">local_file.credentials_json.content</span><span class="p">).</span><span class="na">username</span><span class="w"> </span><span class="o">=</span><span class="p">=</span><span class="w"> </span><span class="s2">"a_different_username"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"incorrect username"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In the above example, the override block defined at the file level is used in the first <code>run</code> block. Then in the second <code>run</code> block, the alternative local override takes precedence over the file level override.</p>
+
+<p>Finally, you can override the entire module with the <code>override_module</code> block. In the following example, Terraform overrides the entire module instead of specific resources in the module. </p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tftest.hcl</span>
+<span class="err">mock_</span><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="nb">override_module</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">module.credentials</span><span class="w"></span>
+<span class="w">  </span><span class="nb">outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="na">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"username", password = "password"</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nf">jsondecode</span><span class="p">(</span><span class="nv">local_file.credentials_json.content</span><span class="p">).</span><span class="na">username</span><span class="w"> </span><span class="o">=</span><span class="p">=</span><span class="w"> </span><span class="s2">"username"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"incorrect username"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In this case, the override block specifies <code>outputs</code> instead of <code>values</code> and the output value is specified as HCL instead of as a string as the real module is passing the data through the <code>jsondecode</code> function. As with <code>override_data</code> blocks, you can also specify the <code>override_module</code> block in the <code>run</code> block and the same precedence rules apply.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Repeated%20blocks%20and%20nested%20attributes"></a><h2 id="repeated-blocks-and-nested-attributes">Repeated blocks and nested attributes</h2>
+
+<p>Some resources and data sources specify repeated nested attributes as computed directly, while repeated blocks in the resource may also contain computed attributes. For repeated blocks and nested attributes, you cannot specify values for specific instances in the collection. Instead, you must provide a single set of values that apply for all instances in the collection.</p>
+
+<p>For example, the <code>aws_dynamodb_table</code> resource contains a root-level computed <code>arn</code> attribute as well as a set-repeated block called <code>replica</code> which also contains a computed <code>arn</code> attribute. The following is an example of a simple instance of an <code>aws_dynamodb_table</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tf</span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_dynamodb_table"</span><span class="w"> </span><span class="nv">"my_table"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_table"</span><span class="w"></span>
+<span class="w">  </span><span class="na">hash_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"key"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">attribute</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"key"</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"S"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">replica</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">region_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eu-west-2"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">replica</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">region_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Normally, the AWS provider would return ARN values for the DynamoDB table and both of the specified replicas. While a <code>mock_resource</code> block can mimic this behavior, it cannot differentiate between the multiple <code>replica</code> blocks in the resource:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">mock_</span><span class="kr">resource</span><span class="w"> </span><span class="nv">"aws_dynamodb_table"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">defaults</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws:dynamodb:::my_table"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">replica</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws:dynamodb:::my_replica"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In this case, the <code>mock_resource</code> provides a specific value for the ARN of the DynamoDB table, but the ARN values returned for the replica tables are shared between all instances.</p>
+
+            
+        
+    </body></html>

@@ -1,0 +1,117 @@
+<html><!-- Online page at https://registry.terraform.io/providers/heroku/heroku/latest/docs/resources/ssl --><head>
+                <title>heroku_ssl</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="heroku_ssl">heroku_ssl</h1>
+
+<p>This resource manages an SSL certificate for a Heroku app.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>IMPORTANT!</em>
+    <p>This resource renders the "private_key" attribute in plain-text in your state file. Please ensure that your state file is properly secured and encrypted at rest.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<pre><code># Create a new Heroku app
+resource "heroku_app" "default" {
+  name = "test-app"
+  region = "us"
+}
+
+# Build a slug that we can scale
+resource "heroku_build" "default" {
+  app_id = heroku_app.default.id
+  source {
+    url = "https://github.com/heroku/terraform-provider-heroku/raw/master/heroku/test-fixtures/app.tgz"
+  }
+}
+
+# Scale the app to a tier that supports Heroku SSL
+resource "heroku_formation" "web" {
+  app_id = heroku_app.default.id
+  type = "web"
+  size = "basic"
+  quantity = 1
+
+  # Wait until the build has completed before attempting to scale
+  depends_on = [heroku_build.default]
+}
+
+# Create the certificate
+resource "heroku_ssl" "one" {
+  app_id = heroku_app.default.uuid
+  certificate_chain = file("server.crt")
+  private_key = file("server.key")
+
+  # Wait until the process_tier changes to basic before attempting to create a cert
+  depends_on = [heroku_formation.web]
+}
+
+resource "heroku_domain" "no-ssl" {
+  app_id = heroku_app.default.id
+  hostname = "terraform-123-no-ssl.example.com"
+  # Until November 2021 if you have an ssl resource, but do not want to associate it with a domain, you must ensure the domain is created after the ssl resource. See https://devcenter.heroku.com/changelog-items/2192 for more details. We do this by adding a depends_on for the ssl resources.
+  depends_on = [heroku_ssl.one]
+}
+
+# Associate it with a domain
+resource "heroku_domain" "one" {
+  app_id = heroku_app.default.id
+  hostname = "terraform-123.example.com"
+  sni_endpoint_id = heroku_ssl.one.id
+}
+
+# Create another certificate
+resource "heroku_ssl" "two" {
+  app_id = heroku_app.default.uuid
+  certificate_chain = file("server.crt")
+  private_key = file("server.key")
+  # Wait until the process_tier changes to basic before attempting to create a cert
+  depends_on = [heroku_formation.web]
+}
+
+# Associate it with a second domain
+resource "heroku_domain" "two" {
+  app_id = heroku_app.default.id
+  hostname = "terraform-456.example.com"
+  sni_endpoint_id = heroku_ssl.two.id
+}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>app_id</code> - (Required) Heroku app ID (do not use app name)</li>
+<li><code>certificate_chain</code> - (Required) The certificate chain to add.</li>
+<li><code>private_key</code> - (Optional) The private key for a given certificate chain. You <strong>must</strong> set this attribute when creating or
+updating an SSL resource. However, <strong>do not</strong> set a value for this attribute if you are initially importing an existing
+SSL resource. The attribute value does not get displayed in logs or regular output.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>The following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - The ID of the SSL certificate</li>
+<li><code>name</code> - The name of the SSL certificate</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Importing"></a><h2 id="importing">Importing</h2>
+
+<p>An existing SSL resource can be imported using a composite value of the app name and certificate UUID separated by a colon.</p>
+
+<p>For example:</p>
+
+<pre><code>$ terraform import heroku_ssl.production_api production-api:b85d9224-310b-409b-891e-c903f5a40568
+</code></pre>
+
+            
+        
+    </body></html>

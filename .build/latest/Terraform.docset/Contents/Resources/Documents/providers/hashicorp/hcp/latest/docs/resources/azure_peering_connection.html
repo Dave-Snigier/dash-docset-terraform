@@ -1,0 +1,163 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/hcp/latest/docs/resources/azure_peering_connection --><head>
+                <title>hcp_azure_peering_connection</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="hcp_azure_peering_connection-resource">hcp_azure_peering_connection (Resource)</h1>
+
+<p>The Azure peering connection resource allows you to manage a peering connection between an HVN and a peer Azure VNet.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn"</span><span class="w"> </span><span class="nv">"hvn"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"main-hvn"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cloud_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azure"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"westus2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.25.16.0/20"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// This resource initially returns in a Pending state, because its application_id is required to complete acceptance of the connection.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_azure_peering_connection"</span><span class="w"> </span><span class="nv">"peer"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">peering_id</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"dev"</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vnet_name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_subscription_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_subscription.sub.subscription_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_tenant_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;tenant UUID&gt;"</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vnet_region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.location</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// This data source is the same as the resource above, but waits for the connection to be Active before returning.</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"hcp_azure_peering_connection"</span><span class="w"> </span><span class="nv">"peer"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">peering_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_azure_peering_connection.peer.peering_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">wait_for_active_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// The route depends on the data source, rather than the resource, to ensure the peering is in an Active state.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn_route"</span><span class="w"> </span><span class="nv">"route"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_route_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"azure-route"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.31.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_link</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">data.hcp_azure_peering_connection.peer.self_link</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azuread"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"azurerm_subscription"</span><span class="w"> </span><span class="nv">"sub"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">subscription_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;subscription UUID&gt;"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_resource_group"</span><span class="w"> </span><span class="nv">"rg"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"resource-group-test"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"West US"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_virtual_network"</span><span class="w"> </span><span class="nv">"vnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"vnet-test"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.rg.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">address_space</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"10.0.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azuread_service_principal"</span><span class="w"> </span><span class="nv">"principal"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">application_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_azure_peering_connection.peer.application_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_role_definition"</span><span class="w"> </span><span class="nv">"definition"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcp-hvn-peering-access"</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">assignable_scopes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">azurerm_virtual_network.vnet.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">permissions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"Microsoft.Network/virtualNetworks/peer/action"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"Microsoft.Network/virtualNetworks/virtualNetworkPeerings/read"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"Microsoft.Network/virtualNetworks/virtualNetworkPeerings/write"</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_role_assignment"</span><span class="w"> </span><span class="nv">"assignment"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">azuread_service_principal.principal.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.vnet.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_definition_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_role_definition.definition.role_definition_resource_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<!-- schema generated by tfplugindocs -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Schema"></a><h2 id="schema">Schema</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Required"></a><h3 id="required">Required</h3>
+
+<ul>
+<li><code>hvn_link</code> (String) The <code>self_link</code> of the HashiCorp Virtual Network (HVN).</li>
+<li><code>peer_resource_group_name</code> (String) The resource group name of the peer VNet in Azure.</li>
+<li><code>peer_subscription_id</code> (String) The subscription ID of the peer VNet in Azure.</li>
+<li><code>peer_tenant_id</code> (String) The tenant ID of the peer VNet in Azure.</li>
+<li><code>peer_vnet_name</code> (String) The name of the peer VNet in Azure.</li>
+<li><code>peer_vnet_region</code> (String) The region of the peer VNet in Azure.</li>
+<li><code>peering_id</code> (String) The ID of the peering connection.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Optional"></a><h3 id="optional">Optional</h3>
+
+<ul>
+<li><code>allow_forwarded_traffic</code> (Boolean) Whether the forwarded traffic originating from the peered VNet is allowed in the HVN</li>
+<li><code>timeouts</code> (Block, Optional) (see <a href="#nestedblock--timeouts">below for nested schema</a>)</li>
+<li><code>use_remote_gateways</code> (Boolean) If the HVN should use the gateway of the peered VNet</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Read-Only"></a><h3 id="read-only">Read-Only</h3>
+
+<ul>
+<li><code>application_id</code> (String) The ID of the Azure application whose credentials are used to peer the HCP HVN's underlying VNet with the customer VNet.</li>
+<li><code>azure_peering_id</code> (String) The peering connection ID used by Azure.</li>
+<li><code>created_at</code> (String) The time that the peering connection was created.</li>
+<li><code>expires_at</code> (String) The time after which the peering connection will be considered expired if it hasn't transitioned into <code>ACCEPTED</code> or <code>ACTIVE</code> state.</li>
+<li><code>id</code> (String) The ID of this resource.</li>
+<li><code>organization_id</code> (String) The ID of the HCP organization where the peering connection is located. Always matches the HVN's organization.</li>
+<li><code>project_id</code> (String) The ID of the HCP project where the peering connection is located. Always matches the HVN's project.</li>
+<li><code>self_link</code> (String) A unique URL identifying the peering connection.</li>
+<li><code>state</code> (String) The state of the Azure peering connection.</li>
+</ul>
+
+<p><a id="nestedblock--timeouts"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Nested%20Schema%20for%20timeouts"></a><h3 id="nested-schema-for-timeouts">Nested Schema for <code>timeouts</code></h3>
+
+<p>Optional:</p>
+
+<ul>
+<li><code>create</code> (String)</li>
+<li><code>default</code> (String)</li>
+<li><code>delete</code> (String)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Import is supported using the following syntax:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Using an explicit project ID, the import ID is:</span>
+<span class="c1"># {project_id}:{hvn_id}:{peering_id}</span>
+terraform import hcp_azure_peering_connection.peer f709ec73-55d4-46d8-897d-816ebba28778:main-hvn:199e7e96-4d5f-4456-91f3-b6cc71f1e561
+<span class="c1"># Using the provider-default project ID, the import ID is:</span>
+<span class="c1"># {hvn_id}:{peering_id}</span>
+terraform import hcp_azure_peering_connection.peer main-hvn:199e7e96-4d5f-4456-91f3-b6cc71f1e561
+</code></pre></div>
+
+            
+        
+    </body></html>

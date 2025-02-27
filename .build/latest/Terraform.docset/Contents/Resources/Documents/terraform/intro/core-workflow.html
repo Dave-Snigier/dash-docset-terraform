@@ -1,0 +1,336 @@
+<html><!-- Online page at https://www.terraform.io/intro/core-workflow --><head>
+                <title>Core Terraform Workflow Overview</title>
+                <meta charset="utf-8"/>
+                <link href="../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="core-terraform-workflow-overview">Core Terraform Workflow Overview</h1>
+
+<p>The core Terraform workflow has three steps:</p>
+
+<ol>
+<li><strong>Write</strong> - Author infrastructure as code.</li>
+<li><strong>Plan</strong> - Preview changes before applying.</li>
+<li><strong>Apply</strong> - Provision reproducible infrastructure.</li>
+</ol>
+
+<p>This guide walks through how each of these three steps plays out in the context
+of working as an individual practitioner, how they evolve when a team is
+collaborating on infrastructure, and how HCP Terraform enables this
+workflow to run smoothly for entire organizations.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Working%20as%20an%20Individual%20Practitioner"></a><h2 id="working-as-an-individual-practitioner">Working as an Individual Practitioner</h2>
+
+<p>Let's first walk through how these parts fit together as an individual working
+on infrastructure as code.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Write"></a><h3 id="write">Write</h3>
+
+<p>You write Terraform configuration just like you write code: in your editor of
+choice. It's common practice to store your work in a version controlled
+repository even when you're just operating as an individual.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Create repository</span>
+$ git init my-infra <span class="o">&amp;&amp;</span> <span class="nb">cd</span> my-infra
+
+Initialized empty Git repository <span class="k">in</span> /.../my-infra/.git/
+
+<span class="c1"># Write initial config</span>
+$ vim main.tf
+
+<span class="c1"># Initialize Terraform</span>
+$ terraform init
+
+Initializing provider plugins...
+<span class="c1"># ...</span>
+Terraform has been successfully initialized!
+</code></pre></div>
+
+<p>As you make progress on authoring your config, repeatedly running plans can help
+flush out syntax errors and ensure that your config is coming together as you
+expect.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Make edits to config</span>
+$ vim main.tf
+
+<span class="c1"># Review plan</span>
+$ terraform plan
+
+<span class="c1"># Make additional edits, and repeat</span>
+$ vim main.tf
+</code></pre></div>
+
+<p>This parallels working on application code as an individual, where a tight
+feedback loop between editing code and running test commands is useful.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Plan"></a><h3 id="plan">Plan</h3>
+
+<p>When the feedback loop of the Write step has yielded a change that looks good,
+it's time to commit your work and review the final plan.</p>
+
+<div class="codehilite"><pre><span></span><code>$ git add main.tf
+$ git commit -m <span class="s1">'Managing infrastructure as code!'</span>
+
+<span class="o">[</span>main <span class="o">(</span>root-commit<span class="o">)</span> f735520<span class="o">]</span> Managing infrastructure as code!
+ <span class="m">1</span> file changed, <span class="m">1</span> insertion<span class="o">(</span>+<span class="o">)</span>
+</code></pre></div>
+
+<p>Because <code>terraform apply</code> will display a plan for confirmation before
+proceeding to change any infrastructure, that's the command you run for final
+review.</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform apply
+
+An execution plan has been generated and is shown below.
+<span class="c1"># ...</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Apply"></a><h3 id="apply">Apply</h3>
+
+<p>After one last check, you are ready to tell Terraform to provision real
+infrastructure.</p>
+
+<div class="codehilite"><pre><span></span><code>Do you want to perform these actions?
+
+  Terraform will perform the actions described above.
+  Only <span class="s1">'yes'</span> will be accepted to approve.
+  Enter a value: yes
+
+<span class="c1"># ...</span>
+
+Apply complete! Resources: <span class="m">1</span> added, <span class="m">0</span> changed, <span class="m">0</span> destroyed.
+</code></pre></div>
+
+<p>At this point, it's common to push your version control repository to a remote
+location for safekeeping.</p>
+
+<div class="codehilite"><pre><span></span><code>$ git remote add origin https://github.com/*user*/*repo*.git
+$ git push origin main
+</code></pre></div>
+
+<p>This core workflow is a loop; the next time you want to make changes, you start
+the process over from the beginning.</p>
+
+<p>Notice how closely this workflow parallels the process of writing application
+code or scripts as an individual? This is what we mean when we talk about
+Terraform enabling infrastructure as code.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Working%20as%20a%20Team"></a><h2 id="working-as-a-team">Working as a Team</h2>
+
+<p>Once multiple people are collaborating on Terraform configuration, new steps
+must be added to each part of the core workflow to ensure everyone is working
+together smoothly. You'll see that many of these steps parallel the workflow
+changes we make when we work on application code as teams rather than as
+individuals.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Write"></a><h3 id="write-2">Write</h3>
+
+<p>While each individual on a team still makes changes to Terraform configuration
+in their editor of choice, they save their changes to version control <em>branches</em>
+to avoid colliding with each other's work. Working in branches enables team
+members to resolve mutually incompatible infrastructure changes using their
+normal merge conflict workflow.</p>
+
+<div class="codehilite"><pre><span></span><code>$ git checkout -b add-load-balancer
+
+Switched to a new branch <span class="s1">'add-load-balancer'</span>
+</code></pre></div>
+
+<p>Running iterative plans is still useful as a feedback loop while authoring
+configuration, though having each team member's computer able to run them
+becomes more difficult with time. As the team and the infrastructure grows, so
+does the number of sensitive input variables (e.g. API Keys, SSL Cert Pairs)
+required to run a plan.</p>
+
+<p>To avoid the burden and the security risk of each team member arranging all
+sensitive inputs locally, it's common for teams to migrate to a model in which
+Terraform operations are executed in a shared Continuous Integration (CI)
+environment. The work needed to create such a CI environment is nontrivial, and
+is outside the scope of this core workflow overview, but a full deep dive on
+this topic can be found in our
+<a href="../terraform/tutorials/automation/automate-terraform?utm_source=WEBSITE&amp;utm_medium=WEB_IO&amp;utm_offer=ARTICLE_PAGE&amp;utm_content=DOCS.html">Running Terraform in Automation</a>
+guide.</p>
+
+<p>This longer iteration cycle of committing changes to version control and then
+waiting for the CI pipeline to execute is often lengthy enough to prohibit using
+speculative plans as a feedback loop while authoring individual Terraform
+configuration changes. Speculative plans are still useful before new Terraform
+changes are applied or even merged to the main development branch, however, as
+we'll see in a minute.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Plan"></a><h3 id="plan-2">Plan</h3>
+
+<p>For teams collaborating on infrastructure, Terraform's plan output creates an
+opportunity for team members to review each other's work. This allows the team
+to ask questions, evaluate risks, and catch mistakes before any potentially
+harmful changes are made.</p>
+
+<p>The natural place for these reviews to occur is alongside pull requests within
+version control--the point at which an individual proposes a merge from their
+working branch to the shared team branch. If team members review proposed
+config changes alongside speculative plan output, they can evaluate whether the
+intent of the change is being achieved by the plan.</p>
+
+<p>The problem becomes producing that speculative plan output for the team to
+review. Some teams that still run Terraform locally make a practice that pull
+requests should include an attached copy of speculative plan output generated
+by the change author. Others arrange for their CI system to post speculative
+plan output to pull requests automatically.</p>
+
+<p><img alt="Screenshot of Pull Request with manually posted Terraform plan output" src="/img/docs/manually-pasted-plan-output.png"/></p>
+
+<p>In addition to reviewing the plan for the proper expression of its author's
+intent, the team can also make an evaluation whether they want this change to
+happen now. For example, if a team notices that a certain change could result
+in service disruption, they may decide to delay merging its pull request until
+they can schedule a maintenance window.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Apply"></a><h3 id="apply-2">Apply</h3>
+
+<p>Once a pull request has been approved and merged, it's important for the team
+to review the final concrete plan that's run against the shared team branch and
+the latest version of the state file.</p>
+
+<p>This plan has the potential to be different than the one reviewed on the pull
+request due to issues like merge order or recent infrastructural changes. For
+example, if a manual change was made to your infrastructure since the plan was
+reviewed, the plan might be different when you merge.</p>
+
+<p>It is at this point that the team asks questions about the potential
+implications of applying the change. Do we expect any service disruption from
+this change? Is there any part of this change that is high risk? Is there
+anything in our system that we should be watching as we apply this? Is there
+anyone we need to notify that this change is happening?</p>
+
+<p>Depending on the change, sometimes team members will want to watch the apply
+output as it is happening. For teams that are running Terraform locally, this
+may involve a screen share with the team. For teams running Terraform in CI,
+this may involve gathering around the build log.</p>
+
+<p>Just like the workflow for individuals, the core workflow for teams is a loop
+that plays out for each change. For some teams this loop happens a few times a
+week, for others, many times a day.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/The%20Core%20Workflow%20Enhanced%20by%20HCP%20Terraform"></a><h2 id="the-core-workflow-enhanced-by-hcp-terraform">The Core Workflow Enhanced by HCP Terraform</h2>
+
+<p>While the above described workflows enable the safe, predictable, and
+reproducible creating or changing of infrastructure, there are multiple
+collaboration points that can be streamlined, especially as teams and
+organizations scale.  We designed HCP Terraform to support and enhance
+the core Terraform workflow for anyone collaborating on infrastructure, from
+small teams to large organizations. Let's look at how HCP Terraform makes
+for a better experience at each step.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Write"></a><h3 id="write-3">Write</h3>
+
+<p>HCP Terraform provides a centralized and secure location for storing
+input variables and state while also bringing back a tight feedback loop for
+speculative plans for config authors. Terraform configuration can interact with
+HCP Terraform through the <a href="../terraform/cli/cloud.html">CLI integration</a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">cloud</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">organization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-org"</span><span class="w"></span>
+<span class="w">    </span><span class="na">hostname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"app.terraform.io"</span><span class="c1"> # Optional; defaults to app.terraform.io</span>
+
+<span class="w">    </span><span class="nb">workspaces</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">layer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"networking"</span><span class="w"></span>
+<span class="w">        </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"cli"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">      # For terraform versions below 1.10, you must specify key-only tags</span>
+<span class="c1">      # using a list of strings. Example:</span>
+<span class="c1">      # tags = ["networking", "source:cli"]</span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After you configure the integration, an HCP Terraform API key is all your team members need to edit config and run speculative plans
+against the latest version of the state file using all the remotely stored
+input variables.</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform workspace <span class="k">select</span> my-app-dev
+Switched to workspace <span class="s2">"my-app-dev"</span>.
+
+$ terraform plan
+
+Running plan remotely <span class="k">in</span> Terraform Enterprise.
+
+Output will stream here. To view this plan <span class="k">in</span> a browser, visit:
+
+https://app.terraform.io/my-org/my-app-dev/.../
+
+Refreshing Terraform state <span class="k">in</span>-memory prior to plan...
+
+<span class="c1"># ...</span>
+
+Plan: <span class="m">1</span> to add, <span class="m">0</span> to change, <span class="m">0</span> to destroy.
+</code></pre></div>
+
+<p>With the assistance of this plan output, team members can each work on
+authoring config until it is ready to propose as a change via a pull request.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Plan"></a><h3 id="plan-3">Plan</h3>
+
+<p>Once a pull request is ready for review, HCP Terraform makes the process
+of reviewing a speculative plan easier for team members. First, the plan is
+automatically run when the pull request is created. Status updates to the pull
+request indicate while the plan is in progress.</p>
+
+<p>Once the plan is complete, the status update indicates whether there were any
+changes in the speculative plan, right from the pull request view.</p>
+
+<p><img alt="Screenshot of Pull Request with resource changes in the status update" src="/img/docs/pull-request.png"/></p>
+
+<p>For certain types of changes, this information is all that's needed for a team
+member to be able to approve the pull request. When a teammate needs to do a
+full review of the plan, clicking the link to HCP Terraform brings up a
+view that allows them to quickly analyze the full plan details.</p>
+
+<p><img alt="Screenshot of Pull Request run in HCP Terraform" src="/img/docs/pr-plan.png"/></p>
+
+<p>This page allows the reviewer to quickly determine if the plan is matching the
+config author's intent and evaluate the risk of the change.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Apply"></a><h3 id="apply-3">Apply</h3>
+
+<p>After merge, HCP Terraform presents the concrete plan to the team for
+review and approval.</p>
+
+<p><img alt="Screenshot of concrete plan" src="/img/docs/concrete-plan.png"/></p>
+
+<p>The team can discuss any outstanding questions about the plan before the change
+is made.</p>
+
+<p><img alt="Screenshot of back-and-forth in HCP Terraform comments" src="/img/docs/plan-comments.png"/></p>
+
+<p>Once the Apply is confirmed, HCP Terraform displays the progress live
+to anyone who'd like to watch.</p>
+
+<p><img alt="Screenshot of in-progress Apply" src="/img/docs/in-progress-apply.png"/></p>
+
+<!--
+
+TODO: Add this back in w/ screenshot of notification
+
+And after the change completes, the team can be notified of its outcome.
+
+    [ Multi-screenshot of Slack alert indicating Apply completed successfully and
+    with error; except it's not gonna be Slack anymore? ]
+
+-->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Conclusion"></a><h2 id="conclusion">Conclusion</h2>
+
+<p>There are many different ways to use Terraform: as an individual user, a single
+team, or an entire organization at scale. Choosing the best approach for the
+density of collaboration needed will provide the most return on your investment
+in the core Terraform workflow. For organizations using Terraform at scale,
+HCP Terraform introduces new layers that build on this core workflow to
+solve problems unique to teams and organizations.</p>
+
+            
+        
+    </body></html>

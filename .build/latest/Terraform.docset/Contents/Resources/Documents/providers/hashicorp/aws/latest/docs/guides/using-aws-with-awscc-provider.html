@@ -1,0 +1,138 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/guides/using-aws-with-awscc-provider --><head>
+                <title>Using AWS &amp; AWSCC Provider Together</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="using-aws-awscc-provider-together">Using AWS &amp; AWSCC Provider Together</h1>
+
+<p>The <a href="https://registry.terraform.io/providers/hashicorp/awscc/latest">HashiCorp Terraform AWS Cloud Control Provider</a> aims to bring Amazon Web Services (AWS) resources to Terraform users faster. The new provider is automatically generated, which means new features and services on AWS can be supported right away. The AWS Cloud Control provider supports hundreds of AWS resources, with more support being added as AWS service teams adopt the Cloud Control API standard.</p>
+
+<p>For Terraform users managing infrastructure on AWS, we expect the AWSCC provider will be used alongside the existing AWS provider. This guide is provided to show guidance and an example of using the providers together to deploy an AWS Cloud WAN Core Network.</p>
+
+<p>For more information about the AWSCC provider, please see the provider documentation in <a href="https://registry.terraform.io/providers/hashicorp/awscc/latest">Terraform Registry</a></p>
+
+<!-- TOC depthFrom:2 -->
+
+<ul>
+<li><a href="#aws-cloud-wan">AWS CloudWAN Overview</a></li>
+<li><a href="#specifying-multiple-providers">Specifying Multiple Providers</a>
+<ul>
+<li><a href="#first-look-at-awscc-resources">First Look at AWSCC Resources</a></li>
+<li><a href="#using-aws-and-awscc-providers-together">Using AWS and AWSCC Providers Together</a></li>
+</ul></li>
+</ul>
+
+<!-- /TOC -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/AWS%20Cloud%20Wan"></a><h2 id="aws-cloud-wan">AWS Cloud Wan</h2>
+
+<p>In this guide we will deploy <a href="https://aws.amazon.com/cloud-wan/">AWS Cloud WAN</a> to demonstrate how both AWS &amp; AWSCC can work togther. Cloud WAN is a wide area networking (WAN) service that helps you build, manage, and monitor a unified global network that manages traffic running between resources in your cloud and on-premises environments.</p>
+
+<p>With Cloud WAN, you define network policies that are used to create a global network that spans multiple locations and networks—eliminating the need to configure and manage different networks individually using different technologies. Your network policies can be used to specify which of your Amazon Virtual Private Clouds (VPCs) and on-premises locations you wish to connect through AWS VPN or third-party software-defined WAN (SD-WAN) products, and the Cloud WAN central dashboard generates a complete view of the network to monitor network health, security, and performance. Cloud WAN automatically creates a global network across AWS Regions using Border Gateway Protocol (BGP), so you can easily exchange routes around the world.</p>
+
+<p>For more information on AWS Cloud WAN see <a href="https://docs.aws.amazon.com/vpc/latest/cloudwan/what-is-cloudwan.html">the documentation.</a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Specifying%20Multiple%20Providers"></a><h2 id="specifying-multiple-providers">Specifying Multiple Providers</h2>
+
+<p>Terraform can use many providers at once, as long as they are specified in your <code>terraform</code> configuration block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">required_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&gt;= 1.0.7"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&gt;= 4.9.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">awscc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/awscc"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&gt;= 0.25.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The code snippet above informs terraform to download 2 providers as plugins for the current root module, the AWS and AWSCC provider. You can tell which provider is being use by looking at the resource or data source name-prefix. Resources that start with <code>aws_</code> use the AWS provider, resources that start with <code>awscc_</code> are using the AWSCC provider.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/First%20look%20at%20AWSCC%20resources"></a><h3 id="first-look-at-awscc-resources">First look at AWSCC resources</h3>
+
+<p>Lets start by building our <a href="https://aws.amazon.com/about-aws/global-infrastructure/global_network/">global network</a> which will house our core network.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">terraform_tag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[{</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform"</span><span class="w"></span>
+<span class="w">    </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"true"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"awscc_networkmanager_global_network"</span><span class="w"> </span><span class="nv">"main"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"My Global Network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">concat</span><span class="p">(</span><span class="nv">local.terraform_tag</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">[{</span><span class="w"></span>
+<span class="w">      </span><span class="na">key</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Name"</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"My Global Network"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}]</span><span class="w"></span>
+<span class="w">  </span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Above, we define a <code>awscc_networkmanager_global_network</code> with 2 tags and a description. AWSCC resources use the <a href="https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html">standard AWS tag format</a> which is expressed in HCL as a list of maps with 2 keys. We want to reuse the <code>terraform = true</code> tag so we define it as a <code>local</code> then we use <a href="https://www.terraform.io/language/functions/concat">concat</a> to join the list of tags together.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20AWS%20and%20AWSCC%20providers%20together"></a><h3 id="using-aws-and-awscc-providers-together">Using AWS and AWSCC providers together</h3>
+
+<p>Next we will create a <a href="https://docs.aws.amazon.com/vpc/latest/cloudwan/cloudwan-core-network-policy.html">core network</a> using an AWSCC resource <code>awscc_networkmanager_core_network</code> and an AWS data source <code>data.aws_networkmanager_core_network_policy_document</code> which allows users to write HCL to generate the json policy used as the <a href="https://docs.aws.amazon.com/vpc/latest/cloudwan/cloudwan-policies-json.html">core policy network</a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"awscc_networkmanager_core_network"</span><span class="w"> </span><span class="nv">"main"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"My Core Network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">global_network_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">awscc_networkmanager_global_network.main.id</span><span class="c1"></span>
+<span class="c1">  # Compose jsonencode and jsondecode to produce a normalized JSON string.</span>
+<span class="w">  </span><span class="na">policy_document</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">(</span><span class="nf">jsondecode</span><span class="p">(</span><span class="nv">data.aws_networkmanager_core_network_policy_document.main.json</span><span class="p">))</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">local.terraform_tag</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_networkmanager_core_network_policy_document"</span><span class="w"> </span><span class="nv">"main"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">core_network_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">vpn_ecmp_support</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="na">asn_ranges</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"64512-64555"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="nb">edge_locations</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="w">      </span><span class="na">asn</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="m">64512</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">segments</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                          </span><span class="o">=</span><span class="w"> </span><span class="s2">"shared"</span><span class="w"></span>
+<span class="w">    </span><span class="na">description</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"SegmentForSharedServices"</span><span class="w"></span>
+<span class="w">    </span><span class="na">require_attachment_acceptance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">segment_actions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">action</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"share"</span><span class="w"></span>
+<span class="w">    </span><span class="na">mode</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"attachment-route"</span><span class="w"></span>
+<span class="w">    </span><span class="na">segment</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"shared"</span><span class="w"></span>
+<span class="w">    </span><span class="na">share_with</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">attachment_policies</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">rule_number</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition_logic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"or"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">conditions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"tag-value"</span><span class="w"></span>
+<span class="w">      </span><span class="na">operator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"equals"</span><span class="w"></span>
+<span class="w">      </span><span class="na">key</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"segment"</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"shared"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">action</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">association_method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"constant"</span><span class="w"></span>
+<span class="w">      </span><span class="na">segment</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"shared"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Thanks to Terraform's plugin design, the providers work together seemlessly!</p>
+
+            
+        
+    </body></html>

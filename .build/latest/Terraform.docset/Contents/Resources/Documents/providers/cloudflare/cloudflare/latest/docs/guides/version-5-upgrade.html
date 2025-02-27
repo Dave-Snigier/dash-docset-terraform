@@ -1,0 +1,1486 @@
+<html><!-- Online page at https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/guides/version-5-upgrade --><head>
+                <title>Terraform Cloudflare Provider Version 5 Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-cloudflare-provider-version-5-upgrade-guide">Terraform Cloudflare Provider Version 5 Upgrade Guide</h1>
+
+<p>Version 5 of the Cloudflare Terraform Provider is a ground-up rewrite of the
+provider, using code generation from our OpenAPI spec. While this introduces
+attribute and resource changes, it moves the provider to align more closely
+with the service endpoints. This allows automation the steps to get changes
+into the provider lowering the delay between new features and complete
+coverage.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Version%20Configuration"></a><h2 id="provider-version-configuration">Provider Version Configuration</h2>
+
+<p>If you are not ready to make a move to version 5 of the Cloudflare provider,
+you may keep the 4.x branch active for your Terraform project by specifying:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"cloudflare"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 4"</span><span class="c1"></span>
+<span class="c1">  # ... any other configuration</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>We highly recommend reviewing this guide, make necessary changes and move to
+5.x branch, as further 4.x releases are unlikely to happen outside of critical
+security fixes.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Before attempting to upgrade to version 5, you should first upgrade to the latest version of 4.x to ensure any transitional updates are applied to your existing configuration.</p>
+</aside>
+
+<p>Once ready, make the following change to use the latest 5.x release:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"cloudflare"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 5"</span><span class="c1"></span>
+<span class="c1">  # ... any other configuration</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Approach"></a><h2 id="approach">Approach</h2>
+
+<p>At a high level, there are two parts to the migration. The first is the migration of the
+configuration (HCL) and the second is the migration of the state. Within each of those
+sections, there is the need to migrate attributes and potentially the resource rename.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Automatic"></a><h3 id="automatic">Automatic</h3>
+
+<p>For assisting with automatic migrations, we have provided [GritQL] patterns.</p>
+
+<p>This will allow you to rewrite the parts of your Terraform configuration and state
+that have changed automatically. Once you [install Grit], you can run the commands
+in the directory where your Terraform configuration is located.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>While all efforts have been made to ease the transition, some of the more complex resources that may contain difficult to reconcile resources have been intentionally skipped for the automatic migration and are only manually documented. If you are using modules or other dynamic features of HCL, the provided codemods may not be as effective. We recommend reviewing the manual migration notes to verify all the changes.</p>
+</aside>
+
+<p>We recommend ensuring you are using version control for these changes or make a
+backup prior to initiating the change to enable reverting if needed.</p>
+
+<ol>
+<li><p>Update the resource attributes in your configuration. _Note: this will not update
+your state file. The next step will determine how your state file is updated._</p>
+
+<div class="codehilite"><pre><span></span><code>$ grit apply github.com/cloudflare/terraform-provider-cloudflare#cloudflare_terraform_v5
+</code></pre></div></li>
+<li><p>Choose the appropriate method from [migrating renamed resources] that best suits
+your situation and use case to migrate the attribute changes. If you are choosing to
+use the provided GritQL patterns, the pattern name is
+<code>cloudflare_terraform_v5_attribute_renames_state</code>. Otherwise, you can reimport the
+resources without manually managing the state file.</p></li>
+<li><p>Perform the resource renames. _Note: this will not update your state file.
+The next step will determine how your state file is updated._</p>
+
+<div class="codehilite"><pre><span></span><code>$ grit apply github.com/cloudflare/terraform-provider-cloudflare#cloudflare_terraform_v5_resource_renames_configuration
+</code></pre></div></li>
+<li><p>Choose the appropriate method from [migrating renamed resources] that best suits
+your situation and use case to migrate the resource renames. If you are choosing to
+use the provided GritQL patterns, the pattern name is
+<code>cloudflare_terraform_v5_resource_renames_state</code>.</p></li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Manual"></a><h3 id="manual">Manual</h3>
+
+<ol>
+<li>Update the resource attributes in your configuration using the migration notes.</li>
+<li>Choose the appropriate method from [migrating renamed resources] that best suits
+your situation and use case to migrate the attribute changes.</li>
+<li>Perform the resource renames using the migration notes.</li>
+<li>Choose the appropriate method from [migrating renamed resources] that best suits
+your situation and use case to migrate the resource renames.</li>
+</ol>
+
+<!-- This code block is only used for confirming grit patterns -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changelog"></a><h2 id="changelog">Changelog</h2>
+
+<pre><code>language hcl
+
+cloudflare_terraform_v5()
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_access_application"></a><h2 id="cloudflare_access_application">cloudflare_access_application</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_access_application</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_access_ca_certificate"></a><h2 id="cloudflare_access_ca_certificate">cloudflare_access_ca_certificate</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_access_short_lived_certificate</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_access_custom_page"></a><h2 id="cloudflare_access_custom_page">cloudflare_access_custom_page</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_access_custom_page</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_access_group"></a><h2 id="cloudflare_access_group">cloudflare_access_group</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_access_group</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_access_identity_provider"></a><h2 id="cloudflare_access_identity_provider">cloudflare_access_identity_provider</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_access_identity_provider</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_access_keys_configuration"></a><h2 id="cloudflare_access_keys_configuration">cloudflare_access_keys_configuration</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_access_key_configuration</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_access_mutual_tls_certificate"></a><h2 id="cloudflare_access_mutual_tls_certificate">cloudflare_access_mutual_tls_certificate</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_access_mtls_certificate</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_access_mutual_tls_hostname_settings"></a><h2 id="cloudflare_access_mutual_tls_hostname_settings">cloudflare_access_mutual_tls_hostname_settings</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_access_mtls_hostname_settings</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_access_organization"></a><h2 id="cloudflare_access_organization">cloudflare_access_organization</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_organization</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_access_policy"></a><h2 id="cloudflare_access_policy">cloudflare_access_policy</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_access_policy</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_access_service_token"></a><h2 id="cloudflare_access_service_token">cloudflare_access_service_token</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_access_service_token</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_access_tag"></a><h2 id="cloudflare_access_tag">cloudflare_access_tag</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_access_tag</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_device_dex_test"></a><h2 id="cloudflare_device_dex_test">cloudflare_device_dex_test</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_dex_test</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_device_managed_networks"></a><h2 id="cloudflare_device_managed_networks">cloudflare_device_managed_networks</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_device_managed_networks</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_device_policy_certificates"></a><h2 id="cloudflare_device_policy_certificates">cloudflare_device_policy_certificates</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_device_certificates</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_device_posture_integration"></a><h2 id="cloudflare_device_posture_integration">cloudflare_device_posture_integration</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_device_posture_integration</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_device_posture_rule"></a><h2 id="cloudflare_device_posture_rule">cloudflare_device_posture_rule</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_device_posture_rule</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_device_settings_policy"></a><h2 id="cloudflare_device_settings_policy">cloudflare_device_settings_policy</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_device_custom_profile</code> or <code>cloudflare_zero_trust_device_custom_profile</code> depending on your intended usage.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_dlp_custom_profile"></a><h2 id="cloudflare_dlp_custom_profile">cloudflare_dlp_custom_profile</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_dlp_custom_profile</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_dlp_predefined_profile"></a><h2 id="cloudflare_dlp_predefined_profile">cloudflare_dlp_predefined_profile</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_dlp_predefined_profile</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_dlp_profile"></a><h2 id="cloudflare_dlp_profile">cloudflare_dlp_profile</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_custom_dlp_profile</code> or <code>cloudflare_zero_trust_predefined_dlp_profile</code> depending on which you are targeting.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_fallback_domain%20/%20cloudflare_zero_trust_local_fallback_domain"></a><h2 id="cloudflare_fallback_domain-cloudflare_zero_trust_local_fallback_domain">cloudflare_fallback_domain / cloudflare_zero_trust_local_fallback_domain</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_device_custom_profile_local_domain_fallback</code> or <code>cloudflare_zero_trust_device_default_profile_local_domain_fallback</code> depending on which you are targeting.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_gateway_app_types"></a><h2 id="cloudflare_gateway_app_types">cloudflare_gateway_app_types</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_gateway_app_types</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_gre_tunnel"></a><h2 id="cloudflare_gre_tunnel">cloudflare_gre_tunnel</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_magic_wan_gre_tunnel</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_ipsec_tunnel"></a><h2 id="cloudflare_ipsec_tunnel">cloudflare_ipsec_tunnel</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_magic_wan_ipsec_tunnel</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_record"></a><h2 id="cloudflare_record">cloudflare_record</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_dns_record</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_risk_behavior"></a><h2 id="cloudflare_risk_behavior">cloudflare_risk_behavior</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_risk_behavior</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_split_tunnel"></a><h2 id="cloudflare_split_tunnel">cloudflare_split_tunnel</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_device_default_profile</code> and <code>cloudflare_zero_trust_device_custom_profile</code> depending on which you are targeting.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_static_route"></a><h2 id="cloudflare_static_route">cloudflare_static_route</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_magic_wan_static_route</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_teams_account"></a><h2 id="cloudflare_teams_account">cloudflare_teams_account</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_gateway_settings</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_teams_list"></a><h2 id="cloudflare_teams_list">cloudflare_teams_list</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_list</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_teams_location"></a><h2 id="cloudflare_teams_location">cloudflare_teams_location</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_dns_location</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_teams_proxy_endpoint"></a><h2 id="cloudflare_teams_proxy_endpoint">cloudflare_teams_proxy_endpoint</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_gateway_proxy_endpoint</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_teams_rule"></a><h2 id="cloudflare_teams_rule">cloudflare_teams_rule</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_gateway_policy</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_tunnel"></a><h2 id="cloudflare_tunnel">cloudflare_tunnel</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_tunnel_cloudflared</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_tunnel_config"></a><h2 id="cloudflare_tunnel_config">cloudflare_tunnel_config</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_tunnel_cloudflared_config</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_tunnel_route"></a><h2 id="cloudflare_tunnel_route">cloudflare_tunnel_route</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_tunnel_cloudflared_route</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_tunnel_virtual_network"></a><h2 id="cloudflare_tunnel_virtual_network">cloudflare_tunnel_virtual_network</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_zero_trust_tunnel_cloudflared_virtual_network</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_worker_cron_trigger"></a><h2 id="cloudflare_worker_cron_trigger">cloudflare_worker_cron_trigger</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_workers_cron_trigger</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_worker_domain"></a><h2 id="cloudflare_worker_domain">cloudflare_worker_domain</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_workers_custom_domain</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_worker_script"></a><h2 id="cloudflare_worker_script">cloudflare_worker_script</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_workers_script</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_worker_secret"></a><h2 id="cloudflare_worker_secret">cloudflare_worker_secret</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_workers_secret</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_workers_for_platforms_namespace"></a><h2 id="cloudflare_workers_for_platforms_namespace">cloudflare_workers_for_platforms_namespace</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_workers_for_platforms_dispatch_namespace</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_managed_headers"></a><h2 id="cloudflare_managed_headers">cloudflare_managed_headers</h2>
+
+<ul>
+<li>Renamed to <code>cloudflare_managed_transforms</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_account_member"></a><h2 id="cloudflare_account_member">cloudflare_account_member</h2>
+
+<ul>
+<li><code>email_address</code> is now <code>email</code>.</li>
+<li><p><code>role_ids</code> is now <code>roles</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_account_member"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">email_address</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"me@example.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"a", "b", "c"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_account_member"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">email</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"me@example.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">roles</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"a", "b", "c"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_account"></a><h2 id="cloudflare_account">cloudflare_account</h2>
+
+<ul>
+<li><p><code>enforce_twofactor</code> is now <code>settings.enforce_twofactor</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_account"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">enforce_twofactor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_account"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">settings</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">enforce_twofactor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_byo_ip_prefix"></a><h2 id="cloudflare_byo_ip_prefix">cloudflare_byo_ip_prefix</h2>
+
+<ul>
+<li><p><code>advertisement</code> is now <code>advertised</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_byo_ip_prefix"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">advertisement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_byo_ip_prefix"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">advertised</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_healthcheck"></a><h2 id="cloudflare_healthcheck">cloudflare_healthcheck</h2>
+
+<ul>
+<li><code>allow_insecure</code> is now nested under <code>http_config</code></li>
+<li><code>expected_body</code> is now nested under <code>http_config</code>.</li>
+<li><code>expected_codes</code> is now nested under <code>http_config</code>.</li>
+<li><code>follow_redirects</code> is now nested under <code>http_config</code>.</li>
+<li><code>method</code> is now nested under <code>http_config</code>.</li>
+<li><code>path</code> is now nested under <code>http_config</code>.</li>
+<li><code>port</code> is now nested under <code>http_config</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zone_cache_reserve"></a><h2 id="cloudflare_zone_cache_reserve">cloudflare_zone_cache_reserve</h2>
+
+<ul>
+<li><p><code>enabled</code> is now <code>value</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zone_cache_reserve"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zone_cache_reserve"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zone_cache_reserve"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"on"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zone_cache_reserve"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"off"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_api_token"></a><h2 id="cloudflare_api_token">cloudflare_api_token</h2>
+
+<ul>
+<li><code>condition</code> is now a single nested attribute (<code>condition = { ... }</code>) instead of a block (<code>condition { ... }</code>).</li>
+<li><code>request_ip</code> is now a single nested attribute (<code>request_ip = { ... }</code>) instead of a block (<code>request_ip { ... }</code>).</li>
+<li><code>policy</code> is now <code>policies</code>.</li>
+</ul>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_api_token"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"allow"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_groups</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"%[2]s"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="nb">resources</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s2">"com.cloudflare.api.account.zone.*"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"*"</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}]</span><span class="w"></span>
+<span class="w">  </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">request_ip</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">in</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"192.0.2.1/32"</span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="na">not_in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"198.51.100.1/32"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_api_token"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">policies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"allow"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_groups</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"%[2]s"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="nb">resources</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s2">"com.cloudflare.api.account.zone.*"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"*"</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}]</span><span class="w"></span>
+<span class="w">  </span><span class="nb">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">request_ip</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">in</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"192.0.2.1/32"</span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="na">not_in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"198.51.100.1/32"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_hostname_tls_setting"></a><h2 id="cloudflare_hostname_tls_setting">cloudflare_hostname_tls_setting</h2>
+
+<ul>
+<li><p><code>setting</code> is now <code>setting_id</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_hostname_tls_setting"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">setting</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"min_tls_version"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_hostname_tls_setting"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">setting_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"min_tls_version"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_logpull_retention"></a><h2 id="cloudflare_logpull_retention">cloudflare_logpull_retention</h2>
+
+<ul>
+<li><p><code>enabled</code> is now <code>flag</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_logpull_retention"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_logpull_retention"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">flag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_logpush_ownership_challenge"></a><h2 id="cloudflare_logpush_ownership_challenge">cloudflare_logpush_ownership_challenge</h2>
+
+<ul>
+<li><p><code>ownership_challenge_filename</code> is now <code>filename</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_logpush_ownership_challenge"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">ownership_challenge_filename</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_logpush_ownership_challenge"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">filename</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_magic_wan_gre_tunnel"></a><h2 id="cloudflare_magic_wan_gre_tunnel">cloudflare_magic_wan_gre_tunnel</h2>
+
+<ul>
+<li><code>health_check_enabled</code> is now <code>health_check.enabled</code>.</li>
+<li><p><code>health_check_type</code> is now <code>health_check.type</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_magic_wan_gre_tunnel"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">health_check_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">health_check_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"reply"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_magic_wan_gre_tunnel"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">health_check</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"reply"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_magic_wan_ipsec_tunnel"></a><h2 id="cloudflare_magic_wan_ipsec_tunnel">cloudflare_magic_wan_ipsec_tunnel</h2>
+
+<ul>
+<li><code>health_check_direction</code> is now <code>health_check.direction</code>.</li>
+<li><code>health_check_enabled</code> is now <code>health_check.enabled</code>.</li>
+<li><code>health_check_rate</code> is now <code>health_check.rate</code>.</li>
+<li><code>health_check_target</code> is now <code>health_check.target</code> with further nested attributes.</li>
+<li><p><code>health_check_type</code> is now <code>health_check.type</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_magic_wan_ipsec_tunnel"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">health_check_direction</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"unidirectional"</span><span class="w"></span>
+<span class="w">  </span><span class="na">health_check_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"reply"</span><span class="w"></span>
+<span class="w">  </span><span class="na">health_check_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">health_check_rate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"low"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_magic_wan_ipsec_tunnel"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">health_check</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">direction</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"unidirectional"</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"reply"</span><span class="w"></span>
+<span class="w">    </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">rate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"low"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_tunnel_cloudflared"></a><h2 id="cloudflare_zero_trust_tunnel_cloudflared">cloudflare_zero_trust_tunnel_cloudflared</h2>
+
+<ul>
+<li><p><code>secret</code> is now <code>tunnel_secret</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zero_trust_tunnel_cloudflared"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_s3cr3t!"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zero_trust_tunnel_cloudflared"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">tunnel_secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_s3cr3t!"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_access_short_lived_certificate"></a><h2 id="cloudflare_zero_trust_access_short_lived_certificate">cloudflare_zero_trust_access_short_lived_certificate</h2>
+
+<ul>
+<li><p><code>application_id</code> is now <code>app_id</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zero_trust_access_short_lived_certificate"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">application_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"21d2f241bab5a0af65be098a0ba3d6c1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zero_trust_access_short_lived_certificate"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">app_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"21d2f241bab5a0af65be098a0ba3d6c1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_workers_secret"></a><h2 id="cloudflare_workers_secret">cloudflare_workers_secret</h2>
+
+<ul>
+<li><p><code>secret_text</code> is now <code>text</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_workers_secret"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">secret_text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_s3cr3t!"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_workers_secret"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">text</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_s3cr3t!"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_workers_kv"></a><h2 id="cloudflare_workers_kv">cloudflare_workers_kv</h2>
+
+<ul>
+<li><p><code>key</code> is now <code>key_name</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_workers_kv"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_key"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_workers_kv"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">key_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_key"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_tiered_cache"></a><h2 id="cloudflare_tiered_cache">cloudflare_tiered_cache</h2>
+
+<ul>
+<li><p><code>cache_type</code> is now <code>value</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_tiered_cache"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cache_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"on"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_tiered_cache"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"on"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_web_analytics_site"></a><h2 id="cloudflare_web_analytics_site">cloudflare_web_analytics_site</h2>
+
+<ul>
+<li><p><code>ruleset_id</code> is now <code>ruleset.id</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_web_analytics_site"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">ruleset_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"deadbeef"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_web_analytics_site"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">ruleset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"deadbeef"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_gateway_settings"></a><h2 id="cloudflare_zero_trust_gateway_settings">cloudflare_zero_trust_gateway_settings</h2>
+
+<ul>
+<li><code>activity_log_enabled</code> is now <code>settings.activity_log.enabled</code>.</li>
+<li><code>non_identity_browser_isolation_enabled</code> is now <code>settings.browser_isolation.non_identity_enabled</code>.</li>
+<li><code>protocol_detection_enabled</code> is now <code>settings.protocol_detection.enabled</code>.</li>
+<li><code>tls_decrypt_enabled</code> is now <code>settings.tls_decrypt.enabled</code>.</li>
+<li><code>url_browser_isolation_enabled</code> is now <code>settings.browser_isolation.url_browser_isolation_enabled</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_load_balancer"></a><h2 id="cloudflare_load_balancer">cloudflare_load_balancer</h2>
+
+<ul>
+<li><code>adaptive_routing</code> is now a single nested attribute (<code>adaptive_routing = { ... }</code>) instead of a block (<code>adaptive_routing { ... }</code>).</li>
+<li><code>country_pools</code> is now a list of objects (<code>country_pools = [{ ... }]</code>) instead of multiple block attribute (<code>country_pools { ... }</code>).</li>
+<li><code>fixed_response</code> is now a single nested attribute (<code>fixed_response = { ... }</code>) instead of a block (<code>fixed_response { ... }</code>).</li>
+<li><code>location_strategy</code> is now a single nested attribute (<code>location_strategy = { ... }</code>) instead of a block (<code>location_strategy { ... }</code>).</li>
+<li><code>overrides</code> is now a single nested attribute (<code>overrides = { ... }</code>) instead of a block (<code>overrides { ... }</code>).</li>
+<li><code>pop_pools</code> is now a list of objects (<code>pop_pools = [{ ... }]</code>) instead of multiple block attribute (<code>pop_pools { ... }</code>).</li>
+<li><code>random_steering</code> is now a single nested attribute (<code>random_steering = { ... }</code>) instead of a block (<code>random_steering { ... }</code>).</li>
+<li><code>region_pools</code> is now a list of objects (<code>region_pools = [{ ... }]</code>) instead of multiple block attribute (<code>region_pools { ... }</code>).</li>
+<li><code>rules</code> is now a list of objects (<code>rules = [{ ... }]</code>) instead of multiple block attribute (<code>rules { ... }</code>).</li>
+<li><code>session_affinity_attributes</code> is now a single nested attribute (<code>session_affinity_attributes = { ... }</code>) instead of a block (<code>session_affinity_attributes { ... }</code>).</li>
+<li><p><code>fallback_pool_id</code> is now <code>fallback_pool</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_load_balancer"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">fallback_pool_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"520636c63a13852db69ca56570b0abf4"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_load_balancer"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">fallback_pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"520636c63a13852db69ca56570b0abf4"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+<li><p><code>default_pool_ids</code> is now <code>default_pools</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_load_balancer"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_pool_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"520636c63a13852db69ca56570b0abf4", "4cc60288984088b5188246199f87daa7"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_load_balancer"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_pools</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"520636c63a13852db69ca56570b0abf4", "4cc60288984088b5188246199f87daa7"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_r2_bucket"></a><h2 id="cloudflare_r2_bucket">cloudflare_r2_bucket</h2>
+
+<ul>
+<li><p><code>location_hint</code> is now <code>location</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_r2_bucket"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">location_hint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"APAC"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_r2_bucket"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"APAC"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_teams_list"></a><h2 id="cloudflare_teams_list-2">cloudflare_teams_list</h2>
+
+<ul>
+<li><p><code>items</code> is now a list of objects (<code>[{ value = $item }]</code>) instead of <code>items = [$item1, $item2]</code></p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_teams_list"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">items</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"item-1234", "item-5678"</span><span class="w">   </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_teams_list"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">items</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[{</span><span class="w"> </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"item-1234" }, { value = "item-5678"</span><span class="w"> </span><span class="p">}]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_workers_kv"></a><h2 id="cloudflare_workers_kv-2">cloudflare_workers_kv</h2>
+
+<ul>
+<li><p><code>key</code> is now <code>key_name</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_workers_kv"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-simple-key"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_workers_kv"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">key_name</span><span class="o">=</span><span class="w"> </span><span class="s2">"my-simple-key"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_tunnel_cloudflared"></a><h2 id="cloudflare_zero_trust_tunnel_cloudflared-2">cloudflare_zero_trust_tunnel_cloudflared</h2>
+
+<ul>
+<li><code>secret</code> is now <code>tunnel_secret</code>.</li>
+<li><p><code>cname</code> is no longer available.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"zero_trust_tunnel_cloudflared"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0da42c8d2132a9ddaf714f9e7c920711"</span><span class="w"></span>
+<span class="w">  </span><span class="na">secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-secret"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"foo.example.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"zero_trust_tunnel_cloudflared"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0da42c8d2132a9ddaf714f9e7c920711"</span><span class="w"></span>
+<span class="w">  </span><span class="na">tunnel_secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-secret"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zone_cache_variants"></a><h2 id="cloudflare_zone_cache_variants">cloudflare_zone_cache_variants</h2>
+
+<ul>
+<li><p>file extensions are now nested under the <code>value</code> object.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zone_cache_variants"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0da42c8d2132a9ddaf714f9e7c920711"</span><span class="w"></span>
+<span class="w">  </span><span class="na">avif</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/avif", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">bmp</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/bmp", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">gif</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/gif", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">jpeg</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/jpeg", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">jpg</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/jpg", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">jp2</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/jp2", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">jpg2</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/jpg2", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">png</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/png"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">tif</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/tif", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">tiff</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/tiff", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">webp</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zone_cache_variants"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0da42c8d2132a9ddaf714f9e7c920711"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">avif</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/avif", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">bmp</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/bmp", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">gif</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/gif", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">jpeg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/jpeg", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">jpg</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/jpg", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">jp2</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/jp2", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">jpg2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/jpg2", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">png</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/png"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">tif</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/tif", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">tiff</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/tiff", "image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">webp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"image/webp"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_custom_page"></a><h2 id="cloudflare_custom_page">cloudflare_custom_page</h2>
+
+<ul>
+<li><code>cloudflare_custom_page</code> has been removed.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zone_settings_override"></a><h2 id="cloudflare_zone_settings_override">cloudflare_zone_settings_override</h2>
+
+<ul>
+<li><code>cloudflare_zone_settings_override</code> has been removed. Use <code>cloudflare_zone_setting</code> instead on a per setting basis.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zone"></a><h2 id="cloudflare_zone">cloudflare_zone</h2>
+
+<ul>
+<li>Zone subscriptions are now controlled independently using <code>cloudflare_zone_subscription</code> resource.</li>
+<li><p><code>zone</code> is now an <code>name</code>.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zone"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zone"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+<li><p><code>account_id</code> is now an <code>account</code> object with the <code>id</code> attribute inside.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zone"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"f037e56e89293a057740de681ac9abbe"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"example.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zone"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">account</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"f037e56e89293a057740de681ac9abbe"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"example.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<ul>
+<li><code>jump_start</code> is no longer an attribute.</li>
+</ul>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zone"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">account</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"f037e56e89293a057740de681ac9abbe"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"example.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">jump_start</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<p></p><div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zone"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">account</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"f037e56e89293a057740de681ac9abbe"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"example.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul><p></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_access_group"></a><h2 id="cloudflare_zero_trust_access_group">cloudflare_zero_trust_access_group</h2>
+
+<ul>
+<li><code>auth_context</code> is now a list of objects (<code>auth_context = [{ ... }]</code>) instead of multiple block attribute (<code>auth_context { ... }</code>).</li>
+<li><code>azure</code> is now a single nested attribute (<code>azure = { ... }</code>) instead of a block (<code>azure { ... }</code>).</li>
+<li><code>exclude</code> is now a list of objects (<code>exclude = [{ ... }]</code>) instead of multiple block attribute (<code>exclude { ... }</code>).</li>
+<li><code>external_evaluation</code> is now a single nested attribute (<code>external_evaluation = { ... }</code>) instead of a block (<code>external_evaluation { ... }</code>).</li>
+<li><code>github</code> is now a list of objects (<code>github = [{ ... }]</code>) instead of multiple block attribute (<code>github { ... }</code>).</li>
+<li><code>gsuite</code> is now a single nested attribute (<code>gsuite = { ... }</code>) instead of a block (<code>gsuite { ... }</code>).</li>
+<li><code>include</code> is now a list of objects (<code>include = [{ ... }]</code>) instead of multiple block attribute (<code>include { ... }</code>).</li>
+<li><code>okta</code> is now a single nested attribute (<code>okta = { ... }</code>) instead of a block (<code>okta { ... }</code>).</li>
+<li><code>require</code> is now a list of objects (<code>require = [{ ... }]</code>) instead of multiple block attribute (<code>require { ... }</code>).</li>
+<li><code>saml</code> is now a single nested attribute (<code>saml = { ... }</code>) instead of a block (<code>saml { ... }</code>).</li>
+<li><p><code>application_id</code> and <code>precedence</code> no longer used.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zero_trust_access_group"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"f037e56e89293a057740de681ac9abbe"</span><span class="w"></span>
+<span class="w">  </span><span class="na">application_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"foo"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">precedence</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zero_trust_access_group"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"f037e56e89293a057740de681ac9abbe"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_access_service_token"></a><h2 id="cloudflare_zero_trust_access_service_token">cloudflare_zero_trust_access_service_token</h2>
+
+<ul>
+<li><p><code>min_days_for_renewal</code> is no longer used. If you would like similar functionality, you can use <code>duration = "forever"</code> instead.</p>
+
+<p>Before</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zero_trust_access_service_token"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"f037e56e89293a057740de681ac9abbe"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"CI/CD app renewed"</span><span class="w"></span>
+<span class="w">  </span><span class="na">min_days_for_renewal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">30</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_zero_trust_access_service_token"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"f037e56e89293a057740de681ac9abbe"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"CI/CD app renewed"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_access_application"></a><h2 id="cloudflare_zero_trust_access_application">cloudflare_zero_trust_access_application</h2>
+
+<ul>
+<li><code>authentication</code> is now a single nested attribute (<code>authentication = { ... }</code>) instead of a block (<code>authentication { ... }</code>).</li>
+<li><code>cors_headers</code> is now a single nested attribute (<code>cors_headers = { ... }</code>) instead of a block (<code>cors_headers { ... }</code>).</li>
+<li><code>custom_attribute</code> is now a list of objects (<code>custom_attribute = [{ ... }]</code>) instead of multiple block attribute (<code>custom_attribute { ... }</code>).</li>
+<li><code>custom_claim</code> is now a list of objects (<code>custom_claim = [{ ... }]</code>) instead of multiple block attribute (<code>custom_claim { ... }</code>).</li>
+<li><code>footer_links</code> is now a list of objects (<code>footer_links = [{ ... }]</code>) instead of multiple block attribute (<code>footer_links { ... }</code>).</li>
+<li><code>hybrid_and_implicit_options</code> is now a single nested attribute (<code>hybrid_and_implicit_options = { ... }</code>) instead of a block (<code>hybrid_and_implicit_options { ... }</code>).</li>
+<li><code>landing_page_design</code> is now a list of objects (<code>landing_page_design = [{ ... }]</code>) instead of multiple block attribute (<code>landing_page_design { ... }</code>).</li>
+<li><code>mappings</code> is now a list of objects (<code>mappings = [{ ... }]</code>) instead of multiple block attribute (<code>mappings { ... }</code>).</li>
+<li><code>operations</code> is now a single nested attribute (<code>operations = { ... }</code>) instead of a block (<code>operations { ... }</code>).</li>
+<li><code>refresh_token_options</code> is now a single nested attribute (<code>refresh_token_options = { ... }</code>) instead of a block (<code>refresh_token_options { ... }</code>).</li>
+<li><code>saas_app</code> is now a single nested attribute (<code>saas_app = { ... }</code>) instead of a block (<code>saas_app { ... }</code>).</li>
+<li><code>scim_config</code> is now a single nested attribute (<code>scim_config = { ... }</code>) instead of a block (<code>scim_config { ... }</code>).</li>
+<li><code>source</code> is now a list of objects (<code>source = [{ ... }]</code>) instead of multiple block attribute (<code>source { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_access_mtls_hostname_settings"></a><h2 id="cloudflare_zero_trust_access_mtls_hostname_settings">cloudflare_zero_trust_access_mtls_hostname_settings</h2>
+
+<ul>
+<li><code>settings</code> is now a list of objects (<code>settings = [{ ... }]</code>) instead of multiple block attribute (<code>settings { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_access_policy"></a><h2 id="cloudflare_zero_trust_access_policy">cloudflare_zero_trust_access_policy</h2>
+
+<ul>
+<li><code>approval_group</code> is now a list of objects (<code>approval_group = [{ ... }]</code>) instead of multiple block attribute (<code>approval_group { ... }</code>).</li>
+<li><code>auth_context</code> is now a list of objects (<code>auth_context = [{ ... }]</code>) instead of multiple block attribute (<code>auth_context { ... }</code>).</li>
+<li><code>azure</code> is now a single nested attribute (<code>azure = { ... }</code>) instead of a block (<code>azure { ... }</code>).</li>
+<li><code>exclude</code> is now a list of objects (<code>exclude = [{ ... }]</code>) instead of multiple block attribute (<code>exclude { ... }</code>).</li>
+<li><code>external_evaluation</code> is now a single nested attribute (<code>external_evaluation = { ... }</code>) instead of a block (<code>external_evaluation { ... }</code>).</li>
+<li><code>github</code> is now a list of objects (<code>github = [{ ... }]</code>) instead of multiple block attribute (<code>github { ... }</code>).</li>
+<li><code>gsuite</code> is now a single nested attribute (<code>gsuite = { ... }</code>) instead of a block (<code>gsuite { ... }</code>).</li>
+<li><code>include</code> is now a list of objects (<code>include = [{ ... }]</code>) instead of multiple block attribute (<code>include { ... }</code>).</li>
+<li><code>okta</code> is now a single nested attribute (<code>okta = { ... }</code>) instead of a block (<code>okta { ... }</code>).</li>
+<li><code>require</code> is now a list of objects (<code>require = [{ ... }]</code>) instead of multiple block attribute (<code>require { ... }</code>).</li>
+<li><code>saml</code> is now a single nested attribute (<code>saml = { ... }</code>) instead of a block (<code>saml { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_access_identity_provider"></a><h2 id="cloudflare_zero_trust_access_identity_provider">cloudflare_zero_trust_access_identity_provider</h2>
+
+<ul>
+<li><code>config</code> is now a single nested attribute (<code>config = { ... }</code>) instead of a block (<code>config { ... }</code>).</li>
+<li><code>scim_config</code> is now a single nested attribute (<code>scim_config = { ... }</code>) instead of a block (<code>scim_config { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_organization"></a><h2 id="cloudflare_zero_trust_organization">cloudflare_zero_trust_organization</h2>
+
+<ul>
+<li><code>custom_pages</code> is now a single nested attribute (<code>custom_pages = { ... }</code>) instead of a block (<code>custom_pages { ... }</code>).</li>
+<li><code>login_design</code> is now a single nested attribute (<code>login_design = { ... }</code>) instead of a block (<code>login_design { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_address_map"></a><h2 id="cloudflare_address_map">cloudflare_address_map</h2>
+
+<ul>
+<li><code>ips</code> is now a list of objects (<code>ips = [{ ... }]</code>) instead of multiple block attribute (<code>ips { ... }</code>).</li>
+<li><code>memberships</code> is now a list of objects (<code>memberships = [{ ... }]</code>) instead of multiple block attribute (<code>memberships { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_api_shield"></a><h2 id="cloudflare_api_shield">cloudflare_api_shield</h2>
+
+<ul>
+<li><code>auth_id_characteristics</code> is now a list of objects (<code>auth_id_characteristics = [{ ... }]</code>) instead of multiple block attribute (<code>auth_id_characteristics { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_certificate_pack"></a><h2 id="cloudflare_certificate_pack">cloudflare_certificate_pack</h2>
+
+<ul>
+<li><code>validation_errors</code> is now a list of objects (<code>validation_errors = [{ ... }]</code>) instead of multiple block attribute (<code>validation_errors { ... }</code>).</li>
+<li><code>validation_records</code> is now a list of objects (<code>validation_records = [{ ... }]</code>) instead of multiple block attribute (<code>validation_records { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_custom_hostname"></a><h2 id="cloudflare_custom_hostname">cloudflare_custom_hostname</h2>
+
+<ul>
+<li><code>settings</code> is now a single nested attribute (<code>settings = { ... }</code>) instead of a block (<code>settings { ... }</code>).</li>
+<li><code>ssl</code> is now a single nested attribute (<code>ssl = { ... }</code>) instead of a block (<code>ssl { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_custom_ssl"></a><h2 id="cloudflare_custom_ssl">cloudflare_custom_ssl</h2>
+
+<ul>
+<li><code>custom_ssl_options</code> is now a list of objects (<code>custom_ssl_options = [{ ... }]</code>) instead of multiple block attribute (<code>custom_ssl_options { ... }</code>).</li>
+<li><code>custom_ssl_priority</code> is now a list of objects (<code>custom_ssl_priority = [{ ... }]</code>) instead of multiple block attribute (<code>custom_ssl_priority { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_dex_test"></a><h2 id="cloudflare_zero_trust_dex_test">cloudflare_zero_trust_dex_test</h2>
+
+<ul>
+<li><code>data</code> is now a single nested attribute (<code>data = { ... }</code>) instead of a block (<code>data { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_device_managed_networks"></a><h2 id="cloudflare_zero_trust_device_managed_networks">cloudflare_zero_trust_device_managed_networks</h2>
+
+<ul>
+<li><code>config</code> is now a single nested attribute (<code>config = { ... }</code>) instead of a block (<code>config { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_device_posture_integration"></a><h2 id="cloudflare_zero_trust_device_posture_integration">cloudflare_zero_trust_device_posture_integration</h2>
+
+<ul>
+<li><code>config</code> is now a single nested attribute (<code>config = { ... }</code>) instead of a block (<code>config { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_device_posture_rule"></a><h2 id="cloudflare_zero_trust_device_posture_rule">cloudflare_zero_trust_device_posture_rule</h2>
+
+<ul>
+<li><code>input</code> is now a single nested attribute (<code>input = { ... }</code>) instead of a block (<code>input { ... }</code>).</li>
+<li><code>match</code> is now a list of objects (<code>match = [{ ... }]</code>) instead of multiple block attribute (<code>match { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_custom_dlp_profile%20/%20cloudflare_zero_trust_predefined_dlp_profile"></a><h2 id="cloudflare_zero_trust_custom_dlp_profile-cloudflare_zero_trust_predefined_dlp_profile">cloudflare_zero_trust_custom_dlp_profile / cloudflare_zero_trust_predefined_dlp_profile</h2>
+
+<ul>
+<li><code>context_awareness</code> is now a list of objects (<code>context_awareness = [{ ... }]</code>) instead of multiple block attribute (<code>context_awareness { ... }</code>).</li>
+<li><code>entry</code> is now a list of objects (<code>entry = [{ ... }]</code>) instead of multiple block attribute (<code>entry { ... }</code>).</li>
+<li><code>pattern</code> is now a list of objects (<code>pattern = [{ ... }]</code>) instead of multiple block attribute (<code>pattern { ... }</code>).</li>
+<li><code>skip</code> is now a list of objects (<code>skip = [{ ... }]</code>) instead of multiple block attribute (<code>skip { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_email_routing_catch_all"></a><h2 id="cloudflare_email_routing_catch_all">cloudflare_email_routing_catch_all</h2>
+
+<ul>
+<li><code>action</code> is now a list of objects (<code>action = [{ ... }]</code>) instead of multiple block attribute (<code>action { ... }</code>).</li>
+<li><code>matcher</code> is now a list of objects (<code>matcher = [{ ... }]</code>) instead of multiple block attribute (<code>matcher { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_email_routing_rule"></a><h2 id="cloudflare_email_routing_rule">cloudflare_email_routing_rule</h2>
+
+<ul>
+<li><code>action</code> is now a list of objects (<code>action = [{ ... }]</code>) instead of multiple block attribute (<code>action { ... }</code>).</li>
+<li><code>matcher</code> is now a list of objects (<code>matcher = [{ ... }]</code>) instead of multiple block attribute (<code>matcher { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_healthcheck"></a><h2 id="cloudflare_healthcheck-2">cloudflare_healthcheck</h2>
+
+<ul>
+<li><code>header</code> is now a list of objects (<code>header = [{ ... }]</code>) instead of multiple block attribute (<code>header { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_list"></a><h2 id="cloudflare_list">cloudflare_list</h2>
+
+<ul>
+<li><code>hostname</code> is now a list of objects (<code>hostname = [{ ... }]</code>) instead of multiple block attribute (<code>hostname { ... }</code>).</li>
+<li><code>item</code> is now a list of objects (<code>item = [{ ... }]</code>) instead of multiple block attribute (<code>item { ... }</code>).</li>
+<li><code>redirect</code> is now a list of objects (<code>redirect = [{ ... }]</code>) instead of multiple block attribute (<code>redirect { ... }</code>).</li>
+<li><code>value</code> is now a list of objects (<code>value = [{ ... }]</code>) instead of multiple block attribute (<code>value { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_list_item"></a><h2 id="cloudflare_list_item">cloudflare_list_item</h2>
+
+<ul>
+<li><code>hostname</code> is now a single nested attribute (<code>hostname = { ... }</code>) instead of a block (<code>hostname { ... }</code>).</li>
+<li><code>redirect</code> is now a single nested attribute (<code>redirect = { ... }</code>) instead of a block (<code>redirect { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_load_balancer_monitor"></a><h2 id="cloudflare_load_balancer_monitor">cloudflare_load_balancer_monitor</h2>
+
+<ul>
+<li><code>header</code> is now a list of objects (<code>header = [{ ... }]</code>) instead of multiple block attribute (<code>header { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_load_balancer_pool"></a><h2 id="cloudflare_load_balancer_pool">cloudflare_load_balancer_pool</h2>
+
+<ul>
+<li><code>header</code> is now a single nested attribute (<code>header = { ... }</code>) instead of a block (<code>header { ... }</code>).</li>
+<li><code>load_shedding</code> is now a single nested attribute (<code>load_shedding = { ... }</code>) instead of a block (<code>load_shedding { ... }</code>).</li>
+<li><code>origin_steering</code> is now a single nested attribute (<code>origin_steering = { ... }</code>) instead of a block (<code>origin_steering { ... }</code>).</li>
+<li><code>origins</code> is now a list of objects (<code>origins = [{ ... }]</code>) instead of multiple block attribute (<code>origins { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_logpush_job"></a><h2 id="cloudflare_logpush_job">cloudflare_logpush_job</h2>
+
+<ul>
+<li><code>output_options</code> is now a single nested attribute (<code>output_options = { ... }</code>) instead of a block (<code>output_options { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_managed_transforms"></a><h2 id="cloudflare_managed_transforms">cloudflare_managed_transforms</h2>
+
+<ul>
+<li><code>managed_request_headers</code> is now a list of objects (<code>managed_request_headers = [{ ... }]</code>) instead of multiple block attribute (<code>managed_request_headers { ... }</code>).</li>
+<li><code>managed_response_headers</code> is now a list of objects (<code>managed_response_headers = [{ ... }]</code>) instead of multiple block attribute (<code>managed_response_headers { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_notification_policy"></a><h2 id="cloudflare_notification_policy">cloudflare_notification_policy</h2>
+
+<ul>
+<li><code>email_integration</code> is now a list of objects (<code>email_integration = [{ ... }]</code>) instead of multiple block attribute (<code>email_integration { ... }</code>).</li>
+<li><code>filters</code> is now a single nested attribute (<code>filters = { ... }</code>) instead of a block (<code>filters { ... }</code>).</li>
+<li><code>pagerduty_integration</code> is now a list of objects (<code>pagerduty_integration = [{ ... }]</code>) instead of multiple block attribute (<code>pagerduty_integration { ... }</code>).</li>
+<li><code>webhooks_integration</code> is now a list of objects (<code>webhooks_integration = [{ ... }]</code>) instead of multiple block attribute (<code>webhooks_integration { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_pages_project"></a><h2 id="cloudflare_pages_project">cloudflare_pages_project</h2>
+
+<ul>
+<li><code>build_config</code> is now a single nested attribute (<code>build_config = { ... }</code>) instead of a block (<code>build_config { ... }</code>).</li>
+<li><code>config</code> is now a list of objects (<code>config = [{ ... }]</code>) instead of multiple block attribute (<code>config { ... }</code>).</li>
+<li><code>deployment_configs</code> is now a single nested attribute (<code>deployment_configs = { ... }</code>) instead of a block (<code>deployment_configs { ... }</code>).</li>
+<li><code>placement</code> is now a single nested attribute (<code>placement = { ... }</code>) instead of a block (<code>placement { ... }</code>).</li>
+<li><code>preview</code> is now a single nested attribute (<code>preview = { ... }</code>) instead of a block (<code>preview { ... }</code>).</li>
+<li><code>production</code> is now a single nested attribute (<code>production = { ... }</code>) instead of a block (<code>production { ... }</code>).</li>
+<li><code>service_binding</code> is now a list of objects (<code>service_binding = [{ ... }]</code>) instead of multiple block attribute (<code>service_binding { ... }</code>).</li>
+<li><code>source</code> is now a list of objects (<code>source = [{ ... }]</code>) instead of multiple block attribute (<code>source { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_dns_record"></a><h2 id="cloudflare_dns_record">cloudflare_dns_record</h2>
+
+<ul>
+<li><code>data</code> is now a single nested attribute (<code>data = { ... }</code>) instead of a block (<code>data { ... }</code>).</li>
+<li><code>data.flag</code> is now a number (<code>flag = 0</code>) instead of a string (<code>flag = "0"</code>).</li>
+<li><code>hostname</code> has been removed. Instead, you should use a combination of data source and resource attributes to get the same value.</li>
+<li><code>allow_overwrite</code> has been removed.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_risk_behavior"></a><h2 id="cloudflare_zero_trust_risk_behavior">cloudflare_zero_trust_risk_behavior</h2>
+
+<ul>
+<li><code>behavior</code> is now a list of objects (<code>behavior = [{ ... }]</code>) instead of multiple block attribute (<code>behavior { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_ruleset"></a><h2 id="cloudflare_ruleset">cloudflare_ruleset</h2>
+
+<ul>
+<li><code>action_parameters</code> is now a single nested attribute (<code>action_parameters = { ... }</code>) instead of a block (<code>action_parameters { ... }</code>).</li>
+<li><code>algorithms</code> is now a list of objects (<code>algorithms = [{ ... }]</code>) instead of multiple block attribute (<code>algorithms { ... }</code>).</li>
+<li><code>autominify</code> is now a list of objects (<code>autominify = [{ ... }]</code>) instead of multiple block attribute (<code>autominify { ... }</code>).</li>
+<li><code>browser_ttl</code> is now a list of objects (<code>browser_ttl = [{ ... }]</code>) instead of multiple block attribute (<code>browser_ttl { ... }</code>).</li>
+<li><code>cache_key</code> is now a list of objects (<code>cache_key = [{ ... }]</code>) instead of multiple block attribute (<code>cache_key { ... }</code>).</li>
+<li><code>categories</code> is now a list of objects (<code>categories = [{ ... }]</code>) instead of multiple block attribute (<code>categories { ... }</code>).</li>
+<li><code>cookie</code> is now a list of objects (<code>cookie = [{ ... }]</code>) instead of multiple block attribute (<code>cookie { ... }</code>).</li>
+<li><code>custom_key</code> is now a list of objects (<code>custom_key = [{ ... }]</code>) instead of multiple block attribute (<code>custom_key { ... }</code>).</li>
+<li><code>edge_ttl</code> is now a list of objects (<code>edge_ttl = [{ ... }]</code>) instead of multiple block attribute (<code>edge_ttl { ... }</code>).</li>
+<li><code>exposed_credential_check</code> is now a list of objects (<code>exposed_credential_check = [{ ... }]</code>) instead of multiple block attribute (<code>exposed_credential_check { ... }</code>).</li>
+<li><code>from_list</code> is now a list of objects (<code>from_list = [{ ... }]</code>) instead of multiple block attribute (<code>from_list { ... }</code>).</li>
+<li><code>from_value</code> is now a list of objects (<code>from_value = [{ ... }]</code>) instead of multiple block attribute (<code>from_value { ... }</code>).</li>
+<li><code>header</code> is now a list of objects (<code>header = [{ ... }]</code>) instead of multiple block attribute (<code>header { ... }</code>).</li>
+<li><code>headers</code> is now a map of attributes keyed by the name instead of multiple block attribute (<code>headers { ... }</code>).</li>
+<li><code>host</code> is now a list of objects (<code>host = [{ ... }]</code>) instead of multiple block attribute (<code>host { ... }</code>).</li>
+<li><code>logging</code> is now a single nested attribute (<code>logging = { ... }</code>) instead of a block (<code>logging { ... }</code>).</li>
+<li><code>matched_data</code> is now a list of objects (<code>matched_data = [{ ... }]</code>) instead of multiple block attribute (<code>matched_data { ... }</code>).</li>
+<li><code>origin</code> is now a list of objects (<code>origin = [{ ... }]</code>) instead of multiple block attribute (<code>origin { ... }</code>).</li>
+<li><code>overrides</code> is now a list of objects (<code>overrides = [{ ... }]</code>) instead of multiple block attribute (<code>overrides { ... }</code>).</li>
+<li><code>path</code> is now a list of objects (<code>path = [{ ... }]</code>) instead of multiple block attribute (<code>path { ... }</code>).</li>
+<li><code>query_string</code> is now a list of objects (<code>query_string = [{ ... }]</code>) instead of multiple block attribute (<code>query_string { ... }</code>).</li>
+<li><code>query</code> is now a list of objects (<code>query = [{ ... }]</code>) instead of multiple block attribute (<code>query { ... }</code>).</li>
+<li><code>ratelimit</code> is now a list of objects (<code>ratelimit = [{ ... }]</code>) instead of multiple block attribute (<code>ratelimit { ... }</code>).</li>
+<li><code>response</code> is now a single nested attribute (<code>response = { ... }</code>) instead of a block (<code>response { ... }</code>).</li>
+<li><code>rules</code> is now a list of objects (<code>rules = [{ ... }]</code>) instead of multiple block attribute (<code>rules { ... }</code>).</li>
+<li><code>serve_stale</code> is now a list of objects (<code>serve_stale = [{ ... }]</code>) instead of multiple block attribute (<code>serve_stale { ... }</code>).</li>
+<li><code>sni</code> is now a list of objects (<code>sni = [{ ... }]</code>) instead of multiple block attribute (<code>sni { ... }</code>).</li>
+<li><code>status_code_range</code> is now a list of objects (<code>status_code_range = [{ ... }]</code>) instead of multiple block attribute (<code>status_code_range { ... }</code>).</li>
+<li><code>status_code_ttl</code> is now a list of objects (<code>status_code_ttl = [{ ... }]</code>) instead of multiple block attribute (<code>status_code_ttl { ... }</code>).</li>
+<li><code>target_url</code> is now a list of objects (<code>target_url = [{ ... }]</code>) instead of multiple block attribute (<code>target_url { ... }</code>).</li>
+<li><code>uri</code> is now a list of objects (<code>uri = [{ ... }]</code>) instead of multiple block attribute (<code>uri { ... }</code>).</li>
+<li><code>user</code> is now a list of objects (<code>user = [{ ... }]</code>) instead of multiple block attribute (<code>user { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_spectrum_application"></a><h2 id="cloudflare_spectrum_application">cloudflare_spectrum_application</h2>
+
+<ul>
+<li><code>dns</code> is now a single nested attribute (<code>dns = { ... }</code>) instead of a block (<code>dns { ... }</code>).</li>
+<li><code>edge_ips</code> is now a single nested attribute (<code>edge_ips = { ... }</code>) instead of a block (<code>edge_ips { ... }</code>).</li>
+<li><code>origin_dns</code> is now a single nested attribute (<code>origin_dns = { ... }</code>) instead of a block (<code>origin_dns { ... }</code>).</li>
+<li><code>origin_port_range</code> is now a list of objects (<code>origin_port_range = [{ ... }]</code>) instead of multiple block attribute (<code>origin_port_range { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_split_tunnels"></a><h2 id="cloudflare_zero_trust_split_tunnels">cloudflare_zero_trust_split_tunnels</h2>
+
+<ul>
+<li><code>tunnels</code> is now a list of objects (<code>tunnels = [{ ... }]</code>) instead of multiple block attribute (<code>tunnels { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_gateway_settings"></a><h2 id="cloudflare_zero_trust_gateway_settings-2">cloudflare_zero_trust_gateway_settings</h2>
+
+<ul>
+<li><code>antivirus</code> is now a list of objects (<code>antivirus = [{ ... }]</code>) instead of multiple block attribute (<code>antivirus { ... }</code>).</li>
+<li><code>block_page</code> is now a list of objects (<code>block_page = [{ ... }]</code>) instead of multiple block attribute (<code>block_page { ... }</code>).</li>
+<li><code>body_scanning</code> is now a list of objects (<code>body_scanning = [{ ... }]</code>) instead of multiple block attribute (<code>body_scanning { ... }</code>).</li>
+<li><code>custom_certificate</code> is now a list of objects (<code>custom_certificate = [{ ... }]</code>) instead of multiple block attribute (<code>custom_certificate { ... }</code>).</li>
+<li><code>dns</code> is now a list of objects (<code>dns = [{ ... }]</code>) instead of multiple block attribute (<code>dns { ... }</code>).</li>
+<li><code>extended_email_matching</code> is now a list of objects (<code>extended_email_matching = [{ ... }]</code>) instead of multiple block attribute (<code>extended_email_matching { ... }</code>).</li>
+<li><code>fips</code> is now a list of objects (<code>fips = [{ ... }]</code>) instead of multiple block attribute (<code>fips { ... }</code>).</li>
+<li><code>http</code> is now a list of objects (<code>http = [{ ... }]</code>) instead of multiple block attribute (<code>http { ... }</code>).</li>
+<li><code>l4</code> is now a list of objects (<code>l4 = [{ ... }]</code>) instead of multiple block attribute (<code>l4 { ... }</code>).</li>
+<li><code>logging</code> is now a list of objects (<code>logging = [{ ... }]</code>) instead of multiple block attribute (<code>logging { ... }</code>).</li>
+<li><code>notification_settings</code> is now a list of objects (<code>notification_settings = [{ ... }]</code>) instead of multiple block attribute (<code>notification_settings { ... }</code>).</li>
+<li><code>payload_log</code> is now a list of objects (<code>payload_log = [{ ... }]</code>) instead of multiple block attribute (<code>payload_log { ... }</code>).</li>
+<li><code>proxy</code> is now a list of objects (<code>proxy = [{ ... }]</code>) instead of multiple block attribute (<code>proxy { ... }</code>).</li>
+<li><code>settings_by_rule_type</code> is now a list of objects (<code>settings_by_rule_type = [{ ... }]</code>) instead of multiple block attribute (<code>settings_by_rule_type { ... }</code>).</li>
+<li><code>ssh_session_log</code> is now a list of objects (<code>ssh_session_log = [{ ... }]</code>) instead of multiple block attribute (<code>ssh_session_log { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_dns_location"></a><h2 id="cloudflare_zero_trust_dns_location">cloudflare_zero_trust_dns_location</h2>
+
+<ul>
+<li><code>networks</code> is now a list of objects (<code>networks = [{ ... }]</code>) instead of multiple block attribute (<code>networks { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_gateway_policy"></a><h2 id="cloudflare_zero_trust_gateway_policy">cloudflare_zero_trust_gateway_policy</h2>
+
+<ul>
+<li><code>audit_ssh</code> is now a single nested attribute (<code>audit_ssh = { ... }</code>) instead of a block (<code>audit_ssh { ... }</code>).</li>
+<li><code>biso_admin_controls</code> is now a single nested attribute (<code>biso_admin_controls = { ... }</code>) instead of a block (<code>biso_admin_controls { ... }</code>).</li>
+<li><code>check_session</code> is now a single nested attribute (<code>check_session = { ... }</code>) instead of a block (<code>check_session { ... }</code>).</li>
+<li><code>dns_resolvers</code> is now a single nested attribute (<code>dns_resolvers = { ... }</code>) instead of a block (<code>dns_resolvers { ... }</code>).</li>
+<li><code>egress</code> is now a single nested attribute (<code>egress = { ... }</code>) instead of a block (<code>egress { ... }</code>).</li>
+<li><code>ipv4</code> is now a list of objects (<code>ipv4 = [{ ... }]</code>) instead of multiple block attribute (<code>ipv4 { ... }</code>).</li>
+<li><code>ipv6</code> is now a list of objects (<code>ipv6 = [{ ... }]</code>) instead of multiple block attribute (<code>ipv6 { ... }</code>).</li>
+<li><code>l4override</code> is now a single nested attribute (<code>l4override = { ... }</code>) instead of a block (<code>l4override { ... }</code>).</li>
+<li><code>notification_settings</code> is now a single nested attribute (<code>notification_settings = { ... }</code>) instead of a block (<code>notification_settings { ... }</code>).</li>
+<li><code>payload_log</code> is now a single nested attribute (<code>payload_log = { ... }</code>) instead of a block (<code>payload_log { ... }</code>).</li>
+<li><code>rule_settings</code> is now a single nested attribute (<code>rule_settings = { ... }</code>) instead of a block (<code>rule_settings { ... }</code>).</li>
+<li><code>untrusted_cert</code> is now a single nested attribute (<code>untrusted_cert = { ... }</code>) instead of a block (<code>untrusted_cert { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_zero_trust_tunnel_cloudflared_config"></a><h2 id="cloudflare_zero_trust_tunnel_cloudflared_config">cloudflare_zero_trust_tunnel_cloudflared_config</h2>
+
+<ul>
+<li><code>access</code> is now a list of objects (<code>access = [{ ... }]</code>) instead of multiple block attribute (<code>access { ... }</code>).</li>
+<li><code>access</code> is now a single nested attribute (<code>access = { ... }</code>) instead of a block (<code>access { ... }</code>).</li>
+<li><code>config</code> is now a single nested attribute (<code>config = { ... }</code>) instead of a block (<code>config { ... }</code>).</li>
+<li><code>ingress_rule</code> is now a list of objects (<code>ingress_rule = [{ ... }]</code>) instead of multiple block attribute (<code>ingress_rule { ... }</code>).</li>
+<li><code>ip_rules</code> is now a list of objects (<code>ip_rules = [{ ... }]</code>) instead of multiple block attribute (<code>ip_rules { ... }</code>).</li>
+<li><code>origin_request</code> is now a list of objects (<code>origin_request = [{ ... }]</code>) instead of multiple block attribute (<code>origin_request { ... }</code>).</li>
+<li><code>origin_request</code> is now a single nested attribute (<code>origin_request = { ... }</code>) instead of a block (<code>origin_request { ... }</code>).</li>
+<li><code>warp_routing</code> is now a single nested attribute (<code>warp_routing = { ... }</code>) instead of a block (<code>warp_routing { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_waiting_room"></a><h2 id="cloudflare_waiting_room">cloudflare_waiting_room</h2>
+
+<ul>
+<li><code>additional_routes</code> is now a list of objects (<code>additional_routes = [{ ... }]</code>) instead of multiple block attribute (<code>additional_routes { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_waiting_room_rules"></a><h2 id="cloudflare_waiting_room_rules">cloudflare_waiting_room_rules</h2>
+
+<ul>
+<li><code>rules</code> is now a list of objects (<code>rules = [{ ... }]</code>) instead of multiple block attribute (<code>rules { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_workers_script"></a><h2 id="cloudflare_workers_script">cloudflare_workers_script</h2>
+
+<ul>
+<li><code>name</code> is now <code>script_name</code>.</li>
+<li><code>analytics_engine_binding</code> is now a list of objects (<code>analytics_engine_binding = [{ ... }]</code>) instead of multiple block attribute (<code>analytics_engine_binding { ... }</code>).</li>
+<li><code>d1_database_binding</code> is now a list of objects (<code>d1_database_binding = [{ ... }]</code>) instead of multiple block attribute (<code>d1_database_binding { ... }</code>).</li>
+<li><code>kv_namespace_binding</code> is now a list of objects (<code>kv_namespace_binding = [{ ... }]</code>) instead of multiple block attribute (<code>kv_namespace_binding { ... }</code>).</li>
+<li><code>placement</code> is now a list of objects (<code>placement = [{ ... }]</code>) instead of multiple block attribute (<code>placement { ... }</code>).</li>
+<li><code>plain_text_binding</code> is now a list of objects (<code>plain_text_binding = [{ ... }]</code>) instead of multiple block attribute (<code>plain_text_binding { ... }</code>).</li>
+<li><code>queue_binding</code> is now a list of objects (<code>queue_binding = [{ ... }]</code>) instead of multiple block attribute (<code>queue_binding { ... }</code>).</li>
+<li><code>r2_bucket_binding</code> is now a list of objects (<code>r2_bucket_binding = [{ ... }]</code>) instead of multiple block attribute (<code>r2_bucket_binding { ... }</code>).</li>
+<li><code>secret_text_binding</code> is now a list of objects (<code>secret_text_binding = [{ ... }]</code>) instead of multiple block attribute (<code>secret_text_binding { ... }</code>).</li>
+<li><code>service_binding</code> is now a list of objects (<code>service_binding = [{ ... }]</code>) instead of multiple block attribute (<code>service_binding { ... }</code>).</li>
+<li><code>webassembly_binding</code> is now a list of objects (<code>webassembly_binding = [{ ... }]</code>) instead of multiple block attribute (<code>webassembly_binding { ... }</code>).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_magic_wan_static_route"></a><h2 id="cloudflare_magic_wan_static_route">cloudflare_magic_wan_static_route</h2>
+
+<ul>
+<li><code>colo_names</code> is now <code>scope.colo_names</code></li>
+<li><code>colo_regions</code> is now <code>scope.colo_regions</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_page_rule"></a><h2 id="cloudflare_page_rule">cloudflare_page_rule</h2>
+
+<ul>
+<li><code>actions</code>is now a single nested attribute instead of a block.</li>
+<li><code>ignore = true</code> is now <code>exclude = ["*"]</code></li>
+<li><code>ignore = false</code> is now <code>include = ["*"]</code></li>
+<li><code>cache_ttl_by_status</code> is now a map (<code>cache_ttl_by_status = { ... }</code>) instead of a list of objects (<code>cache_ttl_by_status = [{ ... }]</code>)</li>
+</ul>
+
+<p>Before</p>
+
+<pre><code>resource "cloudflare_page_rule" "example" {
+  target = "example.com"
+  actions {
+    cache_key_fields = {
+      query_string = {
+        ignore = true
+        ignore = false
+      }
+    }
+  }
+}
+</code></pre>
+
+<p>After</p>
+
+<pre><code>resource "cloudflare_page_rule" "example" {
+  target = "example.com"
+  actions = {
+    cache_key_fields = {
+      query_string = {
+        exclude = ["*"]
+        include = ["*"]
+      }
+    }
+  }
+}
+</code></pre>
+
+            
+        
+    </body></html>

@@ -1,0 +1,377 @@
+<html><!-- Online page at https://www.terraform.io/language/stacks/deploy/authenticate --><head>
+                <title>Authenticate a Stack</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="authenticate-a-stack">Authenticate a Stack</h1>
+
+<p>You can authenticate a Stack in two ways:  by using OIDC to dynamically authenticate with the built-in <code>identity_token</code> block or by accessing existing authentication credentials with the <code>store</code> block. We recommend authenticating your Stack with OIDC because using static credentials to authenticate providers presents a security risk, even if you rotate your credentials regularly.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Authenticate%20with%20OIDC"></a><h2 id="authenticate-with-oidc">Authenticate with OIDC</h2>
+
+<p><a href="https://openid.net/connect/">OpenID Connect</a> (OIDC) is an identity layer on top of the OAuth 2.0 protocol. You can use HCP Terraform’s <a href="../../../terraform/cloud-docs/workspaces/dynamic-provider-credentials/workload-identity-tokens.html">Workload identity</a> tokens, built on the OpenID Connect protocol, to securely connect and authenticate your Stacks with cloud providers.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Hands on</em>
+    <p>: Walk through setting up OIDC for a Stack in the <a href="../../../terraform/tutorials/cloud/stacks-deploy.html">Deploy a Stack with HCP Terraform</a> tutorial.</p>
+</aside>
+
+<p>Stacks have a built-in <code>identity_token</code> block that creates workload identity tokens, also known as JWT tokens. You can use these tokens to authenticate Stacks with Terraform providers securely.</p>
+
+<p>This guide covers how to set up OIDC for Stacks using the <code>identity_token</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Overview"></a><h3 id="overview">Overview</h3>
+
+<p>The details of Stack authentication differ based on which cloud provider you are setting up, but the basic steps remain the same:</p>
+
+<ol>
+<li>Set up the trust configuration between your cloud provider and HCP Terraform, which usually includes creating roles and policies for your cloud provider.  </li>
+<li>Add an <code>identity_token</code> block to your Stack’s deployment file using the audience and roles you created in the previous step.   </li>
+</ol>
+
+<p>Your deployments can reference the value of the <code>identity_token</code> block to pass the trust relationship role to your Stack’s operations.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configure%20trust%20configuration"></a><h3 id="configure-trust-configuration">Configure trust configuration</h3>
+
+<p>In this example, you will set up an example trust policy with AWS. For examples of setting up trust policies with other providers, refer to our <a href="https://github.com/hashicorp-guides/terraform-stacks-identity-tokens/tree/main">repository of example configurations</a>.</p>
+
+<p>We recommend using Terraform to create and configure the trust relationship and permissions for the cloud provider you want to authenticate with. Using the following Terraform configuration, <a href="../../../terraform/cloud-docs/workspaces/create.html">create a new workspace</a> and configure the <code>aws_region</code>, <code>tf_organization</code>, <code>tf_project,</code> and <code>tf_stack</code> variables for your specific set up.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tf</span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"aws_region"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The AWS region to create the role in."</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"tf_organization"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The name of the organization that this workspace and Stack live in."</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"tf_project"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The name of the project that this workspace and Stack live in."</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"tf_stack"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The name of the Stack you will you use this token in."</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.aws_region</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_openid_connect_provider"</span><span class="w"> </span><span class="nv">"stacks_openid_provider"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">url</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://app.terraform.io"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_id_list</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"aws.workload.identity"</span><span class="p">]</span><span class="c1"></span>
+
+<span class="c1">  # This is the thumbprint of https://app.terraform.io as of 2024/08/07</span>
+<span class="c1">  # Refer to "Adjust access of trust" to learn how to update this thumbprint</span>
+<span class="w">  </span><span class="na">thumbprint_list</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"9e99a48a9960b14926bb7f3b02e22da2b0ab7280"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"stacks_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"stacks-${var.tf_organization}-${var.tf_project}-${var.tf_stack}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.stacks_role_policy.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"stacks_role_policy"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Federated"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_iam_openid_connect_provider.stacks_openid_provider.arn</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"sts:AssumeRoleWithWebIdentity"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">test</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"StringEquals"</span><span class="w"></span>
+<span class="w">      </span><span class="na">variable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"app.terraform.io:aud"</span><span class="w"></span>
+<span class="w">      </span><span class="na">values</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"aws.workload.identity"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">test</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"StringLike"</span><span class="w"></span>
+<span class="w">      </span><span class="na">variable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"app.terraform.io:sub"</span><span class="c1"></span>
+<span class="c1">      # This value dictates which HCP Terraform organizations, projects,  </span>
+<span class="c1">      # and stacks can assume the new role you are creating.</span>
+<span class="c1">      # </span>
+<span class="c1">      # You can widen access to an entire organization or project by</span>
+<span class="c1">      # tweaking the value below. You can also restrict access to specific</span>
+<span class="c1">      # deployments or operations. Refer to Configure trust for more information.</span>
+<span class="w">      </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"organization:${var.tf_organization}:project:${var.tf_project}:stack:${var.tf_stack}:*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Now, you give the new role access to things you want to manage in your Stack.</span>
+<span class="c1">#</span>
+<span class="c1"># The policies below are too broad for a production use case, but you set them </span>
+<span class="c1"># broadly for now to ensure this Stacks can do anything during development and </span>
+<span class="c1"># testing. In practice, only give your Stack access to what it needs to manage.</span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role_policy_attachment"</span><span class="w"> </span><span class="nv">"iam"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.stacks_role.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam::aws:policy/IAMFullAccess"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role_policy_attachment"</span><span class="w"> </span><span class="nv">"sudo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.stacks_role.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam::aws:policy/PowerUserAccess"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Your workspace returns this output role, which you use to configure your </span>
+<span class="c1"># deployments. </span>
+<span class="kr">output</span><span class="w"> </span><span class="nv">"role_arn"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.stacks_role.arn</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After setting up your workspace in HCP Terraform, perform a plan and apply operation. HCP Terraform will create your OpenID provider, policy, and role before outputting your new role’s ARN with the <code>role_arn</code> output. Copy your new AWS ARN role because this is the value you use to configure your cloud provider with your Stack and HCP Terraform.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Adjust%20access%20of%20trust"></a><h4 id="adjust-access-of-trust">Adjust access of trust</h4>
+
+<p>Workload identity tokens contain useful metadata in their payloads, known as claims. Once a cloud platform verifies a token using HCP Terraform’s public key, it can look at the identity token's claims to match it to the correct permissions or reject it.</p>
+
+<p>You do not need to understand the full token specification or what every claim means, but you can use the claims to adjust your trust relationship.</p>
+
+<p>Workload identity tokens commonly reference the following claims.</p>
+
+<table>
+<thead>
+<tr>
+  <th style="text-align:left;">Claim</th>
+  <th style="text-align:left;">Explanation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td style="text-align:left;"><code>jti</code> (JWT ID)</td>
+  <td style="text-align:left;">A unique identifier for each token, which is a UUID.</td>
+</tr>
+<tr>
+  <td style="text-align:left;"><code>iss</code> (issuer)</td>
+  <td style="text-align:left;">Full URL of the HCP Terraform  instance that signed the token. For example, “https://app.terraform.io”.</td>
+</tr>
+<tr>
+  <td style="text-align:left;"><code>iat</code> (issued at)</td>
+  <td style="text-align:left;">Unix timestamp when the token was issued. May be required by certain relying parties.</td>
+</tr>
+<tr>
+  <td style="text-align:left;"><code>nbf</code> (not before)</td>
+  <td style="text-align:left;">Unix Timestamp when the token can start being used. Should be the same as <code>iat</code> for your purposes and may be required by certain relying parties.</td>
+</tr>
+<tr>
+  <td style="text-align:left;"><code>aud</code> (audience)</td>
+  <td style="text-align:left;">Intended audience for the token. For example, “api://AzureADTokenExchange” for Azure.</td>
+</tr>
+<tr>
+  <td style="text-align:left;"><code>exp</code> (expiration)</td>
+  <td style="text-align:left;">Unix timestamp based on the timeout of the operation phase that it was issued for.</td>
+</tr>
+<tr>
+  <td style="text-align:left;"><code>sub</code> (subject)</td>
+  <td style="text-align:left;">Fully qualified path to a Stack deployment, followed by the operation type:<br/><code>organization:&lt;organization_name&gt;:project:&lt;project_name&gt;:stack:&lt;stack_name&gt;:deployment:my-deployment-name:operation:&lt;operation_type&gt;</code><br/><br/>For example:<br/><code>organization:My_Org:project:My_Project:stack:My_Stack:deployment:staging:operation:apply</code></td>
+</tr>
+</tbody>
+</table>
+
+<p>You can further customize your token’s permissions using the following custom claims.</p>
+
+<table>
+<thead>
+<tr>
+  <th style="text-align:left;">Claim</th>
+  <th style="text-align:left;">Explanation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td style="text-align:left;"><code>terraform_operation</code> ("run phase")</td>
+  <td style="text-align:left;">The Terraform operation this token was issued for. For example, “plan” or “apply”.</td>
+</tr>
+<tr>
+  <td style="text-align:left;"><code>terraform_stack_deployment_name</code></td>
+  <td style="text-align:left;">Name of the deployment that the operation is for.</td>
+</tr>
+<tr>
+  <td style="text-align:left;"><code>terraform_stack_id</code> (stack ID)</td>
+  <td style="text-align:left;">External ID of the Stack that the operation is for.</td>
+</tr>
+<tr>
+  <td style="text-align:left;"><code>terraform_stack_name</code> (stack name)</td>
+  <td style="text-align:left;">Name of the Stack that the operation is for.</td>
+</tr>
+<tr>
+  <td style="text-align:left;"><code>terraform_project_id</code> (project ID)</td>
+  <td style="text-align:left;">External ID of the project that the operation is taking place in. Useful if you want to use the same role across Stacks in a given project.</td>
+</tr>
+<tr>
+  <td style="text-align:left;"><code>terraform_project_name</code> (project name)</td>
+  <td style="text-align:left;">Name of the project that the operation is taking place in.</td>
+</tr>
+<tr>
+  <td style="text-align:left;"><code>terraform_organization_id</code> (organization ID)</td>
+  <td style="text-align:left;">External ID of the HCP Terraform organization that the operation is taking place in. Useful if you are in a large company that may have more than one organization or if you want to use the same role across your entire organization.</td>
+</tr>
+<tr>
+  <td style="text-align:left;"><code>terraform_organization_name</code> (organization name)</td>
+  <td style="text-align:left;">Name of the HCP Terraform organization that the operation is taking place in.</td>
+</tr>
+<tr>
+  <td style="text-align:left;"><code>terraform_plan_id</code> (plan ID)</td>
+  <td style="text-align:left;">External ID of the plan that this token is being used for creating or applying. This might be used to track down where a token has been leaked from or to block a specific token if it has been leaked.</td>
+</tr>
+</tbody>
+</table>
+
+<p>You can also update your configuration to use the current thumbprint for HCP Terraform by running the following command and removing the colons from the value it returns.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">$ </span><span class="nb">echo</span> <span class="p">|</span> openssl s_client -showcerts -servername app.terraform.io -connect app.terraform.io:443 <span class="m">2</span>&gt;/dev/null <span class="p">|</span> openssl x509 -fingerprint -noout -sha1
+<span class="go">sha1 Fingerprint=FD:88:23:AE:FB:96:13:28:A1:34:70:6D:C8:57:5A:17:0F:0B:B3:7C</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configure%20HCP%20Terraform"></a><h3 id="configure-hcp-terraform">Configure HCP Terraform</h3>
+
+<p>Stacks use the <a href="../../../terraform/language/stacks/reference/tfdeploy.html#identity_token-block-configuration"><code>identity_token</code> block</a> to define a JSON Web Token (JWT) for a specific deployment. This token enables OIDC-based authentication, allowing your Stack deployments to securely connect to cloud providers like AWS, Azure, and GCP.</p>
+
+<p>When you define the <code>identity_token</code> block, you specify its audience. For example, the example Stack deployment configuration defines an <code>identity_token</code> block specifying the AWS audience.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">identity_token</span><span class="w"> </span><span class="s2">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">audience</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"aws.workload.identity"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Once defined, you can reference an identity token in a deployment's input variables and reference that token in a provider’s configuration.</p>
+
+<p>You also need to add your trust relationship, your role ARN, to configure your token with the trust relationship to authenticate AWS resources.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployments.tfdeploy.hcl</span>
+
+<span class="err">identity_token</span><span class="w"> </span><span class="s2">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">audience</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"aws.workload.identity"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">deployment</span><span class="w"> </span><span class="s2">"development"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">role_arn</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;YOUR_ROLE_ARN&gt;"</span><span class="w"></span>
+<span class="w">        </span><span class="na">identity_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">identity_token.aws.jwt</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Now, the deployments are authenticated with AWS and can pass the trust configuration to your Stack’s providers for authentication.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># variables.tfstack.hcl</span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"role_arn"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"identity_token"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">    </span><span class="na">ephemeral</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># providers.tfstack.hcl</span>
+
+<span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">        </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 5.7.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nc">"aws"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="w">        </span><span class="nb">assume_role_with_web_identity</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="na">role_arn</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">var.aws_role</span><span class="w"></span>
+<span class="w">            </span><span class="na">web_identity_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.aws_token</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>With this setup, each of your deployments pass the ARN of your trust relationship role and a JWT token generated by AWS each time you plan or apply your Stack. Each of your deployments uses their own role, configured with the specific permissions you require.</p>
+
+<p>For more examples of setting up OIDC with different providers, refer to our <a href="https://github.com/hashicorp-guides/terraform-stacks-identity-tokens/tree/main">repository of example configurations</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Authenticate%20with%20existing%20credentials"></a><h2 id="authenticate-with-existing-credentials">Authenticate with existing credentials</h2>
+
+<p>You can use the <code>store</code> block to define key-value secrets in your deployment configuration and then access those values in your deployments.</p>
+
+<p>You can use the <code>store</code> block to access credentials stored in an <a href="../../../terraform/cloud-docs/workspaces/variables/managing-variables.html#variable-sets">HCP Terraform variable set</a>. This example uses a <code>store</code> block with a variable set to access credentials stored in HCP Terraform. For more information about using <code>store</code> blocks, refer to the <a href="../../../terraform/language/stacks/reference/tfdeploy.html">Deployment configuration reference</a>.</p>
+
+<p>Before writing any configuration, ensure your Stack can access the variable set you are targeting by allowing your project to access the set or making the set globally available.</p>
+
+<p>Next, add a <code>store</code> block to your deployment configuration file to access your variable set. Once defined, your deployments can access your variable set’s values. </p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployments.tfdeploy.hcl</span>
+
+<span class="c1"># Source environment secrets from your HCP Terraform variable set</span>
+<span class="err">store</span><span class="w"> </span><span class="s2">"varset" "tokens"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"varset-&lt;variables-set-id&gt;"</span><span class="w"></span>
+<span class="w">  </span><span class="na">category</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"env"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Access your variable set's value using your store and pass them into your </span>
+<span class="c1"># deployment's inputs.</span>
+<span class="err">deployment</span><span class="w"> </span><span class="s2">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">access_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">store.varset.tokens.AWS_ACCESS_KEY_ID</span><span class="w">    </span>
+<span class="w">    </span><span class="na">secret_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">store.varset.tokens.AWS_SECRET_ACCESS_KEY</span><span class="w"></span>
+<span class="w">    </span><span class="na">session_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">store.varset.tokens.AWS_SESSION_TOKEN</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>For example, if your <code>test</code> deployment can use your <code>store</code> to access your variable set’s keys, and therefore, your variable set’s AWS provider credentials.  </p>
+
+<p>Your <code>test</code> deployment can define your AWS credentials as <code>inputs</code>, allowing your <code>providers</code> to access those credentials. </p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># providers.tfstack.hcl</span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"access_key"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS access key"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">ephemeral</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"secret_key"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS sensitive secret key."</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">ephemeral</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"session_token"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS session token."</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">ephemeral</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">    </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 5.7.0"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nc">"aws"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">access_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.access_key</span><span class="w"></span>
+<span class="w">    </span><span class="na">secret_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.secret_key</span><span class="w"></span>
+<span class="w">    </span><span class="na">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.session_token</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>This example allows your <code>aws.this</code> provider to authenticate to AWS using the credentials from a variable set stored in HCP Terraform. For more information about using <code>store</code> blocks, refer to the <a href="../../../terraform/language/stacks/reference/tfdeploy.html">Deployment configuration reference</a>.</p>
+
+            
+        
+    </body></html>

@@ -1,0 +1,271 @@
+<html><!-- Online page at https://www.terraform.io/language/backend/remote --><head>
+                <title>remote</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="remote">remote</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>We introduced the remote backend in Terraform v0.11.13 and Terraform Enterprise v201809-1. As of Terraform v1.1.0 and Terraform Enterprise v202201-1, we recommend using HCP Terraform's built-in <a href="../../terraform/cli/cloud/settings.html"><code>cloud</code> integration</a> instead. The <code>cloud</code> option supports an improved user experience and more features, such as <a href="../../terraform/cloud-docs/workspaces/settings.html#user-interface">structured run output mode</a>, which displays your plan and apply results in a human-readable format.</p>
+</aside>
+
+<p>The remote backend is unique among all other Terraform backends because it can both store state snapshots and execute operations for HCP Terraform's <a href="../../terraform/cloud-docs/run/cli.html">CLI-driven run workflow</a>. It used to be called an "enhanced" backend.</p>
+
+<p>When using full remote operations, operations like <code>terraform plan</code> or <code>terraform apply</code> can be executed in Terraform
+Cloud's run environment, with log output streaming to the local terminal. Remote plans and applies use variable values from the associated HCP Terraform workspace.</p>
+
+<p>You can also use HCP Terraform with local operations, in which case only state is stored in the HCP Terraform backend.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Command%20Support"></a><h2 id="command-support">Command Support</h2>
+
+<p>The remote backend supports the following Terraform commands:</p>
+
+<ul>
+<li><code>apply</code></li>
+<li><code>console</code> (supported in Terraform &gt;= v0.11.12)</li>
+<li><code>destroy</code></li>
+<li><code>fmt</code></li>
+<li><code>get</code></li>
+<li><code>graph</code> (supported in Terraform &gt;= v0.11.12)</li>
+<li><code>import</code> (supported in Terraform &gt;= v0.11.12)</li>
+<li><code>init</code></li>
+<li><code>output</code></li>
+<li><code>plan</code></li>
+<li><code>providers</code></li>
+<li><code>show</code></li>
+<li><code>state</code> (supports all sub-commands: list, mv, pull, push, rm, show)</li>
+<li><code>taint</code></li>
+<li><code>untaint</code></li>
+<li><code>validate</code></li>
+<li><code>version</code></li>
+<li><code>workspace</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Workspaces"></a><h2 id="workspaces">Workspaces</h2>
+
+<p>The remote backend can work with either a single remote HCP Terraform workspace, or with multiple similarly-named remote workspaces (like <code>networking-dev</code> and <code>networking-prod</code>). The <code>workspaces</code> block of the backend configuration
+determines which mode it uses:</p>
+
+<ul>
+<li><p>To use a single remote HCP Terraform workspace, set <code>workspaces.name</code> to the
+remote workspace's full name (like <code>networking-prod</code>).</p></li>
+<li><p>To use multiple remote workspaces, set <code>workspaces.prefix</code> to a prefix used in
+all of the desired remote workspace names. For example, set
+<code>prefix = "networking-"</code> to use HCP Terraform workspaces with
+names like <code>networking-dev</code> and <code>networking-prod</code>. This is helpful when
+mapping multiple Terraform CLI <a href="../../terraform/language/state/workspaces.html">workspaces</a>
+used in a single Terraform configuration to multiple HCP Terraform
+workspaces.</p></li>
+</ul>
+
+<p>The backend configuration requires either <code>name</code> or <code>prefix</code>. Omitting both or
+setting both results in a configuration error.</p>
+
+<p>If previous state is present when you run <code>terraform init</code> and the corresponding
+remote workspaces are empty or absent, Terraform will create workspaces and
+update the remote state accordingly. However, if your workspace requires variables or a specific version of Terraform for remote operations, we
+recommend that you create your remote workspaces on HCP Terraform before
+running any remote operations against them.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Workspace%20Names"></a><h3 id="workspace-names">Workspace Names</h3>
+
+<p>Terraform uses shortened names without the common prefix to interact with workspaces on the command line. For example, if <code>prefix = "networking-"</code>, use <code>terraform workspace select prod</code> to switch to the Terraform CLI workspace <code>prod</code> within the current configuration. However, remote Terraform operations such as <code>plan</code> and <code>apply</code> for that Terraform CLI workspace will take place in the HCP Terraform workspace <code>networking-prod</code>.</p>
+
+<p>Because of this, the <a href="../../terraform/language/state/workspaces.html#current-workspace-interpolation"><code>terraform.workspace</code></a> interpolation expression produces different results depending on whether a remote workspace is configured to perform operations locally or remotely. For example, in a remote workspace called <code>networking-prod</code> created with <code>prefix = "networking-"</code> the expression produces the following:</p>
+
+<ul>
+<li>For local operations, <code>terraform.workspace</code> = <code>prod</code></li>
+<li>For remote operations, <code>terraform.workspace</code>=  <code>networking-prod</code></li>
+</ul>
+
+<p>Prior to Terraform version 1.1.0, HCP Terraform workspaces used only the single <code>default</code> Terraform CLI workspace internally. So if a Terraform configuration used <code>terraform.workspace</code> to return <code>dev</code> or <code>prod</code>, remote runs in HCP Terraform would always evaluate it as <code>default</code>, regardless of
+which workspace you set with the <code>terraform workspace select</code> command. Therefore, we do not recommend using <code>terraform.workspace</code> in Terraform configurations that use Terraform 1.0.x or earlier and run remote operations against HCP Terraform workspaces.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Determining%20Run%20Environment"></a><h3 id="determining-run-environment">Determining Run Environment</h3>
+
+<p>If you need to determine whether a run is local or remote in your Terraform configuration, we recommend using <a href="../../terraform/cloud-docs/run/run-environment.html#environment-variables">HCP Terraform run environment variables</a>. The example below uses <code>HCP_TERRAFORM_RUN_ID</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">output</span><span class="w"> </span><span class="nv">"current_workspace_name"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">terraform.workspace</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"HCP_TERRAFORM_RUN_ID"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"remote_execution_determine"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Remote run environment? %{if var.HCP_TERRAFORM_RUN_ID != ""}Yes%{else}No this is local%{endif}!"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Configurations"></a><h2 id="example-configurations">Example Configurations</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>We recommend omitting the token from the configuration, and instead using <a href="../../terraform/cli/commands/login.html"><code>terraform login</code></a> or manually configuring <code>credentials</code> in the <a href="../../terraform/cli/config/config-file.html#credentials">CLI config file</a>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Basic%20Configuration"></a><h3 id="basic-configuration">Basic Configuration</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Using a single workspace:</span>
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"remote"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">hostname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"app.terraform.io"</span><span class="w"></span>
+<span class="w">    </span><span class="na">organization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"company"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">workspaces</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-app-prod"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Using multiple workspaces:</span>
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"remote"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">hostname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"app.terraform.io"</span><span class="w"></span>
+<span class="w">    </span><span class="na">organization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"company"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">workspaces</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-app-"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20CLI%20Input"></a><h3 id="using-cli-input">Using CLI Input</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tf</span>
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">required_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 0.12.0"</span><span class="w"></span>
+
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"remote"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Backend configuration file:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># config.remote.tfbackend</span>
+<span class="nb">workspaces</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"workspace"</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="na">hostname</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"app.terraform.io"</span><span class="w"></span>
+<span class="na">organization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"company"</span><span class="w"></span>
+</code></pre></div>
+
+<p>Running <code>terraform init</code> with the backend file:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform init -backend-config<span class="o">=</span>config.remote.tfbackend
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%20Configuration"></a><h3 id="data-source-configuration">Data Source Configuration</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"terraform_remote_state"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"remote"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">organization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"company"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">workspaces</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"workspace"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuration%20Variables"></a><h2 id="configuration-variables">Configuration Variables</h2>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>Warning</em>
+    <p>We recommend using environment variables to supply credentials and other sensitive data. If you use <code>-backend-config</code> or hardcode these values directly in your configuration, Terraform will include these values in both the <code>.terraform</code> subdirectory and in plan files. Refer to <a href="../../terraform/language/backend.html#credentials-and-sensitive-data">Credentials and Sensitive Data</a> for details.</p>
+</aside>
+
+<p>The following configuration options are supported:</p>
+
+<ul>
+<li><code>hostname</code> - (Optional) The remote backend hostname to connect to. Defaults
+to app.terraform.io.</li>
+<li><code>organization</code> - (Required) The name of the organization containing the
+targeted workspace(s).</li>
+<li><code>token</code> - (Optional) The token used to authenticate with the remote backend.
+We recommend omitting the token from the configuration, and instead using
+<a href="../../terraform/cli/commands/login.html"><code>terraform login</code></a> or manually configuring
+<code>credentials</code> in the
+<a href="../../terraform/cli/config/config-file.html#credentials">CLI config file</a>.</li>
+<li><p><code>workspaces</code> - (Required) A block specifying which remote workspace(s) to use.
+The <code>workspaces</code> block supports the following keys:</p>
+
+<ul>
+<li><code>name</code> - (Optional) The full name of one remote workspace. When configured,
+only the default workspace can be used. This option conflicts with <code>prefix</code>.</li>
+<li><code>prefix</code> - (Optional) A prefix used in the names of one or more remote
+workspaces, all of which can be used with this configuration. The full
+workspace names are used in HCP Terraform, and the short names
+(minus the prefix) are used on the command line for Terraform CLI workspaces.
+If omitted, only the default workspace can be used. This option conflicts with <code>name</code>.</li>
+</ul></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>You must use the <code>name</code> key when configuring a <code>terraform_remote_state</code> data source that retrieves state from another HCP Terraform workspace. The <code>prefix</code> key is only intended for use when configuring an instance of the remote backend.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Command%20Line%20Arguments"></a><h2 id="command-line-arguments">Command Line Arguments</h2>
+
+<p>For configurations that include a <code>backend "remote"</code> block, commands that
+make local modifications to Terraform state and then push them back up to
+the remote workspace accept the following option to modify that behavior:</p>
+
+<ul>
+<li><p><code>-ignore-remote-version</code> - Override checking that the local and remote
+Terraform versions agree, making an operation proceed even when there is
+a mismatch.</p>
+
+<p>Normally state-modification operations require using a local version of
+Terraform CLI which is compatible with the Terraform version selected
+for the remote workspace as part of its settings. This is to avoid the
+local operation creating a new state snapshot which the workspace's
+remote execution environment would then be unable to decode.</p>
+
+<p>Overriding this check can result in an HCP Terraform workspace that is
+no longer able to complete remote operations, so we recommend against
+using this option.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Excluding%20Files%20from%20Upload%20with%20.terraformignore"></a><h2 id="excluding-files-from-upload-with-terraformignore">Excluding Files from Upload with .terraformignore</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Version note</em>
+    <p><code>.terraformignore</code> support was added in Terraform 0.12.11.</p>
+</aside>
+
+<p>When executing a remote <code>plan</code> or <code>apply</code> in a <a href="../../terraform/cloud-docs/run/cli.html">CLI-driven run</a>,
+an archive of your configuration directory is uploaded to HCP Terraform. You can define
+paths to ignore from upload via a <code>.terraformignore</code> file at the root of your configuration directory. If this file is not present, the archive will exclude the following by default:</p>
+
+<ul>
+<li><code>.git/</code> directories</li>
+<li><code>.terraform/</code> directories (exclusive of <code>.terraform/modules</code>)</li>
+</ul>
+
+<p>The <code>.terraformignore</code> file can include rules as one would include in a
+<a href="https://git-scm.com/book/en/v2/Git-Basics-Recording-Changes-to-the-Repository#_ignoring"><code>.gitignore</code> file</a></p>
+
+<ul>
+<li>Comments (starting with <code>#</code>) or blank lines are ignored</li>
+<li>End a pattern with a forward slash <code>/</code> to specify a directory</li>
+<li>Negate a pattern by starting it with an exclamation point <code>!</code></li>
+</ul>
+
+<p>Note that unlike <code>.gitignore</code>, only the <code>.terraformignore</code> at the root of the configuration
+directory is considered.</p>
+
+            
+        
+    </body></html>

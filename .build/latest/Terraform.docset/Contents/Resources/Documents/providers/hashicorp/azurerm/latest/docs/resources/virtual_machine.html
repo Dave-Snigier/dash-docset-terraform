@@ -1,0 +1,543 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_machine --><head>
+                <title>azurerm_virtual_machine</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="azurerm_virtual_machine">azurerm_virtual_machine</h1>
+
+<p>Manages a Virtual Machine.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Disclaimers"></a><h2 id="disclaimers">Disclaimers</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The <code>azurerm_virtual_machine</code> resource has been superseded by the <a href="linux_virtual_machine.html"><code>azurerm_linux_virtual_machine</code></a> and <a href="windows_virtual_machine.html"><code>azurerm_windows_virtual_machine</code></a> resources. The existing <code>azurerm_virtual_machine</code> resource will continue to be available throughout the 3.x releases however is in a feature-frozen state to maintain compatibility - new functionality will instead be added to the <code>azurerm_linux_virtual_machine</code> and <code>azurerm_windows_virtual_machine</code> resources.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Data Disks can be attached either directly on the <code>azurerm_virtual_machine</code> resource, or using the <code>azurerm_virtual_machine_data_disk_attachment</code> resource - but the two cannot be used together. If both are used against the same Virtual Machine, spurious changes will occur.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20%28from%20an%20Azure%20Platform%20Image%29"></a><h2 id="example-usage-from-an-azure-platform-image">Example Usage (from an Azure Platform Image)</h2>
+
+<p>This example provisions a Virtual Machine with Managed Disks. Other examples of the <code>azurerm_virtual_machine</code> resource can be found in <a href="https://github.com/hashicorp/terraform-provider-azurerm/tree/main/examples/virtual-machines">the <code>./examples/virtual-machines</code> directory within the GitHub Repository</a></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"prefix"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfvmex"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_resource_group"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-resources"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"West Europe"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_virtual_network"</span><span class="w"> </span><span class="nv">"main"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">address_space</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"10.0.0.0/16"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_subnet"</span><span class="w"> </span><span class="nv">"internal"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"internal"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">virtual_network_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.main.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">address_prefixes</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"10.0.2.0/24"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_network_interface"</span><span class="w"> </span><span class="nv">"main"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-nic"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">ip_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                          </span><span class="o">=</span><span class="w"> </span><span class="s2">"testconfiguration1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnet_id</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_subnet.internal.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">private_ip_address_allocation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Dynamic"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_virtual_machine"</span><span class="w"> </span><span class="nv">"main"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-vm"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_interface_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">azurerm_network_interface.main.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">vm_size</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"Standard_DS1_v2"</span><span class="c1"></span>
+
+<span class="c1">  # Uncomment this line to delete the OS disk automatically when deleting the VM</span>
+<span class="c1">  # delete_os_disk_on_termination = true</span>
+
+<span class="c1">  # Uncomment this line to delete the data disks automatically when deleting the VM</span>
+<span class="c1">  # delete_data_disks_on_termination = true</span>
+
+<span class="w">  </span><span class="nb">storage_image_reference</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">publisher</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Canonical"</span><span class="w"></span>
+<span class="w">    </span><span class="na">offer</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"0001-com-ubuntu-server-jammy"</span><span class="w"></span>
+<span class="w">    </span><span class="na">sku</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"22_04-lts"</span><span class="w"></span>
+<span class="w">    </span><span class="na">version</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"latest"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">storage_os_disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"myosdisk1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">caching</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"ReadWrite"</span><span class="w"></span>
+<span class="w">    </span><span class="na">create_option</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"FromImage"</span><span class="w"></span>
+<span class="w">    </span><span class="na">managed_disk_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Standard_LRS"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">os_profile</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">computer_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hostname"</span><span class="w"></span>
+<span class="w">    </span><span class="na">admin_username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"testadmin"</span><span class="w"></span>
+<span class="w">    </span><span class="na">admin_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Password1234!"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">os_profile_linux_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">disable_password_authentication</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">environment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"staging"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) Specifies the name of the Virtual Machine. Changing this forces a new resource to be created.</p></li>
+<li><p><code>resource_group_name</code> - (Required) Specifies the name of the Resource Group in which the Virtual Machine should exist. Changing this forces a new resource to be created.</p></li>
+<li><p><code>location</code> - (Required) Specifies the Azure Region where the Virtual Machine exists. Changing this forces a new resource to be created.</p></li>
+<li><p><code>network_interface_ids</code> - (Required) A list of Network Interface IDs which should be associated with the Virtual Machine.</p></li>
+<li><p><code>os_profile_linux_config</code> - (Optional) (Required, when a Linux machine) An <code>os_profile_linux_config</code> block as defined below.</p></li>
+<li><p><code>os_profile_windows_config</code> - (Optional) (Required, when a Windows machine) An <code>os_profile_windows_config</code> block as defined below.</p></li>
+<li><p><code>vm_size</code> - (Required) Specifies the <a href="https://docs.microsoft.com/azure/virtual-machines/sizes-general">size of the Virtual Machine</a>. See also <a href="https://docs.microsoft.com/azure/virtual-machines/vm-naming-conventions">Azure VM Naming Conventions</a>.</p></li>
+</ul>
+
+<hr/>
+
+<ul>
+<li><p><code>availability_set_id</code> - (Optional) The ID of the Availability Set in which the Virtual Machine should exist. Changing this forces a new resource to be created.</p></li>
+<li><p><code>boot_diagnostics</code> - (Optional) A <code>boot_diagnostics</code> block as defined below.</p></li>
+<li><p><code>additional_capabilities</code> - (Optional) An <code>additional_capabilities</code> block as defined below.</p></li>
+<li><p><code>delete_os_disk_on_termination</code> - (Optional) Should the OS Disk (either the Managed Disk / VHD Blob) be deleted when the Virtual Machine is destroyed? Defaults to <code>false</code>.</p></li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This setting works when instance is deleted via Terraform only and don't forget to delete disks manually if you deleted VM manually. It can increase spending.</p>
+</aside>
+
+<ul>
+<li><code>delete_data_disks_on_termination</code> - (Optional) Should the Data Disks (either the Managed Disks / VHD Blobs) be deleted when the Virtual Machine is destroyed? Defaults to <code>false</code>.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This setting works when instance is deleted via Terraform only and don't forget to delete disks manually if you deleted VM manually. It can increase spending.</p>
+</aside>
+
+<ul>
+<li><p><code>identity</code> - (Optional) An <code>identity</code> block as defined below.</p></li>
+<li><p><code>license_type</code> - (Optional) Specifies the BYOL Type for this Virtual Machine. This is only applicable to Windows Virtual Machines. Possible values are <code>Windows_Client</code> and <code>Windows_Server</code>.</p></li>
+<li><p><code>os_profile</code> - (Optional) An <code>os_profile</code> block as defined below. Required when <code>create_option</code> in the <code>storage_os_disk</code> block is set to <code>FromImage</code>.</p></li>
+<li><p><code>os_profile_secrets</code> - (Optional) One or more <code>os_profile_secrets</code> blocks as defined below.</p></li>
+<li><p><code>plan</code> - (Optional) A <code>plan</code> block as defined below.</p></li>
+<li><p><code>primary_network_interface_id</code> - (Optional) The ID of the Network Interface (which must be attached to the Virtual Machine) which should be the Primary Network Interface for this Virtual Machine.</p></li>
+<li><p><code>proximity_placement_group_id</code> - (Optional) The ID of the Proximity Placement Group to which this Virtual Machine should be assigned. Changing this forces a new resource to be created</p></li>
+<li><p><code>storage_data_disk</code> - (Optional) One or more <code>storage_data_disk</code> blocks as defined below.</p></li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Please Note</em>
+    <p>Data Disks can also be attached either using this block or <a href="virtual_machine_data_disk_attachment.html">the <code>azurerm_virtual_machine_data_disk_attachment</code> resource</a> - but not both.</p>
+</aside>
+
+<ul>
+<li><p><code>storage_image_reference</code> - (Optional) A <code>storage_image_reference</code> block as defined below. Changing this forces a new resource to be created.</p></li>
+<li><p><code>storage_os_disk</code> - (Required) A <code>storage_os_disk</code> block as defined below.</p></li>
+<li><p><code>tags</code> - (Optional) A mapping of tags to assign to the Virtual Machine.</p></li>
+<li><p><code>zones</code> - (Optional) A list of a single item of the Availability Zone which the Virtual Machine should be allocated in. Changing this forces a new resource to be created.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Please Note</em>
+    <p>Availability Zones are <a href="https://docs.microsoft.com/azure/availability-zones/az-overview">only supported in several regions at this time</a>.</p>
+</aside>
+
+<p>For more information on the different example configurations, please check out the <a href="https://docs.microsoft.com/en-gb/rest/api/compute/virtualmachines/createorupdate#examples">Azure documentation</a></p>
+
+<hr/>
+
+<p>An <code>additional_unattend_config</code> block supports the following:</p>
+
+<ul>
+<li><p><code>pass</code> - (Required) Specifies the name of the pass that the content applies to. The only allowable value is <code>oobeSystem</code>.</p></li>
+<li><p><code>component</code> - (Required) Specifies the name of the component to configure with the added content. The only allowable value is <code>Microsoft-Windows-Shell-Setup</code>.</p></li>
+<li><p><code>setting_name</code> - (Required) Specifies the name of the setting to which the content applies. Possible values are: <code>FirstLogonCommands</code> and <code>AutoLogon</code>.</p></li>
+<li><p><code>content</code> - (Required) Specifies the base-64 encoded XML formatted content that is added to the unattend.xml file for the specified path and component.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>boot_diagnostics</code> block supports the following:</p>
+
+<ul>
+<li><p><code>enabled</code> - (Required) Should Boot Diagnostics be enabled for this Virtual Machine?</p></li>
+<li><p><code>storage_uri</code> - (Required) The Storage Account's Blob Endpoint which should hold the virtual machine's diagnostic files.</p></li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This needs to be the root of a Storage Account and not a Storage Container.</p>
+</aside>
+
+<hr/>
+
+<p>A <code>additional_capabilities</code> block supports the following:</p>
+
+<ul>
+<li><code>ultra_ssd_enabled</code> - (Required) Should Ultra SSD disk be enabled for this Virtual Machine? Changing this forces a new resource to be created.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Azure Ultra Disk Storage is only available in a region that support availability zones and can only enabled on the following VM series: <code>ESv3</code>, <code>DSv3</code>, <code>FSv3</code>, <code>LSv2</code>, <code>M</code> and <code>Mv2</code>. For more information see the <code>Azure Ultra Disk Storage</code> <a href="https://docs.microsoft.com/azure/virtual-machines/windows/disks-enable-ultra-ssd">product documentation</a>.</p>
+</aside>
+
+<hr/>
+
+<p>A <code>identity</code> block supports the following:</p>
+
+<ul>
+<li><code>type</code> - (Required) Specifies the type of Managed Service Identity that should be configured on this Virtual Machine. Possible values are <code>SystemAssigned</code>, <code>UserAssigned</code>, <code>SystemAssigned, UserAssigned</code> (to enable both).</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Managed Service Identity previously required the installation of a VM Extension, but this information <a href="https://docs.microsoft.com/azure/active-directory/managed-service-identity/overview#how-does-it-work">is now available via the Azure Instance Metadata Service</a>.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>When <code>type</code> is set to <code>SystemAssigned</code>, identity the Principal ID can be retrieved after the virtual machine has been created. More details are available below. See <a href="https://docs.microsoft.com/azure/active-directory/managed-service-identity/overview">documentation</a> for additional information.</p>
+</aside>
+
+<ul>
+<li><code>identity_ids</code> - (Optional) Specifies a list of User Assigned Managed Identity IDs to be assigned to this Virtual Machine.</li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This is required when <code>type</code> is set to <code>UserAssigned</code> or <code>SystemAssigned, UserAssigned</code>.</p>
+</aside>
+
+<hr/>
+
+<p>A <code>os_profile</code> block supports the following:</p>
+
+<ul>
+<li><p><code>computer_name</code> - (Required) Specifies the name of the Virtual Machine. Changing this forces a new resource to be created.</p></li>
+<li><p><code>admin_username</code> - (Required) Specifies the name of the local administrator account.</p></li>
+<li><p><code>admin_password</code> - (Optional) (Optional for Windows, Optional for Linux) The password associated with the local administrator account.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If using Linux, it may be preferable to use SSH Key authentication (available in the <code>os_profile_linux_config</code> block) instead of password authentication.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p><code>admin_password</code> must be between 6-72 characters long and must satisfy at least 3 of password complexity requirements from the following:</p>
+</aside>
+
+<ol>
+<li>Contains an uppercase character</li>
+<li>Contains a lowercase character</li>
+<li>Contains a numeric digit</li>
+<li>Contains a special character</li>
+</ol>
+
+<ul>
+<li><code>custom_data</code> - (Optional) Specifies custom data to supply to the machine. On Linux-based systems, this can be used as a cloud-init script. On other systems, this will be copied as a file on disk. Internally, Terraform will base64 encode this value before sending it to the API. The maximum length of the binary array is 65535 bytes. Changing this forces a new resource to be created.</li>
+</ul>
+
+<hr/>
+
+<p>A <code>os_profile_linux_config</code> block supports the following:</p>
+
+<ul>
+<li><p><code>disable_password_authentication</code> - (Required) Specifies whether password authentication should be disabled. If set to <code>false</code>, an <code>admin_password</code> must be specified.</p></li>
+<li><p><code>ssh_keys</code> - (Optional) One or more <code>ssh_keys</code> blocks as defined below. This field is required if <code>disable_password_authentication</code> is set to <code>true</code>.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>os_profile_secrets</code> block supports the following:</p>
+
+<ul>
+<li><p><code>source_vault_id</code> - (Required) Specifies the ID of the Key Vault to use.</p></li>
+<li><p><code>vault_certificates</code> - (Optional) One or more <code>vault_certificates</code> blocks as defined below.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>os_profile_windows_config</code> block supports the following:</p>
+
+<ul>
+<li><code>provision_vm_agent</code> - (Optional) Should the Azure Virtual Machine Guest Agent be installed on this Virtual Machine? Defaults to <code>false</code>.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This is different from the Default value used for this field within Azure.</p>
+</aside>
+
+<ul>
+<li><p><code>enable_automatic_upgrades</code> - (Optional) Are automatic updates enabled on this Virtual Machine? Defaults to <code>false</code>.</p></li>
+<li><p><code>timezone</code> - (Optional) Specifies the time zone of the virtual machine, <a href="https://jackstromberg.com/2017/01/list-of-time-zones-consumed-by-azure/">the possible values are defined here</a>. Changing this forces a new resource to be created.</p></li>
+<li><p><code>winrm</code> - (Optional) One or more <code>winrm</code> blocks as defined below.</p></li>
+<li><p><code>additional_unattend_config</code> - (Optional) An <code>additional_unattend_config</code> block as defined below.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>plan</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) Specifies the name of the image from the marketplace.</p></li>
+<li><p><code>publisher</code> - (Required) Specifies the publisher of the image.</p></li>
+<li><p><code>product</code> - (Required) Specifies the product of the image from the marketplace.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>ssh_keys</code> block supports the following:</p>
+
+<ul>
+<li><code>key_data</code> - (Required) The Public SSH Key which should be written to the <code>path</code> defined above.</li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Azure only supports RSA SSH2 key signatures of at least 2048 bits in length</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Rather than defining this in-line you can source this from a local file using <a href="https://www.terraform.io/docs/configuration/functions/file.html">the <code>file</code> function</a> - for example <code>key_data = file("~/.ssh/id_rsa.pub")</code>.</p>
+</aside>
+
+<ul>
+<li><code>path</code> - (Required) The path of the destination file on the virtual machine</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Due to a limitation in the Azure VM Agent the only allowed <code>path</code> is <code>/home/{username}/.ssh/authorized_keys</code>.</p>
+</aside>
+
+<hr/>
+
+<p>A <code>storage_image_reference</code> block supports the following:</p>
+
+<p>This block provisions the Virtual Machine from one of two sources: an Azure Platform Image (e.g. Ubuntu/Windows Server) or a Custom Image.</p>
+
+<p>To provision from an Azure Platform Image, the following fields are applicable:</p>
+
+<ul>
+<li><p><code>publisher</code> - (Optional) Specifies the publisher of the image used to create the virtual machine. Changing this forces a new resource to be created.</p></li>
+<li><p><code>offer</code> - (Optional) Specifies the offer of the image used to create the virtual machine. Changing this forces a new resource to be created.</p></li>
+<li><p><code>sku</code> - (Optional) Specifies the SKU of the image used to create the virtual machine. Changing this forces a new resource to be created.</p></li>
+<li><p><code>version</code> - (Optional) Specifies the version of the image used to create the virtual machine. Changing this forces a new resource to be created.</p></li>
+</ul>
+
+<p>To provision a Custom Image, the following fields are applicable:</p>
+
+<ul>
+<li><code>id</code> - (Optional) Specifies the ID of the Custom Image which the Virtual Machine should be created from. Changing this forces a new resource to be created.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>An example of how to use this is available within <a href="https://github.com/hashicorp/terraform-provider-azurerm/tree/main/examples/virtual-machines/virtual_machine/managed-disks/from-custom-image">the <code>./examples/virtual-machines/virtual_machine/managed-disks/from-custom-image</code> directory within the GitHub Repository</a></p>
+</aside>
+
+<hr/>
+
+<p>A <code>storage_data_disk</code> block supports the following:</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Data Disks can also be attached either using this block or <a href="virtual_machine_data_disk_attachment.html">the <code>azurerm_virtual_machine_data_disk_attachment</code> resource</a> - but not both.</p>
+</aside>
+
+<ul>
+<li><p><code>name</code> - (Required) The name of the Data Disk.</p></li>
+<li><p><code>caching</code> - (Optional) Specifies the caching requirements for the Data Disk. Possible values include <code>None</code>, <code>ReadOnly</code> and <code>ReadWrite</code>.</p></li>
+<li><p><code>create_option</code> - (Required) Specifies how the data disk should be created. Possible values are <code>Attach</code>, <code>FromImage</code> and <code>Empty</code>.</p></li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>If using an image that does not have data to be written to the Data Disk, use <code>Empty</code> as the create option in order to create the desired disk without any data.</p>
+</aside>
+
+<ul>
+<li><p><code>disk_size_gb</code> - (Optional) Specifies the size of the data disk in gigabytes.</p></li>
+<li><p><code>lun</code> - (Required) Specifies the logical unit number of the data disk. This needs to be unique within all the Data Disks on the Virtual Machine.</p></li>
+<li><p><code>write_accelerator_enabled</code> - (Optional) Specifies if Write Accelerator is enabled on the disk. This can only be enabled on <code>Premium_LRS</code> managed disks with no caching and <a href="https://docs.microsoft.com/azure/virtual-machines/workloads/sap/how-to-enable-write-accelerator">M-Series VMs</a>. Defaults to <code>false</code>.</p></li>
+</ul>
+
+<p>The following properties apply when using Managed Disks:</p>
+
+<ul>
+<li><code>managed_disk_type</code> - (Optional) Specifies the type of managed disk to create. Possible values are either <code>Standard_LRS</code>, <code>StandardSSD_LRS</code>, <code>Premium_LRS</code> or <code>UltraSSD_LRS</code>.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p><code>managed_disk_type</code> of type <code>UltraSSD_LRS</code> is currently in preview and are not available to subscriptions that have not <a href="https://aka.ms/UltraSSDPreviewSignUp">requested</a> onboarding to <code>Azure Ultra Disk Storage</code> preview. <code>Azure Ultra Disk Storage</code> is only available in <code>East US 2</code>, <code>North Europe</code>, and <code>Southeast Asia</code> regions. For more information see the <code>Azure Ultra Disk Storage</code> <a href="https://docs.microsoft.com/azure/virtual-machines/windows/disks-enable-ultra-ssd">product documentation</a>, <a href="https://azure.microsoft.com/en-us/blog/announcing-the-general-availability-of-azure-ultra-disk-storage/">product blog</a> and <a href="https://docs.microsoft.com/azure/virtual-machines/windows/faq-for-disks#ultra-disks">FAQ</a>. You must also set <code>additional_capabilities.ultra_ssd_enabled</code> to <code>true</code>.</p>
+</aside>
+
+<ul>
+<li><code>managed_disk_id</code> - (Optional) Specifies the ID of an Existing Managed Disk which should be attached to this Virtual Machine. When this field is set <code>create_option</code> must be set to <code>Attach</code>.</li>
+</ul>
+
+<p>The following properties apply when using Unmanaged Disks:</p>
+
+<ul>
+<li><code>vhd_uri</code> - (Optional) Specifies the URI of the VHD file backing this Unmanaged Data Disk. </li>
+</ul>
+
+<hr/>
+
+<p>A <code>storage_os_disk</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) Specifies the name of the OS Disk.</p></li>
+<li><p><code>create_option</code> - (Required) Specifies how the OS Disk should be created. Possible values are <code>Attach</code> (managed disks only) and <code>FromImage</code>.</p></li>
+<li><p><code>caching</code> - (Optional) Specifies the caching requirements for the OS Disk. Possible values include <code>None</code>, <code>ReadOnly</code> and <code>ReadWrite</code>.</p></li>
+<li><p><code>disk_size_gb</code> - (Optional) Specifies the size of the OS Disk in gigabytes.</p></li>
+<li><p><code>image_uri</code> - (Optional) Specifies the Image URI in the format <code>publisherName:offer:skus:version</code>. This field can also specify the <a href="https://docs.microsoft.com/azure/virtual-machines/linux/tutorial-custom-images">VHD URI</a> of a custom VM image to clone. When cloning a Custom (Unmanaged) Disk Image the <code>os_type</code> field must be set.</p></li>
+<li><p><code>os_type</code> - (Optional) Specifies the Operating System on the OS Disk. Possible values are <code>Linux</code> and <code>Windows</code>.</p></li>
+<li><p><code>write_accelerator_enabled</code> - (Optional) Specifies if Write Accelerator is enabled on the disk. This can only be enabled on <code>Premium_LRS</code> managed disks with no caching and <a href="https://docs.microsoft.com/azure/virtual-machines/workloads/sap/how-to-enable-write-accelerator">M-Series VMs</a>. Defaults to <code>false</code>.</p></li>
+</ul>
+
+<p>The following properties apply when using Managed Disks:</p>
+
+<ul>
+<li><p><code>managed_disk_id</code> - (Optional) Specifies the ID of an existing Managed Disk which should be attached as the OS Disk of this Virtual Machine. If this is set then the <code>create_option</code> must be set to <code>Attach</code>. Changing this forces a new resource to be created.</p></li>
+<li><p><code>managed_disk_type</code> - (Optional) Specifies the type of Managed Disk which should be created. Possible values are <code>Standard_LRS</code>, <code>StandardSSD_LRS</code> or <code>Premium_LRS</code>.</p></li>
+</ul>
+
+<p>The following properties apply when using Unmanaged Disks:</p>
+
+<ul>
+<li><code>vhd_uri</code> - (Optional) Specifies the URI of the VHD file backing this Unmanaged OS Disk. Changing this forces a new resource to be created.</li>
+</ul>
+
+<hr/>
+
+<p>A <code>vault_certificates</code> block supports the following:</p>
+
+<ul>
+<li><code>certificate_url</code> - (Required) The ID of the Key Vault Secret. Stored secret is the Base64 encoding of a JSON Object that which is encoded in UTF-8 of which the contents need to be:</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"data"</span><span class="p">:</span><span class="s2">"&lt;Base64-encoded-certificate&gt;"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"dataType"</span><span class="p">:</span><span class="s2">"pfx"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"password"</span><span class="p">:</span><span class="s2">"&lt;pfx-file-password&gt;"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If your certificate is stored in Azure Key Vault - this can be sourced from the <code>secret_id</code> property on the <code>azurerm_key_vault_certificate</code> resource.</p>
+</aside>
+
+<ul>
+<li><code>certificate_store</code> - (Optional) (Required, on windows machines) Specifies the certificate store on the Virtual Machine where the certificate should be added to, such as <code>My</code>.</li>
+</ul>
+
+<hr/>
+
+<p>A <code>winrm</code> block supports the following:</p>
+
+<ul>
+<li><p><code>protocol</code> - (Required) Specifies the protocol of listener. Possible values are <code>HTTP</code> or <code>HTTPS</code>.</p></li>
+<li><p><code>certificate_url</code> - (Optional) The ID of the Key Vault Secret which contains the encrypted Certificate which should be installed on the Virtual Machine. This certificate must also be specified in the <code>vault_certificates</code> block within the <code>os_profile_secrets</code> block.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This can be sourced from the <code>secret_id</code> field on the <code>azurerm_key_vault_certificate</code> resource.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to the Arguments listed above - the following Attributes are exported:</p>
+
+<ul>
+<li><p><code>id</code> - The ID of the Virtual Machine.</p></li>
+<li><p><code>identity</code> - An <code>identity</code> block as defined below.</p></li>
+</ul>
+
+<hr/>
+
+<p>An <code>identity</code> block exports the following:</p>
+
+<ul>
+<li><code>principal_id</code> - The Principal ID associated with this Managed Service Identity.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>You can access the Principal ID via <code>${azurerm_virtual_machine.example.identity[0].principal_id}</code></p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p>The <code>timeouts</code> block allows you to specify <a href="https://www.terraform.io/language/resources/syntax#operation-timeouts">timeouts</a> for certain actions:</p>
+
+<ul>
+<li><code>create</code> - (Defaults to 60 minutes) Used when creating the Virtual Machine.</li>
+<li><code>update</code> - (Defaults to 60 minutes) Used when updating the Virtual Machine.</li>
+<li><code>read</code> - (Defaults to 5 minutes) Used when retrieving the Virtual Machine.</li>
+<li><code>delete</code> - (Defaults to 60 minutes) Used when deleting the Virtual Machine.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Virtual Machines can be imported using the <code>resource id</code>, e.g.</p>
+
+<div class="codehilite"><pre><span></span><code>terraform import azurerm_virtual_machine.example /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mygroup1/providers/Microsoft.Compute/virtualMachines/machine1
+</code></pre></div>
+
+            
+        
+    </body></html>

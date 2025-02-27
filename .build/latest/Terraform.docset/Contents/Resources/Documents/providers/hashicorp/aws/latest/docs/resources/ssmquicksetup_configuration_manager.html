@@ -1,0 +1,135 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ssmquicksetup_configuration_manager --><head>
+                <title>aws_ssmquicksetup_configuration_manager</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_ssmquicksetup_configuration_manager">Resource: aws_ssmquicksetup_configuration_manager</h1>
+
+<p>Terraform resource for managing an AWS SSM Quick Setup Configuration Manager.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Patch%20Policy%20Configuration%20Type"></a><h3 id="patch-policy-configuration-type">Patch Policy Configuration Type</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_caller_identity"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_partition"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_region"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_ssm_patch_baselines"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_baselines</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # transform the output of the aws_ssm_patch_baselines data source</span>
+<span class="c1">  # into the format expected by the SelectedPatchBaselines parameter</span>
+<span class="w">  </span><span class="na">selected_patch_baselines</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="err">for</span><span class="w"> </span><span class="err">baseline</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">data.aws_ssm_patch_baselines.example.baseline_identities</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nv">baseline.operating_system</span><span class="w"> </span><span class="p">=</span><span class="err">&gt;</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"value"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nv">baseline.baseline_id</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"label"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nv">baseline.baseline_name</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"description"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nv">baseline.baseline_description</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"disabled"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">!</span><span class="nv">baseline.default_baseline</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ssmquicksetup_configuration_manager"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">configuration_definition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">local_deployment_administration_role_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:role/AWS-QuickSetup-PatchPolicy-LocalAdministrationRole"</span><span class="w"></span>
+<span class="w">    </span><span class="na">local_deployment_execution_role_name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS-QuickSetup-PatchPolicy-LocalExecutionRole"</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w">                                     </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWSQuickSetupType-PatchPolicy"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"ConfigurationOptionsPatchOperation"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"Scan"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"ConfigurationOptionsScanValue"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"cron(0 1 * * ? *)"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"ConfigurationOptionsScanNextInterval"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"false"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"PatchBaselineRegion"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nv">data.aws_region.current.name</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"PatchBaselineUseDefault"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"default"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"PatchPolicyName"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"example"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"SelectedPatchBaselines"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nv">local.selected_patch_baselines</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"OutputLogEnableS3"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"false"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"RateControlConcurrency"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"10%"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"RateControlErrorThreshold"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"2%"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"IsPolicyAttachAllowed"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"false"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"TargetAccounts"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nv">data.aws_caller_identity.current.account_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"TargetRegions"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nv">data.aws_region.current.name</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"TargetType"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"*"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>configuration_definition</code> - (Required) Definition of the Quick Setup configuration that the configuration manager deploys. See <a href="#configuration_definition-argument-reference"><code>configuration_definition</code></a> below.</li>
+<li><code>name</code> - (Required) Configuration manager name.</li>
+</ul>
+
+<p>The following arguments are optional:</p>
+
+<ul>
+<li><code>description</code> - (Optional) Description of the configuration manager.</li>
+<li><code>tags</code> - (Optional) Map of tags assigned to the resource. If configured with a provider <a href="../index.html#default_tags-configuration-block"><code>default_tags</code> configuration block</a> present, tags with matching keys will overwrite those defined at the provider-level.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/configuration_definition%20Argument%20Reference"></a><h3 id="configuration_definition-argument-reference"><code>configuration_definition</code> Argument Reference</h3>
+
+<ul>
+<li><code>local_deployment_administrator_role_arn</code> - (Optional) ARN of the IAM role used to administrate local configuration deployments.</li>
+<li><code>local_deployment_execution_role_name</code> - (Optional) Name of the IAM role used to deploy local configurations.</li>
+<li><code>parameters</code> - (Required) Parameters for the configuration definition type. Parameters for configuration definitions vary based the configuration type. See the <a href="https://docs.aws.amazon.com/quick-setup/latest/APIReference/API_ConfigurationDefinitionInput.html">AWS API documentation</a> for a complete list of parameters for each configuration type.</li>
+<li><code>type</code> - (Required) Type of the Quick Setup configuration.</li>
+<li><code>type_version</code> - (Optional) Version of the Quick Setup type to use.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>manager_arn</code> - ARN of the Configuration Manager.</li>
+<li><code>status_summaries</code> - A summary of the state of the configuration manager. This includes deployment statuses, association statuses, drift statuses, health checks, and more. See <a href="#status_summaries-attribute-reference"><code>status_summaries</code></a> below.</li>
+<li><code>tags_all</code> - Map of tags assigned to the resource, including those inherited from the provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/status_summaries%20Attribute%20Reference"></a><h3 id="status_summaries-attribute-reference"><code>status_summaries</code> Attribute Reference</h3>
+
+<ul>
+<li><code>status</code> - Current status.</li>
+<li><code>status_message</code> - When applicable, returns an informational message relevant to the current status and status type of the status summary object.</li>
+<li><code>status_type</code> - Type of a status summary.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p><a href="https://developer.hashicorp.com/terraform/language/resources/syntax#operation-timeouts">Configuration options</a>:</p>
+
+<ul>
+<li><code>create</code> - (Default <code>20m</code>)</li>
+<li><code>update</code> - (Default <code>20m</code>)</li>
+<li><code>delete</code> - (Default <code>20m</code>)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import SSM Quick Setup Configuration Manager using the <code>manager_arn</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ssmquicksetup_configuration_manager.example</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:ssm-quicksetup:us-east-1:012345678901:configuration-manager/abcd-1234"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import SSM Quick Setup Configuration Manager using the <code>manager_arn</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_ssmquicksetup_configuration_manager.example arn:aws:ssm-quicksetup:us-east-1:012345678901:configuration-manager/abcd-1234
+</code></pre></div>
+
+            
+        
+    </body></html>

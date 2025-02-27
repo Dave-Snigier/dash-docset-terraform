@@ -1,0 +1,153 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/service_principal_configuration --><head>
+                <title>Configuring a User or Service Principal for managing Azure Active Directory</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="configuring-a-user-or-service-principal-for-managing-azure-active-directory">Configuring a User or Service Principal for managing Azure Active Directory</h1>
+
+<p>Terraform supports a number of different methods for authenticating to Azure:</p>
+
+<ul>
+<li><a href="azure_cli.html">Authenticating to Azure using the Azure CLI</a></li>
+<li><a href="managed_service_identity.html">Authenticating to Azure using Managed Identity</a></li>
+<li><a href="service_principal_client_certificate.html">Authenticating to Azure using a Service Principal and a Client Certificate</a></li>
+<li><a href="service_principal_client_secret.html">Authenticating to Azure using a Service Principal and a Client Secret</a></li>
+</ul>
+
+<hr/>
+
+<p>We recommend using either a Service Principal or Managed Identity when running Terraform non-interactively (such as when running Terraform in a CI server) - and authenticating using the Azure CLI when running Terraform locally.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20a%20Service%20Principal"></a><h2 id="creating-a-service-principal">Creating a Service Principal</h2>
+
+<p>A Service Principal represents an application within Azure Active Directory whose properties and authentication tokens can be used as the <code>tenant_id</code>, <code>client_id</code> and <code>client_secret</code> fields needed by Terraform.</p>
+
+<p>Depending on how the service principal authenticates to Azure it can be created and configured in a number of different ways:</p>
+
+<ul>
+<li><a href="service_principal_client_certificate.html">Authenticating to Azure using a Service Principal and a Client Certificate</a></li>
+<li><a href="service_principal_client_secret.html">Authenticating to Azure using a Service Principal and a Client Secret</a></li>
+</ul>
+
+<hr/>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Azure%20Active%20Directory%20permissions"></a><h2 id="azure-active-directory-permissions">Azure Active Directory permissions</h2>
+
+<p>Now that you have created and authenticated an Application / Service Principal pair, you will need to grant some permissions to administer Azure Active Directory. You can choose either of the following methods to achieve similar results.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Method%201%3A%20API%20roles%20%28recommended%20for%20service%20principals%29"></a><h3 id="method-1-api-roles-recommended-for-service-principals">Method 1: API roles (recommended for service principals)</h3>
+
+<p>This method involves granting API roles to your Application, and then granting consent for your Service Principal to access the APIs in its own capacity (i.e. not on behalf of a user).</p>
+
+<p>Navigate to the <a href="https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/Overview">Azure Active Directory overview</a> within the <a href="https://portal.azure.com/">Azure Portal</a> and select the <a href="https://portal.azure.com#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RegisteredApps">App Registrations blade</a>. Locate your registered Application and click on its display name to manage it.</p>
+
+<p>Go to the API Permissions blade for the Application and click the "Add a permission" button. In the pane that opens, select "Microsoft Graph".</p>
+
+<p>Choose "Application Permissions" for the permission type, and check the permissions you would like to assign. The permissions you need will depend on which directory objects you wish to manage with Terraform. The following table show the required permissions for some common resources:</p>
+
+<table>
+<thead>
+<tr>
+  <th>Resource(s)</th>
+  <th>Role Name(s)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>data.azuread_application</code><br/><code>data.azuread_service_principal</code></td>
+  <td>Application.Read.All</td>
+</tr>
+<tr>
+  <td><code>data.azuread_domains</code></td>
+  <td>Domain.Read.All</td>
+</tr>
+<tr>
+  <td><code>data.azuread_group</code><br/><code>data.azuread_groups</code></td>
+  <td>Group.Read.All</td>
+</tr>
+<tr>
+  <td><code>data.azuread_user</code><br/><code>data.azuread_users</code></td>
+  <td>User.Read.All</td>
+</tr>
+<tr>
+  <td><code>azuread_application</code><br/><code>azuread_application_certificate</code><br/><code>azuread_application_password</code><br/><code>azuread_service_principal</code><br/><code>azuread_service_principal_certificate</code><br/><code>azuread_service_principal_password</code></td>
+  <td>Application.ReadWrite.All</td>
+</tr>
+<tr>
+  <td><code>azuread_group</code><br/><code>azuread_group_member</code></td>
+  <td>Group.ReadWrite.All</td>
+</tr>
+<tr>
+  <td><code>azuread_user</code></td>
+  <td>User.ReadWrite.All</td>
+</tr>
+</tbody>
+</table>
+
+<p><br/></p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Permissions for other resources</em>
+    <p>If the resource you are using is not shown in the above table, consult the documentation page for the resource for a guide to the required permissions.</p>
+</aside>
+
+<p>Depending on the configuration of your AAD tenant, you may also need to grant the Directory.Read.All and/or Directory.ReadWrite.All roles. If a resource you are using is not shown in the table above, consult the resource documentation.</p>
+
+<p>After assigning permissions, you will need to grant consent for the service principal to utilise them. The easiest way to do this is by clicking the Grant Admin Consent button in the same API Permissions pane. You will need to be signed in to the Portal as a Global Administrator.</p>
+
+<p>The Application now has the necessary permissions to administer your Azure Active Directory tenant.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Method%202%3A%20Directory%20Roles%20%28recommended%20for%20users%2C%20i.e.%20Azure%20CLI%20authentication%29"></a><h3 id="method-2-directory-roles-recommended-for-users-ie-azure-cli-authentication">Method 2: Directory Roles (recommended for users, i.e. Azure CLI authentication)</h3>
+
+<p>With this method, you will assign directory roles to your User Principal, to grant the desired permissions to administer objects in your Azure Active Directory tenant. The following steps may need to be performed by an existing Global Administrator, if that is someone else.</p>
+
+<p>Navigate to the <a href="https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/Overview">Azure Active Directory overview</a> within the <a href="https://portal.azure.com/">Azure Portal</a>. Go to the <a href="https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RolesAndAdministrators">Roles and Administrators blade</a>.</p>
+
+<p>Locate the role you wish to assign and click on it. Consult the <a href="https://docs.microsoft.com/en-us/azure/active-directory/users-groups-roles/directory-assign-admin-roles">documentation for administrator role permissions</a> from Microsoft for more information about the available roles and the permissions they grant.</p>
+
+<p>Click "Add assignments" and type the display name or user principal name of your User in the search box to locate it. If you know the Object ID of the User, verify that it is the same. Select it and click the "Add" button to assign the role.</p>
+
+<p>The choice of which directory roles to assign will be specific to your organisation's security policy. Commonly used roles include:</p>
+
+<table>
+<thead>
+<tr>
+  <th>Role</th>
+  <th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>Global Administrator</code></td>
+  <td>Effective superuser permissions to administer any object in your AAD tenant. Sometimes called <code>Company Administrator</code>.</td>
+</tr>
+<tr>
+  <td><code>Global Reader</code></td>
+  <td>Commonly used in conjunction with other roles to allow reading, but not writing, of directory data.</td>
+</tr>
+<tr>
+  <td><code>Application Administrator</code></td>
+  <td>Create and manage applications, service principals (enterprise applications) and application proxy.</td>
+</tr>
+<tr>
+  <td><code>Groups Administrator</code></td>
+  <td>Create and manage groups.</td>
+</tr>
+<tr>
+  <td><code>User Administrator</code></td>
+  <td>Create and manage users _and_ groups.</td>
+</tr>
+</tbody>
+</table>
+
+<p>Once the desired directory role has been assigned, you may need to obtain a new access token in order for the role to take effect. This can be performed by signing out and signing back in to the Azure CLI.</p>
+
+<div class="codehilite"><pre><span></span><code>$ az <span class="nb">logout</span>
+$ az login --allow-no-subscriptions
+</code></pre></div>
+
+            
+        
+    </body></html>

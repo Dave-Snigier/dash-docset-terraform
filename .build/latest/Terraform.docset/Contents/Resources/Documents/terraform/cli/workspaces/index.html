@@ -1,0 +1,83 @@
+<html><!-- Online page at https://www.terraform.io/cli/workspaces --><head>
+                <title>Manage Workspaces Overview</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="manage-workspaces-overview">Manage Workspaces Overview</h1>
+
+<p>Workspaces in the Terraform CLI refer to separate instances of <a href="../../terraform/language/state.html">state data</a> inside the same Terraform working directory. They are distinctly different from <a href="../../terraform/cloud-docs/workspaces.html">workspaces in HCP Terraform</a>, which each have their own Terraform configuration and function as separate working directories.</p>
+
+<p>Terraform relies on state to associate resources with real-world objects. When you run the same configuration multiple times with separate state data, Terraform can manage multiple sets of non-overlapping resources.</p>
+
+<p>Workspaces can be helpful for specific <a href="#use-cases">use cases</a>, but they are not required to use the Terraform CLI. We recommend using <a href="#alternatives-to-workspaces">alternative approaches</a> for complex deployments requiring separate credentials and access controls.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Managing%20CLI%20Workspaces"></a><h2 id="managing-cli-workspaces">Managing CLI Workspaces</h2>
+
+<p>Every <a href="../../terraform/cli/init.html">initialized working directory</a> starts with one workspace named <code>default</code>.</p>
+
+<p>Use the <a href="../../terraform/cli/commands/workspace/list.html"><code>terraform workspace list</code></a>, <a href="../../terraform/cli/commands/workspace/new.html"><code>terraform workspace new</code></a>, and <a href="../../terraform/cli/commands/workspace/delete.html"><code>terraform workspace delete</code></a> commands to manage the available workspaces in the current working directory.</p>
+
+<p>Use <a href="../../terraform/cli/commands/workspace/select.html">the <code>terraform workspace select</code> command</a> to change the currently selected workspace. For a given working directory, you can only select one workspace at a time. Most Terraform commands only interact with the currently selected workspace. This includes <a href="../../terraform/cli/run.html">provisioning</a> and <a href="../../terraform/cli/state.html">state manipulation</a>.</p>
+
+<p>When you provision infrastructure in each workspace, you usually need to manually specify different <a href="../../terraform/language/values/variables.html">input variables</a> to differentiate each collection. For example, you might deploy test infrastructure to a different region.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Use%20Cases"></a><h2 id="use-cases">Use Cases</h2>
+
+<p>You can create multiple <a href="../../terraform/cli/init.html">working directories</a> to maintain multiple instances of a configuration with completely separate state data. However, Terraform installs a separate cache of plugins and modules for each working directory, so maintaining multiple directories can waste bandwidth and disk space. This approach also requires extra tasks like updating configuration from version control for each directory separately and reinitializing each directory when you change the configuration. Workspaces are convenient because they let you create different sets of infrastructure with the same working copy of your configuration and the same plugin and module caches.</p>
+
+<p>A common use for multiple workspaces is to create a parallel, distinct copy of
+a set of infrastructure to test a set of changes before modifying production infrastructure.</p>
+
+<p>Non-default workspaces are often related to feature branches in version control.
+The default workspace might correspond to the <code>main</code> or <code>trunk</code> branch, which describes the intended state of production infrastructure. When a developer creates a feature branch for a change, they might also create a corresponding workspace and deploy into it a temporary copy of the main infrastructure. They can then test changes on the copy without affecting the production infrastructure. Once the change is merged and deployed to the default workspace, they destroy the test infrastructure and delete the temporary workspace.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/When%20Not%20to%20Use%20Multiple%20Workspaces"></a><h3 id="when-not-to-use-multiple-workspaces">When Not to Use Multiple Workspaces</h3>
+
+<p>Workspaces let you quickly switch between multiple instances of a <strong>single configuration</strong> within its <strong>single backend</strong>. They are not designed to solve all problems.</p>
+
+<p>When using Terraform to manage larger systems, you should create separate Terraform configurations that correspond to architectural boundaries within the system. This lets teams manage different components separately. Workspaces alone are not a suitable tool for system decomposition because each subsystem should have its own separate configuration and backend.</p>
+
+<p>In particular, organizations commonly want to create a strong separation
+between multiple deployments of the same infrastructure serving different
+development stages or different internal teams. In this case, the backend for each deployment often has different credentials and access controls. CLI workspaces within a working directory use the same backend, so they are not a suitable isolation mechanism for this scenario.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Alternatives%20to%20Workspaces"></a><h2 id="alternatives-to-workspaces">Alternatives to Workspaces</h2>
+
+<p>Instead of creating CLI workspaces, you can use one or more <a href="../../terraform/language/modules/develop.html">re-usable modules</a> to represent the common elements and then represent each instance as a separate configuration that instantiates those common elements in the context of a different <a href="../../terraform/language/backend.html">backend</a>. The root module of each configuration consists only of a backend configuration and a small number of <code>module</code> blocks with arguments describing any small differences between the deployments.</p>
+
+<p>When multiple configurations represent distinct system components rather than multiple deployments, you can pass data from one component to another using paired resources types and data sources.</p>
+
+<ul>
+<li><p>When a shared <a href="https://www.consul.io/">Consul</a> cluster is available, use <a href="https://registry.terraform.io/providers/hashicorp/consul/latest/docs/resources/key_prefix"><code>consul_key_prefix</code></a> to publish to the key/value store and <a href="https://registry.terraform.io/providers/hashicorp/consul/latest/docs/data-sources/keys"><code>consul_keys</code></a> to retrieve those values in other configurations.</p></li>
+<li><p>In systems that support user-defined labels or tags, use a tagging convention to make resources automatically discoverable. For example, use <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc">the <code>aws_vpc</code> resource type</a> to assign suitable tags and then <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/vpc">the <code>aws_vpc</code> data source</a> to query by those tags in other configurations.</p></li>
+<li><p>For server addresses, use a provider-specific resource to create a DNS record with a predictable name. Then you can either use that name directly or use <a href="https://registry.terraform.io/providers/hashicorp/dns/latest/docs">the <code>dns</code> provider</a> to retrieve the published addresses in other configurations.</p></li>
+<li><p>If you store a Terraform state for one configuration in a remote backend that other configurations can access, then the other configurations can use <a href="../../terraform/language/state/remote-state-data.html"><code>terraform_remote_state</code></a> to directly consume its root module outputs. This setup creates a tighter coupling between configurations, and the root configuration does not need to publish its results in a separate system.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Interactions%20with%20HCP%20Terraform%20Workspaces"></a><h2 id="interactions-with-hcp-terraform-workspaces">Interactions with HCP Terraform Workspaces</h2>
+
+<p>HCP Terraform organizes infrastructure using workspaces, but its workspaces
+act more like completely separate working directories. Each HCP Terraform
+workspace has its own Terraform configuration, set of variable values, state
+data, run history, and settings.</p>
+
+<p>When you <a href="../../terraform/cli/cloud.html">integrate Terraform CLI with HCP Terraform</a>, you can associate the current CLI working directory with one or more remote HCP Terraform workspaces. Then, use the <code>terraform workspace</code> commands to select the remote workspace you want to use for each run.</p>
+
+<p>Refer to <a href="../../terraform/cloud-docs/run/cli.html">CLI-driven Runs</a> in the HCP Terraform documentation for more details.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Workspace%20Internals"></a><h2 id="workspace-internals">Workspace Internals</h2>
+
+<p>Workspaces are technically equivalent to renaming your state file. Terraform then includes a set of protections and support for remote state.</p>
+
+<p>Workspaces are also meant to be a shared resource. They are not private, unless you use purely local state and do not commit your state to version control.</p>
+
+<p>For local state, Terraform stores the workspace states in a directory called <code>terraform.tfstate.d</code>. This directory should be treated similarly to local-only <code>terraform.tfstate</code>. Some teams commit these files to version control, but we recommend using a remote backend instead when there are multiple collaborators.</p>
+
+<p>For <a href="../../terraform/language/state/remote.html">remote state</a>, the workspaces are stored directly in the configured <a href="../../terraform/language/backend.html">backend</a>. For example, if you use <a href="../../terraform/language/backend/consul.html">Consul</a>, the workspaces are stored by appending the workspace name to the state path. To ensure that workspace names are stored correctly and safely in all backends, the name must be valid to use in a URL path segment without escaping.</p>
+
+<p>Terraform stores the current workspace name locally in the ignored <code>.terraform</code> directory. This allows multiple team members to work on different workspaces concurrently. Workspace names are also attached to associated remote workspaces in HCP Terraform. For more details about workspace names in HCP Terraform, refer to the <a href="../../terraform/cli/cloud/settings.html#arguments">CLI Integration (recommended)</a> and <a href="../../terraform/language/backend/remote.html#workspaces">remote backend</a> and  documentation.</p>
+
+            
+        
+    </body></html>

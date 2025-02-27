@@ -1,0 +1,60 @@
+<html><!-- Online page at https://registry.terraform.io/providers/microsoft/azuredevops/latest/docs/guides/authenticating_managed_identity --><head>
+                <title>Azure DevOps Provider: Authenticating via Managed Identity</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <a class="dashAnchor" name="//apple_ref/cpp/Section/What%20is%20a%20managed%20identity%3F"></a><h2 id="what-is-a-managed-identity">What is a managed identity?</h2>
+
+<p><a href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview">Managed identities for Azure resources</a> can be used to authenticate to services that support Azure Active Directory (Azure AD) authentication. There are two types of managed identities: system-assigned and user-assigned. This article is based on system-assigned managed identities.</p>
+
+<p>Managed identities work in conjunction with Azure Resource Manager (ARM), Azure AD, and the Azure Instance Metadata Service (IMDS). Azure resources that support managed identities expose an internal IMDS endpoint that the client can use to request an access token. No credentials are stored on the VM, and the only additional information needed to bootstrap the Terraform connection to Azure is the subscription ID and tenant ID.</p>
+
+<p>Azure AD creates an AD identity when you configure an Azure resource to use a system-assigned managed identity. The configuration process is described in more detail, below. Azure AD then creates a service principal to represent the resource for role-based access control (RBAC) and access control (IAM). The lifecycle of a system-assigned identity is tied to the resource it is enabled for: it is created when the resource is created and it is automatically removed when the resource is deleted.</p>
+
+<p>Before you can use the managed identity, it has to be configured. <a href="https://learn.microsoft.com/en-us/azure/devops/integrate/get-started/authentication/service-principal-managed-identity?view=azure-devops#2-add-and-manage-service-principal-in-an-azure-devops-organization">Add the identity to your Azure DevOps Organization.</a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20Terraform%20to%20use%20a%20managed%20identity"></a><h2 id="configuring-terraform-to-use-a-managed-identity">Configuring Terraform to use a managed identity</h2>
+
+<p>Terraform can be configured to use managed identity for authentication in one of two ways: using environment variables, or by defining the fields within the provider block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20with%20environment%20variables"></a><h3 id="configuring-with-environment-variables">Configuring with environment variables</h3>
+
+<p>The <code>use_msi</code> must be set to <code>true</code> to use a managed identity. By default, Terraform will use the system assigned identity for authentication. To use a user assigned identity instead, you will need to specify the <code>ARM_CLIENT_ID</code> environment variable (equivalent to provider block argument <code>client_id</code>) to the <a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/user_assigned_identity#client_id">client id</a> of the identity.</p>
+
+<p>A provider block is _technically_ optional when using environment variables. Even so, we recommend defining provider blocks so that you can pin or constrain the version of the provider being used, and configure other optional settings:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azuredevops</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"microsoft/azuredevops"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&gt;=0.1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azuredevops"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20with%20the%20provider%20block"></a><h3 id="configuring-with-the-provider-block">Configuring with the provider block</h3>
+
+<p>It's also possible to configure a managed identity within the provider block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azuredevops</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"microsoft/azuredevops"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&gt;=0.1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azuredevops"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">use_msi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

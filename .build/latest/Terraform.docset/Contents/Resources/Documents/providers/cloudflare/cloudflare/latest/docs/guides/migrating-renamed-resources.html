@@ -1,0 +1,215 @@
+<html><!-- Online page at https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/guides/migrating-renamed-resources --><head>
+                <title>Migrating renamed resources</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <a class="dashAnchor" name="//apple_ref/cpp/Section/Before%20you%20start"></a><h2 id="before-you-start">Before you start</h2>
+
+<ul>
+<li>You will need to follow the [Grit CLI install] steps.</li>
+<li>Locate the Grit patterns you'll need to perform the upgrade. They will be in
+<code>.grit/patterns</code> directory of the [GitHub repository]. The filename convention
+is <code>cloudflare_terraform_&lt;version&gt;_&lt;what is changing&gt;_state</code> for operating on
+the JSON tfstate file and <code>cloudflare_terraform_&lt;version&gt;_&lt;what is changing&gt;_configuration</code>
+for changing the HCL configuration. The changelog will call out the
+pattern names as well.</li>
+<li>Lock or ensure no other changes are happening while you are performing the
+migration.</li>
+<li>Make backups of your configuration and state file.</li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>It is recommended to perform testing in a non-production, non-critical environment or a small subset resources before performing the changes to all resources.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20import"></a><h2 id="using-import">Using import</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Recommended for most users and migrations.</p>
+</aside>
+
+<p>We'll assume we're migrating from the <code>cloudflare_old</code> resource to the
+<code>cloudflare_new</code> resource and is applicable for any changes where the changes
+are 1:1 drop in replacements.</p>
+
+<p>Example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_dependant_thing"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.staging_zone_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example Thing"</span><span class="w"></span>
+<span class="w">  </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_old"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">other_thing_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">cloudflare_dependant_thing.example.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<ol>
+<li>Navigate to the directory where your HCL configuration is located.</li>
+<li><p>Apply the <strong>configuration</strong> pattern (replacing the respective parts of the
+filename). This will update your local configuration but not the state file.</p>
+
+<div class="codehilite"><pre><span></span><code>$ grit apply github.com/cloudflare/terraform-provider-cloudflare#cloudflare_terraform_&lt;version&gt;_&lt;what is changing&gt;_configuration
+</code></pre></div></li>
+<li><p>List the resources in state using <code>terraform state list</code>.</p></li>
+</ol>
+
+<pre><code>   $ terraform state list
+   cloudflare_dependant_thing.example
+   cloudflare_old.example
+</code></pre>
+
+<ol>
+<li>Remove the <strong>old</strong> resource using <code>terraform state rm &lt;resource&gt;</code>.</li>
+<li>Invoke <code>terraform import</code> to import the new resource (refer to the resource
+documentation for the correct import string).</li>
+</ol>
+
+<pre><code>   $ terraform import cloudflare_new.example 0da42c8d2132a9ddaf714f9e7c920711/8295065e70782f633792396e73af14bb
+</code></pre>
+
+<ol>
+<li>Confirm no further changes are required by running <code>terraform plan</code>.</li>
+</ol>
+
+<p>At this point, you've switched over to using the new resource and should be able
+to continue using Terraform as normal.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Manually%20modifying%20the%20state%20file"></a><h2 id="manually-modifying-the-state-file">Manually modifying the state file</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Recommended for a large number of resources where importing individually is not feasible.</p>
+</aside>
+
+<ol>
+<li>Pull the state file locally using <code>terraform state pull</code> and output it to a
+file.</li>
+</ol>
+
+<div class="codehilite"><pre><span></span><code>$ terraform state pull &gt; terraform.tfstate
+</code></pre></div>
+
+<ol>
+<li>Run the <strong>state</strong> pattern (replacing the respective parts of the filename).</li>
+</ol>
+
+<div class="codehilite"><pre><span></span><code>$ grit apply github.com/cloudflare/terraform-provider-cloudflare#cloudflare_terraform_&lt;version&gt;_&lt;what is changing&gt;_state terraform.tfstate
+</code></pre></div>
+
+<ol>
+<li>Navigate to the directory where your HCL configuration is located.</li>
+<li>Apply the <strong>configuration</strong> pattern (replacing the respective parts of the
+filename).</li>
+</ol>
+
+<div class="codehilite"><pre><span></span><code>$ grit apply github.com/cloudflare/terraform-provider-cloudflare#cloudflare_terraform_&lt;version&gt;_&lt;what is changing&gt;_configuration
+</code></pre></div>
+
+<ol>
+<li>Push your state file back to the remote using <code>terraform state push terraform.tfstate</code>.</li>
+<li>Confirm no further changes are required by running <code>terraform plan</code>.</li>
+</ol>
+
+<p>At this point, you've switched over to using the new resource and should be able
+to continue using Terraform as normal.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Two%20phase%20swap%20over"></a><h2 id="two-phase-swap-over">Two phase swap over</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Recommend for incremental swapping or introducing new resources with older resources.</p>
+</aside>
+
+<p>We'll assume we're migrating from the <code>cloudflare_old</code> resource to the
+<code>cloudflare_new</code> resource as a dependent resource.</p>
+
+<p>Example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_old"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.staging_zone_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example Thing"</span><span class="w"></span>
+<span class="w">  </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_thing"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">other_thing_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">cloudflare_old.example.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<ol>
+<li>Add your new resource to your configuration.</li>
+</ol>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_old"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.staging_zone_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example Thing"</span><span class="w"></span>
+<span class="w">  </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_new"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.staging_zone_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example Thing"</span><span class="w"></span>
+<span class="w">  </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_thing"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">other_thing_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">cloudflare_old.example.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<ol>
+<li>Update your existing resource to reference the newer resource.</li>
+</ol>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_old"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.staging_zone_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example Thing"</span><span class="w"></span>
+<span class="w">  </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_new"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.staging_zone_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example Thing"</span><span class="w"></span>
+<span class="w">  </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_thing"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">other_thing_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">cloudflare_new.example.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<ol>
+<li>Remove the old resource once it is no longer referenced.</li>
+</ol>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_new"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.staging_zone_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example Thing"</span><span class="w"></span>
+<span class="w">  </span><span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_thing"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">other_thing_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">cloudflare_new.example.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>At this point, you've switched over to using the new resource and should be able
+to continue using Terraform as normal.</p>
+
+            
+        
+    </body></html>

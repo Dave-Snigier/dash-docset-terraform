@@ -1,0 +1,426 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ecs_service --><head>
+                <title>aws_ecs_service</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_ecs_service">Resource: aws_ecs_service</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>To prevent a race condition during service deletion, make sure to set <code>depends_on</code> to the related <code>aws_iam_role_policy</code>; otherwise, the policy may be destroyed too soon and the ECS service will then get stuck in the <code>DRAINING</code> state.</p>
+</aside>
+
+<p>Provides an ECS service - effectively a task that is expected to run until an error occurs or a user terminates it (typically a webserver or a database).</p>
+
+<p>See <a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs_services.html">ECS Services section in AWS developer guide</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ecs_service"</span><span class="w"> </span><span class="nv">"mongo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"mongodb"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ecs_cluster.foo.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">task_definition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ecs_task_definition.mongo.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">desired_count</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">  </span><span class="na">iam_role</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.foo.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_iam_role_policy.foo</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">ordered_placement_strategy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"binpack"</span><span class="w"></span>
+<span class="w">    </span><span class="na">field</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"cpu"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">load_balancer</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">target_group_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_lb_target_group.foo.arn</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"mongo"</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_port</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">8080</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">placement_constraints</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"memberOf"</span><span class="w"></span>
+<span class="w">    </span><span class="na">expression</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"attribute:ecs.availability-zone in [us-west-2a, us-west-2b]"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Ignoring%20Changes%20to%20Desired%20Count"></a><h3 id="ignoring-changes-to-desired-count">Ignoring Changes to Desired Count</h3>
+
+<p>You can utilize the generic Terraform resource <a href="https://www.terraform.io/docs/configuration/meta-arguments/lifecycle.html">lifecycle configuration block</a> with <code>ignore_changes</code> to create an ECS service with an initial count of running instances, then ignore any changes to that count caused externally (e.g., Application Autoscaling).</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ecs_service"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configurations ...</span>
+
+<span class="c1">  # Example: Create service with 2 instances to start</span>
+<span class="w">  </span><span class="na">desired_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="c1"></span>
+
+<span class="c1">  # Optional: Allow external changes without Terraform plan difference</span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">ignore_changes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nb">desired_count</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Daemon%20Scheduling%20Strategy"></a><h3 id="daemon-scheduling-strategy">Daemon Scheduling Strategy</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ecs_service"</span><span class="w"> </span><span class="nv">"bar"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"bar"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ecs_cluster.foo.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">task_definition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ecs_task_definition.bar.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">scheduling_strategy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"DAEMON"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/CloudWatch%20Deployment%20Alarms"></a><h3 id="cloudwatch-deployment-alarms">CloudWatch Deployment Alarms</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ecs_service"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ecs_cluster.example.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">alarms</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">enable</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">rollback</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">alarm_names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_cloudwatch_metric_alarm.example.alarm_name</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/External%20Deployment%20Controller"></a><h3 id="external-deployment-controller">External Deployment Controller</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ecs_service"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ecs_cluster.example.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">deployment_controller</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"EXTERNAL"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Redeploy%20Service%20On%20Every%20Apply"></a><h3 id="redeploy-service-on-every-apply">Redeploy Service On Every Apply</h3>
+
+<p>The key used with <code>triggers</code> is arbitrary.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ecs_service"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configurations ...</span>
+
+<span class="w">  </span><span class="na">force_new_deployment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">triggers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">redeployment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">plan</span><span class="nf">timestamp</span><span class="p">()</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>name</code> - (Required) Name of the service (up to 255 letters, numbers, hyphens, and underscores)</li>
+</ul>
+
+<p>The following arguments are optional:</p>
+
+<ul>
+<li><code>alarms</code> - (Optional) Information about the CloudWatch alarms. <a href="#alarms">See below</a>.</li>
+<li><code>availability_zone_rebalancing</code> - (Optional) ECS automatically redistributes tasks within a service across Availability Zones (AZs) to mitigate the risk of impaired application availability due to underlying infrastructure failures and task lifecycle activities. The valid values are <code>ENABLED</code> and <code>DISABLED</code>. Defaults to <code>DISABLED</code>.</li>
+<li><code>capacity_provider_strategy</code> - (Optional) Capacity provider strategies to use for the service. Can be one or more. These can be updated without destroying and recreating the service only if <code>force_new_deployment = true</code> and not changing from 0 <code>capacity_provider_strategy</code> blocks to greater than 0, or vice versa. <a href="#capacity_provider_strategy">See below</a>. Conflicts with <code>launch_type</code>.</li>
+<li><code>cluster</code> - (Optional) ARN of an ECS cluster.</li>
+<li><code>deployment_circuit_breaker</code> - (Optional) Configuration block for deployment circuit breaker. <a href="#deployment_circuit_breaker">See below</a>.</li>
+<li><code>deployment_controller</code> - (Optional) Configuration block for deployment controller configuration. <a href="#deployment_controller">See below</a>.</li>
+<li><code>deployment_maximum_percent</code> - (Optional) Upper limit (as a percentage of the service's desiredCount) of the number of running tasks that can be running in a service during a deployment. Not valid when using the <code>DAEMON</code> scheduling strategy.</li>
+<li><code>deployment_minimum_healthy_percent</code> - (Optional) Lower limit (as a percentage of the service's desiredCount) of the number of running tasks that must remain running and healthy in a service during a deployment.</li>
+<li><code>desired_count</code> - (Optional) Number of instances of the task definition to place and keep running. Defaults to 0. Do not specify if using the <code>DAEMON</code> scheduling strategy.</li>
+<li><code>enable_ecs_managed_tags</code> - (Optional) Whether to enable Amazon ECS managed tags for the tasks within the service.</li>
+<li><code>enable_execute_command</code> - (Optional) Whether to enable Amazon ECS Exec for the tasks within the service.</li>
+<li><code>force_delete</code> - (Optional) Enable to delete a service even if it wasn't scaled down to zero tasks. It's only necessary to use this if the service uses the <code>REPLICA</code> scheduling strategy.</li>
+<li><code>force_new_deployment</code> - (Optional) Enable to force a new task deployment of the service. This can be used to update tasks to use a newer Docker image with same image/tag combination (e.g., <code>myimage:latest</code>), roll Fargate tasks onto a newer platform version, or immediately deploy <code>ordered_placement_strategy</code> and <code>placement_constraints</code> updates.</li>
+<li><code>health_check_grace_period_seconds</code> - (Optional) Seconds to ignore failing load balancer health checks on newly instantiated tasks to prevent premature shutdown, up to 2147483647. Only valid for services configured to use load balancers.</li>
+<li><code>iam_role</code> - (Optional) ARN of the IAM role that allows Amazon ECS to make calls to your load balancer on your behalf. This parameter is required if you are using a load balancer with your service, but only if your task definition does not use the <code>awsvpc</code> network mode. If using <code>awsvpc</code> network mode, do not specify this role. If your account has already created the Amazon ECS service-linked role, that role is used by default for your service unless you specify a role here.</li>
+<li><code>launch_type</code> - (Optional) Launch type on which to run your service. The valid values are <code>EC2</code>, <code>FARGATE</code>, and <code>EXTERNAL</code>. Defaults to <code>EC2</code>. Conflicts with <code>capacity_provider_strategy</code>.</li>
+<li><code>load_balancer</code> - (Optional) Configuration block for load balancers. <a href="#load_balancer">See below</a>.</li>
+<li><code>network_configuration</code> - (Optional) Network configuration for the service. This parameter is required for task definitions that use the <code>awsvpc</code> network mode to receive their own Elastic Network Interface, and it is not supported for other network modes. <a href="#network_configuration">See below</a>.</li>
+<li><code>ordered_placement_strategy</code> - (Optional) Service level strategy rules that are taken into consideration during task placement. List from top to bottom in order of precedence. Updates to this configuration will take effect next task deployment unless <code>force_new_deployment</code> is enabled. The maximum number of <code>ordered_placement_strategy</code> blocks is <code>5</code>. <a href="#ordered_placement_strategy">See below</a>.</li>
+<li><code>placement_constraints</code> - (Optional) Rules that are taken into consideration during task placement. Updates to this configuration will take effect next task deployment unless <code>force_new_deployment</code> is enabled. Maximum number of <code>placement_constraints</code> is <code>10</code>. <a href="#placement_constraints">See below</a>.</li>
+<li><code>platform_version</code> - (Optional) Platform version on which to run your service. Only applicable for <code>launch_type</code> set to <code>FARGATE</code>. Defaults to <code>LATEST</code>. More information about Fargate platform versions can be found in the <a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/platform_versions.html">AWS ECS User Guide</a>.</li>
+<li><code>propagate_tags</code> - (Optional) Whether to propagate the tags from the task definition or the service to the tasks. The valid values are <code>SERVICE</code> and <code>TASK_DEFINITION</code>.</li>
+<li><code>scheduling_strategy</code> - (Optional) Scheduling strategy to use for the service. The valid values are <code>REPLICA</code> and <code>DAEMON</code>. Defaults to <code>REPLICA</code>. Note that <a href="https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_CreateService.html"><em>Tasks using the Fargate launch type or the <code>CODE_DEPLOY</code> or <code>EXTERNAL</code> deployment controller types don't support the <code>DAEMON</code> scheduling strategy</em></a>.</li>
+<li><code>service_connect_configuration</code> - (Optional) ECS Service Connect configuration for this service to discover and connect to services, and be discovered by, and connected from, other services within a namespace. <a href="#service_connect_configuration">See below</a>.</li>
+<li><code>service_registries</code> - (Optional) Service discovery registries for the service. The maximum number of <code>service_registries</code> blocks is <code>1</code>. <a href="#service_registries">See below</a>.</li>
+<li><code>tags</code> - (Optional) Key-value map of resource tags. If configured with a provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a> present, tags with matching keys will overwrite those defined at the provider-level.</li>
+<li><code>task_definition</code> - (Optional) Family and revision (<code>family:revision</code>) or full ARN of the task definition that you want to run in your service. Required unless using the <code>EXTERNAL</code> deployment controller. If a revision is not specified, the latest <code>ACTIVE</code> revision is used.</li>
+<li><code>triggers</code> - (Optional) Map of arbitrary keys and values that, when changed, will trigger an in-place update (redeployment). Useful with <code>plantimestamp()</code>. See example above.</li>
+<li><code>volume_configuration</code> - (Optional) Configuration for a volume specified in the task definition as a volume that is configured at launch time. Currently, the only supported volume type is an Amazon EBS volume. <a href="#volume_configuration">See below</a>.</li>
+<li><code>vpc_lattice_configurations</code> - (Optional) The VPC Lattice configuration for your service that allows Lattice to connect, secure, and monitor your service across multiple accounts and VPCs. <a href="#vpc_lattice_configurations">See below</a>.</li>
+<li><code>wait_for_steady_state</code> - (Optional) If <code>true</code>, Terraform will wait for the service to reach a steady state (like <a href="https://docs.aws.amazon.com/cli/latest/reference/ecs/wait/services-stable.html"><code>aws ecs wait services-stable</code></a>) before continuing. Default <code>false</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/alarms"></a><h3 id="alarms">alarms</h3>
+
+<p>The <code>alarms</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>alarm_names</code> - (Required) One or more CloudWatch alarm names.</li>
+<li><code>enable</code> - (Required) Whether to use the CloudWatch alarm option in the service deployment process.</li>
+<li><code>rollback</code> - (Required) Whether to configure Amazon ECS to roll back the service if a service deployment fails. If rollback is used, when a service deployment fails, the service is rolled back to the last deployment that completed successfully.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/volume_configuration"></a><h3 id="volume_configuration">volume_configuration</h3>
+
+<p>The <code>volume_configuration</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>name</code> - (Required) Name of the volume.</li>
+<li><code>managed_ebs_volume</code> - (Required) Configuration for the Amazon EBS volume that Amazon ECS creates and manages on your behalf. <a href="#managed_ebs_volume">See below</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/vpc_lattice_configurations"></a><h3 id="vpc_lattice_configurations">vpc_lattice_configurations</h3>
+
+<p><code>vpc_lattice_configurations</code> supports the following:</p>
+
+<ul>
+<li><code>role_arn</code> - (Required) The ARN of the IAM role to associate with this volume. This is the Amazon ECS infrastructure IAM role that is used to manage your AWS infrastructure.</li>
+<li><code>target_group_arn</code> - (Required) The full ARN of the target group or groups associated with the VPC Lattice configuration.</li>
+<li><code>port_name</code> - (Required) The name of the port for a target group associated with the VPC Lattice configuration.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/managed_ebs_volume"></a><h3 id="managed_ebs_volume">managed_ebs_volume</h3>
+
+<p>The <code>managed_ebs_volume</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>role_arn</code> - (Required) Amazon ECS infrastructure IAM role that is used to manage your Amazon Web Services infrastructure. Recommended using the Amazon ECS-managed <code>AmazonECSInfrastructureRolePolicyForVolumes</code> IAM policy with this role.</li>
+<li><code>encrypted</code> - (Optional) Whether the volume should be encrypted. Default value is <code>true</code>.</li>
+<li><code>file_system_type</code> - (Optional) Linux filesystem type for the volume. For volumes created from a snapshot, same filesystem type must be specified that the volume was using when the snapshot was created. Valid values are <code>ext3</code>, <code>ext4</code>, <code>xfs</code>. Default value is <code>xfs</code>.</li>
+<li><code>iops</code> - (Optional) Number of I/O operations per second (IOPS).</li>
+<li><code>kms_key_id</code> - (Optional) Amazon Resource Name (ARN) identifier of the Amazon Web Services Key Management Service key to use for Amazon EBS encryption.</li>
+<li><code>size_in_gb</code> - (Optional) Size of the volume in GiB. You must specify either a <code>size_in_gb</code> or a <code>snapshot_id</code>. You can optionally specify a volume size greater than or equal to the snapshot size.</li>
+<li><code>snapshot_id</code> - (Optional) Snapshot that Amazon ECS uses to create the volume. You must specify either a <code>size_in_gb</code> or a <code>snapshot_id</code>.</li>
+<li><code>throughput</code> - (Optional) Throughput to provision for a volume, in MiB/s, with a maximum of 1,000 MiB/s.</li>
+<li><code>volume_type</code> - (Optional) Volume type.</li>
+<li><code>tag_specifications</code> - (Optional) The tags to apply to the volume. <a href="#tag_specifications">See below</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/capacity_provider_strategy"></a><h3 id="capacity_provider_strategy">capacity_provider_strategy</h3>
+
+<p>The <code>capacity_provider_strategy</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>base</code> - (Optional) Number of tasks, at a minimum, to run on the specified capacity provider. Only one capacity provider in a capacity provider strategy can have a base defined.</li>
+<li><code>capacity_provider</code> - (Required) Short name of the capacity provider.</li>
+<li><code>weight</code> - (Required) Relative percentage of the total number of launched tasks that should use the specified capacity provider.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/deployment_circuit_breaker"></a><h3 id="deployment_circuit_breaker">deployment_circuit_breaker</h3>
+
+<p>The <code>deployment_circuit_breaker</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>enable</code> - (Required) Whether to enable the deployment circuit breaker logic for the service.</li>
+<li><code>rollback</code> - (Required) Whether to enable Amazon ECS to roll back the service if a service deployment fails. If rollback is enabled, when a service deployment fails, the service is rolled back to the last deployment that completed successfully.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/deployment_controller"></a><h3 id="deployment_controller">deployment_controller</h3>
+
+<p>The <code>deployment_controller</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>type</code> - (Optional) Type of deployment controller. Valid values: <code>CODE_DEPLOY</code>, <code>ECS</code>, <code>EXTERNAL</code>. Default: <code>ECS</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/load_balancer"></a><h3 id="load_balancer">load_balancer</h3>
+
+<p><code>load_balancer</code> supports the following:</p>
+
+<ul>
+<li><code>elb_name</code> - (Required for ELB Classic) Name of the ELB (Classic) to associate with the service.</li>
+<li><code>target_group_arn</code> - (Required for ALB/NLB) ARN of the Load Balancer target group to associate with the service.</li>
+<li><code>container_name</code> - (Required) Name of the container to associate with the load balancer (as it appears in a container definition).</li>
+<li><code>container_port</code> - (Required) Port on the container to associate with the load balancer.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Version note</em>
+    <p>Multiple <code>load_balancer</code> configuration block support was added in Terraform AWS Provider version 2.22.0. This allows configuration of <a href="https://aws.amazon.com/about-aws/whats-new/2019/07/amazon-ecs-services-now-support-multiple-load-balancer-target-groups/">ECS service support for multiple target groups</a>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/network_configuration"></a><h3 id="network_configuration">network_configuration</h3>
+
+<p><code>network_configuration</code> support the following:</p>
+
+<ul>
+<li><code>subnets</code> - (Required) Subnets associated with the task or service.</li>
+<li><code>security_groups</code> - (Optional) Security groups associated with the task or service. If you do not specify a security group, the default security group for the VPC is used.</li>
+<li><code>assign_public_ip</code> - (Optional) Assign a public IP address to the ENI (Fargate launch type only). Valid values are <code>true</code> or <code>false</code>. Default <code>false</code>.</li>
+</ul>
+
+<p>For more information, see <a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-networking.html">Task Networking</a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ordered_placement_strategy"></a><h3 id="ordered_placement_strategy">ordered_placement_strategy</h3>
+
+<p><code>ordered_placement_strategy</code> supports the following:</p>
+
+<ul>
+<li><code>type</code> - (Required) Type of placement strategy. Must be one of: <code>binpack</code>, <code>random</code>, or <code>spread</code></li>
+<li><code>field</code> - (Optional) For the <code>spread</code> placement strategy, valid values are <code>instanceId</code> (or <code>host</code>,
+which has the same effect), or any platform or custom attribute that is applied to a container instance.
+For the <code>binpack</code> type, valid values are <code>memory</code> and <code>cpu</code>. For the <code>random</code> type, this attribute is not
+needed. For more information, see <a href="https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_PlacementStrategy.html">Placement Strategy</a>.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>for <code>spread</code>, <code>host</code> and <code>instanceId</code> will be normalized, by AWS, to be <code>instanceId</code>. This means the statefile will show <code>instanceId</code> but your config will differ if you use <code>host</code>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/placement_constraints"></a><h3 id="placement_constraints">placement_constraints</h3>
+
+<p><code>placement_constraints</code> support the following:</p>
+
+<ul>
+<li><code>type</code> - (Required) Type of constraint. The only valid values at this time are <code>memberOf</code> and <code>distinctInstance</code>.</li>
+<li><code>expression</code> -  (Optional) Cluster Query Language expression to apply to the constraint. Does not need to be specified for the <code>distinctInstance</code> type. For more information, see <a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/cluster-query-language.html">Cluster Query Language in the Amazon EC2 Container Service Developer Guide</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/service_registries"></a><h3 id="service_registries">service_registries</h3>
+
+<p><code>service_registries</code> support the following:</p>
+
+<ul>
+<li><code>registry_arn</code> - (Required) ARN of the Service Registry. The currently supported service registry is Amazon Route 53 Auto Naming Service(<code>aws_service_discovery_service</code>). For more information, see <a href="https://docs.aws.amazon.com/Route53/latest/APIReference/API_autonaming_Service.html">Service</a></li>
+<li><code>port</code> - (Optional) Port value used if your Service Discovery service specified an SRV record.</li>
+<li><code>container_port</code> - (Optional) Port value, already specified in the task definition, to be used for your service discovery service.</li>
+<li><code>container_name</code> - (Optional) Container name value, already specified in the task definition, to be used for your service discovery service.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/service_connect_configuration"></a><h3 id="service_connect_configuration">service_connect_configuration</h3>
+
+<p><code>service_connect_configuration</code> supports the following:</p>
+
+<ul>
+<li><code>enabled</code> - (Required) Whether to use Service Connect with this service.</li>
+<li><code>log_configuration</code> - (Optional) Log configuration for the container. <a href="#log_configuration">See below</a>.</li>
+<li><code>namespace</code> - (Optional) Namespace name or ARN of the <a href="../resources/service_discovery_http_namespace.html"><code>aws_service_discovery_http_namespace</code></a> for use with Service Connect.</li>
+<li><code>service</code> - (Optional) List of Service Connect service objects. <a href="#service">See below</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/log_configuration"></a><h3 id="log_configuration">log_configuration</h3>
+
+<p><code>log_configuration</code> supports the following:</p>
+
+<ul>
+<li><code>log_driver</code> - (Required) Log driver to use for the container.</li>
+<li><code>options</code> - (Optional) Configuration options to send to the log driver.</li>
+<li><code>secret_option</code> - (Optional) Secrets to pass to the log configuration. <a href="#secret_option">See below</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/secret_option"></a><h3 id="secret_option">secret_option</h3>
+
+<p><code>secret_option</code> supports the following:</p>
+
+<ul>
+<li><code>name</code> - (Required) Name of the secret.</li>
+<li><code>value_from</code> - (Required) Secret to expose to the container. The supported values are either the full ARN of the AWS Secrets Manager secret or the full ARN of the parameter in the SSM Parameter Store.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/service"></a><h3 id="service">service</h3>
+
+<p><code>service</code> supports the following:</p>
+
+<ul>
+<li><code>client_alias</code> - (Optional) List of client aliases for this Service Connect service. You use these to assign names that can be used by client applications. The maximum number of client aliases that you can have in this list is 1. <a href="#client_alias">See below</a>.</li>
+<li><code>discovery_name</code> - (Optional) Name of the new AWS Cloud Map service that Amazon ECS creates for this Amazon ECS service.</li>
+<li><code>ingress_port_override</code> - (Optional) Port number for the Service Connect proxy to listen on.</li>
+<li><code>port_name</code> - (Required) Name of one of the <code>portMappings</code> from all the containers in the task definition of this Amazon ECS service.</li>
+<li><code>timeout</code> - (Optional) Configuration timeouts for Service Connect</li>
+<li><code>tls</code> - (Optional) Configuration for enabling Transport Layer Security (TLS)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/timeout"></a><h3 id="timeout">timeout</h3>
+
+<p><code>timeout</code> supports the following:</p>
+
+<ul>
+<li><code>idle_timeout_seconds</code> - (Optional) Amount of time in seconds a connection will stay active while idle. A value of 0 can be set to disable idleTimeout.</li>
+<li><code>per_request_timeout_seconds</code> - (Optional) Amount of time in seconds for the upstream to respond with a complete response per request. A value of 0 can be set to disable perRequestTimeout. Can only be set when appProtocol isn't TCP.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/tls"></a><h3 id="tls">tls</h3>
+
+<p><code>tls</code> supports the following:</p>
+
+<ul>
+<li><code>issuer_cert_authority</code> - (Required) Details of the certificate authority which will issue the certificate.</li>
+<li><code>kms_key</code> - (Optional) KMS key used to encrypt the private key in Secrets Manager.</li>
+<li><code>role_arn</code> - (Optional) ARN of the IAM Role that's associated with the Service Connect TLS.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/issuer_cert_authority"></a><h3 id="issuer_cert_authority">issuer_cert_authority</h3>
+
+<p><code>issuer_cert_authority</code> supports the following:</p>
+
+<ul>
+<li><code>aws_pca_authority_arn</code> - (Optional) ARN of the <a href="../resources/acmpca_certificate_authority.html"><code>aws_acmpca_certificate_authority</code></a> used to create the TLS Certificates.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/client_alias"></a><h3 id="client_alias">client_alias</h3>
+
+<p><code>client_alias</code> supports the following:</p>
+
+<ul>
+<li><code>dns_name</code> - (Optional) Name that you use in the applications of client tasks to connect to this service.</li>
+<li><code>port</code> - (Required) Listening port number for the Service Connect proxy. This port is available inside of all of the tasks within the same namespace.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/tag_specifications"></a><h3 id="tag_specifications">tag_specifications</h3>
+
+<p><code>tag_specifications</code> supports the following:</p>
+
+<ul>
+<li><code>resource_type</code> - (Required) The type of volume resource. Valid values, <code>volume</code>.</li>
+<li><code>propagate_tags</code> - (Optional) Determines whether to propagate the tags from the task definition to the Amazon EBS volume.</li>
+<li><code>tags</code> - (Optional) The tags applied to this Amazon EBS volume. <code>AmazonECSCreated</code> and <code>AmazonECSManaged</code> are reserved tags that can't be used.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>id</code> - ARN that identifies the service.</li>
+<li><code>tags_all</code> - A map of tags assigned to the resource, including those inherited from the provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p><a href="https://developer.hashicorp.com/terraform/language/resources/syntax#operation-timeouts">Configuration options</a>:</p>
+
+<ul>
+<li><code>create</code> - (Default <code>20m</code>)</li>
+<li><code>update</code> - (Default <code>20m</code>)</li>
+<li><code>delete</code> - (Default <code>20m</code>)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import ECS services using the <code>name</code> together with ecs cluster <code>name</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ecs_service.imported</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"cluster-name/service-name"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import ECS services using the <code>name</code> together with ecs cluster <code>name</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_ecs_service.imported cluster-name/service-name
+</code></pre></div>
+
+            
+        
+    </body></html>

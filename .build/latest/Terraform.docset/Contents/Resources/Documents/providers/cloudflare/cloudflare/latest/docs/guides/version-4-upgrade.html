@@ -1,0 +1,262 @@
+<html><!-- Online page at https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/guides/version-4-upgrade --><head>
+                <title>Terraform Cloudflare Provider Version 4 Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-cloudflare-provider-version-4-upgrade-guide">Terraform Cloudflare Provider Version 4 Upgrade Guide</h1>
+
+<p>Version 4 of the Cloudflare Terraform Provider is introducing several breaking
+changes to accomodate better user experience and broader resource support for
+more customer types.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Version%20Configuration"></a><h2 id="provider-version-configuration">Provider Version Configuration</h2>
+
+<p>If you are not ready to make a move to version 4 of the Cloudflare provider,
+you may keep the 3.x branch active for your Terraform project by specifying:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"cloudflare"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 3.0"</span><span class="c1"></span>
+<span class="c1">  # ... any other configuration</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>We highly recommend reviewing this guide, make necessary changes and move to
+4.x branch, as further 3.x releases are unlikely to happen outside of critical
+security fixes.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Before attempting to upgrade to version 4, you should first upgrade to the latest version of 3 to ensure any transitional updates are applied to your existing configuration.</p>
+</aside>
+
+<p>Once ready, make the following change to use the latest 4.x release:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"cloudflare"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 4.0"</span><span class="c1"></span>
+<span class="c1">  # ... any other configuration</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>To rewrite your HCL configurations, you could use a combination of <code>grep</code>/<code>ripgrep</code>
+and <code>sed</code> for simple replacements however we will be providing examples using
+[comby] which is a more advanced tool for searching and changing code
+structure. NB: the attached examples are intentionally simple and you may want
+to make them more specific to suit your use case or environment.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20configuration%20for%20account_id%20is%20removed"></a><h2 id="provider-configuration-for-account_id-is-removed">Provider configuration for <code>account_id</code> is removed</h2>
+
+<p>In 3.x, <code>account_id</code> was available as a provider configuration attribute to
+globally define the account you wanted to target for resources. While convenient,
+this introduced problems for managing multiple account level configurations as
+it was a global configuration stored on the underlying HTTP client.</p>
+
+<p>Instead, all resources now require a <code>zone_id</code> or <code>account_id</code> attribute
+explicitly.</p>
+
+<p>Before:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"cloudflare"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_resource"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"cloudflare"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"cloudflare_resource"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Check the specific resource documentation for what resources now require this
+attribute.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/account_id%20required%20for%20some%20resources"></a><h2 id="account_id-required-for-some-resources"><code>account_id</code> required for some resources</h2>
+
+<p>To accomodate the removal of <code>account_id</code> at the provider level, the following
+resources now require the <code>account_id</code> value to be defined.</p>
+
+<ul>
+<li><code>cloudflare_zone</code></li>
+<li><code>cloudflare_load_balancer_pool</code></li>
+<li><code>cloudflare_load_balancer_monitor</code></li>
+<li><code>cloudflare_account_member</code></li>
+<li><code>cloudflare_workers_kv_namespace</code></li>
+<li><code>cloudflare_workers_kv</code></li>
+<li><code>cloudflare_workers_script</code></li>
+<li><code>cloudflare_worker_cron_trigger</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Removed%20ability%20to%20create%20user%20level%20resources"></a><h2 id="removed-ability-to-create-user-level-resources">Removed ability to create user level resources</h2>
+
+<p>User level resources are an older concept that are superseded by account level
+resources. In previous versions, the following resources allowed a fallback in
+the event <code>zone_id</code> or <code>account_id</code> were provided.</p>
+
+<ul>
+<li><code>cloudflare_access_rule</code></li>
+<li><code>cloudflare_load_balancer</code></li>
+<li><code>cloudflare_load_balancer_monitor</code></li>
+<li><code>cloudflare_load_balancer_pool</code></li>
+</ul>
+
+<p>In 4.x, these resources do not have automatic fallback to user level resources
+but instead, require an explicit <code>account_id</code> to use the account level. Zone
+level resources remain unchanged.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/userBaseUrl%20is%20no%20longer%20used%20internally"></a><h2 id="userbaseurl-is-no-longer-used-internally"><code>userBaseUrl</code> is no longer used internally</h2>
+
+<p><code>userBaseUrl</code> is a helper method provided by <code>cloudflare-go</code> to automatically
+detect and build parts of the HTTP request URL if the global <code>AccountID</code> value
+is provided. While internal, this has been removed in favour of explicit
+<code>account_id</code> configurations mentioned above.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_ruleset"></a><h2 id="cloudflare_ruleset"><code>cloudflare_ruleset</code></h2>
+
+<p><code>cloudflare_ruleset</code> resource has been migrated internally to use the
+<code>terraform-plugin-framework</code> to better handle zero/nil values (see
+<a href="https://github.com/cloudflare/terraform-provider-cloudflare/pull/2170">cloudflare/terraform-provider-cloudflare#2170</a>
+for full details).</p>
+
+<p>As part of the migration to the <code>terraform-plugin-framework</code>, the workaround
+that relied on <code>status</code> has been removed. If you have <code>status = "enabled"</code>
+you will need to replace it with <code>enabled = true</code> and similar for <code>status = "disabled"</code>
+to be replaced with <code>enabled = false</code>. This change realigns the Terraform
+resource with the API response.</p>
+
+<p><a href="https://github.com/cloudflare/terraform-provider-cloudflare/releases/tag/v4.2.0">v4.2.0</a>
+introduced the change and to get all the benefits with a smooth upgrade path,
+we recommend you:</p>
+
+<ul>
+<li>Ensure you are on the latest 3.x release</li>
+<li>Remove the resource from your state file (<code>terraform state rm ...</code>)</li>
+<li>Upgrade to 4.x</li>
+<li>Import the <code>cloudflare_ruleset</code> resource back into your state file (<code>terraform import ...</code>)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_spectrum_application"></a><h2 id="cloudflare_spectrum_application"><code>cloudflare_spectrum_application</code></h2>
+
+<ul>
+<li><code>edge_ips</code> is now a nested block that holds all edge IP configuration such as
+<code>type</code>, <code>connectivity</code> and <code>ips</code>.</li>
+<li><code>edge_ip_connectivity</code> is now nested under <code>edge_ips</code> as <code>connectivity</code>.</li>
+<li><code>type</code> is now a required field.</li>
+</ul>
+
+<p>Before:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">resource</span><span class="w"> </span><span class="s2">"cloudflare_spectrum_application" "..."</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="na">edge_ip_connectivity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"all"</span><span class="w"></span>
+<span class="w">  </span><span class="na">edge_ips</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"203.0.113.1", "203.0.113.2"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">resource</span><span class="w"> </span><span class="s2">"cloudflare_spectrum_application" "..."</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="nb">edge_ips</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"static"</span><span class="w"></span>
+<span class="w">    </span><span class="na">ips</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"203.0.113.1", "203.0.113.2"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cloudflare_load_balancer"></a><h2 id="cloudflare_load_balancer"><code>cloudflare_load_balancer</code></h2>
+
+<ul>
+<li><code>session_affinity_attributes</code> has been migrated from <code>TypeMap</code> to <code>TypeSet</code>.</li>
+</ul>
+
+<p>Before:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">resource</span><span class="w"> </span><span class="s2">"cloudflare_load_balancer" "..."</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="nb">session_affinity_attributes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">...</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">resource</span><span class="w"> </span><span class="s2">"cloudflare_load_balancer" "..."</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="nb">session_affinity_attributes</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">...</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>There is no automatic schema migration for this change as <code>TypeMap</code> does not have
+constraints and the current values may have been invalid in previous states.</p>
+
+<ul>
+<li><code>drain_duration</code> is now an integer (previously a string)</li>
+</ul>
+
+<p>Before:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">resource</span><span class="w"> </span><span class="s2">"cloudflare_load_balancer" "..."</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="nb">session_affinity_attributes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">secure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Always"</span><span class="w"></span>
+<span class="w">    </span><span class="na">drain_duration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"5"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">resource</span><span class="w"> </span><span class="s2">"cloudflare_load_balancer" "..."</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="nb">session_affinity_attributes</span><span class="w"> </span><span class="p">{</span><span class="c1"> # note the type change from above</span>
+<span class="w">    </span><span class="na">secure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Always"</span><span class="w"></span>
+<span class="w">    </span><span class="na">drain_duration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Renames"></a><h2 id="renames">Renames</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resources"></a><h3 id="resources">Resources</h3>
+
+<ul>
+<li><code>cloudflare_argo_tunnel</code> is now <code>cloudflare_tunnel</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Removals"></a><h2 id="removals">Removals</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resources"></a><h3 id="resources-2">Resources</h3>
+
+<ul>
+<li><code>cloudflare_access_bookmark</code>: Use <code>cloudflare_access_application</code> configuration
+attributes instead.</li>
+<li><code>cloudflare_waf_group</code>: Use <code>cloudflare_ruleset</code> instead.</li>
+<li><code>cloudflare_waf_override</code>: Use <code>cloudflare_ruleset</code> instead.</li>
+<li><code>cloudflare_waf_package</code>: Use <code>cloudflare_ruleset</code> instead.</li>
+<li><code>cloudflare_waf_rule</code>: Use <code>cloudflare_ruleset</code> instead.</li>
+<li><code>cloudflare_ip_list</code>: Use <code>cloudflare_list</code> instead.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20source"></a><h3 id="data-source">Data source</h3>
+
+<ul>
+<li><code>cloudflare_waf_groups</code>: Use <code>cloudflare_ruleset</code> instead.</li>
+<li><code>cloudflare_waf_packages</code>: Use <code>cloudflare_ruleset</code> instead.</li>
+<li><code>cloudflare_waf_rules</code>: Use <code>cloudflare_ruleset</code> instead.</li>
+</ul>
+
+            
+        
+    </body></html>

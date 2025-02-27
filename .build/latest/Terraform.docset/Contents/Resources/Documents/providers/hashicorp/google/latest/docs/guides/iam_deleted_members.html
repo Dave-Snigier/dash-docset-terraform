@@ -1,0 +1,63 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/iam_deleted_members --><head>
+                <title>Handling diffs within IAM resources due to deleted: IAM principals</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="handling-diffs-within-iam-resources-due-to-deleted-iam-principals">Handling diffs within IAM resources due to <code>deleted:</code> IAM principals</h1>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/What%20is%20a%20deleted%3A%20IAM%20principal%3F"></a><h2 id="what-is-a-deleted-iam-principal">What is a <code>deleted:</code> IAM principal?</h2>
+
+<p>Deleted IAM principals reference IAM principals (service accounts, users, groups) that were granted permission on an IAM policy when they were deleted. Deleting the IAM principal does not immediately purge associated permissions, but prefixes them with <code>deleted:</code> for \~30 days before deleting them. </p>
+
+<p>This results in IAM bindings existing for accounts that no longer exist. These bindings can be removed by removing the permission for the deleted account. Terraform will detect permissions that exist for deleted accounts, and in some cases try to remove them. This can potentially cause permanent diffs depending on which types of IAM resources are used within Terraform. This guide documents the different cases and how to handle the diffs in each case.</p>
+
+<p>Validation will occur in the API preventing granting permissions on an IAM policy to a principal that matches a <code>deleted:</code> principal on the same policy. This is intended to prevent granting permission to a user that has the same name as a recently deleted user who had escalated permissions.</p>
+
+<p>Prior to version 3.3.0 and 2.20.1 of the provider there was a bug with <code>deleted:</code> service accounts. It is strongly recommended to upgrade to 3.3.0+ to avoid issues.</p>
+
+<p>For more information on deleted accounts, see the <a href="https://cloud.google.com/iam/docs/creating-managing-service-accounts">official documentation</a> on service accounts.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Intermediate%20phase"></a><h2 id="intermediate-phase">Intermediate phase</h2>
+
+<p>Deleted IAM principals are being introduced to GCP starting on September 14, 2020. Support for them will be fully rolled out over the few weeks following. This rollout period may present a period of time when the API will behave differently, requiring some extra action to be taken to resolve Terraform diffs. During this phase users will need to delete all references to <code>deleted:</code> members before adding bindings for a new principal with the same email. Attempting to add bindings for a new principal that shares an email with a <code>deleted:</code> principal on the same policy will result in the permissions being added to the <code>deleted:</code> principal, causing Terraform to attempt to recreate the binding. References to a <code>deleted:</code> principal must be fully removed from an IAM policy before permissions can be granted to the new principal.</p>
+
+<p>After this intermediate phase, attempting to grant permissions to a principal that shares an email with a <code>deleted:</code> principal on the same policy will result in an error.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20%2A_iam_policy%20resources"></a><h2 id="using-_iam_policy-resources">Using <code>*_iam_policy</code> resources</h2>
+
+<p><code>_iam_policy</code> allows you to declare the entire IAM policy from within Terraform. Users may see diffs on <code>deleted:</code> members in some circumstances, but applying the policy should succeed and resolve any issues. Specifying <code>deleted:</code> members is not allowed in Terraform, so any policy entirely managed by Terraform should automatically remove any deleted members when Terraform is run.</p>
+
+<p>During the intermediate period it may be required to <code>taint</code> the <code>_iam_policy</code> resource to ensure any deleted principals are removed <em>before</em> the new principal is granted permission. This should only be necessary if you are continuing to see diffs after successful applies. For more information on using <code>taint</code> see the <a href="https://www.terraform.io/docs/commands/taint.html">official documentation</a>.</p>
+
+<p><strong>Note:</strong> Tainting an <code>iam_policy</code> resource will delete and recreate it. If the account that Terraform uses to provision GCP resources requires permissions granted by the <code>iam_policy</code> resource it may result in Terraform being unable to complete the apply. This is possible for <code>google_project_iam_policy</code> and <code>google_organization_iam_policy</code>. Special care should be taken when tainting these resources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/%2A_iam_binding%20resources"></a><h2 id="_iam_binding-resources"><code>*_iam_binding</code> resources</h2>
+
+<p><code>_iam_binding</code> resources handle all the members who are granted a specific role for an IAM policy. These resources may see diffs if a member they grant a role to is deleted and recreated. Due to these resources not controlling the entire IAM policy you may see issues around diffs not being resolved as requests can include both the deleted and non-deleted form of a principal.</p>
+
+<p>Example diff caused by <code>deleted:</code> member on an IAM binding resource:
+  </p><div class="codehilite"><pre><span></span><code><span class="c1"># google_secret_manager_secret_iam_binding.binding will be updated in-place</span>
+  <span class="err">~</span><span class="w"> </span><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_secret_manager_secret_iam_binding"</span><span class="w"> </span><span class="nv">"binding"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+  <span class="w">      </span><span class="na">id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"projects/my-project/secrets/secret/roles/secretmanager.secretAccessor"</span><span class="w"></span>
+  <span class="w">    </span><span class="err">~</span><span class="w"> </span><span class="na">members</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+  <span class="w">        </span><span class="err">-</span><span class="w"> </span><span class="s2">"deleted:serviceAccount:myaccount@my-project.iam.gserviceaccount.com?uid=10231234122325702"</span><span class="p">,</span><span class="w"></span>
+  <span class="w">        </span><span class="err">+</span><span class="w"> </span><span class="s2">"serviceAccount:myaccount@my-project.iam.gserviceaccount.com"</span><span class="p">,</span><span class="w"></span>
+  <span class="w">      </span><span class="p">]</span><span class="w"></span>
+  <span class="w">      </span><span class="na">project</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-project"</span><span class="w"></span>
+  <span class="w">      </span><span class="na">role</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"roles/secretmanager.secretAccessor"</span><span class="w"></span>
+  <span class="w">      </span><span class="na">secret_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"projects/my-project/secrets/secret"</span><span class="w"></span>
+  <span class="w">  </span><span class="p">}</span><span class="w"></span>
+  </code></pre></div><p></p>
+
+<p>Tainting the <code>_iam_binding</code> resource using the <a href="https://www.terraform.io/docs/commands/taint.html">taint command</a> may resolve this diff. If it does not, or results in an API error, you may need to manually remove any references to the deleted version of the principal causing the diff. This can be done through the Cloud Console UI for the resource. This could also be done via Terraform by specifying the entire IAM policy authoritatively using the <code>_iam_policy</code> resource.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/%2A_iam_member%20resources%20and%20inconsistent%20results"></a><h2 id="_iam_member-resources-and-inconsistent-results"><code>*_iam_member</code> resources and inconsistent results</h2>
+
+<p><code>_iam_member</code> resources manage a certain permission for a certain principal. This resource may see diffs if the principal that it grants permissions for is deleted and recreated. Similarly to the binding resources above these may see unresolved diffs on apply. Due to this resource only ensuring that a single role is present for a single principal, member resources will not remove permissions for <code>deleted:</code> members.</p>
+
+<p>If applying the creation of an <code>_iam_member</code> resource results in an API error or the Terraform error: <code>Provider produced inconsistent result after apply</code> it may mean that the deleted version of the principal already exists on the IAM policy. Inspecting the policy either by <a href="https://www.terraform.io/docs/internals/debugging.html">capturing the Terraform debug logs</a> or via the Cloud Console can verify that this is the cause. If the deleted version of the principal exists on the IAM policy, remove it using the Cloud Console or by using an authoritative IAM resource like <code>_iam_policy</code>.</p>
+
+            
+        
+    </body></html>

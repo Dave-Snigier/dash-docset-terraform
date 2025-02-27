@@ -1,0 +1,99 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/template/latest/docs/data-sources/cloudinit_config --><head>
+                <title>cloudinit_multipart</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="template_cloudinit_config">template_cloudinit_config</h1>
+
+<p>Renders a <a href="https://cloudinit.readthedocs.io/en/latest/topics/format.html#mime-multi-part-archive">multipart MIME configuration</a>
+for use with <a href="https://cloudinit.readthedocs.io/">Cloud-init</a>.</p>
+
+<p>Cloud-init is a commonly-used startup configuration utility for cloud compute
+instances. It accepts configuration via provider-specific user data mechanisms,
+such as <code>user_data</code> for Amazon EC2 instances. Multipart MIME is one of the
+data formats it accepts. For more information, see
+<a href="https://cloudinit.readthedocs.io/en/latest/topics/format.html">User-Data Formats</a>
+in the Cloud-init manual.</p>
+
+<p>This is not a generalized utility for producing multipart MIME messages. Its
+featureset is specialized for the features of cloud-init.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Render a part using a `template_file`</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"template_file"</span><span class="w"> </span><span class="nv">"script"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${file("${path.module}/init.tpl")}"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">vars</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">consul_address</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${aws_instance.consul.private_ip}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Render a multi-part cloud-init config making use of the part</span>
+<span class="c1"># above, and other source files</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"template_cloudinit_config"</span><span class="w"> </span><span class="nv">"config"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">gzip</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">base64_encode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1"></span>
+
+<span class="c1">  # Main cloud-config configuration file.</span>
+<span class="w">  </span><span class="nb">part</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">filename</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"init.cfg"</span><span class="w"></span>
+<span class="w">    </span><span class="na">content_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"text/cloud-config"</span><span class="w"></span>
+<span class="w">    </span><span class="na">content</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.template_file.script.rendered}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">part</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">content_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"text/x-shellscript"</span><span class="w"></span>
+<span class="w">    </span><span class="na">content</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"baz"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">part</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">content_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"text/x-shellscript"</span><span class="w"></span>
+<span class="w">    </span><span class="na">content</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"ffbaz"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Start an AWS instance with the cloud-init config as user data</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">ami</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"ami-d05e75b8"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_type</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"t2.micro"</span><span class="w"></span>
+<span class="w">  </span><span class="na">user_data_base64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.template_cloudinit_config.config.rendered}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>gzip</code> - (Optional) Specify whether or not to gzip the rendered output. Defaults to <code>true</code>.</p></li>
+<li><p><code>base64_encode</code> - (Optional) Base64 encoding of the rendered output. Defaults to <code>true</code>,
+and cannot be disabled if <code>gzip</code> is <code>true</code>.</p></li>
+<li><p><code>part</code> - (Required) A nested block type which adds a file to the generated
+cloud-init configuration. Use multiple <code>part</code> blocks to specify multiple
+files, which will be included in order of declaration in the final MIME
+document.</p></li>
+</ul>
+
+<p>Each <code>part</code> block expects the following arguments:</p>
+
+<ul>
+<li><p><code>content</code> - (Required) Body content for the part.</p></li>
+<li><p><code>filename</code> - (Optional) A filename to report in the header for the part.</p></li>
+<li><p><code>content_type</code> - (Optional) A MIME-style content type to report in the header for the part.</p></li>
+<li><p><code>merge_type</code> - (Optional) A value for the <code>X-Merge-Type</code> header of the part,
+to control <a href="https://cloudinit.readthedocs.io/en/latest/topics/merging.html">cloud-init merging behavior</a>.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>The following attributes are exported:</p>
+
+<ul>
+<li><code>rendered</code> - The final rendered multi-part cloud-init config.</li>
+</ul>
+
+            
+        
+    </body></html>

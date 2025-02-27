@@ -1,0 +1,147 @@
+<html><!-- Online page at https://www.terraform.io/language/import/generating-configuration --><head>
+                <title>Generating configuration</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="generating-configuration">Generating configuration</h1>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Experimental</em>
+    <p>Configuration generation is available in Terraform v1.5 as an experimental feature. Later minor versions may contain changes to the formatting of generated configuration and behavior of the <code>terraform plan</code> command using the <code>-generate-config-out</code> flag.</p>
+</aside>
+
+<p>Terraform can generate code for the resources you define in <a href="../../terraform/language/import.html"><code>import</code> blocks</a> that do not already exist in your configuration. Terraform produces HCL to act as a template that contains Terraform's best guess at the appropriate value for each resource argument.</p>
+
+<p>Starting with Terraform's generated HCL, we recommend iterating to find your ideal configuration by removing some attributes, adjusting the value of others, and rearranging <code>resource</code> blocks into files and modules as appropriate.</p>
+
+<p>To generate configuration, run <code>terraform plan</code> with the <code>-generate-config-out</code> flag and supply a new file path. Do not supply a path to an existing file, or Terraform throws an error.</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform plan -generate-config-out<span class="o">=</span><span class="s2">"generated_resources.tf"</span>
+</code></pre></div>
+
+<p>If any resources targeted by an <code>import</code> block do not exist in your configuration, Terraform then generates and writes configuration for those resources in <code>generated_resources.tf</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Workflow"></a><h2 id="workflow">Workflow</h2>
+
+<p>The workflow for generating configuration is similar to the <a href="../../terraform/language/import.html#plan-and-apply-an-import"><code>import</code> block workflow</a>, with the extra step of generating configuration during the planning stage. You can then review and modify the generated configuration before applying. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/1.%20Add%20the%20import%20block"></a><h3 id="1-add-the-import-block">1. Add the <code>import</code> block</h3>
+
+<p>Add an <code>import</code> block to your configuration. This <code>import</code> block can be in a separate file (e.g., <code>import.tf</code>) or an existing configuration file.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iot_thing.bar</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"foo"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The import block's <code>to</code> argument points to the address a <code>resource</code> will have in your state file. If a resource address in your state matches an <code>import</code> block's <code>to</code> argument, Terraform attempts to import into that resource. In future planning, Terraform knows it doesn't need to generate configuration for resources that already exist in your state.</p>
+
+<p>The import block's <code>id</code> argument uses that resource's <a href="../../terraform/language/import.html#import-id">import ID</a>.</p>
+
+<p>If your configuration does not contain other resources for your selected provider, you must add a <code>provider</code> block to inform Terraform which provider it should use to generate configuration. Otherwise, Terraform displays an error if it can not determine which provider to use.
+If you add a new <code>provider</code> block to your configuration, you must run <code>terraform init</code> again.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/2.%20Plan%20and%20generate%20configuration"></a><h3 id="2-plan-and-generate-configuration">2. Plan and generate configuration</h3>
+
+<p>To instruct Terraform to generate configuration for the <code>import</code> blocks you defined, run <code>terraform plan</code> with the <code>-generate-config-out=</code> flag and a new file path. Terraform displays its plan for importing your resource and the file where Terraform generated configuration based on this plan. </p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform plan -generate-config-out<span class="o">=</span>generated.tf
+
+aws_iot_thing.bar: Preparing import... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>foo<span class="o">]</span>
+aws_iot_thing.bar: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>foo<span class="o">]</span>
+
+Terraform will perform the following actions:
+
+  <span class="c1"># aws_iot_thing.bar will be imported</span>
+  <span class="c1"># (config will be generated)</span>
+    resource <span class="s2">"aws_iot_thing"</span> <span class="s2">"bar"</span> <span class="o">{</span>
+        <span class="nv">arn</span>               <span class="o">=</span> <span class="s2">"arn:aws:iot:eu-west-1:1234567890:thing/foo"</span>
+        <span class="nv">attributes</span>        <span class="o">=</span> <span class="o">{}</span>
+        <span class="nv">default_client_id</span> <span class="o">=</span> <span class="s2">"foo"</span>
+        <span class="nv">id</span>                <span class="o">=</span> <span class="s2">"foo"</span>
+        <span class="nv">name</span>              <span class="o">=</span> <span class="s2">"foo"</span>
+        <span class="nv">version</span>           <span class="o">=</span> <span class="m">1</span>
+    <span class="o">}</span>
+
+Plan: <span class="m">1</span> to import, <span class="m">0</span> to add, <span class="m">0</span> to change, <span class="m">0</span> to destroy.
+
+╷
+│ Warning: Config generation is experimental
+│ 
+│ Generating configuration during import is currently experimental, and the generated configuration format may change <span class="k">in</span> future versions.
+╵
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+Terraform has generated configuration and written it to generated.tf. Please review the configuration and edit it as necessary before adding it to version control.
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/3.%20Review%20generated%20configuration"></a><h3 id="3-review-generated-configuration">3. Review generated configuration</h3>
+
+<p>The example above instructs Terraform to generate configuration in a file named <code>generated.tf</code>. The below code is an example of a <code>generated.tf</code> file.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iot_thing"</span><span class="w"> </span><span class="nv">"bar"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"foo"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Review the generated configuration and update it as needed. You may wish to move the generated configuration to another file, add or remove resource arguments, or update it to reference input variables or other resources in your configuration. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/4.%20Apply"></a><h3 id="4-apply">4. Apply</h3>
+
+<p>Run <code>terraform apply</code> to import your infrastructure.</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform apply
+
+aws_iot_thing.bar: Preparing import... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>foo<span class="o">]</span>
+aws_iot_thing.bar: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>foo<span class="o">]</span>
+
+Terraform will perform the following actions:
+
+  <span class="c1"># aws_iot_thing.bar will be imported</span>
+    resource <span class="s2">"aws_iot_thing"</span> <span class="s2">"bar"</span> <span class="o">{</span>
+        <span class="nv">arn</span>               <span class="o">=</span> <span class="s2">"arn:aws:iot:eu-west-1:1234567890:thing/foo"</span>
+        <span class="nv">attributes</span>        <span class="o">=</span> <span class="o">{}</span>
+        <span class="nv">default_client_id</span> <span class="o">=</span> <span class="s2">"foo"</span>
+        <span class="nv">id</span>                <span class="o">=</span> <span class="s2">"foo"</span>
+        <span class="nv">name</span>              <span class="o">=</span> <span class="s2">"foo"</span>
+        <span class="nv">version</span>           <span class="o">=</span> <span class="m">1</span>
+    <span class="o">}</span>
+
+Plan: <span class="m">1</span> to import, <span class="m">0</span> to add, <span class="m">0</span> to change, <span class="m">0</span> to destroy.
+aws_iot_thing.bar: Importing... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>foo<span class="o">]</span>
+aws_iot_thing.bar: Import <span class="nb">complete</span> <span class="o">[</span><span class="nv">id</span><span class="o">=</span>foo<span class="o">]</span>
+
+Apply complete! Resources: <span class="m">1</span> imported, <span class="m">0</span> added, <span class="m">0</span> changed, <span class="m">0</span> destroyed.
+</code></pre></div>
+
+<p>Commit your new resource configuration to your version control system.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Limitations"></a><h2 id="limitations">Limitations</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Conflicting%20resource%20arguments"></a><h3 id="conflicting-resource-arguments">Conflicting resource arguments</h3>
+
+<p>Terraform generates configuration for importable resources during a plan by requesting values for resource attributes from the provider. For certain resources with complex schemas, Terraform may not be able to construct a valid configuration from these values.</p>
+
+<p>Terraform will display an error like the one below if it does not receive values for resource attributes while generating configuration.</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform plan -generate-config-out<span class="o">=</span><span class="s2">"generated.tf"</span>
+╷
+│ Error: Conflicting configuration arguments
+│ 
+│   with aws_instance.ubuntu,
+│   on g.tf line <span class="m">20</span>, <span class="k">in</span> resource <span class="s2">"aws_instance"</span> <span class="s2">"ubuntu"</span>:
+│   <span class="m">20</span>:   <span class="nv">ipv6_address_count</span>                   <span class="o">=</span> <span class="m">0</span>
+│ 
+│ <span class="s2">"ipv6_address_count"</span>: conflicts with ipv6_addresses
+╵
+</code></pre></div>
+
+<p>In the example above, Terraform still generates configuration and writes it to <code>generated.tf</code>. This error stems from a conflict between the <code>ipv6_address_count</code> and <code>ipv6_addresses</code> arguments. The resource supports both of these arguments, but you must choose only one when configuring the resource. You could fix the error by removing one of these two arguments, then running <code>terraform plan</code> again to check that there are no further issues.</p>
+
+            
+        
+    </body></html>

@@ -1,0 +1,160 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/library --><head>
+                <title>databricks_library</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_library-resource">databricks_library resource</h1>
+
+<p>Installs a <a href="https://docs.databricks.com/libraries/index.html">library</a> on <a href="cluster.md">databricks_cluster</a>. Each different type of library has a slightly different syntax. It's possible to set only one type of library within one resource. Otherwise, the plan will fail with an error.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p><code>databricks_library</code> resource would always start the associated cluster if it's not running, so make sure to have auto-termination configured. It's not possible to atomically change the version of the same library without cluster restart. Libraries are fully removed from the cluster only after restart.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Plugin%20Framework%20Migration"></a><h2 id="plugin-framework-migration">Plugin Framework Migration</h2>
+
+<p>The library resource has been migrated from sdkv2 to plugin framework。 If you encounter any problem with this resource and suspect it is due to the migration, you can fallback to sdkv2 by setting the environment variable in the following way <code>export USE_SDK_V2_RESOURCES="databricks_library"</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Installing%20library%20on%20all%20clusters"></a><h2 id="installing-library-on-all-clusters">Installing library on all clusters</h2>
+
+<p>You can install libraries on all clusters with the help of <a href="../data-sources/clusters.md">databricks_clusters</a> data resource:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_clusters"</span><span class="w"> </span><span class="nv">"all"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_library"</span><span class="w"> </span><span class="nv">"cli"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_clusters.all.ids</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.key</span><span class="w"></span>
+<span class="w">  </span><span class="nb">pypi</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">package</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"databricks-cli"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Java/Scala%20JAR"></a><h2 id="javascala-jar">Java/Scala JAR</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_dbfs_file"</span><span class="w"> </span><span class="nv">"app"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${path.module}/app-0.0.1.jar"</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"/FileStore/app-0.0.1.jar"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_library"</span><span class="w"> </span><span class="nv">"app"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_cluster.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">jar</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_dbfs_file.app.dbfs_path</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Java/Scala%20Maven"></a><h2 id="javascala-maven">Java/Scala Maven</h2>
+
+<p>Installing artifacts from Maven repository. You can also optionally specify a <code>repo</code> parameter for a custom Maven-style repository, that should be accessible without any authentication. Maven libraries are resolved in Databricks Control Plane, so repo should be accessible from it. It can even be properly configured <a href="https://github.com/seahen/maven-s3-wagon">maven s3 wagon</a>, <a href="https://aws.amazon.com/codeartifact/">AWS CodeArtifact</a> or <a href="https://azure.microsoft.com/en-us/services/devops/artifacts/">Azure Artifacts</a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_library"</span><span class="w"> </span><span class="nv">"deequ"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_cluster.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">maven</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">coordinates</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"com.amazon.deequ:deequ:1.0.4"</span><span class="c1"></span>
+<span class="c1">    // exclusions block is optional</span>
+<span class="w">    </span><span class="na">exclusions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"org.apache.avro:avro"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Python%20Wheel"></a><h2 id="python-wheel">Python Wheel</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_dbfs_file"</span><span class="w"> </span><span class="nv">"app"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${path.module}/baz.whl"</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"/FileStore/baz.whl"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_library"</span><span class="w"> </span><span class="nv">"app"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_cluster.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">whl</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_dbfs_file.app.dbfs_path</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Python%20PyPI"></a><h2 id="python-pypi">Python PyPI</h2>
+
+<p>Installing Python PyPI artifacts. You can optionally also specify the <code>repo</code> parameter for a custom PyPI mirror, which should be accessible without any authentication for the network that cluster runs in.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p><code>repo</code> host should be accessible from the Internet by Databricks control plane. If connectivity to custom PyPI repositories is required, please modify cluster-node <code>/etc/pip.conf</code> through <a href="global_init_script.md">databricks_global_init_script</a>.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_library"</span><span class="w"> </span><span class="nv">"fbprophet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_cluster.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">pypi</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">package</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"fbprophet==0.6"</span><span class="c1"></span>
+<span class="c1">    // repo can also be specified here</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Python%20requirements%20files"></a><h2 id="python-requirements-files">Python requirements files</h2>
+
+<p>Installing Python libraries listed in the <code>requirements.txt</code> file.  Only Workspace paths and Unity Catalog Volumes paths are supported.  Requires a cluster with DBR 15.0+.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_library"</span><span class="w"> </span><span class="nv">"libraries"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_cluster.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">requirements</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/Workspace/path/to/requirements.txt"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Python%20EGG"></a><h2 id="python-egg">Python EGG</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_dbfs_file"</span><span class="w"> </span><span class="nv">"app"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${path.module}/foo.egg"</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"/FileStore/foo.egg"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_library"</span><span class="w"> </span><span class="nv">"app"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_cluster.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">egg</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_dbfs_file.app.dbfs_path</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/R%20CRan"></a><h2 id="r-cran">R CRan</h2>
+
+<p>Installing artifacts from CRan. You can also optionally specify a <code>repo</code> parameter for a custom cran mirror.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_library"</span><span class="w"> </span><span class="nv">"rkeops"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_cluster.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">cran</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">package</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"rkeops"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>danger</em>
+    <p>Importing this resource is not currently supported.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are often used in the same context:</p>
+
+<ul>
+<li><a href="../guides/workspace-management.md">End to end workspace management</a> guide.</li>
+<li><a href="../data-sources/clusters.md">databricks_clusters</a> data to retrieve a list of <a href="cluster.md">databricks_cluster</a> ids.</li>
+<li><a href="cluster.md">databricks_cluster</a> to create <a href="https://docs.databricks.com/clusters/index.html">Databricks Clusters</a>.</li>
+<li><a href="cluster_policy.md">databricks_cluster_policy</a> to create a <a href="cluster.md">databricks_cluster</a> policy, which limits the ability to create clusters based on a set of rules.</li>
+<li><a href="../data-sources/dbfs_file.md">databricks_dbfs_file</a> data to get file content from <a href="https://docs.databricks.com/data/databricks-file-system.html">Databricks File System (DBFS)</a>.</li>
+<li><a href="../data-sources/dbfs_file_paths.md">databricks_dbfs_file_paths</a> data to get list of file names from get file content from <a href="https://docs.databricks.com/data/databricks-file-system.html">Databricks File System (DBFS)</a>.</li>
+<li><a href="dbfs_file.md">databricks_dbfs_file</a> to manage relatively small files on <a href="https://docs.databricks.com/data/databricks-file-system.html">Databricks File System (DBFS)</a>.</li>
+<li><a href="global_init_script.md">databricks_global_init_script</a> to manage <a href="https://docs.databricks.com/clusters/init-scripts.html#global-init-scripts">global init scripts</a>, which are run on all <a href="cluster.md#init_scripts">databricks_cluster</a> and <a href="job.md#new_cluster">databricks_job</a>.</li>
+<li><a href="job.md">databricks_job</a> to manage <a href="https://docs.databricks.com/jobs.html">Databricks Jobs</a> to run non-interactive code in a <a href="cluster.md">databricks_cluster</a>.</li>
+<li><a href="mount.md">databricks_mount</a> to <a href="https://docs.databricks.com/data/databricks-file-system.html#mount-object-storage-to-dbfs">mount your cloud storage</a> on <code>dbfs:/mnt/name</code>.</li>
+<li><a href="pipeline.md">databricks_pipeline</a> to deploy <a href="https://docs.databricks.com/data-engineering/delta-live-tables/index.html">Delta Live Tables</a>.</li>
+<li><a href="repo.md">databricks_repo</a> to manage <a href="https://docs.databricks.com/repos.html">Databricks Repos</a>.</li>
+</ul>
+
+            
+        
+    </body></html>

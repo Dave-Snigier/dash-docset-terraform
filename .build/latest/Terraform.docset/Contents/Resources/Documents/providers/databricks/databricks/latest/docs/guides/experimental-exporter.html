@@ -1,0 +1,687 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/experimental-exporter --><head>
+                <title>Experimental resource exporter</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="experimental-resource-exporter">Experimental resource exporter</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This tooling is experimental and provided as is. It has an evolving interface, which may change or be removed in future provider versions.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Use the same user who did the exporting to import the exported templates.  Otherwise, it could cause changes in the ownership of the objects.</p>
+</aside>
+
+<p>Generates <code>*.tf</code> files for Databricks resources together with <code>import.sh</code> that is used to import objects into the Terraform state. Available as part of provider binary. The only way to authenticate is through <a href="../index.md#Environment-variables">environment variables</a>. It's best used when you need to export Terraform configuration for an existing Databricks workspace quickly. After generating the configuration, we strongly recommend manually reviewing all created files.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>After downloading the <a href="https://github.com/databricks/terraform-provider-databricks/releases">latest released binary</a>, unpack it and place it in the same folder. You may have already downloaded this binary - check the <code>.terraform</code> folder of any state directory where you've used the <code>databricks</code> provider. It could also be in your plugin cache <code>~/.terraform.d/plugins/registry.terraform.io/databricks/databricks/*/*/terraform-provider-databricks</code>. </p>
+
+<p>Here's the tool in action:</p>
+
+<p><a href="https://asciinema.org/a/Rv8ZFJQpfrfp6ggWddjtyXaOy"><img alt="asciicast" src="https://asciinema.org/a/Rv8ZFJQpfrfp6ggWddjtyXaOy.svg"/></a></p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Please note that in the interactive mode, the selected services are passed as the <code>-listing</code> option, not as <code>-services</code> option (see below).</p>
+</aside>
+
+<p>Exporter can also be used in a non-interactive mode that allows a more granular selection of services and dependencies. For example, the following command will list all resources related to <code>jobs</code> and <code>compute</code> services and import them with their dependencies from <code>groups,secrets,access,compute,users,jobs,storage</code> services.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span> <span class="nv">DATABRICKS_HOST</span><span class="o">=</span>...
+<span class="nb">export</span> <span class="nv">DATABRICKS_TOKEN</span><span class="o">=</span>...
+./terraform-provider-databricks exporter -skip-interactive <span class="se">\</span>
+ -services<span class="o">=</span>groups,secrets,access,compute,users,jobs,storage <span class="se">\</span>
+ -listing<span class="o">=</span>jobs,compute <span class="se">\</span>
+ -debug
+</code></pre></div>
+
+<p>The exporter is also supported on the account level for resources that could be defined on an account level. For example, we can export everything defined on the account level:</p>
+
+<pre><code>export DATABRICKS_HOST=https://accounts.azuredatabricks.net
+export DATABRICKS_ACCOUNT_ID=...
+./terraform-provider-databricks exporter -skip-interactive
+</code></pre>
+
+<p>Or export only specific resources - users and groups:</p>
+
+<pre><code>DATABRICKS_HOST=https://accounts.azuredatabricks.net \ 
+DATABRICKS_ACCOUNT_ID=&lt;uuid&gt;  \
+./terraform-provider-databricks exporter -directory output \
+  -listing groups,users -skip-interactive
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>Warning</em>
+    <p>This tooling was only extensively tested with administrator privileges.</p>
+</aside>
+
+<p>All arguments are optional, and they tune what code is being generated.</p>
+
+<ul>
+<li><code>-directory</code> - Path to a directory, where <code>*.tf</code> and <code>import.sh</code> files would be written. By default, it's set to the current working directory.</li>
+<li><code>-module</code> - Name of module in Terraform state that would affect reference resolution and prefixes for generated commands in <code>import.sh</code>.</li>
+<li><code>-last-active-days</code> - Items older than <code>-last-active-days</code> won't be imported. By default, the value is set to 3650 (10 years). Has an effect on listing <a href="../resources/cluster.md">databricks_cluster</a> and <a href="../resources/job.md">databricks_job</a> resources.</li>
+<li><code>-listing</code> - Comma-separated list of services to be listed and further passed on for importing. For each service specified, the exporter performs a listing of available resources using the <code>List</code> function and emits them for importing together with their dependencies. The <code>-services</code> parameter could be used to control which transitive dependencies will be also imported.</li>
+<li><code>-services</code> - Comma-separated list of services to import. By default, all services are imported.</li>
+<li><code>-match</code> - Match resource names during listing operation. This filter applies to all resources that are getting listed, so if you want to import all dependencies of just one cluster, specify <code>-match=autoscaling -listing=compute</code>. By default, it is empty, which matches everything.</li>
+<li><code>-matchRegex</code> - Match resource names against a given regex during listing operation. Applicable to all resources selected for listing.</li>
+<li><code>-excludeRegex</code> - Exclude resource names matching a given regex. Applied during the listing operation and has higher priority than <code>-match</code> and <code>-matchRegex</code>.  Applicable to all resources selected for listing.  Could be used to exclude things like <code>databricks_automl</code> notebooks, etc.  </li>
+<li><code>-filterDirectoriesDuringWorkspaceWalking</code> - if we should apply match logic to directory names when we're performing workspace tree walking.  <em>Note: be careful with it as it will be applied to all entries, so if you want to filter only specific users, then you will need to specify condition for <code>/Users</code> as well, so regex will be <code>^(/Users|/Users/[a-c].*)$</code></em>.</li>
+<li><code>-mounts</code> - List DBFS mount points, an extremely slow operation that would not trigger unless explicitly specified.</li>
+<li><code>-generateProviderDeclaration</code> - the flag that toggles the generation of <code>databricks.tf</code> file with the declaration of the Databricks Terraform provider that is necessary for Terraform versions since Terraform 0.13 (disabled by default).</li>
+<li><code>-prefix</code> - optional prefix that will be added to the name of all exported resources - that's useful for exporting resources from multiple workspaces for merging into a single one.</li>
+<li><code>-skip-interactive</code> - optionally run in a non-interactive mode.</li>
+<li><code>-includeUserDomains</code> - optionally include domain name into generated resource name for <code>databricks_user</code> resource.</li>
+<li><code>-importAllUsers</code> - optionally include all users and service principals even if they are only part of the <code>users</code> group.</li>
+<li><code>-exportDeletedUsersAssets</code> - optionally include assets of deleted users and service principals.</li>
+<li><code>-incremental</code> - experimental option for incremental export of modified resources and merging with existing resources. <em>Please note that only a limited set of resources (notebooks, SQL queries/dashboards/alerts, ...) provides information about the last modified date - all other resources will be re-exported again! Also, it's impossible to detect the deletion of many resource types (i.e. clusters, jobs, ...), so you must do periodic full export if resources are deleted! For Workspace objects (notebooks, workspace files, and directories) exporter tries to detect deleted objects and remove them from generated code (requires the presence of <code>ws_objects.json</code> file that is written on each export that pulls all workspace objects).  For workspace objects renames are handled as deletion of existing/creation of new resource!</em>  <strong>Requires</strong> <code>-updated-since</code> option if no <code>exporter-run-stats.json</code> file exists in the output directory.</li>
+<li><code>-updated-since</code> - timestamp (in ISO8601 format supported by Go language) for exporting of resources modified since a given timestamp. I.e., <code>2023-07-24T00:00:00Z</code>. If not specified, the exporter will try to load the last run timestamp from the <code>exporter-run-stats.json</code> file generated during the export and use it.</li>
+<li><code>-notebooksFormat</code> - optional format for exporting of notebooks. Supported values are <code>SOURCE</code> (default), <code>DBC</code>, <code>JUPYTER</code>.  This option could be used to export notebooks with embedded dashboards.</li>
+<li><code>-noformat</code> - optionally turn off the execution of <code>terraform fmt</code> on the exported files (enabled by default).</li>
+<li><code>-debug</code> - turn on debug output.</li>
+<li><code>-trace</code> - turn on trace output (includes debug level as well).</li>
+<li><code>-native-import</code> - turns on generation of <a href="https://developer.hashicorp.com/terraform/language/import">native import blocks</a> (requires Terraform 1.5+).  This option is recommended for cases when you want to start managing an existing workspace.</li>
+<li><code>-export-secrets</code> - enables exporting of the secret values - they will be written into the <code>terraform.tfvars</code> file.  <strong>Be very careful with this file!</strong></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Use%20of%20-listing%20and%20-services%20for%20granular%20resources%20selection"></a><h3 id="use-of-listing-and-services-for-granular-resources-selection">Use of <code>-listing</code> and <code>-services</code> for granular resources selection</h3>
+
+<p>The <code>-listing</code> option is used to discover resources to export; if it's not specified, then all services are listed (if they have the <code>List</code> operation implemented). The <code>-services</code> restricts the export of resources only to those resources whose service type is in the list specified by this option.</p>
+
+<p>For example, if we have a job comprising two notebooks and one SQL dashboard, and tasks have Python libraries on DBFS attached. If we just specify the <code>-listing jobs</code>, then it will export the following resources:</p>
+
+<ul>
+<li>job itself</li>
+<li>two notebooks</li>
+<li>directory where notebooks reside</li>
+<li>libraries from DBFS</li>
+<li>SQL dashboard, SQL queries that are used in it, and SQL warehouse that is used to run dashboard/queries</li>
+<li>directory where SQL objects reside</li>
+<li>permissions for all objects above</li>
+<li>user/group information based on permissions, and directories</li>
+</ul>
+
+<p>During code generation, references/dependencies between these objects will be created, and the code will be portable between workspaces.</p>
+
+<p>but if we also specify <code>-services notebooks,storage</code> then it will export only:</p>
+
+<ul>
+<li>job itself</li>
+<li>two notebooks</li>
+<li>directory where notebooks reside</li>
+<li>libraries from DBFS</li>
+</ul>
+
+<p>The rest of the values, like SQL object IDs, etc. will be hard-coded and not portable between workspaces.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Services"></a><h2 id="services">Services</h2>
+
+<p>Services are just logical groups of resources used for filtering and organization in files written in <code>-directory</code>. All resources are globally sorted by their resource name, which allows you to use generated files for compliance purposes. Nevertheless, managing the entire Databricks workspace with Terraform is the preferred way. Except for notebooks and possibly libraries, which may have their own CI/CD processes.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Please note that for services not marked with <strong>listing</strong>, we'll export resources only if they are referenced from other resources.</p>
+</aside>
+
+<ul>
+<li><code>access</code> -  <strong>listing</strong> <a href="../resources/permissions.md">databricks_permissions</a>, <a href="../resources/instance_profile.md">databricks_instance_profile</a>, <a href="../resources/ip_access_list.md">databricks_ip_access_list</a>, <a href="../resources/mws_permission_assignment.md">databricks_mws_permission_assignment</a> and <a href="../resources/access_control_rule_set.md">databricks_access_control_rule_set</a>.   <em>Please note that for <code>databricks_permissions</code> we list only <code>authorization = "tokens"</code>, the permissions for other objects (notebooks, ...) will be emitted when corresponding objects are processed!</em></li>
+<li><code>alerts</code> - <strong>listing</strong> <a href="../resources/alert.md">databricks_alert</a>.</li>
+<li><code>compute</code> - <strong>listing</strong> <a href="../resources/cluster.md">databricks_cluster</a>.</li>
+<li><code>dashboards</code> - <strong>listing</strong> <a href="../resources/dashboard.md">databricks_dashboard</a>.</li>
+<li><code>directories</code> - <strong>listing</strong> <a href="../resources/directory.md">databricks_directory</a>.  <em>Please note that directories aren't listed when running in the incremental mode! Only directories with updated notebooks will be emitted.</em></li>
+<li><code>dlt</code> - <strong>listing</strong> <a href="../resources/pipeline.md">databricks_pipeline</a>.</li>
+<li><code>groups</code> - <strong>listing</strong> <a href="../data-sources/group.md">databricks_group</a> with <a href="../resources/group_member.md">membership</a> and <a href="../resources/group_instance_profile.md">data access</a>.</li>
+<li><code>jobs</code> - <strong>listing</strong> <a href="../resources/job.md">databricks_job</a>. Usually, there are more automated workflows than interactive clusters, so they get their own file in this tool's output.  <em>Please note that workflows deployed and maintained via <a href="https://docs.databricks.com/en/dev-tools/bundles/index.html">Databricks Asset Bundles</a> aren't exported!</em></li>
+<li><code>mlflow-webhooks</code> - <strong>listing</strong> <a href="../resources/mlflow_webhook.md">databricks_mlflow_webhook</a>.</li>
+<li><code>model-serving</code> - <strong>listing</strong> <a href="../resources/model_serving.md">databricks_model_serving</a>.</li>
+<li><code>mounts</code> - <strong>listing</strong> works only in combination with <code>-mounts</code> command-line option.</li>
+<li><code>notebooks</code> - <strong>listing</strong> <a href="../resources/notebook.md">databricks_notebook</a>.</li>
+<li><code>policies</code> - <strong>listing</strong> <a href="../resources/cluster_policy">databricks_cluster_policy</a>.</li>
+<li><code>pools</code> - <strong>listing</strong> <a href="../resources/instance_pool.md">instance pools</a>.</li>
+<li><code>queries</code> - <strong>listing</strong> <a href="../resources/query.md">databricks_query</a>.</li>
+<li><code>repos</code> - <strong>listing</strong> <a href="../resources/repo.md">databricks_repo</a> (both classical Repos in <code>/Repos</code> and Git Folders in artbitrary locations).</li>
+<li><code>secrets</code> - <strong>listing</strong> <a href="../resources/secret_scope.md">databricks_secret_scope</a> along with <a href="../resources/secret.md">keys</a> and <a href="../resources/secret_acl.md">ACLs</a>.</li>
+<li><code>settings</code> - <strong>listing</strong> <a href="../resources/notification_destination.md">databricks_notification_destination</a>.</li>
+<li><code>sql-dashboards</code> - <strong>listing</strong> Legacy <a href="../resources/sql_dashboard.md">databricks_sql_dashboard</a> along with associated <a href="../resources/sql_widget.md">databricks_sql_widget</a> and <a href="../resources/sql_visualization.md">databricks_sql_visualization</a>.</li>
+<li><code>sql-endpoints</code> - <strong>listing</strong> <a href="../resources/sql_endpoint.md">databricks_sql_endpoint</a>.</li>
+<li><code>storage</code> - only <a href="../resources/dbfs_file.md">databricks_dbfs_file</a> and <a href="../resources/file.md">databricks_file</a> referenced in other resources (libraries, init scripts, ...) will be downloaded locally and properly arranged into terraform state.</li>
+<li><code>uc-artifact-allowlist</code> - <strong>listing</strong> exports <a href="../resources/artifact_allowlist.md">databricks_artifact_allowlist</a> resources for Unity Catalog Allow Lists attached to the current metastore.</li>
+<li><code>uc-catalogs</code> - <strong>listing</strong> <a href="../resources/catalog.md">databricks_catalog</a> and <a href="../resources/workspace_binding.md">databricks_workspace_binding</a></li>
+<li><code>uc-connections</code> - <strong>listing</strong> <a href="../resources/connection.md">databricks_connection</a>.  <em>Please note that because API doesn't return sensitive fields, such as, passwords, tokens, ..., the generated <code>options</code> block could be incomplete!</em></li>
+<li><code>uc-credentials</code> - <strong>listing</strong> exports <a href="../resources/credential.md">databricks_credential</a> resources on workspace or account level.  <em>Please note that it will skip storage credentials! Use the <code>uc-storage-credentials</code> service for them</em></li>
+<li><code>uc-external-locations</code> - <strong>listing</strong> exports <a href="../resources/external_location.md">databricks_external_location</a> resource.</li>
+<li><code>uc-grants</code> -  <a href="../resources/grants.md">databricks_grants</a>. <em>Please note that during export the list of grants is expanded to include the identity that does the export! This is done to allow to creation of objects in case when catalogs/schemas have different owners than the current identity.</em>.</li>
+<li><code>uc-metastores</code> - <strong>listing</strong> <a href="../resources/metastore.md">databricks_metastore</a> and <a href="../resource/metastore_assignment.md">databricks_metastore_assignment</a> (only on account-level).  <em>Please note that when using workspace-level configuration, only the metastores from the workspace's region are listed!</em></li>
+<li><code>uc-models</code> - <strong>listing</strong> (<em>we can't list directly, only via dependencies to top-level object</em>) <a href="../resources/registered_model.md">databricks_registered_model</a></li>
+<li><code>uc-online-tables</code> - <strong>listing</strong> (<em>we can't list directly, only via dependencies to top-level object</em>) <a href="../resources/online_table.md">databricks_online_table</a></li>
+<li><code>uc-schemas</code> - <strong>listing</strong> (<em>we can't list directly, only via dependencies to top-level object</em>) <a href="../resources/schema.md">databricks_schema</a></li>
+<li><code>uc-shares</code> - <strong>listing</strong> <a href="../resources/share.md">databricks_share</a> and <a href="../resources/recipient.md">databricks_recipient</a></li>
+<li><code>uc-storage-credentials</code> - <strong>listing</strong> exports <a href="../resources/storage_credential.md">databricks_storage_credential</a> resources on workspace or account level.</li>
+<li><code>uc-system-schemas</code> - <strong>listing</strong> exports <a href="../resources/system_schema.md">databricks_system_schema</a> resources for the UC metastore of the current workspace.</li>
+<li><code>uc-tables</code> - <strong>listing</strong> (<em>we can't list directly, only via dependencies to top-level object</em>) <a href="../resources/sql_table.md">databricks_sql_table</a> resource.</li>
+<li><code>uc-volumes</code> - <strong>listing</strong> (<em>we can't list directly, only via dependencies to top-level object</em>) <a href="../resources/volume.md">databricks_volume</a></li>
+<li><code>users</code> - <strong>listing</strong> <a href="../resources/user.md">databricks_user</a> and <a href="../resources/service_principal.md">databricks_service_principal</a> are written to their own file, simply because of their amount. If you use SCIM provisioning, migrating workspaces is the only use case for importing <code>users</code> service.</li>
+<li><code>vector-search</code> - <strong>listing</strong> exports <a href="../resources/vector_search_endpoint.md">databricks_vector_search_endpoint</a> and <a href="../resources/vector_search_index.md">databricks_vector_search_index</a></li>
+<li><code>wsconf</code> - <strong>listing</strong> exports Workspace-level configuration: <a href="../resources/workspace_conf.md">databricks_workspace_conf</a>, <a href="../resources/sql_global_config.md">databricks_sql_global_config</a> and <a href="../resources/global_init_script.md">databricks_global_init_script</a>.</li>
+<li><code>wsfiles</code> - <strong>listing</strong> <a href="../resources/workspace_file.md">databricks_workspace_file</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Secrets"></a><h2 id="secrets">Secrets</h2>
+
+<p>For security reasons, <a href="../resources/secret.md">databricks_secret</a> cannot contain actual plaintext secrets. By default, the exporter will create a variable in <code>vars.tf</code>, with the same name as the secret. You are supposed to <a href="https://blog.gruntwork.io/a-comprehensive-guide-to-managing-secrets-in-your-terraform-code-1d586955ace1#0e7d">fill in the value of the secret</a> after that.  You can use <code>-export-secrets</code> command-line option to generate the <code>terraform.tfvars</code> file with secret values.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Parallel%20execution"></a><h2 id="parallel-execution">Parallel execution</h2>
+
+<p>To speed up export, Terraform Exporter performs many operations, such as listing &amp; actual data exporting, in parallel using Goroutines.  Built-in defaults control the parallelism, but it's also possible to tune some parameters using environment variables specific to the exporter:</p>
+
+<ul>
+<li><code>EXPORTER_WS_LIST_PARALLELISM</code> (default: <code>5</code>) controls how many Goroutines are used to perform parallel listing of Databricks Workspace objects (notebooks, directories, workspace files, ...).</li>
+<li><code>EXPORTER_DIRECTORIES_CHANNEL_SIZE</code> (default: <code>300000</code>) controls the channel's capacity when listing workspace objects. Please ensure that this value is big enough (greater than the number of directories in the workspace; default value should be ok for most cases); otherwise, there is a chance of deadlock.</li>
+<li><code>EXPORTER_DEDICATED_RESOUSE_CHANNELS</code> - by default, only specific resources (<code>databricks_user</code>, <code>databricks_service_principal</code>, <code>databricks_group</code>) have dedicated channels - the rest are handled by the shared channel.  This is done to prevent throttling by specific APIs.  You can override this by providing a comma-separated list of resources as this environment variable.</li>
+<li><code>EXPORTER_PARALLELISM_NNN</code> - number of Goroutines used to process resources of a specific type (replace <code>NNN</code> with the exact resource name, for example, <code>EXPORTER_PARALLELISM_databricks_notebook=10</code> sets the number of Goroutines for <code>databricks_notebook</code> resource to <code>10</code>).  There is a shared channel (with name <code>default</code>) for handling of resources for which there are no dedicated channels - use <code>EXPORTER_PARALLELISM_default</code> to increase its size (default size is <code>15</code>).   Defaults for some resources are defined by the <code>goroutinesNumber</code> map in <code>exporter/context.go</code> or equal to <code>2</code> if there is no value.  <em>Don't increase default values too much to avoid REST API throttling!</em></li>
+<li><code>EXPORTER_DEFAULT_HANDLER_CHANNEL_SIZE</code> is the size of the shared channel (default: <code>200000</code>). You may need to increase it if you have a huge workspace.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Support%20Matrix"></a><h2 id="support-matrix">Support Matrix</h2>
+
+<p>Exporter aims to generate HCL code for most of the resources within the Databricks workspace:</p>
+
+<table>
+<thead>
+<tr>
+  <th>Resource</th>
+  <th>Supported</th>
+  <th>Incremental</th>
+  <th>Workspace</th>
+  <th>Account</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><a href="../resources/access_control_rule_set.md">databricks_access_control_rule_set</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>No</td>
+  <td>Yes</td>
+</tr>
+<tr>
+  <td><a href="../resources/artifact_allowlist.md">databricks_artifact_allowlist</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/catalog.md">databricks_catalog</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/cluster.md">databricks_cluster</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/cluster_policy.md">databricks_cluster_policy</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/connection.md">databricks_connection</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/credential.md">databricks_credential</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/dashboard.md">databricks_dashboard</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/dbfs_file.md">databricks_dbfs_file</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/external_location.md">databricks_external_location</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/file.md">databricks_file</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/global_init_script.md">databricks_global_init_script</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes**</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/grants.md">databricks_grants</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/group.md">databricks_group</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>Yes</td>
+</tr>
+<tr>
+  <td><a href="../resources/group_instance_profile.md">databricks_group_instance_profile</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/group_member.md">databricks_group_member</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>Yes</td>
+</tr>
+<tr>
+  <td><a href="../resources/group_role.md">databricks_group_role</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>Yes</td>
+</tr>
+<tr>
+  <td><a href="../resources/instance_pool.md">databricks_instance_pool</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/instance_profile.md">databricks_instance_profile</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/ip_access_list.md">databricks_ip_access_list</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes**</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/job.md">databricks_job</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/library.md">databricks_library</a></td>
+  <td>Yes*</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/metastore.md">databricks_metastore</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+</tr>
+<tr>
+  <td><a href="../resources/metastore_assignment.md">databricks_metastore_assignment</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>No</td>
+  <td>Yes</td>
+</tr>
+<tr>
+  <td><a href="../resources/mlflow_experiment.md">databricks_mlflow_experiment</a></td>
+  <td>No</td>
+  <td>No</td>
+  <td>No</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/mlflow_model.md">databricks_mlflow_model</a></td>
+  <td>No</td>
+  <td>No</td>
+  <td>No</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/mlflow_webhook.md">databricks_mlflow_webhook</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/model_serving">databricks_model_serving</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/mws_permission_assignment.md">databricks_mws_permission_assignment</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>No</td>
+  <td>Yes</td>
+</tr>
+<tr>
+  <td><a href="../resources/notebook.md">databricks_notebook</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/notification_destination.md">databricks_notification_destination</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes**</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/obo_token.md">databricks_obo_token</a></td>
+  <td>Not Applicable</td>
+  <td>No</td>
+  <td>No</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/online_table.md">databricks_online_table</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/permissions.md">databricks_permissions</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/pipeline.md">databricks_pipeline</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/recipient.md">databricks_recipient</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/registered.md">databricks_registered_model</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/repo.md">databricks_repo</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/schema.md">databricks_schema</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/secret.md">databricks_secret</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/secret_acl.md">databricks_secret_acl</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/secret_scope.md">databricks_secret_scope</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/service_principal.md">databricks_service_principal</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>Yes</td>
+</tr>
+<tr>
+  <td><a href="../resources/service_principal_role.md">databricks_service_principal_role</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>Yes</td>
+</tr>
+<tr>
+  <td><a href="../resources/share.md">databricks_share</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/sql_alert.md">databricks_sql_alert</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/sql_dashboard.md">databricks_sql_dashboard</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/sql_endpoint.md">databricks_sql_endpoint</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/sql_global_config.md">databricks_sql_global_config</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/sql_permissions.md">databricks_sql_permissions</a></td>
+  <td>No</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/sql_query.md">databricks_sql_query</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/sql_table.md">databricks_sql_table</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/sql_visualization.md">databricks_sql_visualization</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/sql_widget.md">databricks_sql_widget</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/storage_credential.md">databricks_storage_credential</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/system_schema.md">databricks_system_schema</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/token.md">databricks_token</a></td>
+  <td>Not Applicable</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/user.md">databricks_user</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>Yes</td>
+</tr>
+<tr>
+  <td><a href="../resources/user_instance_profile.md">databricks_user_instance_profile</a></td>
+  <td>No</td>
+  <td>No</td>
+  <td>No</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/user_role.md">databricks_user_role</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>Yes</td>
+</tr>
+<tr>
+  <td><a href="../resources/vector_search_endpoint.md">databricks_vector_search_endpoint</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/vector_search_index.md">databricks_vector_search_index</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/volume.md">databricks_volume</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/workspace_binding.md">databricks_workspace_binding</a></td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/workspace_conf.md">databricks_workspace_conf</a></td>
+  <td>Yes (partial)</td>
+  <td>No</td>
+  <td>Yes**</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td><a href="../resources/workspace_file.md">databricks_workspace_file</a></td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+</tbody>
+</table>
+
+<p>Notes:</p>
+
+<ul>
+<li>* - libraries are exported as blocks inside the cluster definition instead of generating <code>databricks_library</code> resources.  This is done to decrease the number of generated resources.</li>
+<li>** - requires workspace admin permission.</li>
+</ul>
+
+            
+        
+    </body></html>

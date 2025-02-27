@@ -1,0 +1,825 @@
+<html><!-- Online page at https://www.terraform.io/language/tests --><head>
+                <title>Tests</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="tests">Tests</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This testing framework is available in Terraform v1.6.0 and later.</p>
+</aside>
+
+<p>Terraform tests let authors validate that module configuration updates do not introduce breaking changes. Tests run against test-specific, short-lived resources, preventing any risk to your existing infrastructure or state.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Integration%20or%20Unit%20testing"></a><h2 id="integration-or-unit-testing">Integration or Unit testing</h2>
+
+<p>By default, tests within Terraform create real infrastructure and can run assertions and validations against that infrastructure. This is analogous to integration testing because you are testing Terraform's core functionality by executing operations and validating the infrastructure Terraform creates.</p>
+
+<p>You can override the normal testing behavior by updating the <code>command</code> attribute within a <a href="#run-blocks"><code>run</code></a> block (examples below). By default, each <code>run</code> block executes with <code>command = apply</code> instructing Terraform to execute a complete <code>apply</code> operation against your configuration. Replacing the <code>command</code> value with <code>command = plan</code> instructs Terraform to <em>not</em> create new infrastructure for this <code>run</code> block. This allows test authors to validate logical operations and custom conditions within their infrastructure in a process analogous to unit testing.</p>
+
+<p>Terraform v1.7.0 introduced the ability to mock data returned by the providers during a <code>terraform test</code> execution. This can be used to write more detailed and complete unit tests.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Syntax"></a><h2 id="syntax">Syntax</h2>
+
+<p>Each Terraform test lives in a test file. Terraform discovers test files are based on their file extension: <code>.tftest.hcl</code> or <code>.tftest.json</code>.</p>
+
+<p>Each test file contains the following root level attributes and blocks:</p>
+
+<ul>
+<li>One to many <a href="#run-blocks"><code>run</code></a> blocks.</li>
+<li>Zero to one <a href="#variables"><code>variables</code></a> block.</li>
+<li>Zero to many <a href="#providers"><code>provider</code></a> blocks.</li>
+</ul>
+
+<p>Terraform executes <code>run</code> blocks in order, simulating a series of Terraform commands executing directly within the configuration directory. The order of the <code>variables</code> and <code>provider</code> blocks doesn't matter, Terraform processes all the values within these blocks at the beginning of the test operation. We recommend defining your <code>variables</code> and <code>provider</code> blocks first, at the beginning of the test file.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example"></a><h3 id="example">Example</h3>
+
+<p>The following example demonstrates a simple Terraform configuration that creates an AWS S3 bucket, using an input variable to modify the name. We will create an example test file (below) that validates the buckets name is created as expected.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tf</span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eu-central-1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"bucket_prefix"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.bucket_prefix}-bucket"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"bucket_name"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.bucket.bucket</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The following test file runs a single Terraform <code>plan</code> command which creates the S3 bucket, and then validates the logic for calculating the name is correct by checking the actual name matches the expected name.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># valid_string_concat.tftest.hcl</span>
+
+<span class="nb">variables</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"test"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"valid_string_concat"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">plan</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.bucket.bucket</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"test-bucket"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"S3 bucket name did not match expected"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Run%20blocks"></a><h2 id="run-blocks">Run blocks</h2>
+
+<p>Each <code>run</code> block has the following fields and blocks:</p>
+
+<table>
+<thead>
+<tr>
+  <th>Field or Block Name</th>
+  <th>Description</th>
+  <th>Default Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>command</code></td>
+  <td>An optional attribute, which is either <code>apply</code> or <code>plan</code>.</td>
+  <td><code>apply</code></td>
+</tr>
+<tr>
+  <td><code>plan_options.mode</code></td>
+  <td>An optional attribute, which is either <code>normal</code> or <code>refresh-only</code>.</td>
+  <td><code>normal</code></td>
+</tr>
+<tr>
+  <td><code>plan_options.refresh</code></td>
+  <td>An optional boolean attribute.</td>
+  <td><code>true</code></td>
+</tr>
+<tr>
+  <td><code>plan_options.replace</code></td>
+  <td>An optional attribute containing a list of resource addresses referencing resources within the configuration under test.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>plan_options.target</code></td>
+  <td>An optional attribute containing a list of resource addresses referencing resources within the configuration under test.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><a href="#variables"><code>variables</code></a></td>
+  <td>An optional <code>variables</code> block.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><a href="#modules"><code>module</code></a></td>
+  <td>An optional <code>module</code> block.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><a href="#providers"><code>providers</code></a></td>
+  <td>An optional <code>providers</code> attribute.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><a href="#assertions"><code>assert</code></a></td>
+  <td>Optional <code>assert</code> blocks.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>expect_failures</code></td>
+  <td>An optional attribute.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>state_key</code></td>
+  <td>An optional attribute.</td>
+  <td></td>
+</tr>
+</tbody>
+</table>
+
+<p>The <code>command</code> attribute and <code>plan_options</code> block tell Terraform which command and options to execute for each run block. The default operation, if you do not specify a <code>command</code> attribute or the <code>plan_options</code> block, is a normal Terraform apply operation.</p>
+
+<p>The <code>command</code> attribute states whether the operation should be a <a href="../../terraform/cli/commands/plan.html"><code>plan</code></a> or an <a href="../../terraform/cli/commands/apply.html"><code>apply</code></a> operation.</p>
+
+<p>The <code>plan_options</code> block allows test authors to customize the <a href="../../terraform/cli/commands/plan.html#planning-modes">planning mode</a> and <a href="../../terraform/cli/commands/plan.html#planning-options">options</a> they would typically need to edit via command-line flags and options. We cover the <code>-var</code> and <code>-var-file</code> options in the <a href="#variables">Variables</a> section.</p>
+
+<p>The <code>state_key</code> allows for fine-grained control over which internal state file Terraform uses for a given run block. Refer to <a href="#modules-state">Modules State</a> for more information.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Assertions"></a><h3 id="assertions">Assertions</h3>
+
+<p>Terraform run block assertions are <a href="../../terraform/language/expressions/custom-conditions.html">Custom Conditions</a>, consisting of a <a href="../../terraform/language/expressions/custom-conditions.html#condition-expressions">condition</a> and an <a href="../../terraform/language/expressions/custom-conditions.html#error-messages">error message</a>.</p>
+
+<p>At the conclusion of a Terraform test command execution, Terraform presents any failed assertions as part of a tests passed or failed status.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Assertion%20References"></a><h4 id="assertion-references">Assertion References</h4>
+
+<p>Assertions within tests can reference any existing <a href="../../terraform/language/expressions/references.html">named values</a> that are available to other custom conditions within the main Terraform configuration.</p>
+
+<p>Additionally, test assertions can directly reference outputs from current and previous <code>run</code> blocks. Pulling from the <a href="#example">previous example</a>, this is a valid condition: <code>condition = output.bucket_name == "test_bucket"</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Variables"></a><h2 id="variables">Variables</h2>
+
+<p>You can provide values for <a href="../../terraform/language/values/variables.html">Input Variables</a> within your configuration directly from your test files.</p>
+
+<p>The test file syntax supports <code>variables</code> blocks at both the root level and within <code>run</code> blocks. Terraform passes all variable values from the test file into all <code>run</code> blocks within the file. You can override variable values for a particular <code>run</code> block with values provided directly within that <code>run</code> block.</p>
+
+<p>Adding to the test file from the <a href="#example">example</a> above:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># variable_precedence.tftest.hcl</span>
+
+<span class="nb">variables</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"test"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"uses_root_level_value"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">plan</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.bucket.bucket</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"test-bucket"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"S3 bucket name did not match expected"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"overrides_root_level_value"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">plan</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">variables</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">bucket_prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"other"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.bucket.bucket</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"other-bucket"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"S3 bucket name did not match expected"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>We've added a second <code>run</code> block that specifies the <code>bucket_prefix</code> variable value as <code>other</code>, overriding the value <code>test</code> that is provided by the test file and used during the first <code>run</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Specify%20variables%20with%20the%20Command%20Line%20or%20definition%20files"></a><h3 id="specify-variables-with-the-command-line-or-definition-files">Specify variables with the Command Line or definition files</h3>
+
+<p>In addition to specifying variable values via test files, the Terraform <code>test</code> command also supports the other typical mechanisms for specifying variable values.</p>
+
+<p>You can specify values for variables across all tests with the <a href="../../terraform/language/values/variables.html#variables-on-the-command-line">Command Line</a> and with <a href="../../terraform/language/values/variables.html#variable-definitions-tfvars-files">Variable Definition Files</a>.</p>
+
+<p>As with the main configuration direction, Terraform will automatically load any variables defined in the automatic variable files within a test directory. The automatic variable files are <code>terraform.tfvars</code>, <code>terraform.tfvars.json</code>, and any files that end with <code>.auto.tfvars</code> or <code>.auto.tfvars.json</code>.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Variable values loaded from the automatic variable files within a test directory will only apply to tests also defined within the same test directory. Variables defined in all other ways will apply to all tests in a given test run.</p>
+</aside>
+
+<p>This is particularly useful for using sensitive variables values and for configuring providers. Otherwise, testing files could directly expose those sensitive values.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Variable%20definition%20precedence"></a><h3 id="variable-definition-precedence">Variable definition precedence</h3>
+
+<p><a href="../../terraform/language/values/variables.html#variable-definition-precedence">Variable Definition Precedence</a> remains the same within tests, except for variable values that test files provide. The variables defined in test files take the highest precedence, overriding environment variables, variables files, or command-line input.</p>
+
+<p>For tests defined in a test directory, any variable values defined in automatic variable files from the test directory will override values defined in automatic variable files from the main configuration directory.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Variable%20References"></a><h3 id="variable-references">Variable References</h3>
+
+<p>Variables you define within <code>run</code> blocks can refer to outputs from modules executed in earlier <code>run</code> blocks and variables defined at higher precedence levels. Variables defined within the file level <code>variables</code> block can only refer to global variables.</p>
+
+<p>For example, the following code block shows how a variable can refer to higher precedence variables and previous run blocks:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">variables</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">global_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"some value"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"run_block_one"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">variables</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">local_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.global_value</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # ...</span>
+<span class="c1">  # Some test assertions should go here.</span>
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"run_block_two"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">variables</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">local_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">run.run_block_one.output_one</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # ...</span>
+<span class="c1">  # Some test assertions should go here.</span>
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Above, the <code>local_value</code> in <code>run_block_one</code> gets its value from the <code>global_value</code> variable. This pattern is useful if you want to assign multiple variables the same value. You can specify a variable value once at the file level and then share it with different variables.</p>
+
+<p>In comparison, <code>local_value</code> in <code>run_block_two</code> takes its value from the output value of <code>output_one</code> from <code>run_block_one</code>. This pattern is useful for passing values between <code>run</code> blocks, particularly if <code>run</code> blocks are executing different modules as detailed in the <a href="#modules">Modules</a> section.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Providers"></a><h2 id="providers">Providers</h2>
+
+<p>You can set or override the required providers within the main configuration from your testing files by using <code>provider</code> and <code>providers</code> blocks and attributes.</p>
+
+<p>At the root level of a Terraform testing file, you can define <a href="../../terraform/language/providers/configuration.html"><code>provider</code> blocks</a> as if Terraform were creating them <a href="../../terraform/language/providers.html">within the main configuration</a>. Terraform will then pass these provider blocks into its configuration as each <code>run</code> block executes.</p>
+
+<p>By default, each provider you specify is directly available within each <code>run</code> block. You can customize the availability of providers within a given <code>run</code> block by using a <code>providers</code> attribute. The behavior and syntax for this block match the behavior of <a href="../../terraform/language/meta-arguments/module-providers.html">providers meta-argument</a>.</p>
+
+<p>If you do not provide provider configuration within a testing file, Terraform attempts to initialize any providers within its configuration using the provider's default settings. For example, any environment variables aimed at configuring providers are still available, and Terraform can use them to create default providers.</p>
+
+<p>Below, we expand on our previous <a href="#example">example</a> to allow tests, instead of the configuration, to specify the region. In this example, we are going to test the following configuration file:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tf</span>
+
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"bucket_prefix"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.bucket_prefix}-bucket"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"bucket_name"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.bucket.bucket</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>We can now define our <code>provider</code> blocks within the following test file:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># customised_provider.tftest.hcl</span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eu-central-1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">variables</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"test"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"valid_string_concat"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">plan</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.bucket.bucket</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"test-bucket"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"S3 bucket name did not match expected"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>We can also create a more complex example configuration, that makes use of multiple providers and aliases:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tf</span>
+
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">      </span><span class="na">configuration_aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws.secondary</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"bucket_prefix"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"test"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"primary_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.bucket_prefix}-primary"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"secondary_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.secondary</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.bucket_prefix}-secondary"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Within our test file we can specify multiple providers:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># customised_providers.tftest.hcl</span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"secondary"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eu-central-1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"providers"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">plan</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.primary_bucket.bucket</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"test-primary"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"invalid value for primary S3 bucket"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.secondary_bucket.bucket</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"test-secondary"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"invalid value for secondary S3 bucket"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>It is also possible to define specific providers you want to use in specific <code>run</code> blocks:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tf</span>
+
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">      </span><span class="na">configuration_aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws.secondary</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_region"</span><span class="w"> </span><span class="nv">"primary"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_region"</span><span class="w"> </span><span class="nv">"secondary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.secondary</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"bucket_prefix"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"test"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"primary_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.bucket_prefix}-${data.aws_region.primary.name}-primary"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"secondary_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.secondary</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.bucket_prefix}-${data.aws_region.secondary.name}-secondary"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Our test file can pass in specific providers for each different <code>run</code> block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># customised_providers.tftest.hcl</span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"secondary"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eu-central-1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"tertiary"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eu-west-2"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"default_providers"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">plan</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.primary_bucket.bucket</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"test-us-east-1-primary"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"invalid value for primary S3 bucket"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.secondary_bucket.bucket</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"test-eu-central-1-secondary"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"invalid value for secondary S3 bucket"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"customised_providers"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">plan</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">providers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">aws</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="err">aws</span><span class="w"></span>
+<span class="w">    </span><span class="nv">aws.secondary</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nv">aws.tertiary</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.primary_bucket.bucket</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"test-us-east-1-primary"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"invalid value for primary S3 bucket"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.secondary_bucket.bucket</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"test-eu-west-2-secondary"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"invalid value for secondary S3 bucket"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<blockquote>
+  <p><strong>Note:</strong> When running tests with <code>command = apply</code>, switching providers between <code>run</code> blocks can result in failed operations and tests because resources created by one provider definition will be unusable when modified by a second.</p>
+</blockquote>
+
+<p>From Terraform v1.7.0, <code>provider</code> blocks can also reference test file variables and run block outputs. This means the testing framework can retrieve credentials and other setup information from one provider and use this when initializing a second.</p>
+
+<p>In the following example, the <code>vault</code> provider is initialized first, and then used within a setup module to extract credentials for the <code>aws</code> provider. For more information on setup modules, see <a href="#modules">Modules</a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"vault"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... vault configuration ...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="c1"></span>
+
+<span class="c1">  # The `aws` provider can reference the outputs of the "vault_setup" run block.</span>
+<span class="w">  </span><span class="na">access_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">run.vault_setup.aws_access_key</span><span class="w"></span>
+<span class="w">  </span><span class="na">secret_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">run.vault_setup.aws_secret_key</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"vault_setup"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">module</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # This module should only include reference to the Vault provider. Terraform</span>
+<span class="c1">    # will automatically work out which providers to supply based on the module</span>
+<span class="c1">    # configuration. The tests will error if a run block requires access to a</span>
+<span class="c1">    # provider that references outputs from a run block that has not executed.</span>
+<span class="w">    </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./testing/vault-setup"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"use_aws_provider"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # This run block can then use both the `aws` and `vault` providers, as the</span>
+<span class="c1">  # previous run block provided all the data required for the `aws` provider.</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Modules"></a><h2 id="modules">Modules</h2>
+
+<p>You can modify the module that a given <code>run</code> block executes.</p>
+
+<p>By default, Terraform executes the given command against the configuration being tested for each <code>run</code> block. Terraform tests the configuration within the directory you execute the <code>terraform test</code> command from (or the directory you point to with the <code>-chdir</code> argument). Each <code>run</code> block also allows the user to change the targeted configuration using the <code>module</code> block.</p>
+
+<p>Unlike the traditional <a href="../../terraform/language/modules/syntax.html"><code>module</code> block</a>, the <code>module</code> block within test files <em>only</em> supports the <a href="../../terraform/language/modules/syntax.html#source"><code>source</code></a> attribute and the <a href="../../terraform/language/modules/syntax.html#version"><code>version</code></a> attribute. The remaining attributes that are typically supplied via the traditional <code>module</code> block should be supplied by the alternate attributes and blocks within the <code>run</code> block.</p>
+
+<blockquote>
+  <p><strong>Note:</strong> Terraform test files only support <a href="../../terraform/language/modules/sources.html#local-paths">local</a> and <a href="../../terraform/language/modules/sources.html#terraform-registry">registry</a> modules within the <code>source</code> attribute.</p>
+</blockquote>
+
+<p>All other blocks and attributes within the <code>run</code> block are supported when executing an alternate module, with <code>assert</code> blocks executing against values from the alternate module. This is discussed more in <a href="#modules-state">Modules State</a>.</p>
+
+<p>Two example use cases for the <code>modules</code> block within a testing file are:</p>
+
+<ol>
+<li>A setup module that creates the infrastructure the main configuration requires for testing.</li>
+<li>A loading module to load and validate secondary infrastructure (such as data sources) that are not created directly by the main configuration being tested.</li>
+</ol>
+
+<p>The following examples demonstrate both of these use cases.</p>
+
+<p>First, we have a module that will create and load several files into an already created S3 bucket. This is the configuration we want to test.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tf</span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"files"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span><span class="kt">string</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.bucket</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_object"</span><span class="w"> </span><span class="nv">"object"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.files</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_s3_bucket.bucket.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.key</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">etag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">filemd5</span><span class="p">(</span><span class="nv">each.value</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Second, we have a setup module that will create the S3 bucket, so it is available to the configuration under test.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># testing/setup/main.tf</span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.bucket</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Third, we have a loading module, that will load the files in the s3 bucket. This is a fairly contrived example, as it is definitely possible just to validate the files directly when they are created in the module under test. It is, however, good for demonstrating the use case.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># testing/loader/main.tf</span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_s3_objects"</span><span class="w"> </span><span class="nv">"objects"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.bucket</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Finally, we have the test file itself which configures everything and calls out to the various helper modules we have created.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># file_count.tftest.hcl</span>
+
+<span class="nb">variables</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my_test_bucket"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">files</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"file-one.txt"</span><span class="o">:</span><span class="w"> </span><span class="s2">"data/files/file_one.txt"</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"file-two.txt"</span><span class="o">:</span><span class="w"> </span><span class="s2">"data/files/file_two.txt"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"setup"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # Create the S3 bucket we will use later.</span>
+
+<span class="w">  </span><span class="nb">module</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./testing/setup"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"execute"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # This is empty, we just run the configuration under test using all the default settings.</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"verify"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # Load and count the objects created in the "execute" run block.</span>
+
+<span class="w">  </span><span class="nb">module</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./testing/loader"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="nv">data.aws_s3_objects.objects.keys</span><span class="p">)</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"created the wrong number of s3 objects"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Modules%20state"></a><h3 id="modules-state">Modules state</h3>
+
+<p>While Terraform executes a <code>terraform test</code> command, Terraform maintains at least one, but possibly many, state files within memory for each test file. Terraform assigns each internal state file a state key that it uses internally to track the state file. The state key is a unique identifier for the state file and you can override it with the <code>state_key</code> attribute of a <code>run</code> block.</p>
+
+<p>There is always at least one state file that maintains the state of the main configuration under test. This state file is shared by all <code>run</code> blocks that do not have a <code>module</code> block specifying an alternate module to load. By default, there is also one state file per alternate module that Terraform loads. An alternate module state file is shared by all <code>run</code> blocks that execute the given module.</p>
+
+<p>You can override this default behavior with the <code>state_key</code> attribute and force Terraform to use a specific state file for a given <code>run</code> block. This is useful when you want to share state between <code>run</code> blocks that do not reference the same module.</p>
+
+<p>The following example uses comments to explain where the state files for each <code>run</code> block originate using the default behavior. In the below example Terraform creates and manages a total of three state files. The first state file is for the main configuration under test, the second for the setup module, and the third for the loader module.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">run</span><span class="w"> </span><span class="s2">"setup"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+
+<span class="c1">  # This run block references an alternate module and is the first run block</span>
+<span class="c1">  # to reference this particular alternate module. Therefore, Terraform creates</span>
+<span class="c1">  # and populates a new empty state file for this run block.</span>
+
+<span class="w">  </span><span class="nb">module</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./testing/setup"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"init"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+
+<span class="c1">  # This run block does not reference an alternate module, so it uses the main</span>
+<span class="c1">  # state file for the configuration under test. As this is the first run block</span>
+<span class="c1">  # to reference the main configuration, the previously empty state file now</span>
+<span class="c1">  # contains the resources created by this run block.</span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # In practice we'd do some interesting checks and tests here but the</span>
+<span class="c1">    # assertions aren't important for this example.</span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # ... more assertions ...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"update_setup"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+
+<span class="c1">  # We've now re-referenced the setup module, so the state file that was created</span>
+<span class="c1">  # for the first "setup" run block will be reused. It will contain any</span>
+<span class="c1">  # resources that were created as part of the other run block before this run</span>
+<span class="c1">  # block executes and will be updated with any changes made by this run block</span>
+<span class="c1">  # after.</span>
+
+<span class="w">  </span><span class="nb">module</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./testing/setup"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">variables</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # In practice, we'd likely make some changes to the module compared to the</span>
+<span class="c1">    # first run block here. Otherwise, there would be no point recalling the</span>
+<span class="c1">    # module.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"update"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+
+<span class="c1">  # As with the "init" run block, we are executing against the main configuration</span>
+<span class="c1">  # again. This means we'd load the main state file that was initially populated</span>
+<span class="c1">  # by the "init" run block, and any changes made by this "run" block will be</span>
+<span class="c1">  # carried forward to any future run blocks that execute against the main</span>
+<span class="c1">  # configuration.</span>
+
+<span class="c1">  # ... updated variables ...</span>
+
+<span class="c1">  # ... assertions ...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"loader"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+
+<span class="c1">  # This run block is now referencing our second alternate module so will create</span>
+<span class="c1">  # our third and final state file. The other two state files are managing</span>
+<span class="c1">  # resources from the main configuration and resources from the setup module.</span>
+<span class="c1">  # We are getting a new state file for this run block as the loader module has</span>
+<span class="c1">  # not previously been referenced by any run blocks.</span>
+
+<span class="w">  </span><span class="nb">module</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./testing/loader"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The following example uses the <code>state_key</code> attribute to force Terraform to use the same state file for different <code>run</code> blocks. In the example below, Terraform creates and manages a single state file that is shared by both the "setup" and "init" run blocks, even though they are loading configuration from separate sources.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">run</span><span class="w"> </span><span class="s2">"setup"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">state_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"main"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">module</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./testing/setup"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"init"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+
+<span class="c1">  # By setting the state key to "main" we are telling Terraform to use the same</span>
+<span class="c1">  # state file for this run block as the "setup" run block. This means that the</span>
+<span class="c1">  # resources created by the "setup" run block will be available to the</span>
+<span class="c1">  # configuration in this run block.</span>
+<span class="w">  </span><span class="na">state_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"main"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # In practice we'd do some interesting checks and tests here but the</span>
+<span class="c1">    # assertions aren't important for this example.</span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # ... more assertions ...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Modules%20Cleanup"></a><h4 id="modules-cleanup">Modules Cleanup</h4>
+
+<p>At the conclusion of a test file, Terraform attempts to destroy every resource it created during the execution of that test file. When Terraform loads alternate modules, the order in which Terraform destroys those objects in is important. For example, in the first <a href="#modules">Modules</a> example, Terraform could not destroy the resources created in the "setup" <code>run</code> block before the objects created in the "execute" <code>run</code> block, because the S3 bucket we created in the "setup" step can not be destroyed while it contains objects.</p>
+
+<p>Terraform destroys resources in reverse <code>run</code> block order. In the most recent <a href="#modules-state">example</a>, there are three state files. One for the main state, one for the <code>./testing/loader</code> module, and one for the <code>./testing/setup</code> module. The <code>./testing/loader</code> state file would be destroyed first as it was referenced most recently by the last run block. The main state file would be destroyed second as it was referenced by the "update" <code>run</code> block. The <code>./testing/setup</code> state file would then be destroyed last.</p>
+
+<p>Note, that the first two <code>run</code> blocks "setup" and "init", do nothing during the destroy operations as their state files are used by later run blocks and have already been destroyed.</p>
+
+<p>If you use a single setup module as an alternate module, and it executes first, or you use no alternate modules, then the order of destruction does not affect you. Anything more complex may require careful consideration to make sure the destruction of resources can complete automatically.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Expecting%20failures"></a><h2 id="expecting-failures">Expecting failures</h2>
+
+<p>By default, if any <a href="../../terraform/language/expressions/custom-conditions.html">Custom Conditions</a>, including <code>check</code> block assertions, fail during the execution of a Terraform test file then the overall command reports the test as a failure.</p>
+
+<p>However, it is a common testing paradigm to want to test failure cases. Terraform supports the <code>expect_failures</code> attribute for this use case.</p>
+
+<p>In each <code>run</code> block the <code>expect_failures</code> attribute can provide a list of checkable objects (resources, data sources, check blocks, input variables, and outputs) that should fail their custom conditions. The test passes if the checkable objects you specify report an issue, and the test fails overall if they do not.</p>
+
+<p>You can still write assertions alongside an <code>expect_failures</code> block, but you should be mindful that all custom conditions, except check block assertions, halt the execution of Terraform. This still applies during test execution, so your assertions should only consider values that you are sure will be computed before the checkable object is due to fail. You can manage this using references, or the <code>depends_on</code> meta-argument within your main configuration.</p>
+
+<p>This also means that, with the exception of <code>check</code> blocks, you can only reliably include a single checkable object. We support a list of checkable objects within the <code>expect_failures</code> attribute purely for <code>check</code> blocks.</p>
+
+<p>A quick example below demonstrates testing the <code>validation</code> block on an input variable. The configuration file accepts a single input variable that must be even number.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tf</span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"input"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">number</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">validation</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.input</span><span class="w"> </span><span class="err">%</span><span class="w"> </span><span class="na">2</span><span class="w"> </span><span class="o">=</span><span class="p">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"must be even number"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The test file contains two run blocks. One that validates that our custom condition passes on an even number and one that validates our custom condition fails on an odd number.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># input_validation.tftest.hcl</span>
+
+<span class="nb">variables</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"zero"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # The variable defined above is even, so we expect the validation to pass.</span>
+
+<span class="w">  </span><span class="na">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">plan</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">run</span><span class="w"> </span><span class="s2">"one"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # This time we set the variable is odd, so we expect the validation to fail.</span>
+
+<span class="w">  </span><span class="na">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">plan</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">variables</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">expect_failures</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">var.input</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<blockquote>
+  <p><strong>Note</strong>: Terraform only expects failures in the operation specified by the <code>command</code> attribute of the <code>run</code> block.</p>
+</blockquote>
+
+<p>Be careful when using <code>expect_failures</code> in <code>run</code> blocks with <code>command = apply</code>. A <code>run</code> block with <code>command = apply</code> that expects a custom condition failure will fail overall if that custom condition fails during the plan.</p>
+
+<p>This is logically consistent, as the <code>run</code> block is expecting to be able to run an apply operation but can not because the plan failed. It is also potentially confusing, as you will see the failure in the diagnostics as the reason the test failed, even though that failure was marked as being expected.</p>
+
+<p>There are instances when Terraform does not execute a custom condition during the planning stage, because that condition is relying on computed attributes that are only available after Terraform creates the referenced resource. In these cases, you could use an <code>expect_failures</code> block alongside a <code>command = apply</code> attribute and value. However, in most cases we recommend only using <code>expect_failures</code> alongside <code>command = plan</code> operations.</p>
+
+<blockquote>
+  <p><strong>Note</strong>: Expected failures only apply to user-defined custom conditions.</p>
+</blockquote>
+
+<p>Other kinds of failure <em>besides</em> the specified expected failures in the checkable object still result in the overall test failing. For example, a variable that expects a boolean value as input fails the surrounding test if Terraform provides the wrong kind of value, even if that variable is included in an <code>expect_failures</code> attribute.</p>
+
+<p>The <code>expect_failures</code> attribute is included to allow authors to test their configuration and any logic defined within. A type mismatch, as in the previous example, is not something Terraform authors should have to worry about testing as Terraform itself will handle enforce type constraints. As such, you can only <code>expect_failures</code> in custom conditions.</p>
+
+            
+        
+    </body></html>

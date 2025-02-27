@@ -1,0 +1,94 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/guides/tfc-check-blocks --><head>
+                <title>Continuous Validation with Terraform Cloud</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="continuous-validation-with-terraform-cloud">Continuous Validation with Terraform Cloud</h1>
+
+<p>The Continuous Validation feature in Terraform Cloud (TFC) allows users to make assertions about their infrastructure between applied runs. This helps users to identify issues at the time they first appear and avoid situations where a change is only identified during a future terraform plan/apply or once it causes a user-facing problem.</p>
+
+<p>Checks can be added to Terraform configuration in Terraform Cloud (TFC) using check blocks. Check blocks contain assertions that are defined with a custom condition expression and an error message. When the condition expression evaluates to false, Terraform will show a warning message that includes the user-defined error message.</p>
+
+<p>Custom conditions can be created using data from Terraform providers’ resources and data sources. Data can also be combined from multiple sources; for example, you can use checks to monitor expirable resources by comparing a resource’s expiration date attribute to the current time returned by Terraform’s built-in time functions.</p>
+
+<p>Below, this guide shows examples of how data returned from the AzureRM provider can be used to define checks in your Terraform configuration. For more information about continuous validation visit the <a href="https://developer.hashicorp.com/terraform/cloud-docs/workspaces/health#continuous-validation">Workspace Health</a> page in the Terraform Cloud documentation.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20-%20Check%20if%20a%20VM%27s%20is%20not%20running%20%28azurerm_linux_virtual_machine%2C%20azurerm_windows_virtual_machine%29"></a><h2 id="example-check-if-a-vms-is-not-running-azurerm_linux_virtual_machine-azurerm_windows_virtual_machine">Example - Check if a VM's is not running (<code>azurerm_linux_virtual_machine</code>, <code>azurerm_windows_virtual_machine</code>)</h2>
+
+<p>VM instances provisioned can pass through several different power states as past of the VM instance lifecycle. Once a VM is provisioned it could experience an error, or a user could suspend or stop that VM, without that change being detected until the next Terraform plan is generated. Continuous validation can be used to assert the state of a VM and detect if there are any unexpected status changes that occur out-of-band.</p>
+
+<p>The example below shows how a check block can be used to assert that a VM is in the running state. You can force the check to fail in this example by provisioning the VM and manually stopping it, and then triggering a health check in TFC. The check will fail and report that the VM is not running.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"azurerm_virtual_machine"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_linux_virtual_machine.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">check</span><span class="w"> </span><span class="s2">"check_vm_state"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_virtual_machine.example.power_state</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"running"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"Virtual Machine (%s) should be in a 'running' status, instead state is '%s'"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">data.azurerm_virtual_machine.example.id</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">data.azurerm_virtual_machine.example.power_state</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The full example can be found in the provider's <a href="https://github.com/hashicorp/terraform-provider-azurerm/tree/main/examples/tfc-checks/vm-power-state">examples</a> folder. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20-%20Check%20if%20a%20Container%20App%20certificate%20will%20expire%20within%20a%20certain%20timeframe%20%28azurerm_app_service_certificate%29"></a><h2 id="example-check-if-a-container-app-certificate-will-expire-within-a-certain-timeframe-azurerm_app_service_certificate">Example - Check if a Container App certificate will expire within a certain timeframe (<code>azurerm_app_service_certificate</code>)</h2>
+
+<p>Azure App Service Certificates (and other resources) can be provisioned using a user supplied certificate. In the example below we show how to check that a certificate should be valid for the next 30 days (see <code>local.month_in_hour_duration</code>).</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">month_in_hour_duration</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"${24 * 30}h"</span><span class="w"></span>
+<span class="w">  </span><span class="na">month_and_2min_in_second_duration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${(60 * 60 * 24 * 30) + (60 * 2)}s"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"azurerm_app_service_certificate"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_app_service_certificate.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_app_service_certificate.example.resource_group_name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">check</span><span class="w"> </span><span class="s2">"check_certificate_state"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">timecmp</span><span class="p">(</span><span class="err">plan</span><span class="nf">timestamp</span><span class="p">(),</span><span class="w"> </span><span class="nf">timeadd</span><span class="p">(</span><span class="w"></span>
+<span class="w">      </span><span class="nv">data.azurerm_app_service_certificate.example.expiration_date</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"-${local.month_in_hour_duration}"</span><span class="p">))</span><span class="w"> </span><span class="err">&lt;</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"App Service Certificate (%s) is valid for at least 30 days, but is due to expire on `%s`."</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">data.azurerm_app_service_certificate.example.id</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">data.azurerm_app_service_certificate.example.expiration_date</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The full example can be found in the provider's <a href="https://github.com/hashicorp/terraform-provider-azurerm/tree/main/examples/tfc-checks/app-service-certificate-expiry">examples</a> folder. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20-%20Check%20if%20an%20App%20Service%20Function%20or%20Web%20App%20has%20exceeded%20its%20usage%20limit%20%28azurerm_linux_function_app%2C%20azurerm_linux_web_app%29"></a><h2 id="example-check-if-an-app-service-function-or-web-app-has-exceeded-its-usage-limit-azurerm_linux_function_app-azurerm_linux_web_app">Example - Check if an App Service Function or Web App has exceeded its usage limit (<code>azurerm_linux_function_app</code>, <code>azurerm_linux_web_app</code>)</h2>
+
+<p>App Service Function and Web Apps can exceed their usage limit. The example below shows how a check block can be used to assert that a Function or Web App has not exceeded its usage limit.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"azurerm_virtual_machine"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_linux_virtual_machine.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">check</span><span class="w"> </span><span class="s2">"check_vm_state"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azurerm_virtual_machine.example.power_state</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"running"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"Virtual Machine (%s) should be in a 'running' status, instead state is '%s'"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">data.azurerm_virtual_machine.example.id</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">data.azurerm_virtual_machine.example.power_state</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The full example can be found in the provider's <a href="https://github.com/hashicorp/terraform-provider-azurerm/tree/main/examples/tfc-checks/app-service-app-usage">examples</a> folder.</p>
+
+            
+        
+    </body></html>

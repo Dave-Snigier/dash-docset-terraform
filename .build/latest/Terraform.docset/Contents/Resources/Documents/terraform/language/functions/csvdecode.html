@@ -1,0 +1,100 @@
+<html><!-- Online page at https://www.terraform.io/language/functions/csvdecode --><head>
+                <title>csvdecode</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="csvdecode-function"><code>csvdecode</code> Function</h1>
+
+<p><code>csvdecode</code> decodes a string containing CSV-formatted data and produces a
+list of maps representing that data.</p>
+
+<p>CSV is <em>Comma-separated Values</em>, an encoding format for tabular data. There
+are many variants of CSV, but this function implements the format defined
+in <a href="https://tools.ietf.org/html/rfc4180">RFC 4180</a>.</p>
+
+<p>The first line of the CSV data is interpreted as a "header" row: the values
+given are used as the keys in the resulting maps. Each subsequent line becomes
+a single map in the resulting list, matching the keys from the header row
+with the given values by index. All lines in the file must contain the same
+number of fields, or this function will produce an error.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Examples"></a><h2 id="examples">Examples</h2>
+
+<pre><code>&gt; csvdecode("a,b,c\n1,2,3\n4,5,6")
+[
+  {
+    "a" = "1"
+    "b" = "2"
+    "c" = "3"
+  },
+  {
+    "a" = "4"
+    "b" = "5"
+    "c" = "6"
+  }
+]
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Use%20with%20the%20for_each%20meta-argument"></a><h2 id="use-with-the-for_each-meta-argument">Use with the <code>for_each</code> meta-argument</h2>
+
+<p>You can use the result of <code>csvdecode</code> with
+<a href="../../terraform/language/meta-arguments/for_each.html">the <code>for_each</code> meta-argument</a>
+to describe a collection of similar objects whose differences are
+described by the rows in the given CSV file.</p>
+
+<p>There must be one column in the CSV file that can serve as a unique id for each
+row, which we can then use as the tracking key for the individual instances in
+the <code>for_each</code> expression. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # We've included this inline to create a complete example, but in practice</span>
+<span class="c1">  # this is more likely to be loaded from a file using the "file" function.</span>
+<span class="w">  </span><span class="na">csv_data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;-</span><span class="dl">CSV</span><span class="sh"></span>
+<span class="sh">    local_id,instance_type,ami</span>
+<span class="sh">    foo1,t2.micro,ami-54d2a63b</span>
+<span class="sh">    foo2,t2.micro,ami-54d2a63b</span>
+<span class="sh">    foo3,t2.micro,ami-54d2a63b</span>
+<span class="sh">    bar1,m3.large,ami-54d2a63b</span>
+<span class="dl">  CSV</span>
+
+<span class="w">  </span><span class="na">instances</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">csvdecode</span><span class="p">(</span><span class="nv">local.csv_data</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">tomap</span><span class="p">({</span><span class="w"> </span><span class="err">for</span><span class="w"> </span><span class="err">inst</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">local.instances</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nv">inst.local_id</span><span class="w"> </span><span class="p">=</span><span class="err">&gt;</span><span class="w"> </span><span class="err">inst</span><span class="w"> </span><span class="p">})</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value.instance_type</span><span class="w"></span>
+<span class="w">  </span><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value.ami</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The <code>for</code> expression in our <code>for_each</code> argument transforms the list produced
+by <code>csvdecode</code> into a map using the <code>local_id</code> as a key, which tells
+Terraform to use the <code>local_id</code> value to track each instance it creates.
+Terraform will create and manage the following instance addresses:</p>
+
+<ul>
+<li><code>aws_instance.example["foo1"]</code></li>
+<li><code>aws_instance.example["foo2"]</code></li>
+<li><code>aws_instance.example["foo3"]</code></li>
+<li><code>aws_instance.example["bar1"]</code></li>
+</ul>
+
+<p>If you modify a row in the CSV on a subsequent plan, Terraform will interpret
+that as an update to the existing object as long as the <code>local_id</code> value is
+unchanged. If you add or remove rows from the CSV then Terraform will plan to
+create or destroy associated instances as appropriate.</p>
+
+<p>If there is no reasonable value you can use as a unique identifier in your CSV
+then you could instead use
+<a href="../../terraform/language/meta-arguments/count.html">the <code>count</code> meta-argument</a>
+to define an object for each CSV row, with each one identified by its index into
+the list returned by <code>csvdecode</code>. However, in that case any future updates to
+the CSV may be disruptive if they change the positions of particular objects in
+the list. We recommend using <code>for_each</code> with a unique id column to make
+behavior more predictable on future changes.</p>
+
+            
+        
+    </body></html>

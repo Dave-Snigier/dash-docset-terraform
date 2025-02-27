@@ -1,0 +1,113 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/google_project_service --><head>
+                <title>User Guide - google_project_service</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="user-guide-google_project_service">User Guide - google_project_service</h1>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Enabling%20Multiple%20Services%20in%20a%20Config"></a><h2 id="enabling-multiple-services-in-a-config">Enabling Multiple Services in a Config</h2>
+
+<p>Users may want to activate many services simultaneously within a single Terraform config. The <code>google_project_service.service</code> field only supports a single value, but Terraform itself provides list iteration with <a href="https://developer.hashicorp.com/terraform/language/meta-arguments/for_each">for_each</a>.
+For example:</p>
+
+<pre><code>variable "services" {
+  type = list(string)
+}
+
+resource "google_project_service" "services" {
+  for_each = toset(var.services)
+  project = "my-project"
+  service = each.value
+}
+</code></pre>
+
+<p>For a more robust example, Google recommends the <a href="https://github.com/terraform-google-modules/terraform-google-project-factory/tree/master/modules/project_services">project_services module</a>. The <code>project_services</code> module simplifies configuring multiple services on a project at once as shown in <a href="https://github.com/terraform-google-modules/terraform-google-project-factory/tree/master/modules/project_services#example-usage">this example</a>.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Even though <code>google_project_service</code> represents a single resource, the Google provider will batch multiple changes into a single request when possible. See the <code>batching</code> <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/provider_reference.html#batching">reference documentation</a> for details.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Request%20Rate%20Errors"></a><h2 id="request-rate-errors">Request Rate Errors</h2>
+
+<p>The service management API called by the google_project_service resource uses request rate quota on the project of the account used to call the API (i.e. against the Terraform credentials) by default. That project (or a fixed <code>billing_project</code>) may exceed your request rate quota in larger configurations. <code>google_project_service</code> batches multiple changes into single requests when possible, see the <code>batching</code> <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/provider_reference.html#batching">reference documentation</a> for details.</p>
+
+<p>Minimizing the number of total resources in root modules will help maximize the provider’s ability to batch requests. Oversized root modules slow Terraform’s execution time and can cause same-type requests to miss the batch window set by <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/provider_reference.html#send_after">batching.send_after</a>. See Google’s <a href="https://cloud.google.com/docs/terraform/best-practices-for-terraform#root-modules">guidance on root modules</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Newly%20activated%20service%20errors"></a><h2 id="newly-activated-service-errors">Newly activated service errors</h2>
+
+<p>Users may run into <a href="https://github.com/hashicorp/terraform-provider-google/issues/8214">issues</a> when activating a service with <code>google_project_service</code> and immediately using the service in another resource. The most common error when doing so will look like:</p>
+
+<pre><code>Error: Error creating &lt;Resource&gt;: googleapi: Error 403: &lt;Service&gt; API has not been used in project &lt;Project&gt; before or it is disabled.
+</code></pre>
+
+<p>Activating a service is eventually consistent in GCP. Terraform attempts to mitigate this in <code>google_project_service</code> by waiting for the activation API’s long-running operation to finish and verifying that the service appears in a list of activated services. Despite these checks, service activation is not guaranteed by the time the <code>google_project_service</code> resource is done provisioning.</p>
+
+<p>At the time of writing, there is no way for the provider to completely verify service activation. The time before <code>google_project_service</code> returns successfully may vary depending on the service, GCP-internal caching, and other circumstances. In particular, just-created projects may experience longer service activation times. Further mitigations users can try are detailed below.</p>
+
+<p>If you are experiencing significantly long activation time with a specific service, it would be best to file an issue in that service’s public issue tracker or speak to your customer representative. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Mitigation%20-%20Adding%20sleeps"></a><h3 id="mitigation-adding-sleeps">Mitigation - Adding sleeps</h3>
+
+<p>A common way to deal with eventual consistency with Terraform is to implement a sleep in between resources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20the%20time%20provider"></a><h4 id="using-the-time-provider">Using the time provider</h4>
+
+<p>The <a href="https://registry.terraform.io/providers/hashicorp/time/latest/docs">time provider</a> offers a <a href="https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep">time_sleep</a> resource. You can use the <code>create_duration</code> field to provide a sleep duration.</p>
+
+<pre><code>resource "google_project" "my_project" {
+  name = "foo-bar-baz"
+  project_id = "foo-bar-baz-test"
+  org_id = var.organization_id
+  billing_account = var.billing_account_id
+}
+
+resource "time_sleep" "wait_30_seconds" {
+  depends_on = [google_project.my_project]
+
+  create_duration = "30s"
+}
+
+resource "google_project_service" "my_service" {
+  project = google_project.my_project.id
+  service = "firebase.googleapis.com"
+
+  disable_dependent_services = true
+  depends_on = [time_sleep.wait_30_seconds]
+}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20the%20local-exec%20provisioner"></a><h4 id="using-the-local-exec-provisioner">Using the local-exec provisioner</h4>
+
+<p>Terraform provides the <a href="https://developer.hashicorp.com/terraform/language/resources/provisioners/local-exec">local-exec provisioner</a> to invoke a local executable after resource creation. Depending on the machine running Terraform, you may invoke some command to sleep for a duration.</p>
+
+<pre><code>resource "google_project" "my_project" {
+  name = "foo-bar-baz"
+  project_id = "foo-bar-baz-test"
+  org_id = var.organization_id
+  billing_account = var.billing_account_id
+}
+
+resource "null_resource" "delay" {
+  provisioner "local-exec" {
+    command = "sleep 60"
+  }
+  triggers = {
+    "project" = "${google_project.my_project.id}"
+  }
+}
+
+resource "google_project_service" "my_service" {
+  project = google_project.my_project.id
+  service = "firebase.googleapis.com"
+
+  disable_dependent_services = true
+  depends_on = [null_resource.delay]
+}
+</code></pre>
+
+            
+        
+    </body></html>

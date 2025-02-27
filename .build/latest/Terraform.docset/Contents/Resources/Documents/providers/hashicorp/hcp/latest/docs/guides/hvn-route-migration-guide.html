@@ -1,0 +1,172 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/hcp/latest/docs/guides/hvn-route-migration-guide --><head>
+                <title>Introducing HVN routes</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="introducing-hvn-routes">Introducing HVN routes</h1>
+
+<p>The HVN route is a new resource that belongs to an HVN. It contains a CIDR block and targets a networking connection:
+either a peering or transit gateway attachment.</p>
+
+<p>HVN routes provide a general view on how an HVN's traffic is routed across all networking connections and create a flexible way of managing these routing rules.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Migrating%20existing%20peerings%20and%20transit%20gateway%20attachments"></a><h2 id="migrating-existing-peerings-and-transit-gateway-attachments">Migrating existing peerings and transit gateway attachments</h2>
+
+<p>There are two ways to migrate existing peerings and transit gateway attachments managed by Terraform:</p>
+
+<ol>
+<li><p>Recreate Resources with Updated Schema</p>
+
+<ul>
+<li>This option is quicker but will result in downtime and possible data loss. Best for test environments. Will allow you to specify human-readable ids for the resources.</li>
+<li>Comment out all <code>hcp_aws_network_peering</code> and <code>hcp_aws_transit_gateway_attachment</code> resources.</li>
+<li>Run <code>terraform apply</code> to destroy currently existing connections.</li>
+<li>Uncomment and update all <code>hcp_aws_network_peering</code> and <code>hcp_aws_transit_gateway_attachment</code> resource definitions to match the new schema.</li>
+<li>Add corresponding <code>hcp_hvn_route</code> resources for each CIDR targeting corresponding peering connections or transit gateway attachment.</li>
+<li>Run <code>terraform apply</code> to recreate connections.</li>
+</ul></li>
+<li><p>Re-Import with Updated Syntax:</p>
+
+<ul>
+<li>This option allows you to avoid downtime or data loss.</li>
+<li>Update any <code>hcp_aws_network_peering</code> and <code>hcp_aws_transit_gateway_attachment</code> resource definitions to match the new schema. All values needed can be found on the details pages of Peerings and TGW attachment in the HCP Portal.</li>
+<li>Add corresponding <code>hcp_hvn_route</code> resources for each CIDR targeting corresponding peering connections or transit gateway attachments.</li>
+<li>Run <code>terraform import hcp_hvn_route.&lt;route-name&gt; &lt;hvn-id&gt;:&lt;hvn-route-id&gt;</code> for each <code>hcp_hvn_route</code>. The <code>&lt;hvn-route-id&gt;</code> can be found on the details pages of the corresponding HVN connection in the HCP Portal.</li>
+<li>Run <code>terraform plan</code> and make sure that there are no changes detected by the Terraform.</li>
+</ul></li>
+</ol>
+
+<p>The examples below walk through the schema upgrade and re-import steps.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Peering%20example"></a><h3 id="peering-example">Peering example</h3>
+
+<p>Given:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn"</span><span class="w"> </span><span class="nv">"hvn"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod-hvn"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cloud_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_aws_network_peering"</span><span class="w"> </span><span class="nv">"peering"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.hvn_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vpc_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"vpc-845f29fc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_account_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"572816266891"</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vpc_region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vpc_cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.31.0.0/16"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Rewrite it to the new schema and add corresponding HVN route:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn"</span><span class="w"> </span><span class="nv">"hvn"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod-hvn"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cloud_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_aws_network_peering"</span><span class="w"> </span><span class="nv">"peering"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.hvn_id</span><span class="c1"></span>
+<span class="c1">  // add `peering_id` that you can find in the HCP Portal</span>
+<span class="w">  </span><span class="na">peering_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"f03324a9-4377-4a54-9c15-958fd07ad77b"</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vpc_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"vpc-845f29fc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"572816266891"</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vpc_region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-2"</span><span class="c1"></span>
+<span class="c1">  // remove `peer_vpc_cidr_block`</span>
+<span class="c1">  // peer_vpc_cidr_block = "172.31.0.0/16"</span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Add a `hcp_hvn_route` resource for the peering's CIDR</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn_route"</span><span class="w"> </span><span class="nv">"peering-route"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="c1"></span>
+<span class="c1">  // you can find this ID in the HCP Portal in the peering details page in the list of routes</span>
+<span class="w">  </span><span class="na">hvn_route_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"a8dda9a8-0f69-4fa0-b38c-55be302fdddb"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.31.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_link</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_aws_network_peering.peering.self_link</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Run <code>import</code> for the <code>hcp_hvn_route</code>:</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform import hcp_hvn_route.peering-route prod-hvn:a8dda9a8-0f69-4fa0-b38c-55be302fdddb
+</code></pre></div>
+
+<p>Run <code>terraform plan</code> to make sure there are no changes detected by the Terraform:</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform plan
+No changes. Infrastructure is up-to-date.
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Transit%20gateway%20attachment%20example"></a><h3 id="transit-gateway-attachment-example">Transit gateway attachment example</h3>
+
+<p>Given:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn"</span><span class="w"> </span><span class="nv">"hvn"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod-hvn"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cloud_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_aws_transit_gateway_attachment"</span><span class="w"> </span><span class="nv">"prod"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">                        </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.hvn_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_attachment_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod-tgw-attachment"</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"tgw-0ee94b1a1167cf89d"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_share_arn</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:ram:us-west-2:..."</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidrs</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"10.1.0.0/24", "10.2.0.0/24"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Rewrite it to the new schema and add corresponding HVN route:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn"</span><span class="w"> </span><span class="nv">"hvn"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod-hvn"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cloud_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_aws_transit_gateway_attachment"</span><span class="w"> </span><span class="nv">"prod"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">                        </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.hvn_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_attachment_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod-tgw-attachment"</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"tgw-0ee94b1a1167cf89d"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_share_arn</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:ram:us-west-2:..."</span><span class="c1"></span>
+<span class="c1">  // remove `destination_cidrs`</span>
+<span class="c1">  // destination_cidrs             = ["10.1.0.0/24", "10.2.0.0/24"]</span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// add a new `hcp_hvn_route` for each CIDR associated with the transit gateway attachment</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn_route"</span><span class="w"> </span><span class="nv">"tgw-route-1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="c1"></span>
+<span class="c1">  // you can find this ID in the HCP Portal in the TGW attachment details page in the list of Routes</span>
+<span class="w">  </span><span class="na">hvn_route_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"35392425-215a-44ec-bbd0-051bb777ce5f"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.0.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_link</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_aws_transit_gateway_attachment.prod.self_link</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn_route"</span><span class="w"> </span><span class="nv">"tgw-route-2"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="c1"></span>
+<span class="c1">  // you can find this ID in the HCP Portal in the transit gateway attachment details page in the list of routes</span>
+<span class="w">  </span><span class="na">hvn_route_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"9867959a-d81b-4e52-ae8e-ca56f9dd06fc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.2.0.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_link</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_aws_transit_gateway_attachment.prod.self_link</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Run <code>import</code> for each <code>hcp_hvn_route</code> you've added:</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform import hcp_hvn_route.tgw-route-1 prod-hvn:35392425-215a-44ec-bbd0-051bb777ce5f
+...
+
+$ terraform import hcp_hvn_route.tgw-route-2 prod-hvn:9867959a-d81b-4e52-ae8e-ca56f9dd06fc
+...
+</code></pre></div>
+
+<p>Run <code>terraform plan</code> to make sure there are no changes detected by the Terraform:</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform plan
+No changes. Infrastructure is up-to-date.
+</code></pre></div>
+
+            
+        
+    </body></html>

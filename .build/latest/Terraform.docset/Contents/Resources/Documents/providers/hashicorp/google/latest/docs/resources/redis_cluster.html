@@ -1,0 +1,1139 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/redis_cluster --><head>
+                <title>google_redis_cluster</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="google_redis_cluster">google_redis_cluster</h1>
+
+<p>A Google Cloud Redis Cluster instance.</p>
+
+<p>To get more information about Cluster, see:</p>
+
+<ul>
+<li><a href="https://cloud.google.com/memorystore/docs/cluster/reference/rest/v1/projects.locations.clusters">API documentation</a></li>
+<li>How-to Guides
+<ul>
+<li><a href="https://cloud.google.com/memorystore/docs/cluster/">Official Documentation</a></li>
+</ul></li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>For <a href="https://cloud.google.com/memorystore/docs/cluster/about-multiple-vpc-networking">Multiple VPC Networking</a> if you want to use <a href="https://cloud.google.com/memorystore/docs/cluster/about-multiple-vpc-networking#psc_connection_types">User-registered PSC Connections</a>, then please use <code>google_redis_cluster_user_created_connections</code> resource.</p>
+</aside>
+
+<p>For <a href="https://cloud.google.com/memorystore/docs/cluster/about-cross-region-replication">Cross Region Replication</a>, please follow the instructions below for performing certain update and failover (switchover and detach) operations</p>
+
+<p><strong>Cross Region Replication</strong></p>
+
+<p><strong>Settings updated on primary and propagated to secondaries</strong></p>
+
+<p>The settings listed <a href="https://cloud.google.com/memorystore/docs/cluster/about-cross-region-replication#set_on_primary">here</a>
+are only allowed to be updated on the primary cluster and the changes are automatically propagated to the secondary clusters.
+To keep the Terraform configuration and state in sync for such settings, please follow the below steps to update them:</p>
+
+<ol>
+<li>Update the setting on the primary cluster:
+<ul>
+<li>Update the setting to its new desired value in the Terraform configuration file.</li>
+<li>Execute <code>terraform apply</code> to apply the change and wait for it to complete.</li>
+</ul></li>
+<li>Detect configuration drift on the secondary cluster(s):
+<ul>
+<li>Execute <code>terraform plan</code>. This should reveal a diff for the modified setting. The proposed value in the Terraform plan should align with the updated value applied to the primary cluster in the preceding step.</li>
+</ul></li>
+<li>Reconcile secondary cluster(s) configuration:
+<ul>
+<li>Manually edit the Terraform configuration file(s) for the secondary cluster(s) to update the setting with the latest value from the state.</li>
+<li>Execute <code>terraform plan</code> once again. This should not generate any diff, confirming the configuration is in sync with the infrastructure.</li>
+</ul></li>
+</ol>
+
+<p><strong>Switchover</strong></p>
+
+<p>To perform a <a href="https://cloud.google.com/memorystore/docs/cluster/working-with-cross-region-replication#perform_a_switchover">switchover</a>, please follow the below steps:</p>
+
+<ol>
+<li>Ensure that the Terraform configuration file for the secondary cluster that needs to become the new primary has the <code>cross_cluster_replication_config</code> field. If it is not present:
+<ul>
+<li>Add the <code>cross_cluster_replication_config</code> field to the configuration file to match the latest value in the state.</li>
+<li>Execute <code>terraform plan</code>. This should not generate any diff, confirming the configuration is in sync with the infrastructure.</li>
+</ul></li>
+<li>Update the <code>cross_cluster_replication_config</code> field of the secondary that needs to become the new primary:
+<ul>
+<li>Change <code>cross_cluster_replication_config.cluster_role</code> from <code>SECONDARY</code> to <code>PRIMARY</code>.</li>
+<li>Remove <code>cross_cluster_replication_config.primary_cluster</code> field.</li>
+<li>Set <code>cross_cluster_replication_config.secondary_clusters</code> list with the new secondaries. The new secondaries are the current primary and other secondary clusters(if any).</li>
+</ul></li>
+</ol>
+
+<pre><code>  -&gt; You can refer to the current value of `cross_cluster_replication_config.membership` field to lookup the current primary and secondary clusters.
+</code></pre>
+
+<p></p>
+
+<ol>
+<li>Execute switchover:
+<ul>
+<li>Execute<code>terraform apply</code> to apply the change and wait for it to complete.</li>
+</ul></li>
+<li>Fix any configuration drifts on the previous primary and other secondary clusters:
+<ul>
+<li>Execute <code>terraform plan</code>. If any diffs are reported for <code>cross_cluster_replication_config</code> field:
+<ul>
+<li>Manually update <code>cross_cluster_replication_config</code> field in the configuration file(s) for those clusters with the latest value from the state.</li>
+<li>Execute <code>terraform plan</code> once again. This should not generate any diff, confirming the configuration is in sync with the infrastructure.</li>
+</ul></li>
+</ul></li>
+</ol>
+
+<p><strong>Detach a secondary cluster</strong></p>
+
+<p>To <a href="https://cloud.google.com/memorystore/docs/cluster/working-with-cross-region-replication#detach_secondary_clusters_option_1">detach</a> a secondary cluster, please follow the below steps:</p>
+
+<ol>
+<li>Ensure that the Terraform configuration file for the secondary cluster that needs to be detached has the <code>cross_cluster_replication_config</code> field. If it is not present:
+<ul>
+<li>Add the <code>cross_cluster_replication_config</code> field to the configuration file to match the latest value in the state.</li>
+<li>Execute <code>terraform plan</code>. This should not generate any diff, confirming the configuration is in sync with the infrastructure.</li>
+</ul></li>
+<li>Update the <code>cross_cluster_replication_config</code> field of the secondary that needs to be detached:
+<ul>
+<li>Change <code>cross_cluster_replication_config.cluster_role</code> from <code>SECONDARY</code> to <code>NONE</code>.</li>
+<li>Remove <code>cross_cluster_replication_config.primary_cluster</code>.</li>
+</ul></li>
+<li>Execute detach:
+<ul>
+<li>Execute<code>terraform apply</code> to apply the change and wait for it to complete.</li>
+</ul></li>
+<li>Fix any configuration drifts on the primary cluster:
+<ul>
+<li>Execute <code>terraform plan</code>. If any diff is reported for <code>cross_cluster_replication_config</code> field:
+<ul>
+<li>Manually update <code>cross_cluster_replication_config</code> field in the configuration file with the latest value from the state.</li>
+<li>Execute <code>terraform plan</code> once again. This should not generate any diff, confirming the configuration is in sync with the infrastructure.</li>
+</ul></li>
+</ul></li>
+</ol>
+
+<p><strong>Detach secondary cluster(s) via primary cluster</strong></p>
+
+<p>To <a href="https://cloud.google.com/memorystore/docs/cluster/working-with-cross-region-replication#detach_secondary_clusters_option_2">detach</a> secondary clusters via primary, please follow the below steps:</p>
+
+<ol>
+<li>Ensure that the Terraform configuration file for the primary cluster from which the secondary(ies) has(ve) to be detached has the <code>cross_cluster_replication_config</code> field. If it is not present:
+<ul>
+<li>Add the <code>cross_cluster_replication_config</code> field to the configuration file to match the latest value in the state.</li>
+<li>Execute <code>terraform plan</code>. This should not generate any diff, confirming the configuration is in sync with the infrastructure.</li>
+</ul></li>
+<li>Update the <code>cross_cluster_replication_config</code> field of the primary cluster:
+<ul>
+<li>If you are detaching all secondaries from the primary:
+<ul>
+<li>Change <code>cross_cluster_replication_config.cluster_role</code> from <code>PRIMARY</code> to <code>NONE</code>.</li>
+<li>Remove <code>cross_cluster_replication_config.secondary_clusters</code> list field.</li>
+</ul></li>
+<li>If you are detaching a subset of secondaries:
+<ul>
+<li>Update <code>cross_cluster_replication_config.secondary_clusters</code> list field to remove the secondary clusters that need to be detached.</li>
+</ul></li>
+</ul></li>
+<li>Execute detach:
+<ul>
+<li>Execute <code>terraform apply</code> to apply the change and wait for it to complete.</li>
+</ul></li>
+<li>Fix any configuration drifts on the secondary cluster(s) that was detached:
+<ul>
+<li>Execute <code>terraform plan</code>. If any diffs are reported for <code>cross_cluster_replication_config</code> field:
+<ul>
+<li>Manually update <code>cross_cluster_replication_config</code> field in the configuration file(s) for those clusters with the latest value from the state.</li>
+<li>Execute <code>terraform plan</code> once again. This should not generate any diff, confirming the configuration is in sync with the infrastructure.</li>
+</ul></li>
+</ul></li>
+</ol>
+
+<div class="oics-button" style="float: right; margin: 0 0 -15px">
+  <a href="https://console.cloud.google.com/cloudshell/open?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fterraform-google-modules%2Fdocs-examples.git&amp;cloudshell_image=gcr.io%2Fcloudshell-images%2Fcloudshell%3Alatest&amp;cloudshell_print=.%2Fmotd&amp;cloudshell_tutorial=.%2Ftutorial.md&amp;cloudshell_working_dir=redis_cluster_ha&amp;open_in_editor=main.tf" target="_blank">
+    <img alt="Open in Cloud Shell" src="//gstatic.com/cloudssh/images/open-btn.svg" style="max-height: 44px; margin: 32px auto; max-width: 100%;"/>
+  </a>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Redis%20Cluster%20Ha"></a><h2 id="example-usage-redis-cluster-ha">Example Usage - Redis Cluster Ha</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_redis_cluster"</span><span class="w"> </span><span class="nv">"cluster-ha"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"ha-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">shard_count</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">  </span><span class="nb">psc_configs</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">replica_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"REDIS_SHARED_CORE_NANO"</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_encryption_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"TRANSIT_ENCRYPTION_MODE_DISABLED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">authorization_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AUTH_MODE_DISABLED"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">redis_configs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">maxmemory-policy</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"volatile-ttl"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">deletion_protection_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">zone_distribution_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MULTI_ZONE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">maintenance_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">weekly_maintenance_window</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">day</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MONDAY"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">start_time</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">hours</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">        </span><span class="na">minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">        </span><span class="na">seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">        </span><span class="na">nanos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_network_connectivity_service_connection_policy.default</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_network_connectivity_service_connection_policy"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_class</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gcp-memorystore-redis"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"my basic service connection policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">psc_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_subnetwork.consumer_subnet.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"consumer_subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-subnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.248/29"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"consumer_net"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="oics-button" style="float: right; margin: 0 0 -15px">
+  <a href="https://console.cloud.google.com/cloudshell/open?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fterraform-google-modules%2Fdocs-examples.git&amp;cloudshell_image=gcr.io%2Fcloudshell-images%2Fcloudshell%3Alatest&amp;cloudshell_print=.%2Fmotd&amp;cloudshell_tutorial=.%2Ftutorial.md&amp;cloudshell_working_dir=redis_cluster_ha_single_zone&amp;open_in_editor=main.tf" target="_blank">
+    <img alt="Open in Cloud Shell" src="//gstatic.com/cloudssh/images/open-btn.svg" style="max-height: 44px; margin: 32px auto; max-width: 100%;"/>
+  </a>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Redis%20Cluster%20Ha%20Single%20Zone"></a><h2 id="example-usage-redis-cluster-ha-single-zone">Example Usage - Redis Cluster Ha Single Zone</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_redis_cluster"</span><span class="w"> </span><span class="nv">"cluster-ha-single-zone"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"ha-cluster-single-zone"</span><span class="w"></span>
+<span class="w">  </span><span class="na">shard_count</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">  </span><span class="nb">psc_configs</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">zone_distribution_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SINGLE_ZONE"</span><span class="w"></span>
+<span class="w">    </span><span class="na">zone</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-f"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">maintenance_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">weekly_maintenance_window</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">day</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MONDAY"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">start_time</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">hours</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">        </span><span class="na">minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">        </span><span class="na">seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">        </span><span class="na">nanos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">deletion_protection_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_network_connectivity_service_connection_policy.default</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_network_connectivity_service_connection_policy"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_class</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gcp-memorystore-redis"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"my basic service connection policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">psc_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_subnetwork.consumer_subnet.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"consumer_subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-subnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.248/29"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"consumer_net"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="oics-button" style="float: right; margin: 0 0 -15px">
+  <a href="https://console.cloud.google.com/cloudshell/open?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fterraform-google-modules%2Fdocs-examples.git&amp;cloudshell_image=gcr.io%2Fcloudshell-images%2Fcloudshell%3Alatest&amp;cloudshell_print=.%2Fmotd&amp;cloudshell_tutorial=.%2Ftutorial.md&amp;cloudshell_working_dir=redis_cluster_secondary&amp;open_in_editor=main.tf" target="_blank">
+    <img alt="Open in Cloud Shell" src="//gstatic.com/cloudssh/images/open-btn.svg" style="max-height: 44px; margin: 32px auto; max-width: 100%;"/>
+  </a>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Redis%20Cluster%20Secondary"></a><h2 id="example-usage-redis-cluster-secondary">Example Usage - Redis Cluster Secondary</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// Primary cluster</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_redis_cluster"</span><span class="w"> </span><span class="nv">"primary_cluster"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-primary-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east1"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">psc_configs</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  // Settings that should match on primary and secondary clusters. </span>
+<span class="c1">  // If you define a setting here, ensure that the secondary clusters also define it with the same values. </span>
+<span class="c1">  // Please see https://cloud.google.com/memorystore/docs/cluster/about-cross-region-replication#settings_copied_from_the_primary_during_instance_creation for the complete list of such settings.</span>
+<span class="w">  </span><span class="na">authorization_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AUTH_MODE_DISABLED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_encryption_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"TRANSIT_ENCRYPTION_MODE_DISABLED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">shard_count</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">  </span><span class="nb">redis_configs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">maxmemory-policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"volatile-ttl"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"REDIS_HIGHMEM_MEDIUM"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">persistence_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"RDB"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rdb_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">rdb_snapshot_period</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ONE_HOUR"</span><span class="w"></span>
+<span class="w">      </span><span class="na">rdb_snapshot_start_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2024-10-02T15:01:23Z"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  // Settings that can have different values on primary and secondary clusters.</span>
+<span class="c1">  // Please see https://cloud.google.com/memorystore/docs/cluster/about-cross-region-replication#override_allowed_during_instance_creation for the complete list of such settings.</span>
+<span class="w">  </span><span class="nb">zone_distribution_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MULTI_ZONE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">replica_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="nb">maintenance_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">weekly_maintenance_window</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">day</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MONDAY"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">start_time</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">hours</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">        </span><span class="na">minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">        </span><span class="na">seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">        </span><span class="na">nanos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">deletion_protection_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_network_connectivity_service_connection_policy.primary_cluster_region_scp</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+
+<span class="c1">// Secondary cluster</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_redis_cluster"</span><span class="w"> </span><span class="nv">"secondary_cluster"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-secondary-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"europe-west1"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">psc_configs</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  // Settings that should match on primary and secondary clusters. </span>
+<span class="c1">  // If you defined a setting here for primary, ensure the secondary clusters also define it with the same values. </span>
+<span class="c1">  // Please see https://cloud.google.com/memorystore/docs/cluster/about-cross-region-replication#settings_copied_from_the_primary_during_instance_creation for the complete list of such settings.</span>
+<span class="w">  </span><span class="na">authorization_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AUTH_MODE_DISABLED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_encryption_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"TRANSIT_ENCRYPTION_MODE_DISABLED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">shard_count</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">  </span><span class="nb">redis_configs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">maxmemory-policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"volatile-ttl"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"REDIS_HIGHMEM_MEDIUM"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">persistence_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"RDB"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rdb_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">rdb_snapshot_period</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ONE_HOUR"</span><span class="w"></span>
+<span class="w">      </span><span class="na">rdb_snapshot_start_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2024-10-02T15:01:23Z"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  // Settings that can be different on primary and secondary clusters.</span>
+<span class="c1">  // Please see https://cloud.google.com/memorystore/docs/cluster/about-cross-region-replication#override_allowed_during_instance_creation for the complete list of such settings.</span>
+<span class="w">  </span><span class="nb">zone_distribution_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MULTI_ZONE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">replica_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">  </span><span class="nb">maintenance_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">weekly_maintenance_window</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">day</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"WEDNESDAY"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">start_time</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">hours</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">        </span><span class="na">minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">        </span><span class="na">seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">        </span><span class="na">nanos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">deletion_protection_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1"></span>
+
+<span class="c1">  // Cross cluster replication config</span>
+<span class="w">  </span><span class="nb">cross_cluster_replication_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">cluster_role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SECONDARY"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">primary_cluster</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_redis_cluster.primary_cluster.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_network_connectivity_service_connection_policy.secondary_cluster_region_scp</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_network_connectivity_service_connection_policy"</span><span class="w"> </span><span class="nv">"primary_cluster_region_scp"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mypolicy-primary-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_class</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gcp-memorystore-redis"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Primary cluster service connection policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">psc_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_subnetwork.primary_cluster_consumer_subnet.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"primary_cluster_consumer_subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"mysubnet-primary-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.1.0/29"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_network_connectivity_service_connection_policy"</span><span class="w"> </span><span class="nv">"secondary_cluster_region_scp"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mypolicy-secondary-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"europe-west1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_class</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gcp-memorystore-redis"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Secondary cluster service connection policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">psc_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_subnetwork.secondary_cluster_consumer_subnet.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"secondary_cluster_consumer_subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"mysubnet-secondary-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.2.0/29"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"europe-west1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"consumer_net"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"mynetwork"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="oics-button" style="float: right; margin: 0 0 -15px">
+  <a href="https://console.cloud.google.com/cloudshell/open?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fterraform-google-modules%2Fdocs-examples.git&amp;cloudshell_image=gcr.io%2Fcloudshell-images%2Fcloudshell%3Alatest&amp;cloudshell_print=.%2Fmotd&amp;cloudshell_tutorial=.%2Ftutorial.md&amp;cloudshell_working_dir=redis_cluster_rdb&amp;open_in_editor=main.tf" target="_blank">
+    <img alt="Open in Cloud Shell" src="//gstatic.com/cloudssh/images/open-btn.svg" style="max-height: 44px; margin: 32px auto; max-width: 100%;"/>
+  </a>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Redis%20Cluster%20Rdb"></a><h2 id="example-usage-redis-cluster-rdb">Example Usage - Redis Cluster Rdb</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_redis_cluster"</span><span class="w"> </span><span class="nv">"cluster-rdb"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"rdb-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">shard_count</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">  </span><span class="nb">psc_configs</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">replica_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"REDIS_SHARED_CORE_NANO"</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_encryption_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"TRANSIT_ENCRYPTION_MODE_DISABLED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">authorization_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AUTH_MODE_DISABLED"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">redis_configs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">maxmemory-policy</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"volatile-ttl"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">deletion_protection_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">zone_distribution_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MULTI_ZONE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">maintenance_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">weekly_maintenance_window</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">day</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MONDAY"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">start_time</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">hours</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">        </span><span class="na">minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">        </span><span class="na">seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">        </span><span class="na">nanos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">persistence_config</span><span class="w"> </span><span class="p">{</span><span class="w"> </span>
+<span class="w">    </span><span class="na">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"RDB"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">rdb_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">rdb_snapshot_period</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ONE_HOUR"</span><span class="w"></span>
+<span class="w">      </span><span class="na">rdb_snapshot_start_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2024-10-02T15:01:23Z"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_network_connectivity_service_connection_policy.default</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_network_connectivity_service_connection_policy"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_class</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gcp-memorystore-redis"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"my basic service connection policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">psc_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_subnetwork.consumer_subnet.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"consumer_subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-subnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.248/29"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"consumer_net"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="oics-button" style="float: right; margin: 0 0 -15px">
+  <a href="https://console.cloud.google.com/cloudshell/open?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fterraform-google-modules%2Fdocs-examples.git&amp;cloudshell_image=gcr.io%2Fcloudshell-images%2Fcloudshell%3Alatest&amp;cloudshell_print=.%2Fmotd&amp;cloudshell_tutorial=.%2Ftutorial.md&amp;cloudshell_working_dir=redis_cluster_aof&amp;open_in_editor=main.tf" target="_blank">
+    <img alt="Open in Cloud Shell" src="//gstatic.com/cloudssh/images/open-btn.svg" style="max-height: 44px; margin: 32px auto; max-width: 100%;"/>
+  </a>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Redis%20Cluster%20Aof"></a><h2 id="example-usage-redis-cluster-aof">Example Usage - Redis Cluster Aof</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_redis_cluster"</span><span class="w"> </span><span class="nv">"cluster-aof"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"aof-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">shard_count</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">  </span><span class="nb">psc_configs</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">replica_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"REDIS_SHARED_CORE_NANO"</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_encryption_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"TRANSIT_ENCRYPTION_MODE_DISABLED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">authorization_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AUTH_MODE_DISABLED"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">redis_configs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">maxmemory-policy</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"volatile-ttl"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">deletion_protection_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">zone_distribution_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MULTI_ZONE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">maintenance_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">weekly_maintenance_window</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">day</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MONDAY"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">start_time</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">hours</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">        </span><span class="na">minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">        </span><span class="na">seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">        </span><span class="na">nanos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">persistence_config</span><span class="w"> </span><span class="p">{</span><span class="w"> </span>
+<span class="w">    </span><span class="na">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AOF"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aof_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">append_fsync</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"EVERYSEC"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_network_connectivity_service_connection_policy.default</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_network_connectivity_service_connection_policy"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_class</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gcp-memorystore-redis"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"my basic service connection policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">psc_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_subnetwork.consumer_subnet.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"consumer_subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-subnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.248/29"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"consumer_net"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="oics-button" style="float: right; margin: 0 0 -15px">
+  <a href="https://console.cloud.google.com/cloudshell/open?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fterraform-google-modules%2Fdocs-examples.git&amp;cloudshell_image=gcr.io%2Fcloudshell-images%2Fcloudshell%3Alatest&amp;cloudshell_print=.%2Fmotd&amp;cloudshell_tutorial=.%2Ftutorial.md&amp;cloudshell_working_dir=redis_cluster_cmek&amp;open_in_editor=main.tf" target="_blank">
+    <img alt="Open in Cloud Shell" src="//gstatic.com/cloudssh/images/open-btn.svg" style="max-height: 44px; margin: 32px auto; max-width: 100%;"/>
+  </a>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Redis%20Cluster%20Cmek"></a><h2 id="example-usage-redis-cluster-cmek">Example Usage - Redis Cluster Cmek</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_redis_cluster"</span><span class="w"> </span><span class="nv">"cluster-cmek"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"cmek-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">shard_count</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">  </span><span class="nb">psc_configs</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">kms_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-key"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">deletion_protection_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">google_network_connectivity_service_connection_policy.default</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"google_project"</span><span class="w"> </span><span class="nv">"project"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_network_connectivity_service_connection_policy"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_class</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gcp-memorystore-redis"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"my basic service connection policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">psc_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_subnetwork.consumer_subnet.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"consumer_subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-subnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.248/29"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.consumer_net.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"consumer_net"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>shard_count</code> -
+(Required)
+Required. Number of shards for the Redis cluster.</p></li>
+<li><p><code>name</code> -
+(Required)
+Unique name of the resource in this scope including project and location using the form:
+projects/{projectId}/locations/{locationId}/clusters/{clusterId}</p></li>
+</ul>
+
+<hr/>
+
+<ul>
+<li><p><code>authorization_mode</code> -
+(Optional)
+Optional. The authorization mode of the Redis cluster. If not provided, auth feature is disabled for the cluster.
+Default value is <code>AUTH_MODE_DISABLED</code>.
+Possible values are: <code>AUTH_MODE_UNSPECIFIED</code>, <code>AUTH_MODE_IAM_AUTH</code>, <code>AUTH_MODE_DISABLED</code>.</p></li>
+<li><p><code>transit_encryption_mode</code> -
+(Optional)
+Optional. The in-transit encryption for the Redis cluster.
+If not provided, encryption is disabled for the cluster.
+Default value is <code>TRANSIT_ENCRYPTION_MODE_DISABLED</code>.
+Possible values are: <code>TRANSIT_ENCRYPTION_MODE_UNSPECIFIED</code>, <code>TRANSIT_ENCRYPTION_MODE_DISABLED</code>, <code>TRANSIT_ENCRYPTION_MODE_SERVER_AUTHENTICATION</code>.</p></li>
+<li><p><code>node_type</code> -
+(Optional)
+The nodeType for the Redis cluster.
+If not provided, REDIS_HIGHMEM_MEDIUM will be used as default
+Possible values are: <code>REDIS_SHARED_CORE_NANO</code>, <code>REDIS_HIGHMEM_MEDIUM</code>, <code>REDIS_HIGHMEM_XLARGE</code>, <code>REDIS_STANDARD_SMALL</code>.</p></li>
+<li><p><code>zone_distribution_config</code> -
+(Optional)
+Immutable. Zone distribution config for Memorystore Redis cluster.
+Structure is <a href="#nested_zone_distribution_config">documented below</a>.</p></li>
+<li><p><code>psc_configs</code> -
+(Optional)
+Required. Each PscConfig configures the consumer network where two
+network addresses will be designated to the cluster for client access.
+Currently, only one PscConfig is supported.
+Structure is <a href="#nested_psc_configs">documented below</a>.</p></li>
+<li><p><code>replica_count</code> -
+(Optional)
+Optional. The number of replica nodes per shard.</p></li>
+<li><p><code>deletion_protection_enabled</code> -
+(Optional)
+Optional. Indicates if the cluster is deletion protected or not.
+If the value if set to true, any delete cluster operation will fail.
+Default value is true.</p></li>
+<li><p><code>redis_configs</code> -
+(Optional)
+Configure Redis Cluster behavior using a subset of native Redis configuration parameters.
+Please check Memorystore documentation for the list of supported parameters:
+https://cloud.google.com/memorystore/docs/cluster/supported-instance-configurations</p></li>
+<li><p><code>persistence_config</code> -
+(Optional)
+Persistence config (RDB, AOF) for the cluster.
+Structure is <a href="#nested_persistence_config">documented below</a>.</p></li>
+<li><p><code>maintenance_policy</code> -
+(Optional)
+Maintenance policy for a cluster
+Structure is <a href="#nested_maintenance_policy">documented below</a>.</p></li>
+<li><p><code>cross_cluster_replication_config</code> -
+(Optional)
+Cross cluster replication config
+Structure is <a href="#nested_cross_cluster_replication_config">documented below</a>.</p></li>
+<li><p><code>kms_key</code> -
+(Optional)
+The KMS key used to encrypt the at-rest data of the cluster.</p></li>
+<li><p><code>region</code> -
+(Optional)
+The name of the region of the Redis cluster.</p></li>
+<li><p><code>project</code> - (Optional) The ID of the project in which the resource belongs.
+If it is not provided, the provider project is used.</p></li>
+</ul>
+
+<p><a name="nested_zone_distribution_config"></a>The <code>zone_distribution_config</code> block supports:</p>
+
+<ul>
+<li><p><code>mode</code> -
+(Optional)
+Immutable. The mode for zone distribution for Memorystore Redis cluster.
+If not provided, MULTI_ZONE will be used as default
+Possible values are: <code>MULTI_ZONE</code>, <code>SINGLE_ZONE</code>.</p></li>
+<li><p><code>zone</code> -
+(Optional)
+Immutable. The zone for single zone Memorystore Redis cluster.</p></li>
+</ul>
+
+<p><a name="nested_psc_configs"></a>The <code>psc_configs</code> block supports:</p>
+
+<ul>
+<li><code>network</code> -
+(Required)
+Required. The consumer network where the network address of
+the discovery endpoint will be reserved, in the form of
+projects/{network_project_id_or_number}/global/networks/{network_id}.</li>
+</ul>
+
+<p><a name="nested_persistence_config"></a>The <code>persistence_config</code> block supports:</p>
+
+<ul>
+<li><p><code>mode</code> -
+(Optional)
+Optional. Controls whether Persistence features are enabled. If not provided, the existing value will be used.</p>
+
+<ul>
+<li>DISABLED:   Persistence (both backup and restore) is disabled for the cluster.</li>
+<li>RDB: RDB based Persistence is enabled.</li>
+<li>AOF: AOF based Persistence is enabled.
+Possible values are: <code>PERSISTENCE_MODE_UNSPECIFIED</code>, <code>DISABLED</code>, <code>RDB</code>, <code>AOF</code>.</li>
+</ul></li>
+<li><p><code>rdb_config</code> -
+(Optional)
+RDB configuration. This field will be ignored if mode is not RDB.
+Structure is <a href="#nested_persistence_config_rdb_config">documented below</a>.</p></li>
+<li><p><code>aof_config</code> -
+(Optional)
+AOF configuration. This field will be ignored if mode is not AOF.
+Structure is <a href="#nested_persistence_config_aof_config">documented below</a>.</p></li>
+</ul>
+
+<p><a name="nested_persistence_config_rdb_config"></a>The <code>rdb_config</code> block supports:</p>
+
+<ul>
+<li><p><code>rdb_snapshot_period</code> -
+(Optional)
+Optional. Available snapshot periods for scheduling.</p>
+
+<ul>
+<li>ONE_HOUR:   Snapshot every 1 hour.</li>
+<li>SIX_HOURS:  Snapshot every 6 hours.</li>
+<li>TWELVE_HOURS:   Snapshot every 12 hours.</li>
+<li>TWENTY_FOUR_HOURS:  Snapshot every 24 hours.
+Possible values are: <code>SNAPSHOT_PERIOD_UNSPECIFIED</code>, <code>ONE_HOUR</code>, <code>SIX_HOURS</code>, <code>TWELVE_HOURS</code>, <code>TWENTY_FOUR_HOURS</code>.</li>
+</ul></li>
+<li><p><code>rdb_snapshot_start_time</code> -
+(Optional)
+The time that the first snapshot was/will be attempted, and to which
+future snapshots will be aligned.
+If not provided, the current time will be used.</p></li>
+</ul>
+
+<p><a name="nested_persistence_config_aof_config"></a>The <code>aof_config</code> block supports:</p>
+
+<ul>
+<li><code>append_fsync</code> -
+(Optional)
+Optional. Available fsync modes.
+<ul>
+<li>NO - Do not explicitly call fsync(). Rely on OS defaults.</li>
+<li>EVERYSEC - Call fsync() once per second in a background thread. A balance between performance and durability.</li>
+<li>ALWAYS - Call fsync() for earch write command.
+Possible values are: <code>APPEND_FSYNC_UNSPECIFIED</code>, <code>NO</code>, <code>EVERYSEC</code>, <code>ALWAYS</code>.</li>
+</ul></li>
+</ul>
+
+<p><a name="nested_maintenance_policy"></a>The <code>maintenance_policy</code> block supports:</p>
+
+<ul>
+<li><p><code>create_time</code> -
+(Output)
+Output only. The time when the policy was created.
+A timestamp in RFC3339 UTC "Zulu" format, with nanosecond
+resolution and up to nine fractional digits.</p></li>
+<li><p><code>update_time</code> -
+(Output)
+Output only. The time when the policy was last updated.
+A timestamp in RFC3339 UTC "Zulu" format, with nanosecond
+resolution and up to nine fractional digits.</p></li>
+<li><p><code>weekly_maintenance_window</code> -
+(Optional)
+Optional. Maintenance window that is applied to resources covered by this policy.
+Minimum 1. For the current version, the maximum number
+of weekly_window is expected to be one.
+Structure is <a href="#nested_maintenance_policy_weekly_maintenance_window">documented below</a>.</p></li>
+</ul>
+
+<p><a name="nested_maintenance_policy_weekly_maintenance_window"></a>The <code>weekly_maintenance_window</code> block supports:</p>
+
+<ul>
+<li><p><code>day</code> -
+(Required)
+Required. The day of week that maintenance updates occur.</p>
+
+<ul>
+<li>DAY_OF_WEEK_UNSPECIFIED: The day of the week is unspecified.</li>
+<li>MONDAY: Monday</li>
+<li>TUESDAY: Tuesday</li>
+<li>WEDNESDAY: Wednesday</li>
+<li>THURSDAY: Thursday</li>
+<li>FRIDAY: Friday</li>
+<li>SATURDAY: Saturday</li>
+<li>SUNDAY: Sunday
+Possible values are: <code>DAY_OF_WEEK_UNSPECIFIED</code>, <code>MONDAY</code>, <code>TUESDAY</code>, <code>WEDNESDAY</code>, <code>THURSDAY</code>, <code>FRIDAY</code>, <code>SATURDAY</code>, <code>SUNDAY</code>.</li>
+</ul></li>
+<li><p><code>duration</code> -
+(Output)
+Output only. Duration of the maintenance window.
+The current window is fixed at 1 hour.
+A duration in seconds with up to nine fractional digits,
+terminated by 's'. Example: "3.5s".</p></li>
+<li><p><code>start_time</code> -
+(Required)
+Required. Start time of the window in UTC time.
+Structure is <a href="#nested_maintenance_policy_weekly_maintenance_window_weekly_maintenance_window_start_time">documented below</a>.</p></li>
+</ul>
+
+<p><a name="nested_maintenance_policy_weekly_maintenance_window_weekly_maintenance_window_start_time"></a>The <code>start_time</code> block supports:</p>
+
+<ul>
+<li><p><code>hours</code> -
+(Optional)
+Hours of day in 24 hour format. Should be from 0 to 23.
+An API may choose to allow the value "24:00:00" for scenarios like business closing time.</p></li>
+<li><p><code>minutes</code> -
+(Optional)
+Minutes of hour of day. Must be from 0 to 59.</p></li>
+<li><p><code>seconds</code> -
+(Optional)
+Seconds of minutes of the time. Must normally be from 0 to 59.
+An API may allow the value 60 if it allows leap-seconds.</p></li>
+<li><p><code>nanos</code> -
+(Optional)
+Fractions of seconds in nanoseconds. Must be from 0 to 999,999,999.</p></li>
+</ul>
+
+<p><a name="nested_cross_cluster_replication_config"></a>The <code>cross_cluster_replication_config</code> block supports:</p>
+
+<ul>
+<li><p><code>cluster_role</code> -
+(Optional)
+The role of the cluster in cross cluster replication. Supported values are:</p>
+
+<ol>
+<li><code>CLUSTER_ROLE_UNSPECIFIED</code>: This is an independent cluster that has never participated in cross cluster replication. It allows both reads and writes.</li>
+<li><code>NONE</code>: This is an independent cluster that previously participated in cross cluster replication(either as a <code>PRIMARY</code> or <code>SECONDARY</code> cluster). It allows both reads and writes.</li>
+<li><code>PRIMARY</code>: This cluster serves as the replication source for secondary clusters that are replicating from it. Any data written to it is automatically replicated to its secondary clusters. It allows both reads and writes.</li>
+<li><code>SECONDARY</code>: This cluster replicates data from the primary cluster. It allows only reads.
+Possible values are: <code>CLUSTER_ROLE_UNSPECIFIED</code>, <code>NONE</code>, <code>PRIMARY</code>, <code>SECONDARY</code>.</li>
+</ol></li>
+<li><p><code>primary_cluster</code> -
+(Optional)
+Details of the primary cluster that is used as the replication source for this secondary cluster. This is allowed to be set only for clusters whose cluster role is of type <code>SECONDARY</code>.
+Structure is <a href="#nested_cross_cluster_replication_config_primary_cluster">documented below</a>.</p></li>
+<li><p><code>secondary_clusters</code> -
+(Optional)
+List of secondary clusters that are replicating from this primary cluster. This is allowed to be set only for clusters whose cluster role is of type <code>PRIMARY</code>.
+Structure is <a href="#nested_cross_cluster_replication_config_secondary_clusters">documented below</a>.</p></li>
+<li><p><code>membership</code> -
+(Output)
+An output only view of all the member clusters participating in cross cluster replication. This field is populated for all the member clusters irrespective of their cluster role.
+Structure is <a href="#nested_cross_cluster_replication_config_membership">documented below</a>.</p></li>
+<li><p><code>update_time</code> -
+(Output)
+The last time cross cluster replication config was updated.</p></li>
+</ul>
+
+<p><a name="nested_cross_cluster_replication_config_primary_cluster"></a>The <code>primary_cluster</code> block supports:</p>
+
+<ul>
+<li><p><code>cluster</code> -
+(Optional)
+The full resource path of the primary cluster in the format: projects/{project}/locations/{region}/clusters/{cluster-id}</p></li>
+<li><p><code>uid</code> -
+(Output)
+The unique id of the primary cluster.</p></li>
+</ul>
+
+<p><a name="nested_cross_cluster_replication_config_secondary_clusters"></a>The <code>secondary_clusters</code> block supports:</p>
+
+<ul>
+<li><p><code>cluster</code> -
+(Optional)
+The full resource path of the secondary cluster in the format: projects/{project}/locations/{region}/clusters/{cluster-id}</p></li>
+<li><p><code>uid</code> -
+(Output)
+The unique id of the secondary cluster.</p></li>
+</ul>
+
+<p><a name="nested_cross_cluster_replication_config_membership"></a>The <code>membership</code> block contains:</p>
+
+<ul>
+<li><p><code>primary_cluster</code> -
+(Output)
+Details of the primary cluster that is used as the replication source for all the secondary clusters.
+Structure is <a href="#nested_cross_cluster_replication_config_membership_primary_cluster">documented below</a>.</p></li>
+<li><p><code>secondary_clusters</code> -
+(Output)
+List of secondary clusters that are replicating from the primary cluster.
+Structure is <a href="#nested_cross_cluster_replication_config_membership_secondary_clusters">documented below</a>.</p></li>
+</ul>
+
+<p><a name="nested_cross_cluster_replication_config_membership_primary_cluster"></a>The <code>primary_cluster</code> block contains:</p>
+
+<ul>
+<li><p><code>cluster</code> -
+(Output)
+The full resource path of the primary cluster in the format: projects/{project}/locations/{region}/clusters/{cluster-id}</p></li>
+<li><p><code>uid</code> -
+(Output)
+The unique id of the primary cluster.</p></li>
+</ul>
+
+<p><a name="nested_cross_cluster_replication_config_membership_secondary_clusters"></a>The <code>secondary_clusters</code> block contains:</p>
+
+<ul>
+<li><p><code>cluster</code> -
+(Output)
+The full resource path of the secondary cluster in the format: projects/{project}/locations/{region}/clusters/{cluster-id}</p></li>
+<li><p><code>uid</code> -
+(Output)
+The unique id of the secondary cluster.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to the arguments listed above, the following computed attributes are exported:</p>
+
+<ul>
+<li><p><code>id</code> - an identifier for the resource with format <code>projects/{{project}}/locations/{{region}}/clusters/{{name}}</code></p></li>
+<li><p><code>create_time</code> -
+The timestamp associated with the cluster creation request. A timestamp in
+RFC3339 UTC "Zulu" format, with nanosecond resolution and up to nine fractional
+digits. Examples: "2014-10-02T15:01:23Z" and "2014-10-02T15:01:23.045123456Z".</p></li>
+<li><p><code>state</code> -
+The current state of this cluster. Can be CREATING, READY, UPDATING, DELETING and SUSPENDED</p></li>
+<li><p><code>uid</code> -
+System assigned, unique identifier for the cluster.</p></li>
+<li><p><code>discovery_endpoints</code> -
+Output only. Endpoints created on each given network,
+for Redis clients to connect to the cluster.
+Currently only one endpoint is supported.
+Structure is <a href="#nested_discovery_endpoints">documented below</a>.</p></li>
+<li><p><code>psc_connections</code> -
+Output only. PSC connections for discovery of the cluster topology and accessing the cluster.
+Structure is <a href="#nested_psc_connections">documented below</a>.</p></li>
+<li><p><code>state_info</code> -
+Output only. Additional information about the current state of the cluster.
+Structure is <a href="#nested_state_info">documented below</a>.</p></li>
+<li><p><code>size_gb</code> -
+Output only. Redis memory size in GB for the entire cluster.</p></li>
+<li><p><code>precise_size_gb</code> -
+Output only. Redis memory precise size in GB for the entire cluster.</p></li>
+<li><p><code>maintenance_schedule</code> -
+Upcoming maintenance schedule.
+Structure is <a href="#nested_maintenance_schedule">documented below</a>.</p></li>
+<li><p><code>psc_service_attachments</code> -
+Service attachment details to configure Psc connections.
+Structure is <a href="#nested_psc_service_attachments">documented below</a>.</p></li>
+</ul>
+
+<p><a name="nested_discovery_endpoints"></a>The <code>discovery_endpoints</code> block contains:</p>
+
+<ul>
+<li><p><code>address</code> -
+(Optional)
+Output only. Network address of the exposed Redis endpoint used by clients to connect to the service.</p></li>
+<li><p><code>port</code> -
+(Optional)
+Output only. The port number of the exposed Redis endpoint.</p></li>
+<li><p><code>psc_config</code> -
+(Optional)
+Output only. Customer configuration for where the endpoint
+is created and accessed from.
+Structure is <a href="#nested_discovery_endpoints_discovery_endpoints_psc_config">documented below</a>.</p></li>
+</ul>
+
+<p><a name="nested_discovery_endpoints_discovery_endpoints_psc_config"></a>The <code>psc_config</code> block supports:</p>
+
+<ul>
+<li><code>network</code> -
+(Optional)
+The consumer network where the network address of the discovery
+endpoint will be reserved, in the form of
+projects/{network_project_id}/global/networks/{network_id}.</li>
+</ul>
+
+<p><a name="nested_psc_connections"></a>The <code>psc_connections</code> block contains:</p>
+
+<ul>
+<li><p><code>psc_connection_id</code> -
+(Optional)
+Output only. The PSC connection id of the forwarding rule connected to the service attachment.</p></li>
+<li><p><code>address</code> -
+(Optional)
+Output only. The IP allocated on the consumer network for the PSC forwarding rule.</p></li>
+<li><p><code>forwarding_rule</code> -
+(Optional)
+Output only. The URI of the consumer side forwarding rule. Example: projects/{projectNumOrId}/regions/us-east1/forwardingRules/{resourceId}.</p></li>
+<li><p><code>project_id</code> -
+(Optional)
+Output only. The consumer projectId where the forwarding rule is created from.</p></li>
+<li><p><code>network</code> -
+(Optional)
+The consumer network where the IP address resides, in the form of projects/{projectId}/global/networks/{network_id}.</p></li>
+</ul>
+
+<p><a name="nested_state_info"></a>The <code>state_info</code> block contains:</p>
+
+<ul>
+<li><code>update_info</code> -
+(Optional)
+A nested object resource.
+Structure is <a href="#nested_state_info_update_info">documented below</a>.</li>
+</ul>
+
+<p><a name="nested_state_info_update_info"></a>The <code>update_info</code> block supports:</p>
+
+<ul>
+<li><p><code>target_shard_count</code> -
+(Optional)
+Target number of shards for redis cluster.</p></li>
+<li><p><code>target_replica_count</code> -
+(Optional)
+Target number of replica nodes per shard.</p></li>
+</ul>
+
+<p><a name="nested_maintenance_schedule"></a>The <code>maintenance_schedule</code> block contains:</p>
+
+<ul>
+<li><p><code>start_time</code> -
+(Output)
+Output only. The start time of any upcoming scheduled maintenance for this cluster.
+A timestamp in RFC3339 UTC "Zulu" format, with nanosecond
+resolution and up to nine fractional digits.</p></li>
+<li><p><code>end_time</code> -
+(Output)
+Output only. The end time of any upcoming scheduled maintenance for this cluster.
+A timestamp in RFC3339 UTC "Zulu" format, with nanosecond
+resolution and up to nine fractional digits.</p></li>
+<li><p><code>schedule_deadline_time</code> -
+(Output)
+Output only. The deadline that the maintenance schedule start time
+can not go beyond, including reschedule.
+A timestamp in RFC3339 UTC "Zulu" format, with nanosecond
+resolution and up to nine fractional digits.</p></li>
+</ul>
+
+<p><a name="nested_psc_service_attachments"></a>The <code>psc_service_attachments</code> block contains:</p>
+
+<ul>
+<li><p><code>service_attachment</code> -
+(Output)
+Service attachment URI which your self-created PscConnection should use as</p></li>
+<li><p><code>connection_type</code> -
+(Output)
+Type of a PSC connection targeting this service attachment.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p>This resource provides the following
+<a href="https://developer.hashicorp.com/terraform/plugin/sdkv2/resources/retries-and-customizable-timeouts">Timeouts</a> configuration options:</p>
+
+<ul>
+<li><code>create</code> - Default is 60 minutes.</li>
+<li><code>update</code> - Default is 120 minutes.</li>
+<li><code>delete</code> - Default is 30 minutes.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Cluster can be imported using any of these accepted formats:</p>
+
+<ul>
+<li><code>projects/{{project}}/locations/{{region}}/clusters/{{name}}</code></li>
+<li><code>{{project}}/{{region}}/{{name}}</code></li>
+<li><code>{{region}}/{{name}}</code></li>
+<li><code>{{name}}</code></li>
+</ul>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import Cluster using one of the formats above. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"projects/{{project}}/locations/{{region}}/clusters/{{name}}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_redis_cluster.default</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When using the <a href="https://developer.hashicorp.com/terraform/cli/commands/import"><code>terraform import</code> command</a>, Cluster can be imported using one of the formats above. For example:</p>
+
+<pre><code>$ terraform import google_redis_cluster.default projects/{{project}}/locations/{{region}}/clusters/{{name}}
+$ terraform import google_redis_cluster.default {{project}}/{{region}}/{{name}}
+$ terraform import google_redis_cluster.default {{region}}/{{name}}
+$ terraform import google_redis_cluster.default {{name}}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/User%20Project%20Overrides"></a><h2 id="user-project-overrides">User Project Overrides</h2>
+
+<p>This resource supports <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/provider_reference#user_project_override">User Project Overrides</a>.</p>
+
+            
+        
+    </body></html>

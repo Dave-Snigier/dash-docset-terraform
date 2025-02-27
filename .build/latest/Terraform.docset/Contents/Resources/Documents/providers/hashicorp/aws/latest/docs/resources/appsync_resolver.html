@@ -1,0 +1,202 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/appsync_resolver --><head>
+                <title>aws_appsync_resolver</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_appsync_resolver">Resource: aws_appsync_resolver</h1>
+
+<p>Provides an AppSync Resolver.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_appsync_graphql_api"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">authentication_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"API_KEY"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-example"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">schema</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">EOF</span><span class="sh"></span>
+<span class="sh">type Mutation {</span>
+<span class="sh">    putPost(id: ID!, title: String!): Post</span>
+<span class="sh">}</span>
+
+<span class="sh">type Post {</span>
+<span class="sh">    id: ID!</span>
+<span class="sh">    title: String!</span>
+<span class="sh">}</span>
+
+<span class="sh">type Query {</span>
+<span class="sh">    singlePost(id: ID!): Post</span>
+<span class="sh">}</span>
+
+<span class="sh">schema {</span>
+<span class="sh">    query: Query</span>
+<span class="sh">    mutation: Mutation</span>
+<span class="sh">}</span>
+<span class="dl">EOF</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_appsync_datasource"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">api_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_appsync_graphql_api.test.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf_example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"HTTP"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">http_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">endpoint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"http://example.com"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># UNIT type resolver (default)</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_appsync_resolver"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">api_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_appsync_graphql_api.test.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">field</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"singlePost"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Query"</span><span class="w"></span>
+<span class="w">  </span><span class="na">data_source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_appsync_datasource.test.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">request_template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">EOF</span><span class="sh"></span>
+<span class="sh">{</span>
+<span class="sh">    "version": "2018-05-29",</span>
+<span class="sh">    "method": "GET",</span>
+<span class="sh">    "resourcePath": "/",</span>
+<span class="sh">    "params":{</span>
+<span class="sh">        "headers": $utils.http.copyheaders($ctx.request.headers)</span>
+<span class="sh">    }</span>
+<span class="sh">}</span>
+<span class="dl">EOF</span>
+
+<span class="w">  </span><span class="na">response_template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">EOF</span><span class="sh"></span>
+<span class="sh">#if($ctx.result.statusCode == 200)</span>
+<span class="sh">    $ctx.result.body</span>
+<span class="sh">#else</span>
+<span class="sh">    $utils.appendError($ctx.result.body, $ctx.result.statusCode)</span>
+<span class="sh">#end</span>
+<span class="dl">EOF</span>
+
+<span class="w">  </span><span class="nb">caching_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">caching_keys</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"$context.identity.sub"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"$context.arguments.id"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">ttl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">60</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># PIPELINE type resolver</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_appsync_resolver"</span><span class="w"> </span><span class="nv">"Mutation_pipelineTest"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"Mutation"</span><span class="w"></span>
+<span class="w">  </span><span class="na">api_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_appsync_graphql_api.test.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">field</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"pipelineTest"</span><span class="w"></span>
+<span class="w">  </span><span class="na">request_template</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"{}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">response_template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"$util.toJson($ctx.result)"</span><span class="w"></span>
+<span class="w">  </span><span class="na">kind</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"PIPELINE"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">pipeline_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">functions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_appsync_function.test1.function_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_appsync_function.test2.function_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_appsync_function.test3.function_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20JS"></a><h2 id="example-usage-js">Example Usage JS</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_appsync_resolver"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Query"</span><span class="w"></span>
+<span class="w">  </span><span class="na">api_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_appsync_graphql_api.test.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">field</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"pipelineTest"</span><span class="w"></span>
+<span class="w">  </span><span class="na">kind</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"PIPELINE"</span><span class="w"></span>
+<span class="w">  </span><span class="na">code</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="p">(</span><span class="s2">"some-code-dir"</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">runtime</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"APPSYNC_JS"</span><span class="w"></span>
+<span class="w">    </span><span class="na">runtime_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1.0.0"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">pipeline_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">functions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_appsync_function.test.function_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>This resource supports the following arguments:</p>
+
+<ul>
+<li><code>api_id</code> - (Required) API ID for the GraphQL API.</li>
+<li><code>code</code> - (Optional) The function code that contains the request and response functions. When code is used, the runtime is required. The runtime value must be APPSYNC_JS.</li>
+<li><code>type</code> - (Required) Type name from the schema defined in the GraphQL API.</li>
+<li><code>field</code> - (Required) Field name from the schema defined in the GraphQL API.</li>
+<li><code>request_template</code> - (Optional) Request mapping template for UNIT resolver or 'before mapping template' for PIPELINE resolver. Required for non-Lambda resolvers.</li>
+<li><code>response_template</code> - (Optional) Response mapping template for UNIT resolver or 'after mapping template' for PIPELINE resolver. Required for non-Lambda resolvers.</li>
+<li><code>data_source</code> - (Optional) Data source name.</li>
+<li><code>max_batch_size</code> - (Optional) Maximum batching size for a resolver. Valid values are between <code>0</code> and <code>2000</code>.</li>
+<li><code>kind</code>  - (Optional) Resolver type. Valid values are <code>UNIT</code> and <code>PIPELINE</code>.</li>
+<li><code>sync_config</code> - (Optional) Describes a Sync configuration for a resolver. See <a href="#sync-config">Sync Config</a>.</li>
+<li><code>pipeline_config</code> - (Optional) The caching configuration for the resolver. See <a href="#pipeline-config">Pipeline Config</a>.</li>
+<li><code>caching_config</code> - (Optional) The Caching Config. See <a href="#caching-config">Caching Config</a>.</li>
+<li><code>runtime</code> - (Optional) Describes a runtime used by an AWS AppSync pipeline resolver or AWS AppSync function. Specifies the name and version of the runtime to use. Note that if a runtime is specified, code must also be specified. See <a href="#runtime">Runtime</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Caching%20Config"></a><h3 id="caching-config">Caching Config</h3>
+
+<ul>
+<li><code>caching_keys</code> - (Optional) The caching keys for a resolver that has caching activated. Valid values are entries from the $context.arguments, $context.source, and $context.identity maps.</li>
+<li><code>ttl</code> - (Optional) The TTL in seconds for a resolver that has caching activated. Valid values are between <code>1</code> and <code>3600</code> seconds.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Pipeline%20Config"></a><h3 id="pipeline-config">Pipeline Config</h3>
+
+<ul>
+<li><code>functions</code> - (Optional) A list of Function objects.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Sync%20Config"></a><h3 id="sync-config">Sync Config</h3>
+
+<ul>
+<li><code>conflict_detection</code> - (Optional) Conflict Detection strategy to use. Valid values are <code>NONE</code> and <code>VERSION</code>.</li>
+<li><code>conflict_handler</code> - (Optional) Conflict Resolution strategy to perform in the event of a conflict. Valid values are <code>NONE</code>, <code>OPTIMISTIC_CONCURRENCY</code>, <code>AUTOMERGE</code>, and <code>LAMBDA</code>.</li>
+<li><code>lambda_conflict_handler_config</code> - (Optional) Lambda Conflict Handler Config when configuring <code>LAMBDA</code> as the Conflict Handler. See <a href="#lambda-conflict-handler-config">Lambda Conflict Handler Config</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Lambda%20Conflict%20Handler%20Config"></a><h4 id="lambda-conflict-handler-config">Lambda Conflict Handler Config</h4>
+
+<ul>
+<li><code>lambda_conflict_handler_arn</code> - (Optional) ARN for the Lambda function to use as the Conflict Handler.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Runtime"></a><h3 id="runtime">Runtime</h3>
+
+<ul>
+<li><code>name</code> - (Optional) The name of the runtime to use. Currently, the only allowed value is <code>APPSYNC_JS</code>.</li>
+<li><code>runtime_version</code> - (Optional) The version of the runtime to use. Currently, the only allowed version is <code>1.0.0</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>arn</code> - ARN</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import <code>aws_appsync_resolver</code> using the <code>api_id</code>, a hyphen, <code>type</code>, a hypen and <code>field</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_appsync_resolver.example</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcdef123456-exampleType-exampleField"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import <code>aws_appsync_resolver</code> using the <code>api_id</code>, a hyphen, <code>type</code>, a hypen and <code>field</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_appsync_resolver.example abcdef123456-exampleType-exampleField
+</code></pre></div>
+
+            
+        
+    </body></html>

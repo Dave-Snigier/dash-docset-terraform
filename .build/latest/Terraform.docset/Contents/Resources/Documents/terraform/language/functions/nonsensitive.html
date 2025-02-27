@@ -1,0 +1,129 @@
+<html><!-- Online page at https://www.terraform.io/language/functions/nonsensitive --><head>
+                <title>nonsensitive</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="nonsensitive-function"><code>nonsensitive</code> Function</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This function is only available in Terraform v0.15 and later.</p>
+</aside>
+
+<p><code>nonsensitive</code> takes a sensitive value and returns a copy of that value with
+the sensitive marking removed, thereby exposing the sensitive value.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Warning</em>
+    <p>Using this function indiscriminately will cause values that Terraform would normally have considered as sensitive to be treated as normal values and shown clearly in Terraform's output. Use this function only when you've derived a new value from a sensitive value in a way that eliminates the sensitive portions of the value.</p>
+</aside>
+
+<p>Normally Terraform tracks when you use expressions to derive a new value from
+a value that is marked as sensitive, so that the result can also be marked
+as sensitive.</p>
+
+<p>However, you may wish to write expressions that derive non-sensitive results
+from sensitive values. For example, if you know based on details of your
+particular system and its threat model that a SHA256 hash of a particular
+sensitive value is safe to include clearly in Terraform output, you could use
+the <code>nonsensitive</code> function to indicate that, overriding Terraform's normal
+conservative behavior:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">output</span><span class="w"> </span><span class="nv">"sensitive_example_hash"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">nonsensitive</span><span class="p">(</span><span class="nf">sha256</span><span class="p">(</span><span class="nv">var.sensitive_example</span><span class="p">))</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Another example might be if the original value is only partially sensitive and
+you've written expressions to separate the sensitive and non-sensitive parts:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"mixed_content_json"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"A JSON string containing a mixture of sensitive and non-sensitive values."</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # mixed_content is derived from var.mixed_content_json, so it</span>
+<span class="c1">  # is also considered to be sensitive.</span>
+<span class="w">  </span><span class="na">mixed_content</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsondecode</span><span class="p">(</span><span class="nv">var.mixed_content_json</span><span class="p">)</span><span class="c1"></span>
+
+<span class="c1">  # password_from_json is derived from mixed_content, so it's</span>
+<span class="c1">  # also considered to be sensitive.</span>
+<span class="w">  </span><span class="na">password_from_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.mixed_content</span><span class="p">[</span><span class="s2">"password"</span><span class="p">]</span><span class="c1"></span>
+
+<span class="c1">  # username_from_json would normally be considered to be</span>
+<span class="c1">  # sensitive too, but system-specific knowledge tells us</span>
+<span class="c1">  # that the username is a non-sensitive fragment of the</span>
+<span class="c1">  # original document, and so we can override Terraform's</span>
+<span class="c1">  # determination.</span>
+<span class="w">  </span><span class="na">username_from_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">nonsensitive</span><span class="p">(</span><span class="nv">local.mixed_content</span><span class="p">[</span><span class="s2">"username"</span><span class="p">])</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When you use this function, it's your responsibility to ensure that the
+expression passed as its argument will remove all sensitive content from
+the sensitive value it depends on. By passing a value to <code>nonsensitive</code> you are
+declaring to Terraform that you have done all that is necessary to ensure that
+the resulting value has no sensitive content, even though it was derived
+from sensitive content. If a sensitive value appears in Terraform's output
+due to an inappropriate call to <code>nonsensitive</code> in your module, that's a bug in
+your module and not a bug in Terraform itself.
+<strong>Use this function sparingly and only with due care.</strong></p>
+
+<p><code>nonsensitive</code> will make no changes to values that aren't marked as sensitive, even though such a call may be redundant and potentially confusing.
+Use <code>nonsensitive</code> only after careful consideration and with definite intent.</p>
+
+<p>Consider including a comment adjacent to your call to explain to future
+maintainers what makes the usage safe and thus what invariants they must take
+care to preserve under future modifications.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Examples"></a><h2 id="examples">Examples</h2>
+
+<p>The following examples are from <code>terraform console</code> when running in the
+context of the example above with <code>variable "mixed_content_json"</code> and
+the local value <code>mixed_content</code>, with a valid JSON string assigned to
+<code>var.mixed_content_json</code>.</p>
+
+<pre><code>&gt; var.mixed_content_json
+(sensitive value)
+&gt; local.mixed_content
+(sensitive value)
+&gt; local.mixed_content["password"]
+(sensitive value)
+&gt; nonsensitive(local.mixed_content["username"])
+"zqb"
+&gt; nonsensitive("clear")
+
+Error: Invalid function argument
+
+Invalid value for "value" parameter: the given value is not sensitive, so this
+call is redundant.
+</code></pre>
+
+<p>Note though that it's always your responsibility to use <code>nonsensitive</code> only
+when it's safe to do so. If you use <code>nonsensitive</code> with content that
+<em>ought to be</em> considered sensitive then that content will be disclosed:</p>
+
+<pre><code>&gt; nonsensitive(var.mixed_content_json)
+&lt;&lt;EOT
+{
+  "username": "zqb",
+  "password": "p4ssw0rd"
+}
+EOT
+&gt; nonsensitive(local.mixed_content)
+{
+  "password" = "p4ssw0rd"
+  "username" = "zqb"
+}
+&gt; nonsensitive(local.mixed_content["password"])
+"p4ssw0rd"
+</code></pre>
+
+            
+        
+    </body></html>

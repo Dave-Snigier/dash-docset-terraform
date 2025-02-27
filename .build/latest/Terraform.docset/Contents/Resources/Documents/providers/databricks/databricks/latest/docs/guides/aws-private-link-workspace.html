@@ -1,0 +1,319 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/aws-private-link-workspace --><head>
+                <title>Provisioning Databricks on AWS with Private Link</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="provisioning-databricks-on-aws-with-private-link">Provisioning Databricks on AWS with Private Link</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Refer to the <a href="https://registry.terraform.io/modules/databricks/examples/databricks/latest">Databricks Terraform Registry modules</a> for Terraform modules and examples to deploy Azure Databricks resources.</p>
+</aside>
+
+<p>Databricks PrivateLink support enables private connectivity between users and their Databricks workspaces and between clusters on the data plane and core services on the control plane within the Databricks workspace infrastructure. You can use Terraform to deploy the underlying cloud resources and the private access settings resources automatically using a programmatic approach. This guide assumes you are deploying into an existing VPC and have set up credentials and storage configurations as per prior examples, notably here.</p>
+
+<p><img alt="Private link backend" src="https://raw.githubusercontent.com/databricks/terraform-provider-databricks/main/docs/images/aws-e2-private-link-backend.png"/></p>
+
+<p>This guide uses the following variables in configurations:</p>
+
+<ul>
+<li><code>client_id</code>: <code>application_id</code> of the service principal, see <a href="https://docs.databricks.com/dev-tools/authentication-oauth.html#step-2-create-an-oauth-secret-for-a-service-principal">instruction</a></li>
+<li><code>client_secret</code>: the secret of the service principal.</li>
+<li><code>databricks_account_id</code>: The numeric ID for your Databricks account. When logged in, it appears in the top right corner of the page.</li>
+<li><code>vpc_id</code> - The ID for the AWS VPC.</li>
+<li><code>region</code> - AWS region.</li>
+<li><code>security_group_id</code> - Security groups set up for the existing VPC.</li>
+<li><code>subnet_ids</code> - Existing subnets used for the customer-managed VPC.</li>
+<li><code>workspace_vpce_service</code> - Choose the region-specific service endpoint from this table.</li>
+<li><code>relay_vpce_service</code> - Choose the region-specific service from this table.</li>
+<li><code>vpce_subnet_cidr</code> - CIDR range for the subnet chosen for the VPC endpoint.</li>
+<li><code>tags</code> - tags for the Private Link backend setup.</li>
+<li><code>root_bucket_name</code> - AWS bucket name required for <a href="https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_storage_configurations">databricks_mws_storage_configurations</a>.</li>
+<li><code>cross_account_arn</code> - AWS EC2 role ARN required for <a href="https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_credentials">databricks_mws_credentials</a>.</li>
+</ul>
+
+<p>This guide is provided as-is, and you can use this guide as the basis for your custom Terraform module.</p>
+
+<p>This guide takes you through the following high-level steps to set up a workspace with AWS PrivateLink:</p>
+
+<ul>
+<li>Initialize the required providers</li>
+<li>Configure AWS objects
+<ul>
+<li>A subnet dedicated to your VPC relay and workspace endpoints</li>
+<li>A security group dedicated to your VPC endpoints</li>
+<li>Two AWS VPC endpoints</li>
+</ul></li>
+<li>Workspace Creation</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20initialization"></a><h2 id="provider-initialization">Provider initialization</h2>
+
+<p>To set up account-level resources, initialize <a href="https://www.terraform.io/language/providers/configuration#alias-multiple-provider-configurations">provider with <code>mws</code> alias</a>. See <a href="../index.md#authenticating-with-databricks-managed-service-principal">provider authentication</a> for more details.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">databricks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"databricks/databricks"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 4.15.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"mws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://accounts.cloud.databricks.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.client_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.client_secret</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Define the required variables:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"client_id"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"client_secret"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"root_bucket_name"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"cross_account_arn"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"vpc_id"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"region"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"security_group_id"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"subnet_ids"</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"workspace_vpce_service"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"relay_vpce_service"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"vpce_subnet_cidr"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"private_dns_enabled"</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"tags"</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nb">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"private-link-ws"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Root%20bucket"></a><h2 id="root-bucket">Root bucket</h2>
+
+<p>Create new storage configuration with <a href="../resources/mws_storage_configurations.md">databricks_mws_storage_configurations</a>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_storage_configurations"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">var.root_bucket_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_configuration_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-storage"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Cross-account%20IAM%20role"></a><h2 id="cross-account-iam-role">Cross-account IAM role</h2>
+
+<p>Create new cross-account credentials with <a href="../resources/mws_credentials.md">databricks_mws_credentials</a>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_credentials"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_arn</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.cross_account_arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">credentials_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-credentials"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configure%20networking"></a><h2 id="configure-networking">Configure networking</h2>
+
+<p>In this section, the goal is to create the two back-end VPC endpoints:</p>
+
+<ul>
+<li>Back-end VPC endpoint for SSC relay</li>
+<li>Back-end VPC endpoint for REST APIs</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you want to implement the front-end VPC endpoint as well for the connections from the user to the workspace front-end, use the transit (bastion) VPC that terminates your AWS Direct Connect or VPN gateway connection or one that is routable from such a transit (bastion) VPC. Once the front-end endpoint is created, it can be supplied to <a href="../resources/mws_networks.md">databricks_mws_networks</a> resource using <code>vpc_endpoints</code> argument. Use the <a href="../resources/mws_private_access_settings.md">databricks_mws_private_access_settings</a> resource to control which VPC endpoints can connect to the UI or API of any workspace that attaches this private access settings object.</p>
+</aside>
+
+<p>The first step is to create the required AWS objects:</p>
+
+<ul>
+<li>A subnet dedicated to your VPC endpoints.</li>
+<li>A security group dedicated to your VPC endpoints and satisfying required inbound/outbound TCP/HTTPS traffic rules on ports 443 and 6666, respectively.</li>
+</ul>
+
+<p>For workspace with <a href="https://docs.databricks.com/security/privacy/security-profile.html#prepare-a-workspace-for-the-compliance-security-profile">compliance security profile</a>, you need <em>additionally</em> allow bidirectional access to port 2443 for FIPS connections. The ports to allow bidirectional access are 443, 2443, and 6666.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"prod"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.vpc_id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// this subnet houses the data plane VPC endpoints</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_subnet"</span><span class="w"> </span><span class="nv">"dataplane_vpce"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.vpc_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.vpce_subnet_cidr</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="nv">data.aws_vpc.prod.tags</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-${data.aws_vpc.prod.id}-pl-vpce"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route_table"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.vpc_id</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="nv">data.aws_vpc.prod.tags</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-${data.aws_vpc.prod.id}-pl-local-route-tbl"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route_table_association"</span><span class="w"> </span><span class="nv">"dataplane_vpce_rtb"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_subnet.dataplane_vpce.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route_table.this.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Define security group for data plane VPC endpoint backend/relay connections:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_subnet"</span><span class="w"> </span><span class="nv">"ws_vpc_subnets"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">toset</span><span class="p">(</span><span class="nv">var.subnet_ids</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_cidr_blocks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="err">for</span><span class="w"> </span><span class="err">subnet</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">data.aws_subnet.ws_vpc_subnets</span><span class="w"> </span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="nv">subnet.cidr_block</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_security_group"</span><span class="w"> </span><span class="nv">"dataplane_vpce"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Data Plane VPC endpoint security group"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Security group shared with relay and workspace endpoints"</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">var.vpc_id</span><span class="w"></span>
+
+<span class="w">  </span><span class="err">dynamic</span><span class="w"> </span><span class="s2">"ingress"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">toset</span><span class="p">([</span><span class="w"></span>
+<span class="w">      </span><span class="m">443</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="m">2443</span><span class="p">,</span><span class="c1"> # FIPS port for CSP</span>
+<span class="w">      </span><span class="m">6666</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">])</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">content</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Inbound rules"</span><span class="w"></span>
+<span class="w">      </span><span class="na">from_port</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">ingress.value</span><span class="w"></span>
+<span class="w">      </span><span class="na">to_port</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">ingress.value</span><span class="w"></span>
+<span class="w">      </span><span class="na">protocol</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">      </span><span class="na">cidr_blocks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">concat</span><span class="p">([</span><span class="nv">var.vpce_subnet_cidr</span><span class="p">],</span><span class="w"> </span><span class="nv">local.vpc_cidr_blocks</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="err">dynamic</span><span class="w"> </span><span class="s2">"egress"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">toset</span><span class="p">([</span><span class="w"></span>
+<span class="w">      </span><span class="m">443</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="m">2443</span><span class="p">,</span><span class="c1"> # FIPS port for CSP</span>
+<span class="w">      </span><span class="m">6666</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">])</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">content</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Outbound rules"</span><span class="w"></span>
+<span class="w">      </span><span class="na">from_port</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">egress.value</span><span class="w"></span>
+<span class="w">      </span><span class="na">to_port</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">egress.value</span><span class="w"></span>
+<span class="w">      </span><span class="na">protocol</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">      </span><span class="na">cidr_blocks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">concat</span><span class="p">([</span><span class="nv">var.vpce_subnet_cidr</span><span class="p">],</span><span class="w"> </span><span class="nv">local.vpc_cidr_blocks</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="nv">data.aws_vpc.prod.tags</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-${data.aws_vpc.prod.id}-pl-vpce-sg-rules"</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"backend_rest"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">var.vpc_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">var.workspace_vpce_service</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_type</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Interface"</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_group_ids</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_security_group.dataplane_vpce.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_ids</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_subnet.dataplane_vpce.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_dns_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.private_dns_enabled</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_subnet.dataplane_vpce</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"relay"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">var.vpc_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">service_name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">var.relay_vpce_service</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_type</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Interface"</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_group_ids</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_security_group.dataplane_vpce.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_ids</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_subnet.dataplane_vpce.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_dns_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.private_dns_enabled</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_subnet.dataplane_vpce</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"backend_rest_vpce"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">aws_vpc_endpoint_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc_endpoint.backend_rest.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-vpc-backend-${var.vpc_id}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_vpc_endpoint.backend_rest</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"relay"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">aws_vpc_endpoint_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc_endpoint.relay.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-vpc-relay-${var.vpc_id}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_vpc_endpoint.relay</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_networks"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_group_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">var.security_group_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_ids</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.subnet_ids</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">var.vpc_id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">vpc_endpoints</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">dataplane_relay</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">databricks_mws_vpc_endpoint.relay.vpc_endpoint_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">rest_api</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">databricks_mws_vpc_endpoint.backend_rest_vpce.vpc_endpoint_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configure%20workspace"></a><h2 id="configure-workspace">Configure workspace</h2>
+
+<p>For a workspace to support any of the PrivateLink connectivity scenarios, the workspace must be created with an attached <a href="../resources/mws_private_access_settings.md">databricks_mws_private_access_settings</a> resource.</p>
+
+<p>The credentials ID, referenced below, is one of the attributes created as a result of configuring the cross-account IAM role, which Databricks uses to orchestrate EC2 resources. The credentials are created via <a href="https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_credentials">databricks_mws_credentials</a>. Similarly, the storage configuration ID is obtained from the <a href="https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_storage_configurations">databricks_mws_storage_configurations</a> resource.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_private_access_settings"</span><span class="w"> </span><span class="nv">"pas"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_access_settings_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Private Access Settings for ${local.prefix}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">public_access_enabled</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_workspaces"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">aws_region</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">local.prefix</span><span class="w"></span>
+<span class="w">  </span><span class="na">credentials_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_credentials.this.credentials_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_configuration_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_storage_configurations.this.storage_configuration_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_id</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_networks.this.network_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_access_settings_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_private_access_settings.pas.private_access_settings_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">pricing_tier</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"ENTERPRISE"</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">databricks_mws_networks.this</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

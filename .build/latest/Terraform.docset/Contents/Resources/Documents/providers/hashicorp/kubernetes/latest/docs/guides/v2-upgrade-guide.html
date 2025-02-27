@@ -1,0 +1,296 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/guides/v2-upgrade-guide --><head>
+                <title>Upgrading to v2.0.0 of the Kubernetes provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="upgrading-to-v200-of-the-kubernetes-provider">Upgrading to v2.0.0 of the Kubernetes provider</h1>
+
+<p>This guide covers the changes introduced in v2.0.0 of the Kubernetes provider and what you may need to do to upgrade your configuration.</p>
+
+<p>Use <code>terraform init</code> to install version 2 of the provider. Then run <code>terraform plan</code> to determine if the upgrade will affect any existing resources. Some resources will have updated defaults and may be modified as a result. To opt out of this change, see the guide below and update your Terraform config file to match the existing resource settings (for example, set <code>automount_service_account_token=false</code>). Then run <code>terraform plan</code> again to ensure no resource updates will be applied.</p>
+
+<p>NOTE: Even if there are no resource updates to apply, you may need to run <code>terraform refresh</code> to update your state to the newest version. Otherwise, some commands might fail with <code>Error: missing expected {</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Installing%20and%20testing%20this%20update"></a><h2 id="installing-and-testing-this-update">Installing and testing this update</h2>
+
+<p>The <code>required_providers</code> block can be used to move between version 1.x and version 2.x of the Kubernetes provider, for testing purposes. Please note that this is only possible using <code>terraform plan</code>. Once you run <code>terraform apply</code> or <code>terraform refresh</code>, the changes to Terraform State become permanent, and rolling back is no longer an option. It may be possible to roll back the State by making a copy of <code>.terraform.tfstate</code> before running <code>apply</code> or <code>refresh</code>, but this configuration is unsupported.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20required_providers%20to%20test%20the%20update"></a><h3 id="using-required_providers-to-test-the-update">Using required_providers to test the update</h3>
+
+<p>The version of the Kubernetes provider can be controlled using the <code>required_providers</code> block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">kubernetes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/kubernetes"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&gt;= 2.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When the above code is in place, run <code>terraform init</code> to upgrade the provider version.</p>
+
+<pre><code>$ terraform init -upgrade
+</code></pre>
+
+<p>Ensure you have a valid provider block for 2.0 before proceeding with the <code>terraform plan</code> below. In version 2.0 of the provider, <a href="https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs">provider configuration is now required</a>. A quick way to get up and running with the new provider configuration is to set <code>KUBE_CONFIG_PATH</code> to point to your existing kubeconfig.</p>
+
+<pre><code>export KUBE_CONFIG_PATH=$KUBECONFIG
+</code></pre>
+
+<p>Then run <code>terraform plan</code> to see what changes will be applied. This example shows the specific fields that would have been modified, and their effect on the resources, such as replacement or an in-place update. Some output is omitted for clarity.</p>
+
+<pre><code>$ export KUBE_CONFIG_PATH=$KUBECONFIG
+$ terraform plan
+
+kubernetes_pod.test: Refreshing state... [id=default/test]
+kubernetes_job.test: Refreshing state... [id=default/test]
+kubernetes_stateful_set.test: Refreshing state... [id=default/test]
+kubernetes_deployment.test: Refreshing state... [id=default/test]
+kubernetes_daemonset.test: Refreshing state... [id=default/test]
+kubernetes_cron_job.test: Refreshing state... [id=default/test]
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  ~ update in-place
+-/+ destroy and then create replacement
+
+Terraform will perform the following actions:
+
+  # kubernetes_cron_job.test must be replaced
+-/+ resource "kubernetes_cron_job" "test" {
+                          ~ enable_service_links             = false -&gt; true # forces replacement
+
+  # kubernetes_daemonset.test will be updated in-place
+  ~ resource "kubernetes_daemonset" "test" {
+      + wait_for_rollout = true
+          ~ template {
+              ~ spec {
+                  ~ enable_service_links             = false -&gt; true
+
+  # kubernetes_deployment.test will be updated in-place
+  ~ resource "kubernetes_deployment" "test" {
+              ~ spec {
+                  ~ enable_service_links             = false -&gt; true
+
+  # kubernetes_job.test must be replaced
+-/+ resource "kubernetes_job" "test" {
+                  ~ enable_service_links             = false -&gt; true # forces replacement
+
+  # kubernetes_stateful_set.test will be updated in-place
+  ~ resource "kubernetes_stateful_set" "test" {
+              ~ spec {
+                  ~ enable_service_links             = false -&gt; true
+
+Plan: 2 to add, 3 to change, 2 to destroy.
+</code></pre>
+
+<p>Using the output from <code>terraform plan</code>, you can make modifications to your existing Terraform config, to avoid any unwanted resource changes. For example, in the above config, adding <code>enable_service_links = false</code> to the resources would prevent any changes from occurring to the existing resources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Known%20limitation%3A%20Pod%20data%20sources%20need%20manual%20upgrade"></a><h4 id="known-limitation-pod-data-sources-need-manual-upgrade">Known limitation: Pod data sources need manual upgrade</h4>
+
+<p>During <code>terraform plan</code>, you might encounter the error below:</p>
+
+<pre><code>Error: .spec[0].container[0].resources[0].limits: missing expected {
+</code></pre>
+
+<p>This ocurrs when a Pod data source is present during upgrade. To work around this error, remove the data source from state and try the plan again.</p>
+
+<pre><code>$ terraform state rm data.kubernetes_pod.test
+Removed data.kubernetes_pod.test
+Successfully removed 1 resource instance(s).
+
+$ terraform plan
+</code></pre>
+
+<p>The data source will automatically be added back to state with data from the upgraded schema.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Rolling%20back%20to%20version%201.x"></a><h3 id="rolling-back-to-version-1x">Rolling back to version 1.x</h3>
+
+<p>If you've run the above upgrade and plan, but you don't want to proceed with the 2.0 upgrade, you can roll back using the following steps. NOTE: this will only work if you haven't run <code>terraform apply</code> or <code>terraform refresh</code> while testing version 2 of the provider.</p>
+
+<pre><code>$ terraform version
+Terraform v0.14.4
++ provider registry.terraform.io/hashicorp/kubernetes v2.0
+</code></pre>
+
+<p>Set the provider version back to 1.x.</p>
+
+<pre><code>terraform {
+  required_providers {
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "1.13"
+    }
+  }
+}
+</code></pre>
+
+<p>Then run <code>terraform init -upgrade</code> to install the old provider version.</p>
+
+<pre><code>$ terraform init -upgrade
+
+Initializing the backend...
+
+Initializing provider plugins...
+- Finding hashicorp/kubernetes versions matching "1.13.0"...
+- Installing hashicorp/kubernetes v1.13.0...
+- Installed hashicorp/kubernetes v1.13.0 (signed by HashiCorp)
+</code></pre>
+
+<p>The provider is now downgraded.</p>
+
+<pre><code>$ terraform version
+Terraform v0.14.4
++ provider registry.terraform.io/hashicorp/kubernetes v1.13.0
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20in%20v2.0.0"></a><h2 id="changes-in-v200">Changes in v2.0.0</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20to%20Kubernetes%20credentials%20supplied%20in%20the%20provider%20block"></a><h3 id="changes-to-kubernetes-credentials-supplied-in-the-provider-block">Changes to Kubernetes credentials supplied in the provider block</h3>
+
+<p>We have made several changes to the way access to Kubernetes is configured in the provider block.</p>
+
+<ol>
+<li>The <code>load_config_file</code> attribute has been removed.</li>
+<li>Support for the <code>KUBECONFIG</code> environment variable has been dropped. (Use <code>KUBE_CONFIG_PATH</code> or <code>KUBE_CONFIG_PATHS</code> instead).</li>
+<li>The <code>config_path</code> attribute will no longer default to <code>~/.kube/config</code>.</li>
+</ol>
+
+<p>The above changes have been made to encourage the best practice of configuring access to Kubernetes in the provider block explicitly, instead of relying upon default paths or <code>KUBECONFIG</code> being set. We have done this because allowing the provider to configure its access to Kubernetes implicitly caused confusion with a subset of our users. It also created risk for users who use Terraform to manage multiple clusters. Requiring explicit configuration for Kubernetes in the provider block eliminates the possibility that the configuration will be applied to the wrong cluster.</p>
+
+<p>You will therefore need to explicitly configure access to your Kubernetes cluster in the provider block going forward. For many users this will simply mean specifying the <code>config_path</code> attribute in the provider block. Users already explicitly configuring the provider should not be affected by this change, but will need to remove the <code>load_config_file</code> attribute if they are currently using it.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20to%20the%20load_balancers_ingress%20block%20on%20Service%20and%20Ingress"></a><h3 id="changes-to-the-load_balancers_ingress-block-on-service-and-ingress">Changes to the <code>load_balancers_ingress</code> block on Service and Ingress</h3>
+
+<p>We changed the <code>load_balancers_ingress</code> block on the Service and Ingress resources and data sources to align with the upstream Kubernetes API. <code>load_balancers_ingress</code> was a computed attribute that allowed users to obtain the <code>ip</code> or <code>hostname</code> of a <code>load_balancer</code>. Instead of <code>load_balancers_ingress</code>, users should use <code>status[].load_balancer[].ingress[]</code> to obtain the <code>ip</code> or <code>hostname</code> attributes.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">output</span><span class="w"> </span><span class="nv">"ingress_hostname"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">kubernetes_ingress.example_ingress.status[0].load_balancer[0].ingress[0].hostname</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/The%20automount_service_account_token%20attribute%20now%20defaults%20to%20true%20on%20Service%2C%20Deployment%2C%20StatefulSet%2C%20and%20DaemonSet"></a><h3 id="the-automount_service_account_token-attribute-now-defaults-to-true-on-service-deployment-statefulset-and-daemonset">The <code>automount_service_account_token</code> attribute now defaults to <code>true</code> on Service, Deployment, StatefulSet, and DaemonSet</h3>
+
+<p>Previously if <code>automount_service_account_token = true</code> was not set on the Service, Deployment, StatefulSet, or DaemonSet resources, the service account token was not mounted, even when a <code>service_account_name</code> was specified.  This lead to confusion for many users, because our implementation did not align with the default behavior of the Kubernetes API, which defaults to <code>true</code> for this attribute.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"kubernetes_deployment"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">metadata</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-example"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">labels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">test</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MyExampleApp"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">spec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">replicas</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">selector</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">match_labels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">test</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MyExampleApp"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">template</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">metadata</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nb">labels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">test</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MyExampleApp"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">      </span><span class="nb">spec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nb">container</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"nginx:1.21.6"</span><span class="w"></span>
+<span class="w">          </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="na">service_account_name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"default"</span><span class="w"></span>
+<span class="w">        </span><span class="na">automount_service_account_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Normalize%20wait%20defaults%20across%20Deployment%2C%20DaemonSet%2C%20StatefulSet%2C%20Service%2C%20Ingress%2C%20and%20Job"></a><h3 id="normalize-wait-defaults-across-deployment-daemonset-statefulset-service-ingress-and-job">Normalize wait defaults across Deployment, DaemonSet, StatefulSet, Service, Ingress, and Job</h3>
+
+<p>All of the <code>wait_for</code> attributes now default to <code>true</code>, including:</p>
+
+<ul>
+<li><code>wait_for_rollout</code> on the <code>kubernetes_deployment</code>, <code>kubernetes_daemonset</code>, and <code>kubernetes_stateful_set</code> resources</li>
+<li><code>wait_for_loadbalancer</code> on the <code>kubernetes_service</code> and <code>kubernetes_ingress</code> resources</li>
+<li><code>wait_for_completion</code> on the <code>kubernetes_job</code> resource</li>
+</ul>
+
+<p>Previously some of them defaulted to <code>false</code> while others defaulted to <code>true</code>, causing an inconsistent user experience. If you don't want Terraform to wait for the specified condition before moving on, you must now always set the appropriate attribute to <code>false</code></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"kubernetes_service"</span><span class="w"> </span><span class="nv">"myapp1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">metadata</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myapp1"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">spec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">selector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">app</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">kubernetes_pod.example.metadata[0].labels.app</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">session_affinity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ClientIP"</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"LoadBalancer"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">port</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">port</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">8080</span><span class="w"></span>
+<span class="w">      </span><span class="na">target_port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">80</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">wait_for_load_balancer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"false"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20to%20the%20limits%20and%20requests%20attributes%20on%20all%20resources%20that%20support%20a%20PodSpec"></a><h3 id="changes-to-the-limits-and-requests-attributes-on-all-resources-that-support-a-podspec">Changes to the <code>limits</code> and <code>requests</code> attributes on all resources that support a PodSpec</h3>
+
+<p>The <code>limits</code> and <code>requests</code> attributes on all resources that include a PodSpec, are now a map.  This means that <code>limits {}</code> must be changed to <code>limits = {}</code>, and the same for <code>requests</code>. This change impacts the following resources: <code>kubernetes_deployment</code>, <code>kubernetes_daemonset</code>, <code>kubernetes_stateful_set</code>, <code>kubernetes_pod</code>, <code>kubernetes_job</code>, <code>kubernetes_cron_job</code>. </p>
+
+<p>This change was made to enable the use of extended resources, such as GPUs, in these fields.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"kubernetes_pod"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">metadata</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-example"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">spec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">container</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"nginx:1.21.6"</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+
+<span class="w">      </span><span class="nb">resources</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nb">limits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">cpu</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.5"</span><span class="w"></span>
+<span class="w">          </span><span class="na">memory</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"512Mi"</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"nvidia/gpu"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nb">requests</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">cpu</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"250m"</span><span class="w"></span>
+<span class="w">          </span><span class="na">memory</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"50Mi"</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"nvidia/gpu"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Dropped%20support%20for%20Terraform%200.11"></a><h3 id="dropped-support-for-terraform-011">Dropped support for Terraform 0.11</h3>
+
+<p>All builds of the Kubernetes provider going forward will no longer work with Terraform 0.11. See <a href="https://www.terraform.io/upgrade-guides/index.html">Upgrade Guides</a> for how to migrate your configurations to a newer version of Terraform.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrade%20to%20v2%20of%20the%20Terraform%20Plugin%20SDK"></a><h3 id="upgrade-to-v2-of-the-terraform-plugin-sdk">Upgrade to v2 of the Terraform Plugin SDK</h3>
+
+<p>Contributors to the provider will be interested to know this upgrade has brought the latest version of the <a href="https://github.com/hashicorp/terraform-plugin-sdk">Terraform Plugin SDK</a> which introduced a number of enhancements to the developer experience. Details of the changes introduced can be found under <a href="https://www.terraform.io/docs/extend/guides/v2-upgrade-guide.html">Extending Terraform</a>.</p>
+
+            
+        
+    </body></html>

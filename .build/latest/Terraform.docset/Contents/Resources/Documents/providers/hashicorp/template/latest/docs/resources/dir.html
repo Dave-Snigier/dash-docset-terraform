@@ -1,0 +1,121 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/template/latest/docs/resources/dir --><head>
+                <title>template_dir</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="template_dir">template_dir</h1>
+
+<p>Renders a directory containing templates into a separate directory of
+corresponding rendered files.</p>
+
+<p><code>template_dir</code> is similar to <a href="../d/file.html"><code>template_file</code></a> but it walks
+a given source directory and treats every file it encounters as a template,
+rendering it to a corresponding file in the destination directory.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>When working with local files, Terraform will detect the resource as having been deleted each time a configuration is applied on a new machine where the destination dir is not present and will generate a diff to create it. This may cause "noise" in diffs in environments where configurations are routinely applied by many different users or within automation systems.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>The following example shows how one might use this resource to produce a
+directory of configuration files to upload to a compute instance, using
+Amazon EC2 as a placeholder.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"template_dir"</span><span class="w"> </span><span class="nv">"config"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_dir</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"${path.module}/instance_config_templates"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${path.cwd}/instance_config"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">vars</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">consul_addr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.consul_addr}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"server"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.server_ami}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"t2.micro"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">connection</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ...connection configuration...</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"file"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # Referencing the template_dir resource ensures that it will be</span>
+<span class="c1">    # created or updated before this aws_instance resource is provisioned.</span>
+<span class="w">    </span><span class="na">source</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"${template_dir.config.destination_dir}"</span><span class="w"></span>
+<span class="w">    </span><span class="na">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/etc/myapp"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"consul_addr"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"server_ami"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>source_dir</code> - (Required) Path to the directory where the files to template reside.</p></li>
+<li><p><code>destination_dir</code> - (Required) Path to the directory where the templated files will be written.</p></li>
+<li><p><code>vars</code> - (Optional) Variables for interpolation within the template. Note
+that variables must all be primitives. Direct references to lists or maps
+will cause a validation error.</p></li>
+</ul>
+
+<p>Any required parent directories of <code>destination_dir</code> will be created
+automatically, and any pre-existing file or directory at that location will
+be deleted before template rendering begins.</p>
+
+<p>After rendering, this resource remembers the content of both the source and
+destination directories in the Terraform state, and will plan to recreate the
+output directory if any changes are detected during the plan phase.</p>
+
+<p>Note that it is _not_ safe to use the <code>file</code> interpolation function to read
+files created by this resource, since that function can be evaluated before the
+destination directory has been created or updated. It <em>is</em> safe to use the
+generated files with resources that directly take filenames as arguments,
+as long as the path is constructed using the <code>destination_dir</code> attribute
+to create a dependency relationship with the <code>template_dir</code> resource.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Template%20Syntax"></a><h2 id="template-syntax">Template Syntax</h2>
+
+<p>The <code>template</code> argument is processed as
+<a href="../docs/configuration/expressions.html#string-templates">Terraform template syntax</a>.</p>
+
+<p>However, this provider has its own copy of the template engine embedded in it,
+separate from Terraform itself, and so which features are available are decided
+based on what Terraform version the provider was compiled against, and not
+on which Terraform version you are running.</p>
+
+<p>To include values from your configuration in rendered templates, pass them
+via the <code>vars</code> argument as shown below:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"template_dir"</span><span class="w"> </span><span class="nv">"init"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+
+<span class="w">  </span><span class="nb">vars</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">foo</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.foo}"</span><span class="w"></span>
+<span class="w">    </span><span class="na">attr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${aws_instance.foo.private_ip}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes"></a><h2 id="attributes">Attributes</h2>
+
+<p>This resource exports the following attributes:</p>
+
+<ul>
+<li><code>destination_dir</code> - The destination directory given in configuration.
+Interpolate this attribute into other resource configurations to create
+a dependency to ensure that the destination directory is populated before
+another resource attempts to read it.</li>
+</ul>
+
+            
+        
+    </body></html>

@@ -1,0 +1,521 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/sql_instance_switchover --><head>
+                <title>Performing a SQL Instance Switchover</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="performing-a-sql-instance-switchover">Performing a SQL Instance Switchover</h1>
+
+<p>This page is a brief walkthrough of performing a switchover through terraform. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/SQL%20Server"></a><h2 id="sql-server">SQL Server</h2>
+
+<ol>
+<li>Create a <strong>cross-region</strong> primary and cascadable replica. It is recommended to use deletion_protection to prevent accidental deletions.</li>
+</ol>
+
+<pre><code>resource "google_sql_database_instance" "original-primary" {
+name = "p1"
+region = "us-central1"
+deletion_protection = true
+instance_type = "CLOUD_SQL_INSTANCE"
+replica_names = ["p1-r1"] 
+    ...
+}
+resource "google_sql_database_instance" "original-replica" {
+name = "p1-r1"
+region = "us-east1"
+deletion_protection = true
+instance_type = "READ_REPLICA_INSTANCE"
+master_instance_name = "p1"
+replica_configuration {
+    cascadable_replica = true
+}
+...
+}
+</code></pre>
+
+<ol>
+<li>Invoke switchover on the replica \
+a. Change <code>instance_type</code> from <code>READ_REPLICA_INSTANCE</code> to <code>CLOUD_SQL_INSTANCE</code> \
+b. Remove <code>master_instance_name</code> \
+c. Remove <code>replica_configuration</code> \
+d. Add current primary's name to the replica's <code>replica_names</code> list</li>
+</ol>
+
+<div class="codehilite"><pre><span></span><code><span class="w">resource "google_sql_database_instance" "original-replica" {</span>
+<span class="w"> </span> name = "p1-r1"<span class="w"></span>
+<span class="w"> </span> region = "us-east1"<span class="w"></span>
+<span class="gd">- instance_type = "READ_REPLICA_INSTANCE"</span><span class="w"></span>
+<span class="gi">+ instance_type = "CLOUD_SQL_INSTANCE"</span><span class="w"></span>
+
+<span class="gd">- master_instance_name = "p1"</span><span class="w"></span>
+<span class="gd">- replica_configuration {</span><span class="w"></span>
+<span class="gd">- cascadable_replica = true</span><span class="w"></span>
+<span class="gd">- }</span><span class="w"></span>
+<span class="gi">+ replica_names = ["p1"]</span><span class="w"></span>
+<span class="w"> </span> ...  <span class="w"></span>
+<span class="w">}</span>
+</code></pre></div>
+
+<ol>
+<li>Update the old primary and run <code>terraform plan</code> \
+a. Change <code>instance_type</code> from <code>CLOUD_SQL_INSTANCE</code> to <code>READ_REPLICA_INSTANCE</code> \
+b. Set <code>master_instance_name</code> to the new primary (original replica) \
+c. Set <code>replica_configuration</code> and indicate this is a <code>cascadable-replica</code> \
+d. Remove old replica from <code>replica_names</code> \
+~&gt; <strong>NOTE</strong>: Do <strong>not</strong> delete the replica_names field, even if it has no replicas remaining. Set replica_names = [ ] to indicate it having no replicas. \
+e. Run <code>terraform plan</code> and verify that everything is done in-place (or data will be lost)</li>
+</ol>
+
+<div class="codehilite"><pre><span></span><code><span class="w">resource "google_sql_database_instance" "original-primary" {</span>
+<span class="w"> </span> name = "p1"<span class="w"></span>
+<span class="w"> </span> region="us-central1"<span class="w"></span>
+<span class="gd">- instance_type = "CLOUD_SQL_INSTANCE"</span><span class="w"></span>
+<span class="gi">+ instance_type = "READ_REPLICA_INSTANCE"</span><span class="w"></span>
+<span class="gi">+ master_instance_name = "p1-r1"</span><span class="w"></span>
+<span class="gi">+ replica_configuration </span><span class="w"></span>
+<span class="gi">+   cascadable_replica = true</span><span class="w"></span>
+<span class="gi">+ }</span><span class="w"></span>
+<span class="gd">- replica_names = ["p1-r1"] </span><span class="w"></span>
+<span class="gi">+ replica_names = [] </span><span class="w"></span>
+<span class="w"> </span> ...<span class="w"></span>
+<span class="w">}</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Plan%20and%20verify%20that%3A"></a><h4 id="plan-and-verify-that">Plan and verify that:</h4>
+
+<ul>
+<li><code>terraform plan</code> outputs <strong>"0 to add, 0 to destroy"</strong></li>
+<li><code>terraform plan</code> does not say <strong>"must be replaced"</strong> for any resource</li>
+<li>Every resource <strong>"will be updated in-place"</strong></li>
+<li>Only the 2 instances involved in switchover have planned changes</li>
+<li>(Recommended) Use <code>deletion_protection</code> on instances as a safety measure</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/MySQL"></a><h2 id="mysql">MySQL</h2>
+
+<ol>
+<li>Create a <strong>cross-region, Enterprise Plus edition</strong> primary and replica. The primary should have backup and binary log enabled.</li>
+</ol>
+
+<pre><code>resource "google_sql_database_instance" "original-primary" {
+  project             = "your-project"
+  name                = "your-original-primary"
+  # Can be any region.
+  region              = "us-east1"
+  # Any database version that supports Enterprise Plus edition.
+  database_version    = "MYSQL_8_0"
+  instance_type       = "CLOUD_SQL_INSTANCE"
+
+  settings {
+    # Any tier that supports Enterprise Plus edition.
+    tier              = "db-perf-optimized-N-2"
+    edition           = "ENTERPRISE_PLUS"
+    backup_configuration {
+      enabled            = true
+      binary_log_enabled = true
+    }
+  }
+
+  # You can add more settings.
+}
+
+resource "google_sql_database_instance" "original-replica" {
+  project              = "your-project"
+  name                 = "your-original-replica"
+  # Can be any region, but must be different from the primary's region.
+  region               = "us-west2"
+  # Must be same as the primary's database_version.
+  database_version     = "MYSQL_8_0"
+  instance_type        = "READ_REPLICA_INSTANCE"
+  master_instance_name = google_sql_database_instance.original-primary.name
+
+  settings {
+    # Any tier that supports Enterprise Plus edition.
+    tier              = "db-perf-optimized-N-2"
+    edition           = "ENTERPRISE_PLUS"
+  }
+
+  # You can add more settings.
+}
+</code></pre>
+
+<ol>
+<li>Designate the replica as DR replica of the primary by adding <code>replication_cluster.failover_dr_replica_name</code>.</li>
+</ol>
+
+<div class="codehilite"><pre><span></span><code><span class="w">resource "google_sql_database_instance" "original-primary" {</span>
+<span class="w"> </span> project             = "your-project"<span class="w"></span>
+<span class="w"> </span> name                = "your-original-primary"<span class="w"></span>
+<span class="w"> </span> region              = "us-east1"<span class="w"></span>
+<span class="w"> </span> database_version    = "MYSQL_8_0"<span class="w"></span>
+<span class="w"> </span> instance_type       = "CLOUD_SQL_INSTANCE"<span class="w"></span>
+
+<span class="gi">+  replication_cluster {</span><span class="w"></span>
+<span class="gi">+    # Note that the format of the name is "project:instance".</span><span class="w"></span>
+<span class="gi">+    # If you want to unset DR replica, put empty string in this field.</span><span class="w"></span>
+<span class="gi">+    failover_dr_replica_name = "your-project:your-original-replica"</span><span class="w"></span>
+<span class="gi">+  }</span><span class="w"></span>
+
+<span class="w"> </span> settings {<span class="w"></span>
+<span class="w"> </span>   tier              = "db-perf-optimized-N-2"<span class="w"></span>
+<span class="w"> </span>   edition           = "ENTERPRISE_PLUS"<span class="w"></span>
+<span class="w"> </span>   backup_configuration {<span class="w"></span>
+<span class="w"> </span>     enabled            = true<span class="w"></span>
+<span class="w"> </span>     binary_log_enabled = true<span class="w"></span>
+<span class="w"> </span>   }<span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+<span class="w">}</span>
+
+<span class="w">resource "google_sql_database_instance" "original-replica" {</span>
+<span class="w"> </span> project              = "your-project"<span class="w"></span>
+<span class="w"> </span> name                 = "your-original-replica"<span class="w"></span>
+<span class="w"> </span> region               = "us-west2"<span class="w"></span>
+<span class="w"> </span> database_version     = "MYSQL_8_0"<span class="w"></span>
+<span class="w"> </span> instance_type        = "READ_REPLICA_INSTANCE"<span class="w"></span>
+<span class="w"> </span> master_instance_name = "your-original-primary"<span class="w"></span>
+
+<span class="w"> </span> settings {<span class="w"></span>
+<span class="w"> </span>   tier              = "db-perf-optimized-N-2"<span class="w"></span>
+<span class="w"> </span>   edition           = "ENTERPRISE_PLUS"<span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+<span class="w">}</span>
+</code></pre></div>
+
+<ol>
+<li>Invoke switchover on the original replica.</li>
+</ol>
+
+<ul>
+<li>Change <code>instance_type</code> from <code>READ_REPLICA_INSTANCE</code> to <code>CLOUD_SQL_INSTANCE</code>.</li>
+<li>Remove <code>master_instance_name</code>.</li>
+<li>Add original primary's name to the original replica's <code>replica_names</code> list and <code>replication_cluster.failover_dr_replica_name</code>.</li>
+<li>Enable backup and binary log for original replica.</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="w">resource "google_sql_database_instance" "original-primary" {</span>
+<span class="w"> </span> project             = "your-project"<span class="w"></span>
+<span class="w"> </span> name                = "your-original-primary"<span class="w"></span>
+<span class="w"> </span> region              = "us-east1"<span class="w"></span>
+<span class="w"> </span> database_version    = "MYSQL_8_0"<span class="w"></span>
+<span class="w"> </span> instance_type       = "CLOUD_SQL_INSTANCE"<span class="w"></span>
+
+<span class="w"> </span> replication_cluster {<span class="w"></span>
+<span class="w"> </span>   failover_dr_replica_name = "your-project:your-original-replica"<span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+
+<span class="w"> </span> settings {<span class="w"></span>
+<span class="w"> </span>   tier              = "db-perf-optimized-N-2"<span class="w"></span>
+<span class="w"> </span>   edition           = "ENTERPRISE_PLUS"<span class="w"></span>
+<span class="w"> </span>   backup_configuration {<span class="w"></span>
+<span class="w"> </span>     enabled            = true<span class="w"></span>
+<span class="w"> </span>     binary_log_enabled = true<span class="w"></span>
+<span class="w"> </span>   }<span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+<span class="w">}</span>
+
+<span class="w">resource "google_sql_database_instance" "original-replica" {</span>
+<span class="w"> </span> project              = "your-project"<span class="w"></span>
+<span class="w"> </span> name                 = "your-original-replica"<span class="w"></span>
+<span class="w"> </span> region               = "us-west2"<span class="w"></span>
+<span class="w"> </span> database_version     = "MYSQL_8_0"<span class="w"></span>
+<span class="gd">-  instance_type        = "READ_REPLICA_INSTANCE"</span><span class="w"></span>
+<span class="gi">+  instance_type        = "CLOUD_SQL_INSTANCE"</span><span class="w"></span>
+<span class="gd">-  master_instance_name = "your-original-primary"</span><span class="w"></span>
+<span class="gi">+  replica_names        = ["your-original-primary"]</span><span class="w"></span>
+
+<span class="gi">+  replication_cluster {</span><span class="w"></span>
+<span class="gi">+    failover_dr_replica_name = "your-project:your-original-primary"</span><span class="w"></span>
+<span class="gi">+  }</span><span class="w"></span>
+
+<span class="w"> </span> settings {<span class="w"></span>
+<span class="w"> </span>   tier              = "db-perf-optimized-N-2"<span class="w"></span>
+<span class="w"> </span>   edition           = "ENTERPRISE_PLUS"<span class="w"></span>
+<span class="gi">+    backup_configuration {</span><span class="w"></span>
+<span class="gi">+      enabled            = true</span><span class="w"></span>
+<span class="gi">+      binary_log_enabled = true</span><span class="w"></span>
+<span class="gi">+    }    </span><span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+<span class="w">}</span>
+</code></pre></div>
+
+<ol>
+<li>Update the original primary and run <code>terraform plan</code>.</li>
+<li>Change <code>instance_type</code> from <code>CLOUD_SQL_INSTANCE</code> to <code>READ_REPLICA_INSTANCE</code>.</li>
+<li>Set <code>master_instance_name</code> to the new primary (original replica).</li>
+<li>(If <code>replica_names</code> is present) Remove original replica from <code>replica_names</code>.
+<ul>
+<li><strong>NOTE</strong>: Do <strong>not</strong> delete the <code>replica_names</code> field, even if it has no replicas remaining. Set <code>replica_names = [ ]</code> to indicate it having no replicas.</li>
+</ul></li>
+<li>Remove original replica from <code>replication_cluster.failover_dr_replica_name</code> by setting this field to the empty string.</li>
+<li>Disable backup for original primary (because it became a replica).</li>
+<li>Run <code>terraform plan</code> and verify that your configuration matches infrastructure. You should see a message like the following:
+<ul>
+<li><strong><code>No changes. Your infrastructure matches the configuration.</code></strong></li>
+</ul></li>
+</ol>
+
+<div class="codehilite"><pre><span></span><code><span class="w">resource "google_sql_database_instance" "original-primary" {</span>
+<span class="w"> </span> project             = "your-project"<span class="w"></span>
+<span class="w"> </span> name                = "your-original-primary"<span class="w"></span>
+<span class="w"> </span> region              = "us-east1"<span class="w"></span>
+<span class="w"> </span> database_version    = "MYSQL_8_0"<span class="w"></span>
+<span class="gd">-  instance_type        = "CLOUD_SQL_INSTANCE"</span><span class="w"></span>
+<span class="gi">+  instance_type        = "READ_REPLICA_INSTANCE"</span><span class="w"></span>
+<span class="gi">+  master_instance_name = "your-original-replica"</span><span class="w"></span>
+
+<span class="w"> </span> replication_cluster {<span class="w"></span>
+<span class="gd">-    failover_dr_replica_name = "your-project:your-original-replica"</span><span class="w"></span>
+<span class="gi">+    failover_dr_replica_name = ""</span><span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+
+<span class="w"> </span> settings {<span class="w"></span>
+<span class="w"> </span>   tier              = "db-perf-optimized-N-2"<span class="w"></span>
+<span class="w"> </span>   edition           = "ENTERPRISE_PLUS"<span class="w"></span>
+<span class="w"> </span>   backup_configuration {<span class="w"></span>
+<span class="gd">-      enabled            = true</span><span class="w"></span>
+<span class="gi">+      enabled            = false</span><span class="w"></span>
+<span class="w"> </span>     binary_log_enabled = true<span class="w"></span>
+<span class="w"> </span>   }<span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+<span class="w">}</span>
+
+<span class="w">resource "google_sql_database_instance" "original-replica" {</span>
+<span class="w"> </span> project              = "your-project"<span class="w"></span>
+<span class="w"> </span> name                 = "your-original-replica"<span class="w"></span>
+<span class="w"> </span> region               = "us-west2"<span class="w"></span>
+<span class="w"> </span> database_version     = "MYSQL_8_0"<span class="w"></span>
+<span class="w"> </span> instance_type        = "CLOUD_SQL_INSTANCE"<span class="w"></span>
+<span class="w"> </span> replica_names        = ["your-original-primary"]<span class="w"></span>
+
+<span class="w"> </span> replication_cluster {<span class="w"></span>
+<span class="w"> </span>   failover_dr_replica_name = "your-project:your-original-primary"<span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+
+<span class="w"> </span> settings {<span class="w"></span>
+<span class="w"> </span>   tier              = "db-perf-optimized-N-2"<span class="w"></span>
+<span class="w"> </span>   edition           = "ENTERPRISE_PLUS"<span class="w"></span>
+<span class="w"> </span>   backup_configuration {<span class="w"></span>
+<span class="w"> </span>     enabled            = true<span class="w"></span>
+<span class="w"> </span>     binary_log_enabled = true<span class="w"></span>
+<span class="w"> </span>   }    <span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+<span class="w">}</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/PostgreSQL"></a><h2 id="postgresql">PostgreSQL</h2>
+
+<ol>
+<li>Create a <strong>cross-region, Enterprise Plus edition</strong> primary and replica. The primary should have backup and PITR enabled.</li>
+</ol>
+
+<pre><code>resource "google_sql_database_instance" "original-primary" {
+  project             = "your-project"
+  name                = "your-original-primary"
+  # Can be any region.
+  region              = "us-east1"
+  # Any database version that supports Enterprise Plus edition.
+  database_version    = "POSTGRES_12"
+  instance_type       = "CLOUD_SQL_INSTANCE"
+
+  settings {
+    # Any tier that supports Enterprise Plus edition.
+    tier              = "db-perf-optimized-N-2"
+    edition           = "ENTERPRISE_PLUS"
+    backup_configuration {
+      enabled                        = true
+      point_in_time_recovery_enabled = true
+    }
+  }
+
+  # You can add more settings.
+}
+
+resource "google_sql_database_instance" "original-replica" {
+  project              = "your-project"
+  name                 = "your-original-replica"
+  # Can be any region, but must be different from the primary's region.
+  region               = "us-west2"
+  # Must be same as the primary's database_version.
+  database_version     = "POSTGRES_12"
+  instance_type        = "READ_REPLICA_INSTANCE"
+  master_instance_name = google_sql_database_instance.original-primary.name
+
+  settings {
+    # Any tier that supports Enterprise Plus edition.
+    tier              = "db-perf-optimized-N-2"
+    edition           = "ENTERPRISE_PLUS"
+  }
+
+  # You can add more settings.
+}
+</code></pre>
+
+<ol>
+<li>Designate the replica as DR replica of the primary by adding <code>replication_cluster.failover_dr_replica_name</code>.</li>
+</ol>
+
+<div class="codehilite"><pre><span></span><code><span class="w">resource "google_sql_database_instance" "original-primary" {</span>
+<span class="w"> </span> project             = "your-project"<span class="w"></span>
+<span class="w"> </span> name                = "your-original-primary"<span class="w"></span>
+<span class="w"> </span> region              = "us-east1"<span class="w"></span>
+<span class="w"> </span> database_version    = "POSTGRES_12"<span class="w"></span>
+<span class="w"> </span> instance_type       = "CLOUD_SQL_INSTANCE"<span class="w"></span>
+
+<span class="gi">+  replication_cluster {</span><span class="w"></span>
+<span class="gi">+    # Note that the format of the name is "project:instance".</span><span class="w"></span>
+<span class="gi">+    # If you want to unset DR replica, put empty string in this field.</span><span class="w"></span>
+<span class="gi">+    failover_dr_replica_name = "your-project:your-original-replica"</span><span class="w"></span>
+<span class="gi">+  }</span><span class="w"></span>
+
+<span class="w"> </span> settings {<span class="w"></span>
+<span class="w"> </span>   tier              = "db-perf-optimized-N-2"<span class="w"></span>
+<span class="w"> </span>   edition           = "ENTERPRISE_PLUS"<span class="w"></span>
+<span class="w"> </span>   backup_configuration {<span class="w"></span>
+<span class="w"> </span>     enabled                        = true<span class="w"></span>
+<span class="w"> </span>     point_in_time_recovery_enabled = true<span class="w"></span>
+<span class="w"> </span>   }<span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+<span class="w">}</span>
+
+<span class="w">resource "google_sql_database_instance" "original-replica" {</span>
+<span class="w"> </span> project              = "your-project"<span class="w"></span>
+<span class="w"> </span> name                 = "your-original-replica"<span class="w"></span>
+<span class="w"> </span> region               = "us-west2"<span class="w"></span>
+<span class="w"> </span> database_version     = "POSTGRES_12"<span class="w"></span>
+<span class="w"> </span> instance_type        = "READ_REPLICA_INSTANCE"<span class="w"></span>
+<span class="w"> </span> master_instance_name = "your-original-primary"<span class="w"></span>
+
+<span class="w"> </span> settings {<span class="w"></span>
+<span class="w"> </span>   tier              = "db-perf-optimized-N-2"<span class="w"></span>
+<span class="w"> </span>   edition           = "ENTERPRISE_PLUS"<span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+<span class="w">}</span>
+</code></pre></div>
+
+<ol>
+<li>Invoke switchover on the original replica.</li>
+</ol>
+
+<ul>
+<li>Change <code>instance_type</code> from <code>READ_REPLICA_INSTANCE</code> to <code>CLOUD_SQL_INSTANCE</code>.</li>
+<li>Remove <code>master_instance_name</code>.</li>
+<li>Add original primary's name to the original replica's <code>replica_names</code> list and <code>replication_cluster.failover_dr_replica_name</code>.</li>
+<li>Enable backup and PITR for original replica.</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="w">resource "google_sql_database_instance" "original-primary" {</span>
+<span class="w"> </span> project             = "your-project"<span class="w"></span>
+<span class="w"> </span> name                = "your-original-primary"<span class="w"></span>
+<span class="w"> </span> region              = "us-east1"<span class="w"></span>
+<span class="w"> </span> database_version    = "POSTGRES_12"<span class="w"></span>
+<span class="w"> </span> instance_type       = "CLOUD_SQL_INSTANCE"<span class="w"></span>
+
+<span class="w"> </span> replication_cluster {<span class="w"></span>
+<span class="w"> </span>   failover_dr_replica_name = "your-project:your-original-replica"<span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+
+<span class="w"> </span> settings {<span class="w"></span>
+<span class="w"> </span>   tier              = "db-perf-optimized-N-2"<span class="w"></span>
+<span class="w"> </span>   edition           = "ENTERPRISE_PLUS"<span class="w"></span>
+<span class="w"> </span>   backup_configuration {<span class="w"></span>
+<span class="w"> </span>     enabled                        = true<span class="w"></span>
+<span class="w"> </span>     point_in_time_recovery_enabled = true<span class="w"></span>
+<span class="w"> </span>   }<span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+<span class="w">}</span>
+
+<span class="w">resource "google_sql_database_instance" "original-replica" {</span>
+<span class="w"> </span> project              = "your-project"<span class="w"></span>
+<span class="w"> </span> name                 = "your-original-replica"<span class="w"></span>
+<span class="w"> </span> region               = "us-west2"<span class="w"></span>
+<span class="w"> </span> database_version     = "POSTGRES_12"<span class="w"></span>
+<span class="gd">-  instance_type        = "READ_REPLICA_INSTANCE"</span><span class="w"></span>
+<span class="gi">+  instance_type        = "CLOUD_SQL_INSTANCE"</span><span class="w"></span>
+<span class="gd">-  master_instance_name = "your-original-primary"</span><span class="w"></span>
+<span class="gi">+  replica_names        = ["your-original-primary"]</span><span class="w"></span>
+
+<span class="gi">+  replication_cluster {</span><span class="w"></span>
+<span class="gi">+    failover_dr_replica_name = "your-project:your-original-primary"</span><span class="w"></span>
+<span class="gi">+  }</span><span class="w"></span>
+
+<span class="w"> </span> settings {<span class="w"></span>
+<span class="w"> </span>   tier              = "db-perf-optimized-N-2"<span class="w"></span>
+<span class="w"> </span>   edition           = "ENTERPRISE_PLUS"<span class="w"></span>
+<span class="gi">+    backup_configuration {</span><span class="w"></span>
+<span class="gi">+      enabled                        = true</span><span class="w"></span>
+<span class="gi">+      point_in_time_recovery_enabled = true</span><span class="w"></span>
+<span class="gi">+    }  </span><span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+<span class="w">}</span>
+</code></pre></div>
+
+<ol>
+<li>Update the original primary and run <code>terraform plan</code>.</li>
+<li>Change <code>instance_type</code> from <code>CLOUD_SQL_INSTANCE</code> to <code>READ_REPLICA_INSTANCE</code>.</li>
+<li>Set <code>master_instance_name</code> to the new primary (original replica).</li>
+<li>(If <code>replica_names</code> is present) Remove original replica from <code>replica_names</code>.
+<ul>
+<li><strong>NOTE</strong>: Do <strong>not</strong> delete the <code>replica_names</code> field, even if it has no replicas remaining. Set <code>replica_names = [ ]</code> to indicate it having no replicas.</li>
+</ul></li>
+<li>Remove original replica from <code>replication_cluster.failover_dr_replica_name</code> by setting this field to the empty string.</li>
+<li>Disable backup and PITR for original primary (because it became a replica).</li>
+<li>Run <code>terraform plan</code> and verify that your configuration matches infrastructure. You should see a message like the following:
+<ul>
+<li><strong><code>No changes. Your infrastructure matches the configuration.</code></strong></li>
+</ul></li>
+</ol>
+
+<div class="codehilite"><pre><span></span><code><span class="w">resource "google_sql_database_instance" "original-primary" {</span>
+<span class="w"> </span> project             = "your-project"<span class="w"></span>
+<span class="w"> </span> name                = "your-original-primary"<span class="w"></span>
+<span class="w"> </span> region              = "us-east1"<span class="w"></span>
+<span class="w"> </span> database_version    = "POSTGRES_12"<span class="w"></span>
+<span class="gd">-  instance_type        = "CLOUD_SQL_INSTANCE"</span><span class="w"></span>
+<span class="gi">+  instance_type        = "READ_REPLICA_INSTANCE"</span><span class="w"></span>
+<span class="gi">+  master_instance_name = "your-original-replica"</span><span class="w"></span>
+
+<span class="w"> </span> replication_cluster {<span class="w"></span>
+<span class="gd">-    failover_dr_replica_name = "your-project:your-original-replica"</span><span class="w"></span>
+<span class="gi">+    failover_dr_replica_name = ""</span><span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+
+<span class="w"> </span> settings {<span class="w"></span>
+<span class="w"> </span>   tier              = "db-perf-optimized-N-2"<span class="w"></span>
+<span class="w"> </span>   edition           = "ENTERPRISE_PLUS"<span class="w"></span>
+<span class="w"> </span>   backup_configuration {<span class="w"></span>
+<span class="gd">-      enabled            = true</span><span class="w"></span>
+<span class="gi">+      enabled            = false</span><span class="w"></span>
+<span class="gd">-      point_in_time_recovery_enabled = true</span><span class="w"></span>
+<span class="gi">+      point_in_time_recovery_enabled = false</span><span class="w"></span>
+<span class="w"> </span>   }<span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+<span class="w">}</span>
+
+<span class="w">resource "google_sql_database_instance" "original-replica" {</span>
+<span class="w"> </span> project              = "your-project"<span class="w"></span>
+<span class="w"> </span> name                 = "your-original-replica"<span class="w"></span>
+<span class="w"> </span> region               = "us-west2"<span class="w"></span>
+<span class="w"> </span> database_version     = "POSTGRES_12"<span class="w"></span>
+<span class="w"> </span> instance_type        = "CLOUD_SQL_INSTANCE"<span class="w"></span>
+<span class="w"> </span> replica_names        = ["your-original-primary"]<span class="w"></span>
+
+<span class="w"> </span> replication_cluster {<span class="w"></span>
+<span class="w"> </span>   failover_dr_replica_name = "your-project:your-original-primary"<span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+
+<span class="w"> </span> settings {<span class="w"></span>
+<span class="w"> </span>   tier              = "db-perf-optimized-N-2"<span class="w"></span>
+<span class="w"> </span>   edition           = "ENTERPRISE_PLUS"<span class="w"></span>
+<span class="w"> </span>   backup_configuration {<span class="w"></span>
+<span class="w"> </span>     enabled                        = true<span class="w"></span>
+<span class="w"> </span>     point_in_time_recovery_enabled = true<span class="w"></span>
+<span class="w"> </span>   }    <span class="w"></span>
+<span class="w"> </span> }<span class="w"></span>
+<span class="w">}</span>
+</code></pre></div>
+
+            
+        
+    </body></html>

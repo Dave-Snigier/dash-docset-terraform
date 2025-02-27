@@ -1,0 +1,108 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/notebook --><head>
+                <title>databricks_notebook</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_notebook-resource">databricks_notebook Resource</h1>
+
+<p>This resource allows you to manage <a href="https://docs.databricks.com/notebooks/index.html">Databricks Notebooks</a>. You can also work with <a href="../data-sources/notebook.md">databricks_notebook</a> and <a href="../data-sources/notebook_paths.md">databricks_notebook_paths</a> data sources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>You can declare Terraform-managed notebook by specifying <code>source</code> attribute of corresponding local file. Only <code>.scala</code>, <code>.py</code>, <code>.sql</code>, <code>.r</code>, and <code>.ipynb</code> extensions are supported, if you would like to omit the <code>language</code> attribute.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_current_user"</span><span class="w"> </span><span class="nv">"me"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_notebook"</span><span class="w"> </span><span class="nv">"ddl"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${path.module}/DDLgen.py"</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.databricks_current_user.me.home}/AA/BB/CC"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>You can also create a managed notebook with inline sources through <code>content_base64</code> and <code>language</code> attributes.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_notebook"</span><span class="w"> </span><span class="nv">"notebook"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">content_base64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">base64encode</span><span class="p">(</span><span class="o">&lt;&lt;-</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="sh">    # created from ${abspath(path.module)}</span>
+<span class="sh">    display(spark.range(10))</span>
+<span class="dl">    EOT</span>
+<span class="w">  </span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"/Shared/Demo"</span><span class="w"></span>
+<span class="w">  </span><span class="na">language</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PYTHON"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>You can also manage <a href="https://docs.databricks.com/notebooks/notebooks-manage.html#databricks-archive">Databricks Archives</a> to import the whole folders of notebooks statically. Whenever you update the <code>.dbc</code> file, the Terraform-managed notebook folder is removed and replaced with contents of the new <code>.dbc</code> file. You are strongly advised to use <code>.dbc</code> format only with <code>source</code> attribute of the resource:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_notebook"</span><span class="w"> </span><span class="nv">"lesson"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${path.module}/IntroNotebooks.dbc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"/Shared/Intro"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Notebook on Databricks workspace would only be changed, if Terraform stage did change. This means that any manual changes to managed notebook won't be overwritten by Terraform, if there's no local change to notebook sources. Notebooks are identified by their path, so changing notebook's name manually on the workspace and then applying Terraform state would result in creation of notebook from Terraform state.</p>
+</aside>
+
+<p>The size of a notebook source code must not exceed a few megabytes. The following arguments are supported:</p>
+
+<ul>
+<li><code>path</code> -  (Required) The absolute path of the notebook or directory, beginning with "/", e.g. "/Demo".</li>
+<li><code>source</code> - Path to notebook in source code format on local filesystem. Conflicts with <code>content_base64</code>.</li>
+<li><code>content_base64</code> - The base64-encoded notebook source code. Conflicts with <code>source</code>. Use of <code>content_base64</code> is discouraged, as it's increasing memory footprint of Terraform state and should only be used in exceptional circumstances, like creating a notebook with configuration properties for a data pipeline.</li>
+<li><code>language</code> -  (required with <code>content_base64</code>) One of <code>SCALA</code>, <code>PYTHON</code>, <code>SQL</code>, <code>R</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> -  Path of notebook on workspace</li>
+<li><code>url</code> - Routable URL of the notebook</li>
+<li><code>object_id</code> -  Unique identifier for a NOTEBOOK</li>
+<li><code>workspace_path</code> - path on Workspace File System (WSFS) in form of <code>/Workspace</code> + <code>path</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Access%20Control"></a><h2 id="access-control">Access Control</h2>
+
+<ul>
+<li><a href="permissions.md#notebook-usage">databricks_permissions</a> can control which groups or individual users can access notebooks or folders.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>The resource notebook can be imported using notebook path</p>
+
+<div class="codehilite"><pre><span></span><code>terraform import databricks_notebook.this /path/to/notebook
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are often used in the same context:</p>
+
+<ul>
+<li><a href="../guides/workspace-management.md">End to end workspace management</a> guide.</li>
+<li><a href="cluster.md">databricks_cluster</a> to create <a href="https://docs.databricks.com/clusters/index.html">Databricks Clusters</a>.</li>
+<li><a href="directory.md">databricks_directory</a> to manage directories in <a href="https://docs.databricks.com/workspace/workspace-objects.html">Databricks Workpace</a>.</li>
+<li><a href="job.md">databricks_job</a> to manage <a href="https://docs.databricks.com/jobs.html">Databricks Jobs</a> to run non-interactive code in a <a href="cluster.md">databricks_cluster</a>.</li>
+<li><a href="../data-sources/notebook.md">databricks_notebook</a> data to export a notebook from Databricks Workspace.</li>
+<li><a href="../data-sources/notebook_paths.md">databricks_notebook_paths</a> data to list notebooks in Databricks Workspace.</li>
+<li><a href="pipeline.md">databricks_pipeline</a> to deploy <a href="https://docs.databricks.com/data-engineering/delta-live-tables/index.html">Delta Live Tables</a>.</li>
+<li><a href="repo.md">databricks_repo</a> to manage <a href="https://docs.databricks.com/repos.html">Databricks Repos</a>.</li>
+<li><a href="secret.md">databricks_secret</a> to manage <a href="https://docs.databricks.com/security/secrets/index.html#secrets-user-guide">secrets</a> in Databricks workspace.</li>
+<li><a href="secret_acl.md">databricks_secret_acl</a> to manage access to <a href="https://docs.databricks.com/security/secrets/index.html#secrets-user-guide">secrets</a> in Databricks workspace.</li>
+<li><a href="secret_scope.md">databricks_secret_scope</a> to create <a href="https://docs.databricks.com/security/secrets/index.html#secrets-user-guide">secret scopes</a> in Databricks workspace.</li>
+<li><a href="user.md">databricks_user</a> to <a href="https://docs.databricks.com/administration-guide/users-groups/users.html">manage users</a>, that could be added to <a href="group.md">databricks_group</a> within the workspace.</li>
+<li><a href="../data-sources/user.md">databricks_user</a> data to retrieve information about <a href="user.md">databricks_user</a>.</li>
+</ul>
+
+            
+        
+    </body></html>

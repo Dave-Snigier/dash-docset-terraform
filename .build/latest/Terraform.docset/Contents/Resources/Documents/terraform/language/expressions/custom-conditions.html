@@ -1,0 +1,417 @@
+<html><!-- Online page at https://www.terraform.io/language/expressions/custom-conditions --><head>
+                <title>Custom Conditions</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="custom-conditions">Custom Conditions</h1>
+
+<p>You can create conditions that produce custom error messages for several types of objects in a configuration. For example, you can add a condition to an input variable that checks whether incoming image IDs are formatted properly. Custom conditions can capture assumptions, helping future maintainers understand the configuration design and intent. They also return useful information about errors earlier and in context, helping consumers more easily diagnose issues in their configurations.</p>
+
+<blockquote>
+  <p><strong>Hands On:</strong> Try the <a href="../../terraform/tutorials/configuration-language/checks.html">Validate Infrastructure Using Checks</a> tutorial to learn how to use <code>check</code> blocks. Try the <a href="../../terraform/tutorials/configuration-language/custom-conditions.html">Validate Modules with Custom Conditions</a> tutorial to learn how to use other custom conditions.</p>
+</blockquote>
+
+<p>This page explains the following:</p>
+
+<ul>
+<li>Creating checks with <a href="#checks-with-assertions">assertions</a> to verify your infrastructure as a whole (Terraform v1.5.0 and later)</li>
+<li>Creating <a href="#input-variable-validation">validation conditions</a> for input variables (Terraform v0.13.0 and later)</li>
+<li>Creating <a href="#preconditions-and-postconditions">preconditions and postconditions</a> for resources, data sources, and outputs (Terraform v1.2.0 and later)</li>
+<li>Writing effective <a href="#condition-expressions">condition expressions</a> and <a href="#error-messages">error messages</a></li>
+<li>When Terraform <a href="#conditions-checked-only-during-apply">evaluates custom conditions</a> during the plan and apply cycle</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Selecting%20a%20Custom%20Condition%20for%20your%20use%20case"></a><h2 id="selecting-a-custom-condition-for-your-use-case">Selecting a Custom Condition for your use case</h2>
+
+<p>Terraform's different custom conditions are best suited to various situations. Use the following broad guidelines to select the best custom condition for your use case:</p>
+
+<ol>
+<li><a href="#checks-with-assertions">Check blocks with assertions</a> validate your infrastructure as a whole. Additionally, check blocks do not prevent or block the overall execution of Terraform operations.</li>
+<li><a href="#input-variable-validation">Validation conditions</a> or <a href="#preconditions-and-postconditions">output postconditions</a> can ensure your configuration's inputs and outputs meet specific requirements.</li>
+<li>Resource <a href="#preconditions-and-postconditions">preconditions and postconditions</a> can validate that Terraform produces your configuration with predictable results.</li>
+</ol>
+
+<p>For more information on when to use certain custom conditions, see <a href="#choosing-between-preconditions-and-postconditions">Choosing Between Preconditions and Postconditions</a> and <a href="../../terraform/language/checks.html#choosing-checks-or-other-custom-conditions">Choosing Checks or Other Custom Conditions</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Input%20Variable%20Validation"></a><h2 id="input-variable-validation">Input Variable Validation</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Input variable validation is available in Terraform v0.13.0 and later. Before Terraform v1.9.0, validation rules can refer only to the variable being validated, and not to any other variables.</p>
+</aside>
+
+<p>Add one or more <code>validation</code> blocks within the <code>variable</code> block to specify custom conditions. Each validation requires a <a href="#condition-expressions"><code>condition</code> argument</a>, an expression that must use the value of the variable to return <code>true</code> if the value is valid, or <code>false</code> if it is invalid. The expression must not cause errors directly itself.</p>
+
+<p>If the condition evaluates to <code>false</code>, Terraform produces an <a href="#error-messages">error message</a> that includes the result of the <code>error_message</code> expression. If you declare multiple validations, Terraform returns error messages for all failed conditions.</p>
+
+<p>The following example checks whether the AMI ID has valid syntax.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"image_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The id of the machine image (AMI) to use for the server."</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">validation</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="nv">var.image_id</span><span class="p">)</span><span class="w"> </span><span class="err">&gt;</span><span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="err">&amp;&amp;</span><span class="w"> </span><span class="nf">substr</span><span class="p">(</span><span class="nv">var.image_id</span><span class="p">,</span><span class="w"> </span><span class="m">0</span><span class="p">,</span><span class="w"> </span><span class="m">4</span><span class="p">)</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"ami-"</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The image_id value must be a valid AMI id, starting with \"ami-\"."</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>If the failure of an expression determines the validation decision, use the <a href="../../terraform/language/functions/can.html"><code>can</code> function</a> as demonstrated in the following example.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"image_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The id of the machine image (AMI) to use for the server."</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">validation</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # regex(...) fails if it cannot find a match</span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nf">can</span><span class="p">(</span><span class="nf">regex</span><span class="p">(</span><span class="s2">"^ami-"</span><span class="p">,</span><span class="w"> </span><span class="nv">var.image_id</span><span class="p">))</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The image_id value must be a valid AMI id, starting with \"ami-\"."</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Preconditions%20and%20Postconditions"></a><h2 id="preconditions-and-postconditions">Preconditions and Postconditions</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Preconditions and postconditions are available in Terraform v1.2.0 and later.</p>
+</aside>
+
+<p>Use <code>precondition</code> and <code>postcondition</code> blocks to create custom rules for resources, data sources, and outputs.</p>
+
+<p>Terraform checks a precondition <em>before</em> evaluating the object it is associated with and checks a postcondition <em>after</em> evaluating the object. Terraform evaluates custom conditions as early as possible, but must defer conditions that depend on unknown values until the apply phase. Refer to <a href="#conditions-checked-only-during-apply">Conditions Checked Only During Apply</a> for more details.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Usage"></a><h3 id="usage">Usage</h3>
+
+<p>Each precondition and postcondition requires a <a href="#condition-expressions"><code>condition</code> argument</a>. This is an expression that must return <code>true</code> if the conditition is fufilled or <code>false</code> if it is invalid. The expression can refer to any other objects in the same module, as long as the references do not create cyclic dependencies. Resource postconditions can also use the <a href="#self-object"><code>self</code> object</a> to refer to attributes of each instance of the resource where they are configured.</p>
+
+<p>If the condition evaluates to <code>false</code>, Terraform will produce an <a href="#error-messages">error message</a> that includes the result of the <code>error_message</code> expression. If you declare multiple preconditions or postconditions, Terraform returns error messages for all failed conditions.</p>
+
+<p>The following example uses a postcondition to detect if the caller accidentally provided an AMI intended for the wrong system component.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_ami"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.aws_ami_id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # The AMI ID must refer to an existing AMI that has the tag "nomad-server".</span>
+<span class="w">    </span><span class="nb">postcondition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">self.tags</span><span class="p">[</span><span class="s2">"Component"] == "nomad-server"</span><span class="w"></span>
+<span class="w">      </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tags[\"Component\"] must be \"nomad-server\"."</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resources%20and%20Data%20Sources"></a><h4 id="resources-and-data-sources">Resources and Data Sources</h4>
+
+<p>The <code>lifecycle</code> block inside a <code>resource</code> or <code>data</code> block can include both <code>precondition</code> and <code>postcondition</code> blocks.</p>
+
+<ul>
+<li>Terraform evaluates <code>precondition</code> blocks after evaluating existing <code>count</code> and <code>for_each</code> arguments. This lets Terraform evaluate the precondition separately for each instance and then make <code>each.key</code>, <code>count.index</code>, etc. available to those conditions. Terraform also evaluates preconditions before evaluating the resource's configuration arguments. Preconditions can take precedence over argument evaluation errors.</li>
+<li>Terraform evaluates <code>postcondition</code> blocks after planning and applying changes to a managed resource, or after reading from a data source. Postcondition failures prevent changes to other resources that depend on the failing resource.</li>
+</ul>
+
+<p>In most cases, we do not recommend including both a <code>data</code> block and a <code>resource</code> block that both represent the same object in the same configuration. Doing so can prevent Terraform from understanding that the <code>data</code> block result can be affected by changes in the <code>resource</code> block. However, when you need to check a result of a <code>resource</code> block that the resource itself does not directly export, you can use a <code>data</code> block to check that object safely as long as you place the check as a direct <code>postcondition</code> of the <code>data</code> block. This tells Terraform that the <code>data</code> block is serving as a check of an object defined elsewhere, allowing Terraform to perform actions in the correct order.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Outputs"></a><h4 id="outputs">Outputs</h4>
+
+<p>An <code>output</code> block can include a <code>precondition</code>  block.</p>
+
+<p>Preconditions can serve a symmetrical purpose to input variable <code>validation</code> blocks. Whereas input variable validation checks assumptions the module makes about its inputs, preconditions check guarantees that the module makes about its outputs. You can use preconditions to prevent Terraform from saving an invalid new output value in the state. You can also use them to preserve a valid output value from the previous apply, if applicable.</p>
+
+<p>Terraform evaluates output value preconditions before evaluating the <code>value</code> expression to finalize the result. Preconditions can take precedence over potential errors in the <code>value</code> expression.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Examples"></a><h3 id="examples">Examples</h3>
+
+<p>The following example shows use cases for preconditions and postconditions. The preconditions and postconditions declare the following assumptions and guarantees.</p>
+
+<ul>
+<li><p><strong>The AMI ID must refer to an AMI that contains an operating system for the
+<code>x86_64</code> architecture.</strong> The precondition would detect if the caller accidentally built an AMI for a different architecture, which may not be able to run the software this virtual machine is intended to host.</p></li>
+<li><p><strong>The EC2 instance must be allocated a public DNS hostname.</strong> In Amazon Web Services, EC2 instances are assigned public DNS hostnames only if they belong to a virtual network configured in a certain way. The postcondition would detect if the selected virtual network is not configured correctly, prompting the user to debug the network settings.</p></li>
+<li><p><strong>The EC2 instance will have an encrypted root volume.</strong> The postcondition ensures that the root volume is encrypted, even though the software running in this EC2 instance would probably still operate as expected on an unencrypted volume. This lets Terraform produce an error immediately, before any other components rely on the new EC2 instance.</p></li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_ami"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">owners</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"amazon"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">filter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"image-id"</span><span class="w"></span>
+<span class="w">    </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"ami-abc123"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"t3.micro"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_ami.example.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # The AMI ID must refer to an AMI that contains an operating system</span>
+<span class="c1">    # for the `x86_64` architecture.</span>
+<span class="w">    </span><span class="nb">precondition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_ami.example.architecture</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"x86_64"</span><span class="w"></span>
+<span class="w">      </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The selected AMI must be for the x86_64 architecture."</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">    # The EC2 instance must be allocated a public DNS hostname.</span>
+<span class="w">    </span><span class="nb">postcondition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">self.public_dns</span><span class="w"> </span><span class="p">!=</span><span class="w"> </span><span class="s2">""</span><span class="w"></span>
+<span class="w">      </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"EC2 instance must be in a VPC that has public DNS hostnames enabled."</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_ebs_volume"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # Use data resources that refer to other resources to</span>
+<span class="c1">  # load extra data that isn't directly exported by a resource.</span>
+<span class="c1">  #</span>
+<span class="c1">  # Read the details about the root storage volume for the EC2 instance</span>
+<span class="c1">  # declared by aws_instance.example, using the exported ID.</span>
+
+<span class="w">  </span><span class="nb">filter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"volume-id"</span><span class="w"></span>
+<span class="w">    </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_instance.example.root_block_device[0].volume_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # Whenever a data resource is verifying the result of a managed resource</span>
+<span class="c1">  # declared in the same configuration, you MUST write the checks as</span>
+<span class="c1">  # postconditions of the data resource. This ensures Terraform will wait</span>
+<span class="c1">  # to read the data resource until after any changes to the managed resource</span>
+<span class="c1">  # have completed.</span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # The EC2 instance will have an encrypted root volume.</span>
+<span class="w">    </span><span class="nb">postcondition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">self.encrypted</span><span class="w"></span>
+<span class="w">      </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"The server's root volume is not encrypted."</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"api_base_url"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://${aws_instance.example.private_dns}:8433/"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Choosing%20Between%20Preconditions%20and%20Postconditions"></a><h3 id="choosing-between-preconditions-and-postconditions">Choosing Between Preconditions and Postconditions</h3>
+
+<p>You can often implement a validation check as either a postcondition of the resource producing the data or as a precondition of a resource or output value using the data. To decide which is most appropriate, consider whether the check is representing either an assumption or a guarantee.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Use%20Preconditions%20for%20Assumptions"></a><h4 id="use-preconditions-for-assumptions">Use Preconditions for Assumptions</h4>
+
+<p>An assumption is a condition that must be true in order for the configuration of a particular resource to be usable. For example, an <code>aws_instance</code> configuration can have the assumption that the given AMI will always be configured for the <code>x86_64</code> CPU architecture.</p>
+
+<p>We recommend using preconditions for assumptions, so that future maintainers can find them close to the other expressions that rely on that condition. This lets them understand more about what that resource is intended to allow.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Use%20Postconditions%20for%20Guarantees"></a><h4 id="use-postconditions-for-guarantees">Use Postconditions for Guarantees</h4>
+
+<p>A guarantee is a characteristic or behavior of an object that the rest of the configuration should be able to rely on. For example, an <code>aws_instance</code> configuration can have the guarantee that an EC2 instance will be running in a network that assigns it a private DNS record.</p>
+
+<p>We recommend using postconditions for guarantees, so that future maintainers can find them close to the resource configuration that is responsible for implementing those guarantees. This lets them more easily determine which behaviors they should preserve when changing the configuration.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Additional%20Decision%20Factors"></a><h4 id="additional-decision-factors">Additional Decision Factors</h4>
+
+<p>You should also consider the following questions when creating preconditions and postconditions.</p>
+
+<ul>
+<li>Which resource or output value would be most helpful to report in the error message? Terraform will always report errors in the location where the condition was declared.</li>
+<li>Which approach is more convenient? If a particular resource has many dependencies that all make an assumption about that resource, it can be pragmatic to declare that once as a post-condition of the resource, rather than declaring it many times as preconditions on each of the dependencies.</li>
+<li>Is it helpful to declare the same or similar conditions as both preconditions and postconditions? This can be useful if the postcondition is in a different module than the precondition because it lets the modules verify one another as they evolve independently.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Checks%20with%20Assertions"></a><h2 id="checks-with-assertions">Checks with Assertions</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Check blocks and their assertions are only available in Terraform v1.5.0 and later.</p>
+</aside>
+
+<p><a href="../../terraform/language/checks.html">Check blocks</a> can validate your infrastructure outside the usual resource lifecycle. You can add custom conditions via <code>assert</code> blocks, which execute at the end of the plan and apply stages and produce warnings to notify you of problems within your infrastructure.</p>
+
+<p>You can add one or more <code>assert</code> blocks within a <code>check</code> block to verify custom conditions. Each assertion requires a <a href="#condition-expressions"><code>condition</code> argument</a>, a boolean expression that should return <code>true</code> if the intended assumption or guarantee is fulfilled or <code>false</code> if it does not. Your <code>condition</code> expression can refer to any resource, data source, or variable available to the surrounding <code>check</code> block.</p>
+
+<p>The following example uses a check block with an assertion to verify the Terraform website is healthy.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">check</span><span class="w"> </span><span class="s2">"health_check"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">data</span><span class="w"> </span><span class="nc">"http"</span><span class="w"> </span><span class="nv">"terraform_io"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://www.terraform.io"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">assert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.http.terraform_io.status_code</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="m">200</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.http.terraform_io.url} returned an unhealthy status code"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>If the condition evaluates to <code>false</code>, Terraform produces an <a href="#error-messages">error message</a> that includes the result of the <code>error_message</code> expression. If you declare multiple assertions, Terraform returns error messages for all failed conditions.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Continuous%20Validation%20in%20HCP%20Terraform"></a><h3 id="continuous-validation-in-hcp-terraform">Continuous Validation in HCP Terraform</h3>
+
+<p>HCP Terraform can automatically check whether the checks in a workspace’s configuration continue to pass after Terraform provisions the infrastructure. For example, you can write a <code>check</code> to continuously monitor the validity of an API gateway certificate. Continuous validation alerts you when the condition fails, so you can update the certificate and avoid errors the next time you want to update your infrastructure. Refer to <a href="../../terraform/cloud-docs/workspaces/health.html#continuous-validation">Continuous Validation</a> in the HCP Terraform documentation for details.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Condition%20Expressions"></a><h2 id="condition-expressions">Condition Expressions</h2>
+
+<p>Check assertions, input variable validation, preconditions, and postconditions all require a <code>condition</code> argument. This is a boolean expression that should return <code>true</code> if the intended assumption or guarantee is fulfilled or <code>false</code> if it does not.</p>
+
+<p>You can use any of Terraform's built-in functions or language operators
+in a condition as long as the expression is valid and returns a boolean result. The following language features are particularly useful when writing condition expressions.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Logical%20Operators"></a><h3 id="logical-operators">Logical Operators</h3>
+
+<p>Use the logical operators <code>&amp;&amp;</code> (AND), <code>||</code> (OR), and <code>!</code> (NOT) to combine multiple conditions together.
+  </p><div class="codehilite"><pre><span></span><code><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.name</span><span class="w"> </span><span class="p">!=</span><span class="w"> </span><span class="s2">""</span><span class="w"> </span><span class="err">&amp;&amp;</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span><span class="nv">var.name</span><span class="p">)</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="nv">var.name</span><span class="w"></span>
+  </code></pre></div><p></p>
+
+<p>You can also use arithmetic operators (e.g. <code>a + b</code>), equality operators (eg., <code>a == b</code>) and comparison operators (e.g., <code>a &lt; b</code>). Refer to <a href="../../terraform/language/expressions/operators.html">Arithmetic and Logical Operators</a> for details.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/contains%20Function"></a><h3 id="contains-function"><code>contains</code> Function</h3>
+
+<p>Use the <a href="../../terraform/language/functions/contains.html"><code>contains</code> function</a> to test whether a given value is one of a set of predefined valid values.
+  </p><div class="codehilite"><pre><span></span><code><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">contains</span><span class="p">([</span><span class="s2">"STAGE", "PROD"</span><span class="p">],</span><span class="w"> </span><span class="nv">var.environment</span><span class="p">)</span><span class="w"></span>
+  </code></pre></div><p></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/length%20Function"></a><h3 id="length-function"><code>length</code> Function</h3>
+
+<p>Use the <a href="../../terraform/language/functions/length.html"><code>length</code> function</a> to test a collection's length and require a non-empty list or map.
+  </p><div class="codehilite"><pre><span></span><code><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="nv">var.items</span><span class="p">)</span><span class="w"> </span><span class="p">!=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+  </code></pre></div><p></p>
+
+<p>This is a better approach than directly comparing with another collection using <code>==</code> or <code>!=</code>. This is because the comparison operators can only return <code>true</code> if both operands have exactly the same type, which is often ambiguous for empty collections.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/for%20Expressions"></a><h3 id="for-expressions"><code>for</code> Expressions</h3>
+
+<p>Use <a href="../../terraform/language/expressions/for.html"><code>for</code> expressions</a> in conjunction with the functions <code>alltrue</code> and <code>anytrue</code> to test whether a condition holds for all or for any elements of a collection.
+  </p><div class="codehilite"><pre><span></span><code><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">alltrue</span><span class="p">([</span><span class="w"></span>
+  <span class="w">  </span><span class="err">for</span><span class="w"> </span><span class="err">v</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">var.instances</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nf">contains</span><span class="p">([</span><span class="s2">"t2.micro", "m3.medium"</span><span class="p">],</span><span class="w"> </span><span class="nv">v.type</span><span class="p">)</span><span class="w"></span>
+  <span class="p">])</span><span class="w"></span>
+  </code></pre></div><p></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/can%20Function"></a><h3 id="can-function"><code>can</code> Function</h3>
+
+<p>Use the <a href="../../terraform/language/functions/can.html"><code>can</code> function</a> to concisely use the validity of an expression as a condition. It returns <code>true</code> if its given expression evaluates successfully and <code>false</code> if it returns any error, so you can use various other functions that typically return errors as a part of your condition expressions.</p>
+
+<p>For example, you can use <code>can</code> with <code>regex</code> to test if a string matches a particular pattern because <code>regex</code> returns an error when given a non-matching string.
+  </p><div class="codehilite"><pre><span></span><code><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">can</span><span class="p">(</span><span class="nf">regex</span><span class="p">(</span><span class="s2">"^[a-z]+$"</span><span class="p">,</span><span class="w"> </span><span class="nv">var.name</span><span class="p">))</span><span class="w"></span>
+  </code></pre></div><p></p>
+
+<p>You can also use <code>can</code> with the type conversion functions to test whether a value is convertible to a type or type constraint.
+  </p><div class="codehilite"><pre><span></span><code><span class="c1"># This remote output value must have a value that can</span>
+  <span class="c1"># be used as a string, which includes strings themselves</span>
+  <span class="c1"># but also allows numbers and boolean values.</span>
+  <span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">can</span><span class="p">(</span><span class="nf">tostring</span><span class="p">(</span><span class="nv">data.terraform<em>remote</em>state.example.outputs</span><span class="p">[</span><span class="s2">"name"</span><span class="p">]))</span><span class="w"></span>
+  </code></pre></div><p></p>
+
+<p></p><div class="codehilite"><pre><span></span><code><span class="c1"># This remote output value must be convertible to a list</span>
+  <span class="c1"># type of with element type.</span>
+  <span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">can</span><span class="p">(</span><span class="nf">tolist</span><span class="p">(</span><span class="nv">data.terraform<em>remote</em>state.example.outputs</span><span class="p">[</span><span class="s2">"items"</span><span class="p">]))</span><span class="w"></span>
+  </code></pre></div><p></p>
+
+<p>You can also use <code>can</code> with attribute access or index operators to test whether a collection or structural value has a particular element or index.
+  </p><div class="codehilite"><pre><span></span><code><span class="c1"># var.example must have an attribute named "foo"</span>
+  <span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">can</span><span class="p">(</span><span class="nv">var.example.foo</span><span class="p">)</span><span class="w"></span>
+  </code></pre></div><p></p>
+
+<p></p><div class="codehilite"><pre><span></span><code><span class="c1"># var.example must be a sequence with at least one element</span>
+  <span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">can</span><span class="p">(</span><span class="nv">var.example[0</span><span class="p">])</span><span class="c1"></span>
+  <span class="c1"># (although it would typically be clearer to write this as a</span>
+  <span class="c1"># test like length(var.example) &gt; 0 to better represent the</span>
+  <span class="c1"># intent of the condition.)</span>
+  </code></pre></div><p></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/self%20Object"></a><h3 id="self-object"><code>self</code> Object</h3>
+
+<p>Use the <code>self</code> object in postcondition blocks to refer to attributes of the instance under evaluation.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"t2.micro"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"ami-abc123"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">postcondition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">self.instance_state</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"running"</span><span class="w"></span>
+<span class="w">      </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"EC2 instance must be running."</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/each%20and%20count%20Objects"></a><h3 id="each-and-count-objects"><code>each</code> and <code>count</code> Objects</h3>
+
+<p>In blocks where <a href="../../terraform/language/meta-arguments/for_each.html"><code>for_each</code></a> or <a href="../../terraform/language/meta-arguments/count.html"><code>count</code></a>  are set, use <code>each</code> and <code>count</code> objects to refer to other resources that are expanded in a chain.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"vpc_cidrs"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">set</span><span class="p">(</span><span class="kt">string</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.vpc_cidrs</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">filter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"cidr"</span><span class="w"></span>
+<span class="w">    </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">each.key</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_internet_gateway"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_vpc.example</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">precondition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_vpc.example[each.key].state</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"available"</span><span class="w"></span>
+<span class="w">      </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"VPC ${each.key} must be available."</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Error%20Messages"></a><h2 id="error-messages">Error Messages</h2>
+
+<p>Input variable validations, preconditions, and postconditions all must include the <code>error_message</code> argument. This contains the text that Terraform will include as part of error messages when it detects an unmet condition.</p>
+
+<pre><code>Error: Resource postcondition failed
+
+  with data.aws_ami.example,
+  on ec2.tf line 19, in data "aws_ami" "example":
+  72:       condition     = self.tags["Component"] == "nomad-server"
+    |----------------
+    | self.tags["Component"] is "consul-server"
+
+The selected AMI must be tagged with the Component value "nomad-server".
+</code></pre>
+
+<p>The <code>error_message</code> argument can be any expression that evaluates to a string.
+This includes literal strings, heredocs, and template expressions. You can use the <a href="../../terraform/language/functions/format.html"><code>format</code> function</a> to convert items of <code>null</code>, <code>list</code>, or <code>map</code> types into a formatted string. Multi-line
+error messages are supported, and lines with leading whitespace will not be
+word wrapped.</p>
+
+<p>We recommend writing error messages as one or more full sentences in a
+style similar to Terraform's own error messages. Terraform will show the
+message alongside the name of the resource that detected the problem and any
+external values included in the condition expression.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Conditions%20Checked%20Only%20During%20Apply"></a><h2 id="conditions-checked-only-during-apply">Conditions Checked Only During Apply</h2>
+
+<p>Terraform evaluates custom conditions as early as possible.</p>
+
+<p>Input variable validations can only refer to the variable value, so Terraform always evaluates them immediately. Check assertions, preconditions, and postconditions depend on Terraform evaluating whether the value(s) associated with the condition are known before or after applying the configuration.</p>
+
+<ul>
+<li><strong>Known before apply:</strong> Terraform checks the condition during the planning phase. For example, Terraform can know the value of an image ID during planning as long as it is not generated from another resource.</li>
+<li><strong>Known after apply:</strong> Terraform delays checking that condition until the apply phase. For example, AWS only assigns the root volume ID when it starts an EC2 instance, so Terraform cannot know this value until apply.</li>
+</ul>
+
+<p>During the apply phase, a failed <em>precondition</em>
+will prevent Terraform from implementing planned actions for the associated resource. However, a failed <em>postcondition</em> will halt processing after Terraform has already implemented these actions. The failed postcondition prevents any further downstream actions that rely on the resource, but does not undo the actions Terraform has already taken.</p>
+
+<p>Terraform typically has less information during the initial creation of a
+full configuration than when applying subsequent changes. Therefore, Terraform may check conditions during apply for initial creation and then check them during planning for subsequent updates.</p>
+
+            
+        
+    </body></html>

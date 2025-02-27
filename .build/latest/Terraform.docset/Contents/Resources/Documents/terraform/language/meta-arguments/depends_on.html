@@ -1,0 +1,78 @@
+<html><!-- Online page at https://www.terraform.io/language/meta-arguments/depends_on --><head>
+                <title>The depends_on Meta-Argument</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="the-depends_on-meta-argument">The <code>depends_on</code> Meta-Argument</h1>
+
+<p>Use the <code>depends_on</code> meta-argument to handle hidden resource or module dependencies that Terraform cannot automatically infer. You only need to explicitly specify a dependency when a resource or module relies on another resource's behavior but does not access any of that resource's data in its arguments.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Module support for <code>depends_on</code> was added in Terraform version 0.13, and prior versions can only use it with resources.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Processing%20and%20Planning%20Consequences"></a><h2 id="processing-and-planning-consequences">Processing and Planning Consequences</h2>
+
+<p>The <code>depends_on</code> meta-argument instructs Terraform to complete all actions on the dependency object (including Read actions) before performing actions on the object declaring the dependency. When the dependency object is an entire module, <code>depends_on</code> affects the order in which Terraform processes all of the resources and data sources associated with that module. Refer to <a href="../../terraform/language/resources/behavior.html#resource-dependencies">Resource Dependencies</a> and <a href="../../terraform/language/data-sources.html#data-resource-dependencies">Data Resource Dependencies</a> for more details.</p>
+
+<p>You should use <code>depends_on</code> as a last resort because it can cause Terraform to create more conservative plans that replace more resources than necessary. For example, Terraform may treat more values as unknown “(known after apply)” because it is uncertain what changes will occur on the upstream object. This is especially likely when you use <code>depends_on</code> for modules.</p>
+
+<p>Instead of <code>depends_on</code>, we recommend using <a href="../../terraform/language/expressions/references.html">expression references</a> to imply dependencies when possible. Expression references let Terraform understand which value the reference derives from and avoid planning changes if that particular value hasn’t changed, even if other parts of the upstream object have planned changes.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Usage"></a><h2 id="usage">Usage</h2>
+
+<p>You can use the <code>depends_on</code> meta-argument in <code>module</code> blocks and in all <code>resource</code> blocks, regardless of resource type. It requires a list of references to other resources or child modules in the same calling module. This list cannot include arbitrary expressions because the <code>depends_on</code> value must be known before Terraform knows resource relationships and thus before it can safely evaluate expressions.</p>
+
+<p>We recommend always including a comment that explains why using <code>depends_on</code> is necessary. The following example uses <code>depends_on</code> to handle a "hidden" dependency on the <code>aws_iam_instance_profile.example</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="c1"></span>
+
+<span class="c1">  # assume_role_policy is omitted for brevity in this example. Refer to the</span>
+<span class="c1">  # documentation for aws_iam_role for a complete example.</span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_instance_profile"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # Because this expression refers to the role, Terraform can infer</span>
+<span class="c1">  # automatically that the role must be created first.</span>
+<span class="w">  </span><span class="na">role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.example.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role_policy"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"Statement"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[{</span><span class="c1"></span>
+<span class="c1">      # This policy allows software running on the EC2 instance to</span>
+<span class="c1">      # access the S3 API.</span>
+<span class="w">      </span><span class="s2">"Action"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"s3:*"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"Effect"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">}],</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"ami-a1b2c3d4"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"t2.micro"</span><span class="c1"></span>
+
+<span class="c1">  # Terraform can infer from this that the instance profile must</span>
+<span class="c1">  # be created before the EC2 instance.</span>
+<span class="w">  </span><span class="na">iam_instance_profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_instance_profile.example</span><span class="c1"></span>
+
+<span class="c1">  # However, if software running in this EC2 instance needs access</span>
+<span class="c1">  # to the S3 API in order to boot properly, there is also a "hidden"</span>
+<span class="c1">  # dependency on the aws_iam_role_policy that Terraform cannot</span>
+<span class="c1">  # automatically infer, so it must be declared explicitly:</span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">aws_iam_role_policy.example</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

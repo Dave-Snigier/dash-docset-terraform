@@ -1,0 +1,457 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_workspaces --><head>
+                <title>databricks_mws_workspaces</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_mws_workspaces-resource">databricks_mws_workspaces resource</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Initialize provider with <code>alias = "mws"</code>, <code>host  = "https://accounts.cloud.databricks.com"</code> and use <code>provider = databricks.mws</code>. We require all <code>databricks_mws_*</code> resources to be created within its own dedicated terraform module of your environment. Usually this module creates VPC and IAM roles as well. Code that creates workspaces and code that <a href="../guides/workspace-management.md">manages workspaces</a> must be in separate terraform modules to avoid common confusion between <code>provider = databricks.mws</code> and <code>provider = databricks.created_workspace</code>. This is why we specify <code>databricks_host</code> and <code>databricks_token</code> outputs, that have to be used in the latter modules:</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">module.ai.databricks_host</span><span class="w"></span>
+<span class="w">  </span><span class="na">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">module.ai.databricks_token</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>This resource allows you to set up <a href="https://docs.databricks.com/getting-started/overview.html#e2-architecture-1">workspaces on AWS</a> or <a href="https://docs.gcp.databricks.com/administration-guide/account-settings-gcp/workspaces.html">workspaces on GCP</a>. Please follow this complete runnable example on <a href="../guides/aws-workspace.md">AWS</a> or <a href="../guides/gcp-workspace.md">GCP</a> with new VPC and new workspace setup.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>On Azure you need to use <a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/databricks_workspace">azurerm_databricks_workspace</a> resource to create Azure Databricks workspaces.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20a%20Databricks%20on%20AWS%20workspace"></a><h3 id="creating-a-databricks-on-aws-workspace">Creating a Databricks on AWS workspace</h3>
+
+<p><img alt="Simplest multiworkspace" src="https://raw.githubusercontent.com/databricks/terraform-provider-databricks/main/docs/simplest-multiworkspace.png"/></p>
+
+<p>To get workspace running, you have to configure a couple of things:</p>
+
+<ul>
+<li><a href="mws_credentials.md">databricks_mws_credentials</a> - You can share a credentials (cross-account IAM role) configuration ID with multiple workspaces. It is not required to create a new one for each workspace.</li>
+<li><a href="mws_storage_configurations.md">databricks_mws_storage_configurations</a> - You can share a root S3 bucket with multiple workspaces in a single account. You do not have to create new ones for each workspace. If you share a root S3 bucket for multiple workspaces in an account, data on the root S3 bucket is partitioned into separate directories by workspace.</li>
+<li><a href="mws_networks.md">databricks_mws_networks</a> - (optional, but recommended) You can share one <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/customer-managed-vpc.html">customer-managed VPC</a> with multiple workspaces in a single account. However, Databricks recommends using unique subnets and security groups for each workspace. If you plan to share one VPC with multiple workspaces, be sure to size your VPC and subnets accordingly. Because a Databricks <a href="mws_networks.md">databricks_mws_networks</a> encapsulates this information, you cannot reuse it across workspaces.</li>
+<li><a href="mws_customer_managed_keys.md">databricks_mws_customer_managed_keys</a> - You can share a customer-managed key across workspaces.</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Account ID that can be found in the dropdown under the email address in the upper-right corner of https://accounts.cloud.databricks.com/"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://accounts.cloud.databricks.com"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// register cross-account ARN</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_credentials"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">credentials_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-creds"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_arn</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.crossaccount_arn</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// register root bucket</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_storage_configurations"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_configuration_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-storage"</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">var.root_bucket</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// register VPC</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_networks"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">var.vpc_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_ids</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.subnets_private</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_group_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">var.security_group</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// create workspace in given VPC with DBFS on root bucket</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_workspaces"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.prefix</span><span class="w"></span>
+<span class="w">  </span><span class="na">aws_region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">credentials_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_credentials.this.credentials_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_configuration_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_storage_configurations.this.storage_configuration_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_id</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_networks.this.network_id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">token</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"databricks_token"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_workspaces.this.token[0].token_value</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20a%20Databricks%20on%20AWS%20workspace%20with%20Databricks-Managed%20VPC"></a><h3 id="creating-a-databricks-on-aws-workspace-with-databricks-managed-vpc">Creating a Databricks on AWS workspace with Databricks-Managed VPC</h3>
+
+<p><img alt="VPCs" src="https://docs.databricks.com/_images/customer-managed-vpc.png"/></p>
+
+<p>By default, Databricks creates a VPC in your AWS account for each workspace. Databricks uses it for running clusters in the workspace. Optionally, you can use your VPC for the workspace, using the feature customer-managed VPC. Databricks recommends that you provide your VPC with <a href="mws_networks.md">databricks_mws_networks</a> so that you can configure it according to your organization’s enterprise cloud standards while still conforming to Databricks requirements. You cannot migrate an existing workspace to your VPC. Please see the difference described through IAM policy actions <a href="https://docs.databricks.com/administration-guide/account-api/iam-role.html">on this page</a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Account Id that could be found in the top right corner of https://accounts.cloud.databricks.com/"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"random_string"</span><span class="w"> </span><span class="nv">"naming"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">special</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">upper</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">length</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="m">6</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"dltp${random_string.naming.result}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_aws_assume_role_policy"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">external_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"cross_account_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-crossaccount"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_aws_assume_role_policy.this.json</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tags</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_aws_crossaccount_policy"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role_policy"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.cross_account_role.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_aws_crossaccount_policy.this.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_credentials"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">credentials_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-creds"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_arn</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.cross_account_role.arn</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"root_storage_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-rootbucket"</span><span class="w"></span>
+<span class="w">  </span><span class="na">acl</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"private"</span><span class="w"></span>
+<span class="w">  </span><span class="na">force_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tags</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_versioning"</span><span class="w"> </span><span class="nv">"root_versioning"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.root_storage_bucket.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">versioning_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Disabled"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_server_side_encryption_configuration"</span><span class="w"> </span><span class="nv">"root_storage_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.root_storage_bucket.bucket</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">apply_server_side_encryption_by_default</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">sse_algorithm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AES256"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_public_access_block"</span><span class="w"> </span><span class="nv">"root_storage_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.root_storage_bucket.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">block_public_acls</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">block_public_policy</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">ignore_public_acls</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">restrict_public_buckets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_s3_bucket.root_storage_bucket</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_aws_bucket_policy"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.root_storage_bucket.bucket</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_policy"</span><span class="w"> </span><span class="nv">"root_bucket_policy"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.root_storage_bucket.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_aws_bucket_policy.this.json</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_s3_bucket_public_access_block.root_storage_bucket</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_storage_configurations"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_configuration_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-storage"</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.root_storage_bucket.bucket</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_workspaces"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.prefix</span><span class="w"></span>
+<span class="w">  </span><span class="na">aws_region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">credentials_id</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_credentials.this.credentials_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_configuration_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_storage_configurations.this.storage_configuration_id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">token</span><span class="w"> </span><span class="p">{}</span><span class="c1"></span>
+
+<span class="c1">  # Optional Custom Tags</span>
+<span class="w">  </span><span class="nb">custom_tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="w">    </span><span class="s2">"SoldToCode"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1234"</span><span class="w"></span>
+
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"databricks_token"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_workspaces.this.token[0].token_value</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In order to create a <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/privatelink.html">Databricks Workspace that leverages AWS PrivateLink</a> please ensure that you have read and understood the <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/privatelink.html">Enable Private Link</a> documentation and then customise the example above with the relevant examples from <a href="mws_vpc_endpoint.md">mws_vpc_endpoint</a>, <a href="mws_private_access_settings.md">mws_private_access_settings</a> and <a href="mws_networks.md">mws_networks</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20a%20Databricks%20on%20GCP%20workspace"></a><h3 id="creating-a-databricks-on-gcp-workspace">Creating a Databricks on GCP workspace</h3>
+
+<p>To get workspace running, you have to configure a network object:</p>
+
+<ul>
+<li><a href="mws_networks.md">databricks_mws_networks</a> - (optional, but recommended) You can share one <a href="https://docs.gcp.databricks.com/administration-guide/cloud-configurations/gcp/customer-managed-vpc.html">customer-managed VPC</a> with multiple workspaces in a single account. You do not have to create a new VPC for each workspace. However, you cannot reuse subnets with other resources, including other workspaces or non-Databricks resources. If you plan to share one VPC with multiple workspaces, be sure to size your VPC and subnets accordingly. Because a Databricks <a href="mws_networks.md">databricks_mws_networks</a> encapsulates this information, you cannot reuse it across workspaces.</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Account Id that could be found in the top right corner of https://accounts.cloud.databricks.com/"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_google_service_account"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"google_project"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://accounts.gcp.databricks.com"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+
+<span class="c1">// register VPC</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_networks"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-network"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">gcp_network_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network_project_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">var.google_project</span><span class="w"></span>
+<span class="w">    </span><span class="na">vpc_id</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">var.vpc_id</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnet_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">var.subnet_id</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnet_region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.subnet_region</span><span class="w"></span>
+<span class="w">    </span><span class="na">pod_ip_range_name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"pods"</span><span class="w"></span>
+<span class="w">    </span><span class="na">service_ip_range_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"svc"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// create workspace in given VPC</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_workspaces"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.prefix</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">var.subnet_region</span><span class="w"></span>
+<span class="w">  </span><span class="nb">cloud_resource_container</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">gcp</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">project_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.google_project</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">network_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_networks.this.network_id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">gke_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">connectivity_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PRIVATE_NODE_PUBLIC_MASTER"</span><span class="w"></span>
+<span class="w">    </span><span class="na">master_ip_range</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.3.0.0/28"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">token</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"databricks_token"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_workspaces.this.token[0].token_value</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In order to create a <a href="https://docs.gcp.databricks.com/administration-guide/cloud-configurations/gcp/private-service-connect.html">Databricks Workspace that leverages GCP Private Service Connect</a> please ensure that you have read and understood the <a href="https://docs.gcp.databricks.com/administration-guide/cloud-configurations/gcp/private-service-connect.html">Enable Private Service Connect</a> documentation and then customise the example above with the relevant examples from <a href="mws_vpc_endpoint.md">mws_vpc_endpoint</a>, <a href="mws_private_access_settings.md">mws_private_access_settings</a> and <a href="mws_networks.md">mws_networks</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20a%20Databricks%20on%20GCP%20workspace%20with%20Databricks-Managed%20VPC"></a><h4 id="creating-a-databricks-on-gcp-workspace-with-databricks-managed-vpc">Creating a Databricks on GCP workspace with Databricks-Managed VPC</h4>
+
+<p><img alt="VPCs" src="https://docs.databricks.com/_images/customer-managed-vpc.png"/></p>
+
+<p>By default, Databricks creates a VPC in your GCP project for each workspace. Databricks uses it for running clusters in the workspace. Optionally, you can use your VPC for the workspace, using the feature customer-managed VPC. Databricks recommends that you provide your VPC with <a href="mws_networks.md">databricks_mws_networks</a> so that you can configure it according to your organization’s enterprise cloud standards while still conforming to Databricks requirements. You cannot migrate an existing workspace to your VPC.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Account Id that could be found in the top right corner of https://accounts.cloud.databricks.com/"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"google_client_openid_userinfo"</span><span class="w"> </span><span class="nv">"me"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"google_client_config"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_workspaces"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.accounts</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.prefix</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">data.google_client_config.current.region</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">cloud_resource_container</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">gcp</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">project_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.google_client_config.current.project</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">gke_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">connectivity_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PRIVATE_NODE_PUBLIC_MASTER"</span><span class="w"></span>
+<span class="w">    </span><span class="na">master_ip_range</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.3.0.0/28"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">token</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"databricks_token"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_workspaces.this.token[0].token_value</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>All workspaces would be verified to get into runnable state or deleted upon failure. You can only update <code>credentials_id</code>, <code>network_id</code>, and <code>storage_customer_managed_key_id</code>, <code>private_access_settings_id</code> on a running workspace.</p>
+</aside>
+
+<p>The following arguments are available:</p>
+
+<ul>
+<li><code>account_id</code> - Account Id that could be found in the top right corner of <a href="https://accounts.cloud.databricks.com/">Accounts Console</a>.</li>
+<li><code>deployment_name</code> - (Optional) part of URL as in <code>https://&lt;prefix&gt;-&lt;deployment-name&gt;.cloud.databricks.com</code>. Deployment name cannot be used until a deployment name prefix is defined. Please contact your Databricks representative. Once a new deployment prefix is added/updated, it only will affect the new workspaces created.</li>
+<li><code>workspace_name</code> - name of the workspace, will appear on UI.</li>
+<li><code>network_id</code> - (Optional) <code>network_id</code> from <a href="mws_networks.md">networks</a>.</li>
+<li><code>aws_region</code> - (AWS only) region of VPC.</li>
+<li><code>storage_configuration_id</code> - (AWS only)<code>storage_configuration_id</code> from <a href="mws_storage_configurations.md">storage configuration</a>.</li>
+<li><code>managed_services_customer_managed_key_id</code> - (Optional) <code>customer_managed_key_id</code> from <a href="mws_customer_managed_keys.md">customer managed keys</a> with <code>use_cases</code> set to <code>MANAGED_SERVICES</code>. This is used to encrypt the workspace's notebook and secret data in the control plane.</li>
+<li><code>storage_customer_managed_key_id</code> - (Optional) <code>customer_managed_key_id</code> from <a href="mws_customer_managed_keys.md">customer managed keys</a> with <code>use_cases</code> set to <code>STORAGE</code>. This is used to encrypt the DBFS Storage &amp; Cluster Volumes.</li>
+<li><code>location</code> - (GCP only) region of the subnet.</li>
+<li><code>cloud_resource_container</code> - (GCP only) A block that specifies GCP workspace configurations, consisting of following blocks:
+<ul>
+<li><code>gcp</code> - A block that consists of the following field:</li>
+<li><code>project_id</code> - The Google Cloud project ID, which the workspace uses to instantiate cloud resources for your workspace.</li>
+</ul></li>
+<li><code>gke_config</code> - (GCP only) A block that specifies GKE configuration for the Databricks workspace:
+<ul>
+<li><code>connectivity_type</code>: Specifies the network connectivity types for the GKE nodes and the GKE master network. Possible values are: <code>PRIVATE_NODE_PUBLIC_MASTER</code>, <code>PUBLIC_NODE_PUBLIC_MASTER</code>.</li>
+<li><code>master_ip_range</code>: The IP range from which to allocate GKE cluster master resources. This field will be ignored if GKE private cluster is not enabled. It must be exactly as big as <code>/28</code>.</li>
+</ul></li>
+<li><code>private_access_settings_id</code> - (Optional) Canonical unique identifier of <a href="mws_private_access_settings.md">databricks_mws_private_access_settings</a> in Databricks Account.</li>
+<li><code>custom_tags</code> - (Optional / AWS only) - The custom tags key-value pairing that is attached to this workspace. These tags will be applied to clusters automatically in addition to any <code>default_tags</code> or <code>custom_tags</code> on a cluster level. Please note it can take up to an hour for custom_tags to be set due to scheduling on Control Plane. After custom tags are applied, they can be modified however they can never be completely removed.</li>
+<li><code>pricing_tier</code> - (Optional) - The pricing tier of the workspace.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/token%20block"></a><h3 id="token-block">token block</h3>
+
+<p>You can specify a <code>token</code> block in the body of the workspace resource, so that Terraform manages the refresh of the PAT token for the deployment user. The other option is to create <a href="obo_token.md">databricks_obo_token</a>, though it requires Premium or Enterprise plan enabled as well as more complex setup. Token block exposes <code>token_value</code>, that holds sensitive PAT token and optionally it can accept two arguments:</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Tokens managed by <code>token {}</code> block are recreated when expired.</p>
+</aside>
+
+<ul>
+<li><code>comment</code> - (Optional) Comment, that will appear in "User Settings / Access Tokens" page on Workspace UI. By default it's "Terraform PAT".</li>
+<li><code>lifetime_seconds</code> - (Optional) Token expiry lifetime. By default its 2592000 (30 days).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Updating%20workspaces"></a><h3 id="updating-workspaces">Updating workspaces</h3>
+
+<p>On AWS, the following arguments could be modified after the workspace is running:</p>
+
+<ul>
+<li><code>network_id</code> - Modifying <a href="mws_networks.md#modifying-networks-on-running-workspaces-aws-only">networks on running workspaces</a> would require three separate <code>terraform apply</code> steps.</li>
+<li><code>credentials_id</code></li>
+<li><code>storage_customer_managed_key_id</code></li>
+<li><code>private_access_settings_id</code></li>
+<li><code>custom_tags</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - (String) Canonical unique identifier for the workspace, of the format <code>&lt;account-id&gt;/&lt;workspace-id&gt;</code></li>
+<li><code>workspace_id</code> - (String) workspace id</li>
+<li><code>workspace_status_message</code> - (String) updates on workspace status</li>
+<li><code>workspace_status</code> - (String) workspace status</li>
+<li><code>creation_time</code> - (Integer) time when workspace was created</li>
+<li><code>workspace_url</code> - (String) URL of the workspace</li>
+<li><code>custom_tags</code> - (Map) Custom Tags (if present) added to workspace</li>
+<li><code>gcp_workspace_sa</code> - (String, GCP only) identifier of a service account created for the workspace in form of <code>db-&lt;workspace-id&gt;@prod-gcp-&lt;region&gt;.iam.gserviceaccount.com</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p>The <code>timeouts</code> block allows you to specify <code>create</code>, <code>read</code> and <code>update</code> timeouts. It usually takes 5-7 minutes to provision Databricks workspace and another couple of minutes for your local DNS caches to resolve. Please launch <code>TF_LOG=DEBUG terraform apply</code> whenever you observe timeout issues.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">timeouts</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">create</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"30m"</span><span class="w"></span>
+<span class="w">  </span><span class="na">read</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"10m"</span><span class="w"></span>
+<span class="w">  </span><span class="na">update</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"20m"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>You can reset local DNS caches before provisioning new workspaces with one of the following commands:</p>
+
+<ul>
+<li>Linux - <code>sudo /etc/init.d/nscd restart</code></li>
+<li>Mac OS Sierra, X El Capitan, X Mavericks, X Mountain Lion, or X Lion - <code>sudo killall -HUP mDNSResponder</code></li>
+<li>Mac OS X Yosemite - <code>sudo discoveryutil udnsflushcaches</code></li>
+<li>Mac OS X Snow Leopard - <code>sudo dscacheutil -flushcache</code></li>
+<li>Mac OS X Leopard and below - <code>sudo lookupd -flushcache</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>This resource can be imported by Databricks account ID and workspace ID.</p>
+
+<div class="codehilite"><pre><span></span><code>terraform import databricks_mws_networks.this <span class="s1">'&lt;account_id&gt;/&lt;workspace_id&gt;'</span>
+</code></pre></div>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Not all fields of <code>databricks_mws_workspaces</code> can be updated without causing the workspace to be recreated. If the configuration for these immutable fields does not match the existing workspace, the workspace will be deleted and recreated in the next <code>terraform apply</code>. After importing, verify that the configuration matches the existing resource by running <code>terraform plan</code>. The only fields that can be updated are <code>credentials_id</code>, <code>network_id</code>, <code>storage_customer_managed_key_id</code>, <code>private_access_settings_id</code>, <code>managed_services_customer_managed_key_id</code>, and <code>custom_tags</code>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are used in the same context:</p>
+
+<ul>
+<li><a href="../guides/aws-workspace.md">Provisioning Databricks on AWS</a> guide.</li>
+<li><a href="../guides/aws-private-link-workspace.md">Provisioning Databricks on AWS with Private Link</a> guide.</li>
+<li><a href="../guides/aws-e2-firewall-hub-and-spoke.md">Provisioning AWS Databricks workspaces with a Hub &amp; Spoke firewall for data exfiltration protection</a> guide.</li>
+<li><a href="../guides/gcp-workspace.md">Provisioning Databricks on GCP</a> guide.</li>
+<li><a href="../guides/gcp-private-service-connect-workspace.md">Provisioning Databricks workspaces on GCP with Private Service Connect</a> guide.</li>
+<li><a href="mws_credentials.md">databricks_mws_credentials</a> to configure the cross-account role for creation of new workspaces within AWS.</li>
+<li><a href="mws_customer_managed_keys.md">databricks_mws_customer_managed_keys</a> to configure KMS keys for new workspaces within AWS.</li>
+<li><a href="mws_log_delivery.md">databricks_mws_log_delivery</a> to configure delivery of <a href="https://docs.databricks.com/administration-guide/account-settings/billable-usage-delivery.html">billable usage logs</a> and <a href="https://docs.databricks.com/administration-guide/account-settings/audit-logs.html">audit logs</a>.</li>
+<li><a href="mws_networks.md">databricks_mws_networks</a> to <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/customer-managed-vpc.html">configure VPC</a> &amp; subnets for new workspaces within AWS.</li>
+<li><a href="mws_storage_configurations.md">databricks_mws_storage_configurations</a> to configure root bucket new workspaces within AWS.</li>
+<li><a href="mws_private_access_settings.md">databricks_mws_private_access_settings</a> to create a <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/privatelink.html#step-5-create-a-private-access-settings-configuration-using-the-databricks-account-api">Private Access Setting</a> that can be used as part of a <a href="mws_workspaces.md">databricks_mws_workspaces</a> resource to create a <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/privatelink.html">Databricks Workspace that leverages AWS PrivateLink</a>.</li>
+</ul>
+
+            
+        
+    </body></html>

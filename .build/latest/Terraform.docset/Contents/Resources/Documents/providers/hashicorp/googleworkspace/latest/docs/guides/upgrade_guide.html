@@ -1,0 +1,255 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/googleworkspace/latest/docs/guides/upgrade_guide --><head>
+                <title>Terraform Google Workspace Provider Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-google-workspace-provider-upgrade-guide">Terraform Google Workspace Provider Upgrade Guide</h1>
+
+<p>The Google Workspace provider for Terraform is the first official provider to maintain
+resources within Google Workspace. Prior to the official provider was a <a href="https://github.com/DeviaVir/terraform-provider-gsuite">community-maintained
+GSuite provider</a>. While we kept feature-parity with the latest
+version of the GSuite provider, there exist some changes that you will need to consider when switching. This guide
+is intended to help with that process.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Why%20change%3F"></a><h2 id="why-change">Why change?</h2>
+
+<p>We introduced the Google Workspace provider in order to provide support for Google Workspace
+resources at an official capacity. With this release, the community-maintained GSuite provider
+chose to deprecate itself and refer users to this provider.</p>
+
+<p>In addition to feature-parity, we added some new data sources and added some attributes to 
+some of the already existing resources. While many resource configurations stayed the same 
+between the two providers, you will see mostly small changes, with one major difference in 
+regard to user schemas.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrade%20Topics"></a><h2 id="upgrade-topics">Upgrade Topics</h2>
+
+<!-- TOC depthFrom:2 depthTo:2 -->
+
+<ul>
+<li><a href="#provider-configuration">Provider Configuration</a></li>
+<li><a href="#data-sources">Data Sources</a></li>
+<li><a href="#data-source-gsuite_user_attributes">Data_Source: <code>gsuite_user_attributes</code></a></li>
+<li><a href="#resource-gsuite_user_attributes">Resource: <code>gsuite_user_attributes</code></a></li>
+<li><a href="#resource-googleworkspace_group_members">Resource: <code>googleworkspace_group_members</code></a></li>
+<li><a href="#resource-googleworkspace_group_member">Resource: <code>googleworkspace_group_member</code></a></li>
+<li><a href="#resource-googleworkspace_group_settings">Resource: <code>googleworkspace_group_settings</code></a></li>
+<li><a href="#resource-googleworkspace_user">Resource: <code>googleworkspace_user</code></a></li>
+<li><a href="#resource-googleworkspace_schema">Resource: <code>googleworkspace_schema</code></a></li>
+<li><a href="#user-attributes">User Attributes</a></li>
+</ul>
+
+<!-- /TOC -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Configuration"></a><h2 id="provider-configuration">Provider Configuration</h2>
+
+<p>While the required attributes for defining the provider have not changed,
+we have changed the environment variable names and removed the optional 
+<code>timeout_minutes</code> and <code>update_existing</code>.</p>
+
+<p>The names of the environment variables changed slightly. See the table below 
+for any changes you would need to make to your environment variables</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Note: <code>GOOGLE_CREDENTIALS</code> was added as an option in version <code>0.2.0</code> of the Google Workspace provider.</p>
+</aside>
+
+<table>
+<thead>
+<tr>
+  <th></th>
+  <th>GSuite Provider</th>
+  <th>Google Workspace Provider</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Credentials</td>
+  <td><code>GOOGLE_CREDENTIALS</code>,  <code>GOOGLE_CLOUD_KEYFILE_JSON</code>,  <code>GOOGLE_KEYFILE_JSON</code>,  <code>GOOGLE_APPLICATION_CREDENTIALS</code></td>
+  <td><code>GOOGLEWORKSPACE_CREDENTIALS</code>, <code>GOOGLEWORKSPACE_CLOUD_KEYFILE_JSON</code>, <code>GOOGLE_CREDENTIALS</code> (&gt;= 0.2.0)</td>
+</tr>
+<tr>
+  <td>Impersonated User Email</td>
+  <td><code>IMPERSONATED_USER_EMAIL</code></td>
+  <td><code>GOOGLEWORKSPACE_IMPERSONATED_USER_EMAIL</code></td>
+</tr>
+<tr>
+  <td>Customer Id</td>
+  <td>N/A</td>
+  <td><code>GOOGLEWORKSPACE_CUSTOMER_ID</code></td>
+</tr>
+</tbody>
+</table>
+
+<p>While we removed <code>timeout_minutes</code>, the Google Workspace provider now allows a timeout block 
+to be set on each particular resource. For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"gsuite"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">timeout_minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"googleworkspace_group"</span><span class="w"> </span><span class="nv">"group"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">timeouts</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"5m"</span><span class="w"></span>
+<span class="w">    </span><span class="na">update</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"5m"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Although the option for <code>update_existing</code> was not included in the official provider, 
+the functionality is being tracked in an <a href="https://github.com/hashicorp/terraform/issues/19017">open issue for Terraform</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Sources"></a><h2 id="data-sources">Data Sources</h2>
+
+<p>See the <code>Resource</code> sections in this document for properties that may have been
+added, removed or changed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data_Source%3A%20gsuite_user_attributes"></a><h2 id="data_source-gsuite_user_attributes">Data_Source: <code>gsuite_user_attributes</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20gsuite_user_attributes"></a><h2 id="resource-gsuite_user_attributes">Resource: <code>gsuite_user_attributes</code></h2>
+
+<p>We removed the above data source and resource in favor of a different approach to defining user custom schemas. 
+See how <code>googleworkspace_user.custom_schemas</code> are defined <a href="#user-attributes">below</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20googleworkspace_group_members"></a><h2 id="resource-googleworkspace_group_members">Resource: <code>googleworkspace_group_members</code></h2>
+
+<p>There are some very minor changes to <code>googleworkspace_group_members</code>. The attribute <code>group_email</code> is now <code>group_id</code> and
+accepts only a group's <code>group_id</code>. The attribute <code>member</code> which listed each member, is now plural <code>members</code>. And the
+read-only field, <code>kind</code>, is no longer available.</p>
+
+<p>This resource was originally removed, but re-added in the <code>0.5.0</code> release.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20googleworkspace_group_member"></a><h2 id="resource-googleworkspace_group_member">Resource: <code>googleworkspace_group_member</code></h2>
+
+<p>There are a few minor changes to <code>googleworkspace_group_member</code>. The attribute <code>group</code> changed from accepting
+a group's <code>email</code> to a group's <code>group_id</code>. Also the read-only field, <code>kind</code>, is no longer available.</p>
+
+<p>The read-only field <code>id</code> is the string that will be used in order to import a group member and is of the format 
+<code>groups/&lt;group_id&gt;/members/&lt;member_id&gt;</code> where <code>member_id</code> (in this case) is the id of the customer, group or user.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20googleworkspace_group_settings"></a><h2 id="resource-googleworkspace_group_settings">Resource: <code>googleworkspace_group_settings</code></h2>
+
+<p>The biggest change to this resource is that <code>description</code> of the group cannot be changed on <code>googleworkspace_group_settings</code>.
+Changes to a group's <code>description</code> must be done on the <code>googleworkspace_group</code> resource.</p>
+
+<p>Also, in an attempt to remove fields that are deprecated in the API, we chose to not include <code>who_can_approve_members</code> on
+this resource, instead the functionality is merged into <code>who_can_moderate_members</code>.</p>
+
+<p>Another notable change here is that <code>is_archived</code> can be set to <code>true</code> or <code>false</code> rather than being read-only.</p>
+
+<p>While <code>kind</code> is no longer a read-only property, <code>custom_roles_enabled_for_settings_to_be_merged</code> is available.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20googleworkspace_user"></a><h2 id="resource-googleworkspace_user">Resource: <code>googleworkspace_user</code></h2>
+
+<p>While the majority of changes here include additional attributes, there are some name changes. Specifically, <code>is_ip_whitelisted</code> 
+changed to <code>ip_allowlist</code>, <code>is_suspended</code> to <code>suspended</code>, <code>2s_enforced</code> to <code>is_enforced_in_2_step_verification</code> and 
+<code>2s_enrolled</code> to <code>is_enrolled_in_2_step_verification</code>. </p>
+
+<p>The biggest change, however, is how <code>googleworkspace_user.custom_schemas</code> are now defined. See more information 
+<a href="#user-attributes">below</a>.</p>
+
+<p>The read-only field <code>id</code> is the string that will be used in order to import a user.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20googleworkspace_schema"></a><h2 id="resource-googleworkspace_schema">Resource: <code>googleworkspace_schema</code></h2>
+
+<p>The obvious change here is the name from <code>gsuite_user_schema</code> to <code>googleworkspace_schema</code>, but beyond that some minor 
+changes where the <code>field</code> attribute is now <code>fields</code> and <code>field.range</code> is now <code>fields.numeric_indexing_spec</code> to better 
+align with the API names.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/User%20Attributes"></a><h2 id="user-attributes">User Attributes</h2>
+
+<p>Perhaps the biggest change of all is to the provider defines custom schemas. In the GSuite provider, one would define a 
+user schema (<code>gsuite_user_schema</code>), then define a user attributes data source (<code>gsuite_user_attributes</code>) that would give 
+values to the schema defined by <code>gsuite_user_schema</code>, then combine the two resources into a new resource, 
+<code>gsuite_user_attributes</code>, along with a user's primary email address.</p>
+
+<p>In the official Google Workspace provider, after a schema is defined (<code>googleworkspace_schema</code>), all attributes are defined 
+on the user itself (<code>googleworkspace_user</code>). In the <code>custom_schemas</code> block, one will pass in a <code>schema_name</code> which will 
+reference the name of the previously defined <code>googleworkspace_schema</code>, and <code>schema_values</code>, which is a map of the schema 
+fields' names to their jsonencoded values.</p>
+
+<p>An example may be more helpful. Given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"gsuite_user_schema"</span><span class="w"> </span><span class="nv">"details"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">schema_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"additional-details"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">field</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">field_type</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"PHONE"</span><span class="w"></span>
+<span class="w">    </span><span class="na">field_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"internal-phone"</span><span class="w"></span>
+<span class="w">    </span><span class="na">display_name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"Internal Phone"</span><span class="w"></span>
+<span class="w">    </span><span class="na">indexed</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">read_access_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ALL_DOMAIN_USERS"</span><span class="w"></span>
+<span class="w">    </span><span class="na">multi_valued</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"gsuite_user_attributes"</span><span class="w"> </span><span class="nv">"details"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">phone</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"internal-phone"</span><span class="w"></span>
+<span class="w">    </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"555-555-5555"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"gsuite_user"</span><span class="w"> </span><span class="nv">"user"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">primary_email</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"flast@domain.ext"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">name</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">given_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"First"</span><span class="w"></span>
+<span class="w">    </span><span class="na">family_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Last"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"gsuite_user_attributes"</span><span class="w"> </span><span class="nv">"user_attributes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">primary_email</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">gsuite_user.user.primary_email</span><span class="w"></span>
+<span class="w">  </span><span class="nb">custom_schema</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">gsuite_user_schema.details.schema_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.gsuite_user_attributes.details.json</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration would look like this:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"googleworkspace_schema"</span><span class="w"> </span><span class="nv">"details"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">schema_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"additional-details"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">fields</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">field_type</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"PHONE"</span><span class="w"></span>
+<span class="w">    </span><span class="na">field_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"internal-phone"</span><span class="w"></span>
+<span class="w">    </span><span class="na">display_name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"Internal Phone"</span><span class="w"></span>
+<span class="w">    </span><span class="na">indexed</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">read_access_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ALL_DOMAIN_USERS"</span><span class="w"></span>
+<span class="w">    </span><span class="na">multi_valued</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"googleworkspace_user"</span><span class="w"> </span><span class="nv">"user"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">primary_email</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"flast@domain.ext"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">name</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">given_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"First"</span><span class="w"></span>
+<span class="w">    </span><span class="na">family_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Last"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">custom_schemas</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">schema_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">googleworkspace_schema.details.schema_name</span><span class="w"></span>
+<span class="w">    </span><span class="nb">schema_values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"internal-phone"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">(</span><span class="s2">"555-555-555"</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

@@ -1,0 +1,189 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eip --><head>
+                <title>aws_eip</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_eip">Resource: aws_eip</h1>
+
+<p>Provides an Elastic IP resource.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>EIP may require IGW to exist prior to association. Use <code>depends_on</code> to set an explicit dependency on the IGW.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Do not use <code>network_interface</code> to associate the EIP to <code>aws_lb</code> or <code>aws_nat_gateway</code> resources. Instead use the <code>allocation_id</code> available in those resources to allow AWS to manage the association, otherwise you will see <code>AuthFailure</code> errors.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Single%20EIP%20associated%20with%20an%20instance"></a><h3 id="single-eip-associated-with-an-instance">Single EIP associated with an instance</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_eip"</span><span class="w"> </span><span class="nv">"lb"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.web.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">domain</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"vpc"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Multiple%20EIPs%20associated%20with%20a%20single%20network%20interface"></a><h3 id="multiple-eips-associated-with-a-single-network-interface">Multiple EIPs associated with a single network interface</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_network_interface"</span><span class="w"> </span><span class="nv">"multi-ip"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_subnet.main.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_ips</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"10.0.0.10", "10.0.0.11"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_eip"</span><span class="w"> </span><span class="nv">"one"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">domain</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"vpc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_interface</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_network_interface.multi-ip.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">associate_with_private_ip</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.10"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_eip"</span><span class="w"> </span><span class="nv">"two"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">domain</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"vpc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_interface</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_network_interface.multi-ip.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">associate_with_private_ip</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.11"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attaching%20an%20EIP%20to%20an%20Instance%20with%20a%20pre-assigned%20private%20ip%20%28VPC%20Only%29"></a><h3 id="attaching-an-eip-to-an-instance-with-a-pre-assigned-private-ip-vpc-only">Attaching an EIP to an Instance with a pre-assigned private ip (VPC Only)</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="na">enable_dns_hostnames</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_internet_gateway"</span><span class="w"> </span><span class="nv">"gw"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_subnet"</span><span class="w"> </span><span class="nv">"tf_test_subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">map_public_ip_on_launch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_internet_gateway.gw</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # us-west-2</span>
+<span class="w">  </span><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"ami-5189a661"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"t2.micro"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">private_ip</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.12"</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_subnet.tf_test_subnet.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_eip"</span><span class="w"> </span><span class="nv">"bar"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">domain</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"vpc"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">instance</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.foo.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">associate_with_private_ip</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.12"</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_internet_gateway.gw</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Allocating%20EIP%20from%20the%20BYOIP%20pool"></a><h3 id="allocating-eip-from-the-byoip-pool">Allocating EIP from the BYOIP pool</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_eip"</span><span class="w"> </span><span class="nv">"byoip-ip"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">domain</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"vpc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">public_ipv4_pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ipv4pool-ec2-012345"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Allocating%20EIP%20from%20the%20IPAM%20Pool"></a><h3 id="allocating-eip-from-the-ipam-pool">Allocating EIP from the IPAM Pool</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_eip"</span><span class="w"> </span><span class="nv">"ipam-ip"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">domain</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"vpc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ipam_pool_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ipam-pool-07ccc86aa41bef7ce"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>This resource supports the following arguments:</p>
+
+<ul>
+<li><code>address</code> - (Optional) IP address from an EC2 BYOIP pool. This option is only available for VPC EIPs.</li>
+<li><code>associate_with_private_ip</code> - (Optional) User-specified primary or secondary private IP address to associate with the Elastic IP address. If no private IP address is specified, the Elastic IP address is associated with the primary private IP address.</li>
+<li><code>customer_owned_ipv4_pool</code> - (Optional) ID  of a customer-owned address pool. For more on customer owned IP addressed check out <a href="https://docs.aws.amazon.com/outposts/latest/userguide/outposts-networking-components.html#ip-addressing">Customer-owned IP addresses guide</a>.</li>
+<li><code>domain</code> - (Optional) Indicates if this EIP is for use in VPC (<code>vpc</code>).</li>
+<li><code>instance</code> - (Optional) EC2 instance ID.</li>
+<li><code>ipam_pool_id</code>- (Optional) The ID of an IPAM pool which has an Amazon-provided or BYOIP public IPv4 CIDR provisioned to it.</li>
+<li><code>network_border_group</code> - (Optional) Location from which the IP address is advertised. Use this parameter to limit the address to this location.</li>
+<li><code>network_interface</code> - (Optional) Network interface ID to associate with.</li>
+<li><code>public_ipv4_pool</code> - (Optional) EC2 IPv4 address pool identifier or <code>amazon</code>.
+This option is only available for VPC EIPs.</li>
+<li><code>tags</code> - (Optional) Map of tags to assign to the resource. Tags can only be applied to EIPs in a VPC. If configured with a provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a> present, tags with matching keys will overwrite those defined at the provider-level.</li>
+<li><code>vpc</code> - (Optional <strong>Deprecated</strong>) Boolean if the EIP is in a VPC or not. Use <code>domain</code> instead.
+Defaults to <code>true</code> unless the region supports EC2-Classic.</li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>You can specify either the <code>instance</code> ID or the <code>network_interface</code> ID, but not both. Including both will <strong>not</strong> return an error from the AWS API, but will have undefined behavior. See the relevant [AssociateAddress API Call][1] for more information.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Specifying both <code>public_ipv4_pool</code> and <code>address</code> won't cause an error but <code>address</code> will be used in the case both options are defined as the api only requires one or the other.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>allocation_id</code> - ID that AWS assigns to represent the allocation of the Elastic IP address for use with instances in a VPC.</li>
+<li><code>association_id</code> - ID representing the association of the address with an instance in a VPC.</li>
+<li><code>carrier_ip</code> - Carrier IP address.</li>
+<li><code>customer_owned_ip</code> - Customer owned IP.</li>
+<li><code>id</code> - Contains the EIP allocation ID.</li>
+<li><code>private_dns</code> - The Private DNS associated with the Elastic IP address (if in VPC).</li>
+<li><code>private_ip</code> - Contains the private IP address (if in VPC).</li>
+<li><code>ptr_record</code> - The DNS pointer (PTR) record for the IP address.</li>
+<li><code>public_dns</code> - Public DNS associated with the Elastic IP address.</li>
+<li><code>public_ip</code> - Contains the public IP address.</li>
+<li><code>tags_all</code> - A map of tags assigned to the resource, including those inherited from the provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a>.</li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>The resource computes the <code>public_dns</code> and <code>private_dns</code> attributes according to the <a href="https://docs.aws.amazon.com/vpc/latest/userguide/vpc-dns.html#vpc-dns-hostnames">VPC DNS Guide</a> as they are not available with the EC2 API.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p><a href="https://developer.hashicorp.com/terraform/language/resources/syntax#operation-timeouts">Configuration options</a>:</p>
+
+<ul>
+<li><code>read</code> - (Default <code>15m</code>)</li>
+<li><code>update</code> - (Default <code>5m</code>)</li>
+<li><code>delete</code> - (Default <code>3m</code>)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import EIPs in a VPC using their Allocation ID. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_eip.bar</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eipalloc-00a10e96"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import EIPs in a VPC using their Allocation ID. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_eip.bar eipalloc-00a10e96
+</code></pre></div>
+
+            
+        
+    </body></html>

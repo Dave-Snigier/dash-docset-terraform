@@ -1,0 +1,51 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/hcs/latest/docs/guides/federation --><head>
+                <title>Federate multiple HCS clusters</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="federate-multiple-hcs-clusters">Federate multiple HCS clusters</h1>
+
+<p>Additional information about HCS federation can be found <a href="https://www.hashicorp.com/blog/introducing-federation-on-hashicorp-consul-service">here</a>.
+When federating HCS clusters, be sure the <code>vnet_cidr</code>s do not overlap and that each cluster has a unique <code>consul_datacenter</code> name.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_resource_group"</span><span class="w"> </span><span class="nv">"primary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcs-tf-federation-primary-rg"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"westus2"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcs_cluster"</span><span class="w"> </span><span class="nv">"primary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.primary.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">managed_application_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcs-tf-federation-primary"</span><span class="w"></span>
+<span class="w">  </span><span class="na">email</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"me@example.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_mode</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"production"</span><span class="w"></span>
+<span class="w">  </span><span class="na">min_consul_version</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"v1.9.0"</span><span class="w"></span>
+<span class="w">  </span><span class="na">vnet_cidr</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.25.16.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">consul_datacenter</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcs-tf-federation-example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"hcs_federation_token"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">hcs_cluster.primary.resource_group_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">managed_application_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcs_cluster.primary.managed_application_name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_resource_group"</span><span class="w"> </span><span class="nv">"secondary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcs-tf-federation-secondary-rg"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eastus"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcs_cluster"</span><span class="w"> </span><span class="nv">"secondary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.secondary.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">managed_application_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcs-tf-federation-secondary"</span><span class="w"></span>
+<span class="w">  </span><span class="na">email</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"me@example.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_mode</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"production"</span><span class="w"></span>
+<span class="w">  </span><span class="na">min_consul_version</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"v1.9.0"</span><span class="w"></span>
+<span class="w">  </span><span class="na">vnet_cidr</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.25.17.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">consul_datacenter</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcs-tf-federation-secondary"</span><span class="w"></span>
+<span class="w">  </span><span class="na">consul_federation_token</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">data.hcs_federation_token.test.token</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

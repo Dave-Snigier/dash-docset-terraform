@@ -1,0 +1,103 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/subnets --><head>
+                <title>aws_subnets</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="data-source-aws_subnets">Data Source: aws_subnets</h1>
+
+<p>This resource can be useful for getting back a set of subnet IDs.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>The following shows outputting all CIDR blocks for every subnet ID in a VPC.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_subnets"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">filter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"vpc-id"</span><span class="w"></span>
+<span class="w">    </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">var.vpc_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_subnet"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">toset</span><span class="p">(</span><span class="nv">data.aws_subnets.example.ids</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"subnet_cidr_blocks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="err">for</span><span class="w"> </span><span class="err">s</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">data.aws_subnet.example</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nv">s.cidr_block</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The following example retrieves a set of all subnets in a VPC with a custom
+tag of <code>Tier</code> set to a value of "Private" so that the <code>aws_instance</code> resource
+can loop through the subnets, putting instances across availability zones.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_subnets"</span><span class="w"> </span><span class="nv">"private"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">filter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"vpc-id"</span><span class="w"></span>
+<span class="w">    </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">var.vpc_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Tier</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Private"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"app"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nf">toset</span><span class="p">(</span><span class="nv">data.aws_subnets.private.ids</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">var.ami</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"t2.micro"</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<ul>
+<li><code>filter</code> - (Optional) Custom filter block as described below.</li>
+<li><code>tags</code> - (Optional) Map of tags, each pair of which must exactly match
+a pair on the desired subnets.</li>
+</ul>
+
+<p>More complex filters can be expressed using one or more <code>filter</code> sub-blocks,
+which take the following arguments:</p>
+
+<ul>
+<li><code>name</code> - (Required) Name of the field to filter by, as defined by
+<a href="http://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSubnets.html">the underlying AWS API</a>.
+For example, if matching against tag <code>Name</code>, use:</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_subnets"</span><span class="w"> </span><span class="nv">"selected"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">filter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"tag:Name"</span><span class="w"></span>
+<span class="w">    </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">""</span><span class="p">]</span><span class="c1"> # insert values here</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<ul>
+<li><code>values</code> - (Required) Set of values that are accepted for the given field.
+Subnet IDs will be selected if any one of the given values match.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This data source exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>ids</code> - List of all the subnet ids found.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p><a href="https://developer.hashicorp.com/terraform/language/resources/syntax#operation-timeouts">Configuration options</a>:</p>
+
+<ul>
+<li><code>read</code> - (Default <code>20m</code>)</li>
+</ul>
+
+            
+        
+    </body></html>

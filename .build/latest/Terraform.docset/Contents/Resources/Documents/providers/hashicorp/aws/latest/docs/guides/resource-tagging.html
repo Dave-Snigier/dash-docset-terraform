@@ -1,0 +1,214 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/guides/resource-tagging --><head>
+                <title>Resource Tagging</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-tagging">Resource Tagging</h1>
+
+<p>Many AWS services implement <a href="https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html">resource tags</a> as an essential part of managing components. These arbitrary key-value pairs can be utilized for billing, ownership, automation, <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/access_tags.html">access control</a>, and many other use cases. Given that these tags are an important aspect of successfully managing an AWS environment, the Terraform AWS Provider implements additional functionality beyond the typical one-to-one resource lifecycle management for easier and more customized implementations.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Not all AWS resources support tagging, which can differ across AWS services and even across resources within the same service. Browse the individual Terraform AWS Provider resource documentation pages for the <code>tags</code> argument, to see which support resource tagging. If the AWS API implements tagging support for a resource and it is missing from the Terraform AWS Provider resource, a <a href="https://github.com/hashicorp/terraform-provider-aws/issues/new?labels=enhancement&amp;template=Feature_Request.md">feature request</a> can be submitted.</p>
+</aside>
+
+<!-- TOC depthFrom:2 -->
+
+<ul>
+<li><a href="#getting-started-with-resource-tags">Getting Started with Resource Tags</a></li>
+<li><a href="#ignoring-changes-to-specific-tags">Ignoring Changes to Specific Tags</a>
+<ul>
+<li><a href="#ignoring-changes-in-individual-resources">Ignoring Changes in Individual Resources</a></li>
+<li><a href="#ignoring-changes-in-all-resources">Ignoring Changes in All Resources</a></li>
+</ul></li>
+<li><a href="#managing-individual-resource-tags">Managing Individual Resource Tags</a></li>
+<li><a href="#propagating-tags-to-all-resources">Propagating Tags to All Resources</a></li>
+</ul>
+
+<!-- /TOC -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Getting%20Started%20with%20Resource%20Tags"></a><h2 id="getting-started-with-resource-tags">Getting Started with Resource Tags</h2>
+
+<p>Terraform AWS Provider resources that support resource tags implement a consistent argument named <code>tags</code> which accepts a key-value map, e.g.,</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MyVPC"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The tags for the resource are wholly managed by Terraform except tag keys beginning with <code>aws:</code> as these are managed by AWS services and cannot typically be edited or deleted. Any non-AWS tags added to the VPC outside of Terraform will be proposed for removal on the next Terraform execution. Missing tags or those with incorrect values from the Terraform configuration will be proposed for addition or update on the next Terraform execution. Advanced patterns that can adjust these behaviors for special use cases, such as Terraform AWS Provider configurations that affect all resources and the ability to manage resource tags for resources not managed by Terraform, can be found later in this guide.</p>
+
+<p>For most environments and use cases, this is the typical implementation pattern, whether it be in a standalone Terraform configuration or within a <a href="https://www.terraform.io/docs/modules/">Terraform Module</a>. The Terraform configuration language also enables less repetitive configurations via <a href="https://www.terraform.io/docs/configuration/variables.html">variables</a>, <a href="https://www.terraform.io/docs/configuration/locals.html">locals</a>, or potentially a combination of these, e.g.,</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Terraform 0.12 and later syntax</span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"additional_tags"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">default</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Additional resource tags"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span><span class="kt">string</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="c1">  # This configuration combines some "default" tags with optionally provided additional tags</span>
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="nv">var.additional_tags</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MyVPC"</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">  </span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Ignoring%20Changes%20to%20Specific%20Tags"></a><h2 id="ignoring-changes-to-specific-tags">Ignoring Changes to Specific Tags</h2>
+
+<p>Systems outside of Terraform may automatically interact with the tagging associated with AWS resources. These external systems may be for administrative purposes, such as a Configuration Management Database, or the tagging may be required functionality for those systems, such as Kubernetes. This section shows methods to prevent Terraform from showing differences for specific tags.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Ignoring%20Changes%20in%20Individual%20Resources"></a><h3 id="ignoring-changes-in-individual-resources">Ignoring Changes in Individual Resources</h3>
+
+<p>All Terraform resources support the <a href="https://www.terraform.io/docs/configuration/meta-arguments/lifecycle.html#ignore_changes"><code>lifecycle</code> configuration block <code>ignore_changes</code> argument</a>, which can be used to explicitly ignore all tags changes on a resource beyond an initial configuration or individual tag values.</p>
+
+<p>In this example, the <code>Name</code> tag will be added to the VPC on resource creation, however any external changes to the <code>Name</code> tag value or the addition/removal of any tag (including the <code>Name</code> tag) will be ignored:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Terraform 0.12 and later syntax</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MyVPC"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">ignore_changes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nb">tags</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In this example, the <code>Name</code> and <code>Owner</code> tags will be added to the VPC on resource creation, however any external changes to the value of the <code>Name</code> tag will be ignored while any changes to other tags (including the <code>Owner</code> tag and any additions) will still be proposed:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Terraform 0.12 and later syntax</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"MyVPC"</span><span class="w"></span>
+<span class="w">    </span><span class="na">Owner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Operations"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">ignore_changes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">tags.Name</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Ignoring%20Changes%20in%20All%20Resources"></a><h3 id="ignoring-changes-in-all-resources">Ignoring Changes in All Resources</h3>
+
+<p>As of version 2.60.0 of the Terraform AWS Provider, there is support for ignoring tag changes across all resources under a provider. This simplifies situations where certain tags may be externally applied more globally and enhances functionality beyond <code>ignore_changes</code> to support cases such as tag key prefixes.</p>
+
+<p>In this example, all resources will ignore any addition of the <code>LastScanned</code> tag:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... potentially other configuration ...</span>
+
+<span class="w">  </span><span class="nb">ignore_tags</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">keys</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"LastScanned"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In this example, all resources will ignore any addition of tags with the <code>kubernetes.io/</code> prefix, such as <code>kubernetes.io/cluster/name</code> or <code>kubernetes.io/role/elb</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... potentially other configuration ...</span>
+
+<span class="w">  </span><span class="nb">ignore_tags</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">key_prefixes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"kubernetes.io/"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Any of the <code>ignore_tags</code> configurations can be combined as needed.</p>
+
+<p>The provider ignore tags configuration applies to all Terraform AWS Provider resources under that particular instance (the <code>default</code> provider instance in the above cases). If multiple, different Terraform AWS Provider configurations are being used (e.g., <a href="https://www.terraform.io/docs/configuration/providers.html#alias-multiple-provider-instances">multiple provider instances</a>), the ignore tags configuration must be added to all applicable provider configurations.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Managing%20Individual%20Resource%20Tags"></a><h2 id="managing-individual-resource-tags">Managing Individual Resource Tags</h2>
+
+<p>Certain Terraform AWS Provider services support a special resource for managing an individual tag on a resource without managing the resource itself. One example is the <a href="../resources/ec2_tag.html"><code>aws_ec2_tag</code> resource</a>. These resources enable tagging where resources are created outside Terraform such as EC2 Images (AMIs), shared across accounts via Resource Access Manager (RAM), or implicitly created by other means such as EC2 VPN Connections implicitly creating a taggable EC2 Transit Gateway VPN Attachment.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This is an advanced use case and can cause conflicting management issues when improperly implemented. These individual tag resources should not be combined with the Terraform resource for managing the parent resource. For example, using <code>aws_vpc</code> and <code>aws_ec2_tag</code> to manage tags of the same VPC will cause a perpetual difference where the <code>aws_vpc</code> resource will try to remove the tag being added by the <code>aws_ec2_tag</code> resource.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Not all services supported by the Terraform AWS Provider implement these resources. Browse the Terraform AWS Provider resource documentation pages for a resource with a type ending in <code>_tag</code>. If there is a use case where this type of resource is missing, a <a href="https://github.com/hashicorp/terraform-provider-aws/issues/new?labels=enhancement&amp;template=Feature_Request.md">feature request</a> can be submitted.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Terraform 0.12 and later syntax</span>
+<span class="c1"># ... other configuration ...</span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_tag"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpn_connection.example.transit_gateway_attachment_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">key</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"Owner"</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"Operations"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>To manage multiple tags for a resource in this scenario, <a href="https://www.terraform.io/docs/configuration/meta-arguments/for_each.html"><code>for_each</code></a> can be used:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Terraform 0.12 and later syntax</span>
+<span class="c1"># ... other configuration ...</span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_tag"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s2">"Name"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"MyAttachment", "Owner" : "Operations"</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">resource_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpn_connection.example.transit_gateway_attachment_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">key</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">each.key</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The inline map provided to <code>for_each</code> in the example above is used for brevity, but other Terraform configuration language features similar to those noted at the beginning of this guide can be used to make the example more extensible.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Propagating%20Tags%20to%20All%20Resources"></a><h3 id="propagating-tags-to-all-resources">Propagating Tags to All Resources</h3>
+
+<p>As of version 3.38.0 of the Terraform AWS Provider, the Terraform Configuration language also enables provider-level tagging as an alternative to the methods described in the <a href="#getting-started-with-resource-tags">Getting Started with Resource Tags</a> section above.
+This functionality is available for all Terraform AWS Provider resources that currently support <code>tags</code>, with the exception of the <a href="../resources/autoscaling_group.html.markdown.html"><code>aws_autoscaling_group</code></a> resource. Refactoring the use of <a href="https://www.terraform.io/docs/configuration/variables.html">variables</a> or <a href="https://www.terraform.io/docs/configuration/locals.html">locals</a> may look like:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Terraform 0.12 and later syntax</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+<span class="w">  </span><span class="nb">default_tags</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">Environment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Production"</span><span class="w"></span>
+<span class="w">      </span><span class="na">Owner</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"Ops"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="c1">  # This configuration by default will internally combine tags defined</span>
+<span class="c1">  # within the provider configuration block and those defined here</span>
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MyVPC"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In this example, the <code>Environment</code> and <code>Owner</code> tags defined within the provider configuration block will be added to the VPC on resource creation, in addition to the <code>Name</code> tag defined within the VPC resource configuration.
+To access all the tags applied to the VPC resource, use the read-only attribute <code>tags_all</code>, e.g., <code>aws_vpc.example.tags_all</code>.</p>
+
+            
+        
+    </body></html>

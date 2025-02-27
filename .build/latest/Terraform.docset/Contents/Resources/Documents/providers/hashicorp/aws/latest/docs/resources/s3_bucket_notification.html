@@ -1,0 +1,392 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_notification --><head>
+                <title>aws_s3_bucket_notification</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_s3_bucket_notification">Resource: aws_s3_bucket_notification</h1>
+
+<p>Manages a S3 Bucket Notification Configuration. For additional information, see the <a href="https://docs.aws.amazon.com/AmazonS3/latest/dev/NotificationHowTo.html">Configuring S3 Event Notifications section in the Amazon S3 Developer Guide</a>.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>S3 Buckets only support a single notification configuration resource. Declaring multiple <code>aws_s3_bucket_notification</code> resources to the same S3 Bucket will cause a perpetual difference in configuration. This resource will overwrite any existing event notifications configured for the S3 bucket it's associated with. See the example "Trigger multiple Lambda functions" for an option of how to configure multiple triggers within this resource.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This resource cannot be used with S3 directory buckets.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Add%20notification%20configuration%20to%20SNS%20Topic"></a><h3 id="add-notification-configuration-to-sns-topic">Add notification configuration to SNS Topic</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"topic"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Service"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"s3.amazonaws.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">actions</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"SNS:Publish"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">resources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"arn:aws:sns:*:*:s3-event-notification-topic"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">test</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"ArnLike"</span><span class="w"></span>
+<span class="w">      </span><span class="na">variable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws:SourceArn"</span><span class="w"></span>
+<span class="w">      </span><span class="na">values</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_s3_bucket.bucket.arn</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_sns_topic"</span><span class="w"> </span><span class="nv">"topic"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"s3-event-notification-topic"</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.topic.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"your-bucket-name"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_notification"</span><span class="w"> </span><span class="nv">"bucket_notification"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.bucket.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">topic</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">topic_arn</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_sns_topic.topic.arn</span><span class="w"></span>
+<span class="w">    </span><span class="na">events</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"s3:ObjectCreated:*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">filter_suffix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">".log"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Add%20notification%20configuration%20to%20SQS%20Queue"></a><h3 id="add-notification-configuration-to-sqs-queue">Add notification configuration to SQS Queue</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"queue"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"*"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">actions</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"sqs:SendMessage"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">resources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"arn:aws:sqs:*:*:s3-event-notification-queue"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">test</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"ArnEquals"</span><span class="w"></span>
+<span class="w">      </span><span class="na">variable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws:SourceArn"</span><span class="w"></span>
+<span class="w">      </span><span class="na">values</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_s3_bucket.bucket.arn</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_sqs_queue"</span><span class="w"> </span><span class="nv">"queue"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"s3-event-notification-queue"</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.queue.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"your-bucket-name"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_notification"</span><span class="w"> </span><span class="nv">"bucket_notification"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.bucket.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">queue</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">queue_arn</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_sqs_queue.queue.arn</span><span class="w"></span>
+<span class="w">    </span><span class="na">events</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"s3:ObjectCreated:*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">filter_suffix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">".log"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Add%20notification%20configuration%20to%20Lambda%20Function"></a><h3 id="add-notification-configuration-to-lambda-function">Add notification configuration to Lambda Function</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"assume_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Service"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"lambda.amazonaws.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"sts:AssumeRole"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"iam_for_lambda"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"iam_for_lambda"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.assume_role.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lambda_permission"</span><span class="w"> </span><span class="nv">"allow_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">statement_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"AllowExecutionFromS3Bucket"</span><span class="w"></span>
+<span class="w">  </span><span class="na">action</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"lambda:InvokeFunction"</span><span class="w"></span>
+<span class="w">  </span><span class="na">function_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_lambda_function.func.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"s3.amazonaws.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_arn</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.bucket.arn</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lambda_function"</span><span class="w"> </span><span class="nv">"func"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">filename</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"your-function.zip"</span><span class="w"></span>
+<span class="w">  </span><span class="na">function_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example_lambda_name"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.iam_for_lambda.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">handler</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"exports.example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">runtime</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"nodejs20.x"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"your-bucket-name"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_notification"</span><span class="w"> </span><span class="nv">"bucket_notification"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.bucket.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lambda_function</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">lambda_function_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_lambda_function.func.arn</span><span class="w"></span>
+<span class="w">    </span><span class="na">events</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"s3:ObjectCreated:*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">filter_prefix</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWSLogs/"</span><span class="w"></span>
+<span class="w">    </span><span class="na">filter_suffix</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">".log"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_lambda_permission.allow_bucket</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Trigger%20multiple%20Lambda%20functions"></a><h3 id="trigger-multiple-lambda-functions">Trigger multiple Lambda functions</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"assume_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Service"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"lambda.amazonaws.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"sts:AssumeRole"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"iam_for_lambda"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"iam_for_lambda"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.assume_role.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lambda_permission"</span><span class="w"> </span><span class="nv">"allow_bucket1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">statement_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"AllowExecutionFromS3Bucket1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">action</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"lambda:InvokeFunction"</span><span class="w"></span>
+<span class="w">  </span><span class="na">function_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_lambda_function.func1.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"s3.amazonaws.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_arn</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.bucket.arn</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lambda_function"</span><span class="w"> </span><span class="nv">"func1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">filename</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"your-function1.zip"</span><span class="w"></span>
+<span class="w">  </span><span class="na">function_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example_lambda_name1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.iam_for_lambda.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">handler</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"exports.example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">runtime</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"nodejs20.x"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lambda_permission"</span><span class="w"> </span><span class="nv">"allow_bucket2"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">statement_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"AllowExecutionFromS3Bucket2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">action</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"lambda:InvokeFunction"</span><span class="w"></span>
+<span class="w">  </span><span class="na">function_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_lambda_function.func2.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"s3.amazonaws.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_arn</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.bucket.arn</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lambda_function"</span><span class="w"> </span><span class="nv">"func2"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">filename</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"your-function2.zip"</span><span class="w"></span>
+<span class="w">  </span><span class="na">function_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example_lambda_name2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.iam_for_lambda.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">handler</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"exports.example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"your-bucket-name"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_notification"</span><span class="w"> </span><span class="nv">"bucket_notification"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.bucket.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lambda_function</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">lambda_function_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_lambda_function.func1.arn</span><span class="w"></span>
+<span class="w">    </span><span class="na">events</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"s3:ObjectCreated:*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">filter_prefix</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWSLogs/"</span><span class="w"></span>
+<span class="w">    </span><span class="na">filter_suffix</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">".log"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lambda_function</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">lambda_function_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_lambda_function.func2.arn</span><span class="w"></span>
+<span class="w">    </span><span class="na">events</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"s3:ObjectCreated:*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">filter_prefix</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"OtherLogs/"</span><span class="w"></span>
+<span class="w">    </span><span class="na">filter_suffix</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">".log"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">aws_lambda_permission.allow_bucket1</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nv">aws_lambda_permission.allow_bucket2</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Add%20multiple%20notification%20configurations%20to%20SQS%20Queue"></a><h3 id="add-multiple-notification-configurations-to-sqs-queue">Add multiple notification configurations to SQS Queue</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"queue"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"*"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">actions</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"sqs:SendMessage"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">resources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"arn:aws:sqs:*:*:s3-event-notification-queue"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">test</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"ArnEquals"</span><span class="w"></span>
+<span class="w">      </span><span class="na">variable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws:SourceArn"</span><span class="w"></span>
+<span class="w">      </span><span class="na">values</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_s3_bucket.bucket.arn</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_sqs_queue"</span><span class="w"> </span><span class="nv">"queue"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"s3-event-notification-queue"</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.queue.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"your-bucket-name"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_notification"</span><span class="w"> </span><span class="nv">"bucket_notification"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.bucket.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">queue</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"image-upload-event"</span><span class="w"></span>
+<span class="w">    </span><span class="na">queue_arn</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_sqs_queue.queue.arn</span><span class="w"></span>
+<span class="w">    </span><span class="na">events</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"s3:ObjectCreated:*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">filter_prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"images/"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">queue</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"video-upload-event"</span><span class="w"></span>
+<span class="w">    </span><span class="na">queue_arn</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_sqs_queue.queue.arn</span><span class="w"></span>
+<span class="w">    </span><span class="na">events</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"s3:ObjectCreated:*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">filter_prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"videos/"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>For Terraform's <a href="https://www.terraform.io/docs/configuration/syntax.html">JSON syntax</a>, use an array instead of defining the <code>queue</code> key twice.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"bucket"</span><span class="p">:</span><span class="w"> </span><span class="s2">"${aws_s3_bucket.bucket.id}"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"queue"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">        </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"image-upload-event"</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="nt">"queue_arn"</span><span class="p">:</span><span class="w"> </span><span class="s2">"${aws_sqs_queue.queue.arn}"</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="nt">"events"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"s3:ObjectCreated:*"</span><span class="p">],</span><span class="w"></span>
+<span class="w">            </span><span class="nt">"filter_prefix"</span><span class="p">:</span><span class="w"> </span><span class="s2">"images/"</span><span class="w"></span>
+<span class="w">        </span><span class="p">},</span><span class="w"></span>
+<span class="w">        </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"video-upload-event"</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="nt">"queue_arn"</span><span class="p">:</span><span class="w"> </span><span class="s2">"${aws_sqs_queue.queue.arn}"</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="nt">"events"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"s3:ObjectCreated:*"</span><span class="p">],</span><span class="w"></span>
+<span class="w">            </span><span class="nt">"filter_prefix"</span><span class="p">:</span><span class="w"> </span><span class="s2">"videos/"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Emit%20events%20to%20EventBridge"></a><h3 id="emit-events-to-eventbridge">Emit events to EventBridge</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"your-bucket-name"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_notification"</span><span class="w"> </span><span class="nv">"bucket_notification"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.bucket.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">eventbridge</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>bucket</code> - (Required) Name of the bucket for notification configuration.</li>
+</ul>
+
+<p>The following arguments are optional:</p>
+
+<ul>
+<li><code>eventbridge</code> - (Optional) Whether to enable Amazon EventBridge notifications. Defaults to <code>false</code>.</li>
+<li><code>lambda_function</code> - (Optional, Multiple) Used to configure notifications to a Lambda Function. See below.</li>
+<li><code>queue</code> - (Optional) Notification configuration to SQS Queue. See below.</li>
+<li><code>topic</code> - (Optional) Notification configuration to SNS Topic. See below.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/lambda_function"></a><h3 id="lambda_function"><code>lambda_function</code></h3>
+
+<ul>
+<li><code>events</code> - (Required) <a href="http://docs.aws.amazon.com/AmazonS3/latest/dev/NotificationHowTo.html#notification-how-to-event-types-and-destinations">Event</a> for which to send notifications.</li>
+<li><code>filter_prefix</code> - (Optional) Object key name prefix.</li>
+<li><code>filter_suffix</code> - (Optional) Object key name suffix.</li>
+<li><code>id</code> - (Optional) Unique identifier for each of the notification configurations.</li>
+<li><code>lambda_function_arn</code> - (Required) Lambda function ARN.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/queue"></a><h3 id="queue"><code>queue</code></h3>
+
+<ul>
+<li><code>events</code> - (Required) Specifies <a href="http://docs.aws.amazon.com/AmazonS3/latest/dev/NotificationHowTo.html#notification-how-to-event-types-and-destinations">event</a> for which to send notifications.</li>
+<li><code>filter_prefix</code> - (Optional) Object key name prefix.</li>
+<li><code>filter_suffix</code> - (Optional) Object key name suffix.</li>
+<li><code>id</code> - (Optional) Unique identifier for each of the notification configurations.</li>
+<li><code>queue_arn</code> - (Required) SQS queue ARN.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/topic"></a><h3 id="topic"><code>topic</code></h3>
+
+<ul>
+<li><code>events</code> - (Required) <a href="http://docs.aws.amazon.com/AmazonS3/latest/dev/NotificationHowTo.html#notification-how-to-event-types-and-destinations">Event</a> for which to send notifications.</li>
+<li><code>filter_prefix</code> - (Optional) Object key name prefix.</li>
+<li><code>filter_suffix</code> - (Optional) Object key name suffix.</li>
+<li><code>id</code> - (Optional) Unique identifier for each of the notification configurations.</li>
+<li><code>topic_arn</code> - (Required) SNS topic ARN.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports no additional attributes.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import S3 bucket notification using the <code>bucket</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket_notification.bucket_notification</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"bucket-name"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import S3 bucket notification using the <code>bucket</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_s3_bucket_notification.bucket_notification bucket-name
+</code></pre></div>
+
+            
+        
+    </body></html>

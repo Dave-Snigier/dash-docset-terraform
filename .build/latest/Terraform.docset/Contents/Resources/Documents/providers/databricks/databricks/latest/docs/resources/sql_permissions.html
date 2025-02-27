@@ -1,0 +1,136 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/sql_permissions --><head>
+                <title>databricks_sql_permissions</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_sql_permissions-resource">databricks_sql_permissions Resource</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Please switch to <a href="grants.md">databricks_grants</a> with Unity Catalog to manage data access, which provides a better and faster way for managing data security. <code>databricks_grants</code> resource <em>doesn't require a technical cluster to perform operations</em>. On workspaces with Unity Catalog enabled, you may run into errors such as <code>Error: cannot create sql permissions: cannot read current grants: For unity catalog, please specify the catalog name explicitly. E.g. SHOW GRANT ``your.address@email.com`` ON CATALOG main</code>. This happens if your <code>default_catalog_name</code> was set to a UC catalog instead of <code>hive_metastore</code>. The workaround is to re-assign the metastore again with the default catalog set to be <code>hive_metastore</code>. See <a href="metastore_assignment.md">databricks_metastore_assignment</a>.</p>
+</aside>
+
+<p>This resource manages data object access control lists in Databricks workspaces for things like tables, views, databases, and <a href="https://docs.databricks.com/security/access-control/table-acls/object-privileges.html">more</a>. In order to enable Table Access control, you have to login to the workspace as administrator, go to <code>Admin Console</code>, pick <code>Access Control</code> tab, click on <code>Enable</code> button in <code>Table Access Control</code> section, and click <code>Confirm</code>. The security guarantees of table access control <strong>will only be effective if cluster access control is also turned on</strong>. Please make sure that no users can create clusters in your workspace and all <a href="cluster.md">databricks_cluster</a> have approximately the following configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_cluster"</span><span class="w"> </span><span class="nv">"cluster_with_table_access_control"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  // ...</span>
+
+<span class="w">  </span><span class="nb">spark_conf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"spark.databricks.acl.dfAclsEnabled"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"true"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"spark.databricks.repl.allowedLanguages"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"python,sql"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>It is required to define all permissions for a securable in a single resource, otherwise Terraform cannot guarantee config drift prevention.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>The following resource definition will enforce access control on a table by executing the following SQL queries on a special auto-terminating cluster it would create for this operation:</p>
+
+<ul>
+<li><code>SHOW GRANT ON TABLE `default`.`foo`</code></li>
+<li><code>REVOKE ALL PRIVILEGES ON TABLE `default`.`foo` FROM ... every group and user that has access to it ...</code></li>
+<li><code>GRANT MODIFY, SELECT ON TABLE `default`.`foo` TO `serge@example.com`</code></li>
+<li><code>GRANT SELECT ON TABLE `default`.`foo` TO `special group`</code></li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_sql_permissions"</span><span class="w"> </span><span class="nv">"foo_table"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">table</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"foo"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">privilege_assignments</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">principal</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"serge@example.com"</span><span class="w"></span>
+<span class="w">    </span><span class="na">privileges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"SELECT", "MODIFY"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">privilege_assignments</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">principal</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"special group"</span><span class="w"></span>
+<span class="w">    </span><span class="na">privileges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"SELECT"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<ul>
+<li><code>cluster_id</code> - (Optional) Id of an existing <a href="cluster.md">databricks_cluster</a>, where the appropriate <code>GRANT</code>/<code>REVOKE</code> commands are executed. This cluster must have the appropriate access mode (<code>USER_ISOLATION</code> or <code>LEGACY_TABLE_ACL</code> specified). If no <code>cluster_id</code> is specified, a single-node TACL cluster named <code>terraform-table-acl</code> is automatically created.</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_sql_permissions"</span><span class="w"> </span><span class="nv">"foo_table"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_cluster.cluster_name.id</span><span class="c1"></span>
+<span class="c1">  #...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The following arguments are available to specify the data object you need to enforce access controls on. You must specify only one of those arguments (except for <code>table</code> and <code>view</code>), otherwise resource creation will fail.</p>
+
+<ul>
+<li><code>database</code> - Name of the database. Has default value of <code>default</code>.</li>
+<li><code>table</code> - Name of the table. Can be combined with <code>database</code>.</li>
+<li><code>view</code> - Name of the view. Can be combined with <code>database</code>.</li>
+<li><code>catalog</code> - (Boolean) If this access control for the entire catalog. Defaults to <code>false</code>.</li>
+<li><code>any_file</code> - (Boolean) If this access control for reading/writing any file. Defaults to <code>false</code>.</li>
+<li><code>anonymous_function</code> - (Boolean) If this access control for using anonymous function. Defaults to <code>false</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/privilege_assignments%20blocks"></a><h3 id="privilege_assignments-blocks"><code>privilege_assignments</code> blocks</h3>
+
+<p>You must specify one or many <code>privilege_assignments</code> configuration blocks to declare <code>privileges</code> to a <code>principal</code>, which corresponds to <code>display_name</code> of <a href="group.md#display_name">databricks_group</a> or <a href="user.md#display_name">databricks_user</a>. Terraform would ensure that only those principals and privileges defined in the resource are applied for the data object and would remove anything else. It would not remove any transitive privileges. <code>DENY</code> statements are intentionally not supported. Every <code>privilege_assignments</code> has the following required arguments:</p>
+
+<ul>
+<li><code>principal</code> - <code>display_name</code> for a <a href="group.md#display_name">databricks_group</a> or <a href="user.md#display_name">databricks_user</a>, <code>application_id</code> for a <a href="service_principal.md">databricks_service_principal</a>.</li>
+<li><code>privileges</code> - set of available privilege names in upper case.</li>
+</ul>
+
+<p><a href="https://docs.databricks.com/security/access-control/table-acls/object-privileges.html">Available</a> privilege names are:</p>
+
+<ul>
+<li><code>SELECT</code> - gives read access to an object.</li>
+<li><code>CREATE</code> - gives the ability to create an object (for example, a table in a database).</li>
+<li><code>MODIFY</code> - gives the ability to add, delete, and modify data to or from an object.</li>
+<li><code>USAGE</code> - do not give any abilities, but is an additional requirement to perform any action on a database object.</li>
+<li><code>READ_METADATA</code> - gives the ability to view an object and its metadata.</li>
+<li><code>CREATE_NAMED_FUNCTION</code> - gives the ability to create a named UDF in an existing catalog or database.</li>
+<li><code>MODIFY_CLASSPATH</code> - gives the ability to add files to the Spark class path.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Even though the value <code>ALL PRIVILEGES</code> is mentioned in Table ACL documentation, it's not recommended to use it from terraform, as it may result in unnecessary state updates.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>The resource can be imported using a synthetic identifier. Examples of valid synthetic identifiers are:</p>
+
+<ul>
+<li><code>table/default.foo</code> - table <code>foo</code> in a <code>default</code> database. Database is always mandatory.</li>
+<li><code>view/bar.foo</code> - view <code>foo</code> in <code>bar</code> database.</li>
+<li><code>database/bar</code> - <code>bar</code> database.</li>
+<li><code>catalog/</code> - entire catalog. <code>/</code> suffix is mandatory.</li>
+<li><code>any file/</code> - direct access to any file. <code>/</code> suffix is mandatory.</li>
+<li><code>anonymous function/</code> - anonymous function. <code>/</code> suffix is mandatory.</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code>terraform import databricks_sql_permissions.foo /&lt;object-type&gt;/&lt;object-name&gt;
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are often used in the same context:</p>
+
+<ul>
+<li><a href="../guides/workspace-management.md">End to end workspace management</a> guide.</li>
+<li><a href="group.md">databricks_group</a> to manage <a href="https://docs.databricks.com/administration-guide/users-groups/groups.html">groups in Databricks Workspace</a> or <a href="https://accounts.cloud.databricks.com/">Account Console</a> (for AWS deployments).</li>
+<li><a href="grants.md">databricks_grants</a> to manage data access in Unity Catalog.</li>
+<li><a href="permissions.md">databricks_permissions</a> to manage <a href="https://docs.databricks.com/security/access-control/index.html">access control</a> in Databricks workspace.</li>
+<li><a href="user.md">databricks_user</a> to <a href="https://docs.databricks.com/administration-guide/users-groups/users.html">manage users</a>, that could be added to <a href="group.md">databricks_group</a> within the workspace.</li>
+</ul>
+
+            
+        
+    </body></html>

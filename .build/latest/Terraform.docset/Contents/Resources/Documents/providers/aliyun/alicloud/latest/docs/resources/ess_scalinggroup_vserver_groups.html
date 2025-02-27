@@ -1,0 +1,217 @@
+<html><!-- Online page at https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/ess_scalinggroup_vserver_groups --><head>
+                <title>alicloud_ess_scalinggroup_vserver_groups</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="alicloud_ess_scalinggroup_vserver_groups">alicloud_ess_scalinggroup_vserver_groups</h1>
+
+<p>Attaches/Detaches vserver groups to a specified scaling group.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The load balancer of which vserver groups belongs to must be in <code>active</code> status.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If scaling group's network type is <code>VPC</code>, the vserver groups must be in the same <code>VPC</code>.  -&gt; <strong>NOTE:</strong> A scaling group can have at most 5 vserver groups attached by default.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Vserver groups and the default group of loadbalancer share the same backend server quota.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>When attach vserver groups to scaling group, existing ECS instances will be added to vserver groups; Instead, ECS instances will be removed from vserver group when detach.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Detach action will be executed before attach action.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Vserver group is defined uniquely by <code>loadbalancer_id</code>, <code>vserver_group_id</code>, <code>port</code>.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Modifing <code>weight</code> attribute means detach vserver group first and then, attach with new weight parameter.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Available since v1.53.0.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div style="display: block;margin-bottom: 40px;"><div class="oics-button" style="float: right;position: absolute;margin-bottom: 10px;">
+  <a href="https://api.aliyun.com/terraform?resource=alicloud_ess_scalinggroup_vserver_groups&amp;exampleId=9ae7a110-84b0-e4da-64b4-6132a7bb2a1227867466&amp;activeTab=example&amp;spm=docs.r.ess_scalinggroup_vserver_groups.0.9ae7a11084&amp;intl_lang=EN_US" target="_blank">
+    <img alt="Open in AliCloud" src="https://img.alicdn.com/imgextra/i1/O1CN01hjjqXv1uYUlY56FyX_!!6000000006049-55-tps-254-36.svg" style="max-height: 44px; max-width: 100%;"/>
+  </a>
+</div></div>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"name"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"random_integer"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">min</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10000</span><span class="w"></span>
+<span class="w">  </span><span class="na">max</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">99999</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.name}-${random_integer.default.result}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"alicloud_zones"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">available_disk_category</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"cloud_efficiency"</span><span class="w"></span>
+<span class="w">  </span><span class="na">available_resource_creation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"VSwitch"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"alicloud_vpc"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">local.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.16.0.0/16"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"alicloud_vswitch"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">alicloud_vpc.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.16.0.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">data.alicloud_zones.default.zones[0].id</span><span class="w"></span>
+<span class="w">  </span><span class="na">vswitch_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"alicloud_security_group"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">local.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">alicloud_vpc.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"alicloud_slb_load_balancer"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancer_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="s2">"terraform-example%d"</span><span class="p">,</span><span class="w"> </span><span class="nv">count.index</span><span class="w"> </span><span class="err">+</span><span class="w"> </span><span class="m">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">vswitch_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">alicloud_vswitch.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancer_spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"slb.s1.small"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"alicloud_slb_server_group"</span><span class="w"> </span><span class="nv">"default1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">alicloud_slb_load_balancer.default.0.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">local.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"alicloud_slb_server_group"</span><span class="w"> </span><span class="nv">"default2"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">alicloud_slb_load_balancer.default.1.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">local.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"alicloud_slb_listener"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancer_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">alicloud_slb_load_balancer.default[count.index].id</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend_port</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"22"</span><span class="w"></span>
+<span class="w">  </span><span class="na">frontend_port</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"22"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">  </span><span class="na">bandwidth</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"10"</span><span class="w"></span>
+<span class="w">  </span><span class="na">health_check_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"alicloud_ess_scaling_group"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">min_size</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">max_size</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">scaling_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_cooldown</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">200</span><span class="w"></span>
+<span class="w">  </span><span class="na">removal_policies</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"OldestInstance"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">vswitch_ids</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">alicloud_vswitch.default.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">loadbalancer_ids</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">alicloud_slb_listener.default</span><span class="p">.</span><span class="err">*</span><span class="p">.</span><span class="err">load_balancer_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"alicloud_ess_scalinggroup_vserver_groups"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">scaling_group_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">alicloud_ess_scaling_group.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">vserver_groups</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">loadbalancer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">alicloud_slb_load_balancer.default.0.id</span><span class="w"></span>
+<span class="w">    </span><span class="nb">vserver_attributes</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">vserver_group_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">alicloud_slb_server_group.default1.0.id</span><span class="w"></span>
+<span class="w">      </span><span class="na">port</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"100"</span><span class="w"></span>
+<span class="w">      </span><span class="na">weight</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"60"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">vserver_attributes</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">vserver_group_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">alicloud_slb_server_group.default1.1.id</span><span class="w"></span>
+<span class="w">      </span><span class="na">port</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"110"</span><span class="w"></span>
+<span class="w">      </span><span class="na">weight</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"60"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">vserver_groups</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">loadbalancer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">alicloud_slb_load_balancer.default.1.id</span><span class="w"></span>
+<span class="w">    </span><span class="nb">vserver_attributes</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">vserver_group_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">alicloud_slb_server_group.default2.0.id</span><span class="w"></span>
+<span class="w">      </span><span class="na">port</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"200"</span><span class="w"></span>
+<span class="w">      </span><span class="na">weight</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"60"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">vserver_attributes</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">vserver_group_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">alicloud_slb_server_group.default2.1.id</span><span class="w"></span>
+<span class="w">      </span><span class="na">port</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"210"</span><span class="w"></span>
+<span class="w">      </span><span class="na">weight</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"60"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">force</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>scaling_group_id</code> - (Required, ForceNew) ID of the scaling group.</li>
+<li><code>vserver_groups</code> - (Required) A list of vserver groups attached on scaling group. See <a href="#vserver_groups"><code>vserver_groups</code></a> below.</li>
+<li><code>force</code> - (Optional, Available in 1.64.0+) If instances of scaling group are attached/removed from slb backend server when attach/detach vserver group from scaling group. Default to true.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/vserver_groups"></a><h3 id="vserver_groups"><code>vserver_groups</code></h3>
+
+<p>the vserver_group supports the following:</p>
+
+<ul>
+<li><code>loadbalancer_id</code> - (Required) Loadbalancer server ID of VServer Group.</li>
+<li><code>vserver_attributes</code> - (Required) A list of VServer Group attributes. See <a href="#vserver_groups-vserver_attributes"><code>vserver_attributes</code></a> below.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/vserver_groups-vserver_attributes"></a><h3 id="vserver_groups-vserver_attributes"><code>vserver_groups-vserver_attributes</code></h3>
+
+<ul>
+<li><code>vserver_group_id</code> - (Required) ID of VServer Group.</li>
+<li><code>port</code> - (Required) - The port will be used for VServer Group backend server.</li>
+<li><code>weight</code> - (Required) The weight of an ECS instance attached to the VServer Group.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>The following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - (Required, ForceNew) The ESS vserver groups attachment resource ID.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>ESS vserver groups can be imported using the id, e.g.</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform import alicloud_ess_vserver_groups.example abc123456
+</code></pre></div>
+
+            
+        
+    </body></html>

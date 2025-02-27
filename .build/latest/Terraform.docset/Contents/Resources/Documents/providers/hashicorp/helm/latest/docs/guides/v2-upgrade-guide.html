@@ -1,0 +1,75 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/helm/latest/docs/guides/v2-upgrade-guide --><head>
+                <title>Upgrading to v2.0.0 of the Helm provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="upgrading-to-v200-of-the-helm-provider">Upgrading to v2.0.0 of the Helm provider</h1>
+
+<p>This guide covers the changes introduced in v2.0.0 of the Helm provider and what you may need to do to upgrade your configuration.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20in%20v2.0.0"></a><h2 id="changes-in-v200">Changes in v2.0.0</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20to%20Kubernetes%20credentials%20supplied%20in%20the%20provider%20block"></a><h3 id="changes-to-kubernetes-credentials-supplied-in-the-provider-block">Changes to Kubernetes credentials supplied in the provider block</h3>
+
+<p>We have made several changes to the way access to Kubernetes is configured in the provider block.</p>
+
+<ol>
+<li>The <code>load_config_file</code> attribute has been removed.</li>
+<li>Support for the <code>KUBECONFIG</code> environment variable has been dropped and replaced with <code>KUBE_CONFIG_PATH</code>.</li>
+<li>The <code>config_path</code> attribute will no longer default to <code>~/.kube/config</code> and must be set explicitly.</li>
+</ol>
+
+<p>The above changes have been made to encourage the best practise of configuring access to Kubernetes in the provider block explicitly, instead of relying upon default paths or <code>KUBECONFIG</code> being set. We have done this because allowing the provider to configure its access to Kubernetes implicitly caused confusion with a subset of our users. It also created risk for users who use Terraform to manage multiple clusters. Requiring explicit configuring for kubernetes in the provider block eliminates the possibility that the configuration will be applied to the wrong cluster.</p>
+
+<p>You will therefore need to explicity configure access to your Kubernetes cluster in the provider block going forward. For many users this will simply mean specifying the <code>config_path</code> attribute in the provider block. Users already explicitly configuring the provider should not be affected by this change, but will need to remove the <code>load_config_file</code> attribute if they are currently using it.</p>
+
+<p>When running Terraform inside a Kubernetes cluster no provider configuration is neccessary, as the provider will detect that is has access to a service account token.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Removal%20of%20the%20helm_repository%20data%20source"></a><h3 id="removal-of-the-helm_repository-data-source">Removal of the <code>helm_repository</code> data source</h3>
+
+<p>This feature of the provider caused a fair bit of confusion and was a source of instability as data sources are not supposed to be stateful. This data source performed a stateful operation that modified the filesystem, mirroring similar functionality to the <code>helm repo add</code> command. It has been the recommendation for some time to configure repository information explicity at the <code>helm_resource</code> level and so the data source has been removed. See the example below.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"helm_release"</span><span class="w"> </span><span class="nv">"redis"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"redis"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">repository</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://charts.bitnami.com/bitnami"</span><span class="w"></span>
+<span class="w">  </span><span class="na">chart</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"redis"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The provider will continue to work with repositories that are configured with <code>helm repo add</code> before Terraform is run.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Removal%20of%20set_string%20in%20the%20helm_release%20resource"></a><h3 id="removal-of-set_string-in-the-helm_release-resource">Removal of <code>set_string</code> in the <code>helm_release</code> resource</h3>
+
+<p>The addition of a <code>type</code> attribute to the <code>set</code> block has rendered <code>set_string</code> superfluous so it has been removed. See the example below on how to set a string using the <code>set</code> block. This is used when the type of a value is an ambigious (e.g strings containing only numbers, true, false) and we want it to be explicitly parsed as a string.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"helm_release"</span><span class="w"> </span><span class="nv">"redis"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"redis"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">repository</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://charts.bitnami.com/bitnami"</span><span class="w"></span>
+<span class="w">  </span><span class="na">chart</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"redis"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">set</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"test.value"</span><span class="w"></span>
+<span class="w">    </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"123456"</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"string"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Dropped%20support%20for%20Terraform%200.11"></a><h3 id="dropped-support-for-terraform-011">Dropped support for Terraform 0.11</h3>
+
+<p>All builds of the Helm provider going forward will no longer work with Terraform 0.11. See <a href="https://www.terraform.io/upgrade-guides/index.html">Upgrade Guides</a> for how to migrate your configurations to a newer version of Terraform.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrade%20to%20v2%20of%20the%20Terraform%20Plugin%20SDK"></a><h3 id="upgrade-to-v2-of-the-terraform-plugin-sdk">Upgrade to v2 of the Terraform Plugin SDK</h3>
+
+<p>Contributors to the provider will be interested to know this upgrade has brought the latest version of the <a href="https://github.com/hashicorp/terraform-plugin-sdk">Terraform Plugin SDK</a> which introduced a number of enhancements to the developer experience. Details of the changes introduced can be found under <a href="https://www.terraform.io/docs/extend/guides/v2-upgrade-guide.html">Extending Terraform</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Helm%202"></a><h2 id="helm-2">Helm 2</h2>
+
+<p>We removed support in the provider for Helm 2 earlier this year. In accordance with the <a href="https://helm.sh/blog/helm-v2-deprecation-timeline/">Helm v2 deprecation timeline</a> we will no longer be accepting PRs or handling issues that relate to Helm 2 going forward.</p>
+
+            
+        
+    </body></html>

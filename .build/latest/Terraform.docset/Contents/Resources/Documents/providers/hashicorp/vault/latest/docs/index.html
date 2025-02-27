@@ -1,0 +1,897 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/vault/latest/docs --><head>
+                <title>Vault Provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="vault-provider">Vault Provider</h1>
+
+<p>The Vault provider allows Terraform to read from, write to, and configure
+<a href="https://vaultproject.io/">HashiCorp Vault</a>.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Important</em>
+    <p>Interacting with Vault from Terraform causes any secrets that you read and write to be persisted in both Terraform's state file <em>and</em> in any generated plan files. For any Terraform module that reads or writes Vault secrets, these files should be treated as sensitive and protected accordingly.</p>
+</aside>
+
+<p>This provider serves two pretty-distinct use-cases, which each have their
+own security trade-offs and caveats that are covered in the sections that
+follow. Consider these carefully before using this provider within your
+Terraform configuration.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Visit the <a href="https://learn.hashicorp.com/tutorials/terraform/secrets-vault?utm_source=WEBSITE&amp;utm_medium=WEB_IO&amp;utm_offer=ARTICLE_PAGE&amp;utm_content=DOCS">Inject secrets into Terraform using the Vault provider</a> Learn tutorial to learn how to use short-lived credentials from Vault's AWS Secrets Engine to authenticate the AWS provider.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Best%20Practices"></a><h2 id="best-practices">Best Practices</h2>
+
+<p>We recommend that you avoid placing secrets in your Terraform config or state file wherever possible, and if placed there, you take steps to reduce and manage your risk. We have created a practical guide on how to do this with our opensource versions in Best Practices for Using HashiCorp Terraform with HashiCorp Vault:</p>
+
+<p><a href="https://www.youtube.com/watch?v=fOybhcbuxJ0"><img alt="Best Practices for Using HashiCorp Terraform with HashiCorp Vault" src="https://img.youtube.com/vi/fOybhcbuxJ0/0.jpg"/></a></p>
+
+<p>This webinar walks you through how to protect secrets when using Terraform with Vault. Additional security measures are available in paid Terraform versions as well.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20and%20Populating%20Vault"></a><h2 id="configuring-and-populating-vault">Configuring and Populating Vault</h2>
+
+<p>Terraform can be used by the Vault administrators to configure Vault and
+populate it with secrets. In this case, the state and any plans associated
+with the configuration must be stored and communicated with care, since they
+will contain in cleartext any values that were written into Vault.</p>
+
+<p>Currently, Terraform has no mechanism to redact or protect secrets
+that are provided via configuration, so teams choosing to use Terraform
+for populating Vault secrets should pay careful attention to the notes
+on each resource's documentation page about how any secrets are persisted
+to the state and consider carefully whether such usage is compatible with
+their security policies.</p>
+
+<p>Please see the <a href="./guides/policies.html">Vault Policies and the Terraform Vault Provider</a>
+guide for details on token capabilites.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20Vault%20credentials%20in%20Terraform%20configuration"></a><h2 id="using-vault-credentials-in-terraform-configuration">Using Vault credentials in Terraform configuration</h2>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Important</em>
+    <p>It is important to ensure that the Vault token has a long enough <code>time-to-live</code> to allow for all Vault resources to be successfully provisioned. In the case where the <code>TTL</code> is insufficient, you may encounter unexpected permission denied errors. See <a href="https://developer.hashicorp.com/vault/docs/concepts/tokens#token-time-to-live-periodic-tokens-and-explicit-max-ttls">Vault Token TTLs</a> for more details.</p>
+</aside>
+
+<p>Most Terraform providers require credentials to interact with a third-party
+service that they wrap. This provider allows such credentials to be obtained
+from Vault, which means that operators or systems running Terraform need
+only access to a suitably-privileged Vault token in order to temporarily
+lease the credentials for other providers.</p>
+
+<p>Currently, Terraform has no mechanism to redact or protect secrets that
+are returned via data sources, so secrets read via this provider will be
+persisted into the Terraform state, into any plan files, and in some cases
+in the console output produced while planning and applying. These artifacts
+must therefore all be protected accordingly.</p>
+
+<p>To reduce the exposure of such secrets, the provider requests a Vault token
+with a relatively-short TTL (20 minutes, by default) which in turn means
+that where possible Vault will revoke any issued credentials after that
+time, but in particular it is unable to retract any static secrets such as
+those stored in Vault's "generic" secret backend.</p>
+
+<p>The requested token TTL can be controlled by the <code>max_lease_ttl_seconds</code>
+provider argument described below. It is important to consider that Terraform
+reads from data sources during the <code>plan</code> phase and writes the result into
+the plan. Thus, a subsequent <code>apply</code> will likely fail if it is run after the
+intermediate token has expired, due to the revocation of the secrets that
+are stored in the plan.</p>
+
+<p>Except as otherwise noted, the resources that read secrets from Vault
+are designed such that they require only the <em>read</em> capability on the relevant
+resources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Arguments"></a><h2 id="provider-arguments">Provider Arguments</h2>
+
+<p>The provider configuration block accepts the following arguments.
+In most cases it is recommended to set them via the indicated environment
+variables in order to keep credential information out of the configuration.</p>
+
+<ul>
+<li><p><code>address</code> - (Required) Origin URL of the Vault server. This is a URL
+with a scheme, a hostname and a port but with no path. May be set
+via the <code>VAULT_ADDR</code> environment variable.</p></li>
+<li><p><code>add_address_to_env</code> - (Optional) If <code>true</code> the environment variable
+<code>VAULT_ADDR</code> in the Terraform process environment will be set to the
+value of the <code>address</code> argument from this provider. By default, this is false.</p></li>
+<li><p><code>token</code> - (Optional) Vault token that will be used by Terraform to
+authenticate. May be set via the <code>VAULT_TOKEN</code> environment variable.
+If none is otherwise supplied, Terraform will attempt to read it from
+<code>~/.vault-token</code> (where the vault command stores its current token).
+Terraform will issue itself a new token that is a child of the one given,
+with a short TTL to limit the exposure of any requested secrets, unless
+<code>skip_child_token</code> is set to <code>true</code> (see below). Note that
+the given token must have the update capability on the auth/token/create
+path in Vault in order to create child tokens.  A token is required for
+the provider.  A token can explicitly set via token argument, alternatively 
+a token can be dynamically set via an <code>auth_login*</code> block.</p></li>
+<li><p><code>token_name</code> - (Optional) Token name, that will be used by Terraform when
+creating the child token (<code>display_name</code>). This is useful to provide a reference of the
+Terraform run traceable in vault audit log, e.g. commit hash or id of the CI/CD
+execution job. May be set via the <code>VAULT_TOKEN_NAME</code> environment variable.
+Default value will be <code>terraform</code> if not set or empty.</p></li>
+<li><p><code>ca_cert_file</code> - (Optional) Path to a file on local disk that will be
+used to validate the certificate presented by the Vault server.
+May be set via the <code>VAULT_CACERT</code> environment variable.</p></li>
+<li><p><code>ca_cert_dir</code> - (Optional) Path to a directory on local disk that
+contains one or more certificate files that will be used to validate
+the certificate presented by the Vault server. May be set via the
+<code>VAULT_CAPATH</code> environment variable.</p></li>
+<li><p><code>auth_login_userpass</code> - (Optional) Utilizes the <code>userpass</code> authentication engine. <em><a href="#userpass">See usage details below.</a></em></p></li>
+<li><p><code>auth_login_aws</code> - (Optional) Utilizes the <code>aws</code> authentication engine. <em><a href="#aws">See usage details below.</a></em></p></li>
+<li><p><code>auth_login_cert</code> - (Optional) Utilizes the <code>cert</code> authentication engine. <em><a href="#tls-certificate">See usage details below.</a></em></p></li>
+<li><p><code>auth_login_gcp</code> - (Optional) Utilizes the <code>gcp</code> authentication engine. <em><a href="#gcp">See usage details below.</a></em></p></li>
+<li><p><code>auth_login_kerberos</code> - (Optional) Utilizes the <code>kerberos</code> authentication engine. <em><a href="#kerberos">See usage details below.</a></em></p></li>
+<li><p><code>auth_login_radius</code> - (Optional) Utilizes the <code>radius</code> authentication engine. <em><a href="#radius">See usage details below.</a></em></p></li>
+<li><p><code>auth_login_oci</code> - (Optional) Utilizes the <code>oci</code> authentication engine. <em><a href="#oci">See usage details below.</a></em></p></li>
+<li><p><code>auth_login_oidc</code> - (Optional) Utilizes the <code>oidc</code> authentication engine. <em><a href="#oidc">See usage details below.</a></em></p></li>
+<li><p><code>auth_login_jwt</code> - (Optional) Utilizes the <code>jwt</code> authentication engine. <em><a href="#jwt">See usage details below.</a></em></p></li>
+<li><p><code>auth_login_azure</code> - (Optional) Utilizes the <code>azure</code> authentication engine. <em><a href="#azure">See usage details below.</a></em></p></li>
+<li><p><code>auth_login_token_file</code> - (Optional) Utilizes a local file containing a Vault token. <em><a href="#token-file">See usage details below.</a></em></p></li>
+<li><ul>
+<li><code>auth_login</code> - (Optional) A configuration block, described below, that
+attempts to authenticate using the <code>auth/&lt;method&gt;/login</code> path to
+acquire a token which Terraform will use. Terraform still issues itself
+a limited child token using auth/token/create in order to enforce a short
+TTL and limit exposure. <em><a href="#generic">See usage details below.</a></em></li>
+</ul></li>
+<li><p><code>client_auth</code> - (Optional) A configuration block, described below, that
+provides credentials used by Terraform to authenticate with the Vault
+server. At present there is little reason to set this, because Terraform
+does not support the TLS certificate authentication mechanism.
+*Deprecated, use <code>auth_login_cert</code> instead.</p></li>
+<li><p><code>skip_tls_verify</code> - (Optional) Set this to <code>true</code> to disable verification
+of the Vault server's TLS certificate. This is strongly discouraged except
+in prototype or development environments, since it exposes the possibility
+that Terraform can be tricked into writing secrets to a server controlled
+by an intruder. May be set via the <code>VAULT_SKIP_VERIFY</code> environment variable.</p></li>
+<li><p><code>tls_server_name</code> - (Optional) Name to use as the SNI host when connecting
+via TLS. May be set via the <code>VAULT_TLS_SERVER_NAME</code> environment variable.</p></li>
+<li><p><code>skip_child_token</code> - (Optional) Set this to <code>true</code> to disable
+creation of an intermediate ephemeral Vault token for Terraform to
+use. Enabling this is strongly discouraged since it increases
+the potential for a renewable Vault token being exposed in clear text.
+Only change this setting when the provided token cannot be permitted to
+create child tokens and there is no risk of exposure from the output of
+Terraform. May be set via the <code>TERRAFORM_VAULT_SKIP_CHILD_TOKEN</code> environment
+variable. <strong>Note</strong>: Setting to <code>true</code> will cause <code>token_name</code>
+and <code>max_lease_ttl_seconds</code> to be ignored.
+Please see <a href="#using-vault-credentials-in-terraform-configuration">Using Vault credentials in Terraform configuration</a>
+before enabling this setting.</p></li>
+<li><p><code>max_lease_ttl_seconds</code> - (Optional) Used as the duration for the
+intermediate Vault token Terraform issues itself, which in turn limits
+the duration of secret leases issued by Vault. Defaults to 20 minutes
+and may be set via the <code>TERRAFORM_VAULT_MAX_TTL</code> environment variable.
+See the section above on <em>Using Vault credentials in Terraform configuration</em>
+for the implications of this setting.</p></li>
+<li><p><code>max_retries</code> - (Optional) Used as the maximum number of retries when a 5xx
+error code is encountered. Defaults to <code>2</code> retries and may be set via the
+<code>VAULT_MAX_RETRIES</code> environment variable.</p></li>
+<li><p><code>max_retries_ccc</code> - (Optional) Maximum number of retries for _Client Controlled Consistency_
+related operations. Defaults to <code>10</code> retries and may also be set via the
+<code>VAULT_MAX_RETRIES_CCC</code> environment variable. See
+<a href="https://www.vaultproject.io/docs/enterprise/consistency#vault-eventual-consistency">Vault Eventual Consistency</a>
+for more information. <br/>
+<em>As of Vault Enterprise 1.10 changing this parameter should no longer be required
+See <a href="https://www.vaultproject.io/docs/enterprise/consistency#vault-1-10-mitigations">Vault Eventual Consistency - Vault 1.10 Mitigations</a>
+for more information.</em></p></li>
+<li><p><code>namespace</code> - (Optional) Set the namespace to use. May be set via the
+<code>VAULT_NAMESPACE</code> environment variable.
+See <a href="https://www.vaultproject.io/docs/enterprise/namespaces">namespaces</a> for more info.
+<em>Available only for Vault Enterprise</em>.</p></li>
+<li><p><code>use_root_namespace</code> - (Optional) Authenticate to the root Vault namespace. Conflicts with <code>namespace</code>.</p></li>
+<li><p><code>set_namespace_from_token</code> -(Optional) Defaults to <code>true</code>. In the case where the Vault token is
+for a specific namespace and the provider namespace is not configured, use the token namespace
+as the root namespace for all resources.</p></li>
+<li><p><code>skip_get_vault_version</code> - (Optional) Skip the dynamic fetching of the Vault server version. 
+Set to <code>true</code> when the <em>/sys/seal-status</em> API endpoint is not available. See <a href="#vault_version_override">vault_version_override</a>
+for related info</p></li>
+<li><p><code>vault_version_override</code> - (Optional) Override the target Vault server semantic version.
+Normally the version is dynamically set from the <em>/sys/seal-status</em> API endpoint. In the case where this endpoint
+is not available an override can be specified here.</p></li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Setting the <code>vault_version_override</code> determines Vault server's API compatability, so it's important that the value specified here matches the target server. It is recommended to only ever use this option in the case where the server version cannot be dynamically determined.</p>
+</aside>
+
+<ul>
+<li><code>headers</code> - (Optional) A configuration block, described below, that provides headers
+to be sent along with all requests to the Vault server.  This block can be specified
+multiple times.</li>
+</ul>
+
+<p>The <code>client_auth</code> configuration block accepts the following arguments:</p>
+
+<ul>
+<li><p><code>cert_file</code> - (Required) Path to a file on local disk that contains the
+PEM-encoded certificate to present to the server.</p></li>
+<li><p><code>key_file</code> - (Required) Path to a file on local disk that contains the
+PEM-encoded private key for which the authentication certificate was issued.</p></li>
+</ul>
+
+<p>The <code>headers</code> configuration block accepts the following arguments:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The name of the header.</p></li>
+<li><p><code>value</code> - (Required) The value of the header.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Vault%20Authentication%20Configuration%20Options"></a><h2 id="vault-authentication-configuration-options">Vault Authentication Configuration Options</h2>
+
+<p>The Vault provider supports the following Vault authentication engines.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Userpass"></a><h3 id="userpass">Userpass</h3>
+
+<p>Provides support for authenticating to Vault using the Username &amp; Password authentication engine.</p>
+
+<p><em>For more details see:
+<a href="https://www.vaultproject.io/api-docs/auth/userpass#userpass-auth-method-http-api">Userpass Auth Method (HTTP API)</a></em></p>
+
+<p>The <code>auth_login_userpass</code> configuration block accepts the following arguments:</p>
+
+<ul>
+<li><p><code>namespace</code> - (Optional) The path to the namespace that has the mounted auth method.
+This defaults to the root namespace. Cannot contain any leading or trailing slashes.
+<em>Available only for Vault Enterprise</em>.</p></li>
+<li><p><code>use_root_namespace</code> - (Optional) Authenticate to the root Vault namespace. Conflicts with <code>namespace</code>.</p></li>
+<li><p><code>mount</code> - (Optional) The name of the authentication engine mount. <br/>
+Default: <code>userpass</code></p></li>
+<li><p><code>username</code> - (Required) The username to log into Vault with.
+Can be specified with the <code>TERRAFORM_VAULT_USERNAME</code> environment variable.</p></li>
+<li><p><code>password</code> - (Optional) The password to log into Vault with.
+Can be specified with the <code>TERRAFORM_VAULT_PASSWORD</code> environment variable. <em>Cannot be specified with <code>password_file</code></em>.</p></li>
+<li><p><code>password_file</code> - (Optional) A file containing the password to log into Vault with.
+Can be specified with the <code>TERRAFORM_VAULT_PASSWORD_FILE</code> environment variable. <em>Cannot be specified with <code>password</code></em></p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/AWS"></a><h3 id="aws">AWS</h3>
+
+<p>Provides support for authenticating to Vault using the AWS authentication engine.</p>
+
+<p><em>For more details see:
+<a href="https://www.vaultproject.io/api-docs/auth/aws#aws-auth-method-api">AWS Auth Method (API)</a></em></p>
+
+<p>The <code>auth_login_aws</code> configuration block accepts the following arguments:</p>
+
+<ul>
+<li><p><code>namespace</code> - (Optional) The path to the namespace that has the mounted auth method.
+This defaults to the root namespace. Cannot contain any leading or trailing slashes.
+<em>Available only for Vault Enterprise</em>.</p></li>
+<li><p><code>use_root_namespace</code> - (Optional) Authenticate to the root Vault namespace. Conflicts with <code>namespace</code>.</p></li>
+<li><p><code>mount</code> - (Optional) The name of the authentication engine mount. <br/>
+Default: <code>aws</code></p></li>
+<li><p><code>role</code> - (Required) The name of the role against which the login is being attempted.</p></li>
+<li><p><code>aws_access_key_id</code> - (Optional) The AWS access key ID. <br/>
+<em>Can be specified with the <code>AWS_ACCESS_KEY_ID</code> environment variable.</em></p></li>
+<li><p><code>aws_secret_access_key</code> - (Optional) The AWS secret access key. <br/>
+<em>Can be specified with the <code>AWS_SECRET_ACCESS_KEY</code> environment variable.</em></p></li>
+<li><p><code>aws_session_token</code> - (Optional) The AWS session token. <br/>
+<em>Can be specified with the <code>AWS_SESSION_TOKEN</code> environment variable.</em></p></li>
+<li><p><code>aws_profile</code> - (Optional) The name of the AWS profile. <br/>
+<em>Can be specified with the <code>AWS_PROFILE</code> environment variable.</em></p></li>
+<li><p><code>aws_shared_credentials_file</code> - (Optional) Path to the AWS shared credentials file. <br/>
+<em>Can be specified with the <code>AWS_SHARED_CREDENTIALS_FILE</code> environment variable.</em></p></li>
+<li><p><code>aws_web_identity_token_file</code> - (Optional) Path to the file containing an OAuth 2.0 access token or OpenID
+Connect ID token. <br/>
+<em>Can be specified with the <code>AWS_WEB_IDENTITY_TOKEN_FILE</code> environment variable.</em></p></li>
+<li><p><code>aws_region</code> - (Optional) The AWS region. <br/>
+<em>Can be specified with the <code>AWS_REGION</code> or <code>AWS_DEFAULT_REGION</code> environment variables.</em></p></li>
+<li><p><code>aws_role_arn</code> - (Optional) The ARN of the AWS Role to assume. <em>Used during STS AssumeRole</em> <br/>
+<em>Can be specified with the <code>AWS_ROLE_ARN</code> environment variable.</em></p></li>
+<li><p><code>aws_role_session_name</code> - (Optional) Specifies the name to attach to the AWS role session. <em>Used during STS AssumeRole</em> <br/>
+<em>Can be specified with the <code>AWS_ROLE_SESSION_NAME</code> environment variable.</em></p></li>
+<li><p><code>aws_sts_endpoint</code> - (Optional) The STS endpoint URL.</p></li>
+<li><p><code>aws_iam_endpoint</code> - (Optional) The IAM endpoint URL.</p></li>
+<li><p><code>header_value</code> - (Optional) The Vault header value to include in the STS signing request.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/TLS%20Certificate"></a><h3 id="tls-certificate">TLS Certificate</h3>
+
+<p>Provides support for authenticating to Vault using the TLS Certificate authentication engine.</p>
+
+<p><em>For more details see:
+<a href="https://www.vaultproject.io/api-docs/auth/cert#tls-certificate-auth-method-api">TLS Certificate Auth Method (API)</a></em></p>
+
+<p>The <code>auth_login_cert</code> configuration block accepts the following arguments:</p>
+
+<ul>
+<li><p><code>namespace</code> - (Optional) The path to the namespace that has the mounted auth method.
+This defaults to the root namespace. Cannot contain any leading or trailing slashes.
+<em>Available only for Vault Enterprise</em>.</p></li>
+<li><p><code>use_root_namespace</code> - (Optional) Authenticate to the root Vault namespace. Conflicts with <code>namespace</code>.</p></li>
+<li><p><code>mount</code> - (Optional) The name of the authentication engine mount.
+Default: <code>cert</code></p></li>
+<li><p><code>name</code> - (Optional) Authenticate against only the named certificate role.</p></li>
+<li><p><code>cert_file</code> - (Required) Path to a file on local disk that contains the
+PEM-encoded certificate to present to the server.</p></li>
+<li><p><code>key_file</code> - (Required) Path to a file on local disk that contains the
+PEM-encoded private key for which the authentication certificate was issued.</p></li>
+</ul>
+
+<p><em>This login configuration honors the top-level TLS configuration parameters:
+<a href="#ca_cert_file">ca_cert_file</a>, <a href="#ca_cert_dir">ca_cert_dir</a>, <a href="#skip_tls_verify">skip_tls_verify</a>,
+<a href="#tls_server_name">tls_server_name</a></em></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/GCP"></a><h3 id="gcp">GCP</h3>
+
+<p>Provides support for authenticating to Vault using the Google Cloud Auth engine.</p>
+
+<p><em>For more details see:
+<a href="https://www.vaultproject.io/api-docs/auth/gcp#google-cloud-auth-method-api">Google Cloud Auth Method (API)</a></em></p>
+
+<p>The <code>auth_login_gcp</code> configuration block accepts the following arguments:</p>
+
+<ul>
+<li><p><code>namespace</code> - (Optional) The path to the namespace that has the mounted auth method.
+This defaults to the root namespace. Cannot contain any leading or trailing slashes.
+<em>Available only for Vault Enterprise</em>.</p></li>
+<li><p><code>use_root_namespace</code> - (Optional) Authenticate to the root Vault namespace. Conflicts with <code>namespace</code>.</p></li>
+<li><p><code>mount</code> - (Optional) The name of the authentication engine mount. <br/>
+Default: <code>gcp</code></p></li>
+<li><p><code>role</code> - (Required) The name of the role against which the login is being attempted.</p></li>
+<li><p><code>jwt</code> - (Optional) The signed JSON Web Token against which the login is being attempted.</p></li>
+<li><p><code>credentials</code> - (Optional) Path to the Google Cloud credentials to use when getting the signed 
+JWT token from the IAM service. <br/>
+<em>conflicts with <code>jwt</code></em></p></li>
+<li><p><code>service_account</code> - (Optional) Name of the service account to issue the JWT token for. <br/>
+<em>requires <code>credentials</code></em></p></li>
+</ul>
+
+<p><em>This login configuration will attempt to get a signed JWT token if <code>jwt</code> is not specified. 
+It supports both the IAM and GCE meta-data services as the token source.</em></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Kerberos"></a><h3 id="kerberos">Kerberos</h3>
+
+<p>Provides support for authenticating to Vault using the Kerberos Auth engine.</p>
+
+<p><em>For more details see: 
+<a href="https://www.vaultproject.io/api-docs/auth/kerberos#kerberos-auth-method-api">Kerberos Auth Method (API)</a></em></p>
+
+<p>The <code>auth_login_kerberos</code> configuration block accepts the following arguments:</p>
+
+<ul>
+<li><p><code>namespace</code> - (Optional) The path to the namespace that has the mounted auth method.
+This defaults to the root namespace. Cannot contain any leading or trailing slashes.
+<em>Available only for Vault Enterprise</em>.</p></li>
+<li><p><code>use_root_namespace</code> - (Optional) Authenticate to the root Vault namespace. Conflicts with <code>namespace</code>.</p></li>
+<li><p><code>mount</code> - (Optional) The name of the authentication engine mount. <br/>
+Default: <code>kerberos</code></p></li>
+<li><p><code>token</code> - (Optional) Simple and Protected GSSAPI Negotiation Mechanism (SPNEGO) token.
+Can be specified with the <code>KRB_SPNEGO_TOKEN</code> environment variable.</p></li>
+<li><p><code>username</code> - (Conflicts with <code>token</code>)  The username to login into Kerberos with.</p></li>
+<li><p><code>service</code> - (Conflicts with <code>token</code>) The service principle name.</p></li>
+<li><p><code>realm</code> - (Conflicts with <code>token</code>) The Kerberos server's authoritative authentication domain.</p></li>
+<li><p><code>krb5conf_path</code> - (Conflicts with <code>token</code>) A valid Kerberos configuration file e.g. /etc/krb5.conf.
+Can be specified with the <code>KRB5_CONFIG</code> environment variable.</p></li>
+<li><p><code>keytab_path</code> - (Conflicts with <code>token</code>)  The Kerberos keytab file containing the entry of the login entity.
+Can be specified with the <code>KRB_KEYTAB</code> environment variable.</p></li>
+<li><p><code>disable_fast_negotiation</code> - (Conflicts with <code>token</code>) Disable the Kerberos FAST negotiation.</p></li>
+<li><p><code>remove_instance_name</code> - (Conflicts with <code>token</code>) Strip the host from the username found in the keytab.</p></li>
+</ul>
+
+<p><em>This login configuration will attempt to get a SPNEGO init token from the <code>service</code> domain if <code>token</code> is not specified.
+The following fields are required when token is not specified:
+<code>username</code>, <code>service</code>, <code>realm</code>, <code>krb5conf_path</code>, <code>keytab_path</code></em></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Radius"></a><h3 id="radius">Radius</h3>
+
+<p>Provides support for authenticating to Vault using the Radius Auth engine.</p>
+
+<p><em>For more details see:
+<a href="https://www.vaultproject.io/api-docs/auth/radius#radius-auth-method-api">Radius Auth Method (API)</a></em></p>
+
+<p>The <code>auth_login_radius</code> configuration block accepts the following arguments:</p>
+
+<ul>
+<li><p><code>namespace</code> - (Optional) The path to the namespace that has the mounted auth method.
+This defaults to the root namespace. Cannot contain any leading or trailing slashes.
+<em>Available only for Vault Enterprise</em>.</p></li>
+<li><p><code>use_root_namespace</code> - (Optional) Authenticate to the root Vault namespace. Conflicts with <code>namespace</code>.</p></li>
+<li><p><code>mount</code> - (Optional) The name of the authentication engine mount. <br/>
+Default: <code>radius</code></p></li>
+<li><p><code>username</code> - (Required) The username to Radius username to login into Vault with.</p></li>
+<li><p><code>password</code> - (Required) The password for the Radius <code>username</code> to login into Vault with.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/OCI"></a><h3 id="oci">OCI</h3>
+
+<p>Provides support for authenticating to Vault using the OCI (Oracle Cloud Infrastructure) Auth engine.</p>
+
+<p><em>For more details see:
+<a href="https://www.vaultproject.io/api-docs/auth/oci#oci-auth-method-api">OCI Auth Method (API)</a></em></p>
+
+<p>The <code>auth_login_oci</code> configuration block accepts the following arguments:</p>
+
+<ul>
+<li><p><code>namespace</code> - (Optional) The path to the namespace that has the mounted auth method.
+This defaults to the root namespace. Cannot contain any leading or trailing slashes.
+<em>Available only for Vault Enterprise</em>.</p></li>
+<li><p><code>use_root_namespace</code> - (Optional) Authenticate to the root Vault namespace. Conflicts with <code>namespace</code>.</p></li>
+<li><p><code>mount</code> - (Optional) The name of the authentication engine mount. <br/>
+Default: <code>oci</code></p></li>
+<li><p><code>role</code> - (Required) The name of the role against which the login is being attempted.</p></li>
+<li><p><code>auth_type</code> - (Required) The OCI authentication type to use. Valid choices are: <em>apikeys</em>, <em>instance</em></p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/OIDC"></a><h3 id="oidc">OIDC</h3>
+
+<p>Provides support for authenticating to Vault using the OIDC Auth engine.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Use of this login method requires access to a web browser on the host machine in order to complete the authorization flow.</p>
+</aside>
+
+<p><em>For more details see the OIDC specific documentation here:
+<a href="https://www.vaultproject.io/api-docs/auth/jwt#jwt-oidc-auth-method-api">OIDC/JWT Auth Method (API)</a></em></p>
+
+<p>The <code>auth_login_oidc</code> configuration block accepts the following arguments:</p>
+
+<ul>
+<li><p><code>namespace</code> - (Optional) The path to the namespace that has the mounted auth method.
+This defaults to the root namespace. Cannot contain any leading or trailing slashes.
+<em>Available only for Vault Enterprise</em>.</p></li>
+<li><p><code>use_root_namespace</code> - (Optional) Authenticate to the root Vault namespace. Conflicts with <code>namespace</code>.</p></li>
+<li><p><code>mount</code> - (Optional) The name of the authentication engine mount. <br/>
+Default: <code>oidc</code></p></li>
+<li><p><code>role</code> - (Required) The name of the role against which the login is being attempted.</p></li>
+<li><p><code>callback_listener_address</code> - (Optional) The callback listener's address. <em>Must be a valid URI without the path.</em></p></li>
+<li><p><code>callback_address</code> - (Optional)  The callback address. <em>Must be a valid URI without the path.</em></p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/JWT"></a><h3 id="jwt">JWT</h3>
+
+<p>Provides support for authenticating to Vault using the JWT Auth engine.</p>
+
+<p><em>For more details see the JWT specific documentation here:
+<a href="https://www.vaultproject.io/api-docs/auth/jwt#jwt-oidc-auth-method-api">OIDC/JWT Auth Method (API)</a></em></p>
+
+<p>The <code>auth_login_jwt</code> configuration block accepts the following arguments:</p>
+
+<ul>
+<li><p><code>namespace</code> - (Optional) The path to the namespace that has the mounted auth method.
+This defaults to the root namespace. Cannot contain any leading or trailing slashes.
+<em>Available only for Vault Enterprise</em>.</p></li>
+<li><p><code>use_root_namespace</code> - (Optional) Authenticate to the root Vault namespace. Conflicts with <code>namespace</code>.</p></li>
+<li><p><code>mount</code> - (Optional) The name of the authentication engine mount. <br/>
+Default: <code>jwt</code></p></li>
+<li><p><code>role</code> - (Required) The name of the role against which the login is being attempted.</p></li>
+<li><p><code>jwt</code> - (Required) The signed JSON Web Token against which the login is being attempted. <br/>
+<em>Can be specified with the <code>TERRAFORM_VAULT_AUTH_JWT</code> environment variable.</em></p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Azure"></a><h3 id="azure">Azure</h3>
+
+<p>Provides support for authenticating to Vault using the Azure Auth engine.</p>
+
+<p><em>For more details see the Azure specific documentation here:
+<a href="https://www.vaultproject.io/api-docs/auth/azure#azure-auth-method-api">Azure Auth Method (API)</a></em></p>
+
+<p>The <code>auth_login_azure</code> configuration block accepts the following arguments:</p>
+
+<ul>
+<li><p><code>namespace</code> - (Optional) The path to the namespace that has the mounted auth method.
+This defaults to the root namespace. Cannot contain any leading or trailing slashes.
+<em>Available only for Vault Enterprise</em>.</p></li>
+<li><p><code>use_root_namespace</code> - (Optional) Authenticate to the root Vault namespace. Conflicts with <code>namespace</code>.</p></li>
+<li><p><code>mount</code> - (Optional) The name of the authentication engine mount. <br/>
+Default: <code>azure</code></p></li>
+<li><p><code>role</code> - (Required) The name of the role against which the login is being attempted.</p></li>
+<li><p><code>jwt</code> - (Optional) The signed JSON Web Token against which the login is being attempted. 
+If not provided a token will be created from Azure's managed identities for Azure resources API.
+<em>Can be specified with the <code>TERRAFORM_VAULT_AZURE_AUTH_JWT</code> environment variable.</em></p></li>
+<li><p><code>subscription_id</code> - (Required) The subscription ID for the machine that generated the MSI token.
+This information can be obtained through instance metadata.</p></li>
+<li><p><code>resource_group_name</code> - (Required) The resource group for the machine that generated the MSI token.
+This information can be obtained through instance metadata.</p></li>
+<li><p><code>vm_name</code> - (Optional) The virtual machine name for the machine that generated the MSI token.
+This information can be obtained through instance metadata.</p></li>
+<li><p><code>vmss_name</code> - (Optional) The virtual machine scale set name for the machine that generated
+the MSI token. This information can be obtained through instance metadata.</p></li>
+<li><p><code>tenant_id</code> - (Optional) Provides the tenant ID to use in a multi-tenant authentication scenario.</p></li>
+<li><p><code>client_id</code> - (Optional) The identity's client ID.</p></li>
+<li><p><code>scope</code> - (Optional) The scopes to include in the token request. Defaults to <code>https://management.azure.com/</code></p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Token%20File"></a><h3 id="token-file">Token File</h3>
+
+<p>Provides support for "authenticating" to Vault using a local file containing a Vault token.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Using <code>auth_login_token_file</code> is not recommended, since it relies on a Vault token that is persisted to disk. Please ensure you have processes in place that will remove the token file between Terraform executions.</p>
+</aside>
+
+<p>The <code>auth_login_token_file</code> configuration block accepts the following arguments:</p>
+
+<ul>
+<li><p><code>namespace</code> - (Optional) The path to the namespace that has the mounted auth method.
+This defaults to the root namespace. Cannot contain any leading or trailing slashes.
+<em>Available only for Vault Enterprise</em>.</p></li>
+<li><p><code>use_root_namespace</code> - (Optional) Authenticate to the root Vault namespace. Conflicts with <code>namespace</code>.</p></li>
+<li><p><code>filename</code> - (Required) The filename containing a Vault token. The file must contain a single Vault token 
+and be user readable e.g. perms=<code>0600</code>. May be set via the <code>TERRAFORM_VAULT_TOKEN_FILENAME</code>
+environment variable.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Generic"></a><h3 id="generic">Generic</h3>
+
+<p>Provides support for path based authentication to Vault.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>It is recommended to use one of the authentication engine specific configurations above. This configuration can be used for custom authentication engines, or in the case where an official authentication engine is not yet supported by the provider</p>
+</aside>
+
+<p>The path-based <code>auth_login</code> configuration block accepts the following arguments:</p>
+
+<ul>
+<li><p><code>path</code> - (Required) The login path of the auth backend. For example, login with
+approle by setting this path to <code>auth/approle/login</code>. Additionally, some mounts use parameters
+in the URL, like with <code>userpass</code>: <code>auth/userpass/login/:username</code>.</p></li>
+<li><p><code>namespace</code> - (Optional) The path to the namespace that has the mounted auth method.
+This defaults to the root namespace. Cannot contain any leading or trailing slashes.
+<em>Available only for Vault Enterprise</em>.</p></li>
+<li><p><code>use_root_namespace</code> - (Optional) Authenticate to the root Vault namespace. Conflicts with <code>namespace</code>.</p></li>
+<li><p><code>method</code> - (Optional) When configured, will enable auth method specific operations.
+For example, when set to <code>aws</code>, the provider will automatically sign login requests
+for AWS authentication. Valid values include: <code>aws</code>.</p></li>
+<li><p><code>parameters</code> - (Optional) A map of key-value parameters to send when authenticating
+against the auth backend. Refer to <a href="https://www.vaultproject.io/api-docs/auth">Vault API documentation</a> for a particular auth method
+to see what can go here.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Debugging"></a><h2 id="provider-debugging">Provider Debugging</h2>
+
+<p>Terraform supports various logging options by default.
+These are documented <a href="https://www.terraform.io/docs/internals/debugging.html">here</a>.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>The environment variables below can be configured to provide extended log output. The Terraform log level must be set to <code>DEBUG</code> or higher. It's important to note that any extended log output may <strong>reveal secrets</strong>, so please exercise caution when enabling any of the following:</p>
+</aside>
+
+<ul>
+<li><p><code>TERRAFORM_VAULT_LOG_BODY</code> - when set to <code>true</code> both the request and response body will be logged.</p></li>
+<li><p><code>TERRAFORM_VAULT_LOG_REQUEST_BODY</code> - when set to <code>true</code> the request body will be logged.</p></li>
+<li><p><code>TERRAFORM_VAULT_LOG_RESPONSE_BODY</code> - when set to <code>true</code> the response body will be logged.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"vault"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # It is strongly recommended to configure this provider through the</span>
+<span class="c1">  # environment variables described above, so that each user can have</span>
+<span class="c1">  # separate credentials set in the environment.</span>
+<span class="c1">  #</span>
+<span class="c1">  # This will default to using $VAULT_ADDR</span>
+<span class="c1">  # But can be set explicitly</span>
+<span class="c1">  # address = "https://vault.example.net:8200"</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"vault_generic_secret"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"secret/foo"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">data_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"foo"</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"bar"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"pizza"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"cheese"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20auth_login%20Usage"></a><h3 id="example-auth_login-usage">Example <code>auth_login</code> Usage</h3>
+
+<p>With the <code>userpass</code> backend:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">variable</span><span class="w"> </span><span class="nb">login_username</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="err">variable</span><span class="w"> </span><span class="nb">login_password</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"vault"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">auth_login</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"auth/userpass/login/${var.login_username}"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.login_password</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Or, using <code>approle</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">variable</span><span class="w"> </span><span class="nb">login_approle_role_id</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="err">variable</span><span class="w"> </span><span class="nb">login_approle_secret_id</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"vault"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">auth_login</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"auth/approle/login"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">role_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.login_approle_role_id</span><span class="w"></span>
+<span class="w">      </span><span class="na">secret_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.login_approle_secret_id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20auth_login%20With%20AWS%20Signing"></a><h3 id="example-auth_login-with-aws-signing">Example <code>auth_login</code> With AWS Signing</h3>
+
+<p>Sign AWS metadata for instance profile login requests:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"vault"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">address</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"http://127.0.0.1:8200"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">auth_login</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"auth/aws/login"</span><span class="w"></span>
+<span class="w">    </span><span class="na">method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"dev-role-iam"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>If the Vault server's AWS auth method requires the <code>X-Vault-AWS-IAM-Server-ID</code> header to be set by clients, specify the server ID in <code>header_value</code> within the <code>parameters</code> block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"vault"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">address</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"http://127.0.0.1:8200"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">auth_login</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"auth/aws/login"</span><span class="w"></span>
+<span class="w">    </span><span class="na">method</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"dev-role-iam"</span><span class="w"></span>
+<span class="w">      </span><span class="na">header_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"vault.example.com"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Namespace%20support"></a><h2 id="namespace-support">Namespace support</h2>
+
+<p>The Vault provider supports managing <a href="https://www.vaultproject.io/docs/enterprise/namespaces#vault-enterprise-namespaces">Namespaces</a> (a feature of
+Vault Enterprise), as well as creating resources in those namespaces by
+utilizing <a href="https://www.terraform.io/docs/configuration/providers.html#alias-multiple-provider-configurations">Provider Aliasing</a>. The <code>namespace</code> option in the <a href="./docs.html#provider-arguments">provider
+block</a> enables the management of  resources in the specified
+namespace. 
+In addition, all resources and data sources support specifying their own <code>namespace</code>. 
+All resource's <code>namespace</code> will be made relative to the <code>provider</code>'s configured namespace.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Importing%20namespaced%20resources"></a><h3 id="importing-namespaced-resources">Importing namespaced resources</h3>
+
+<p>Importing a namespaced resource is done by providing the <code>namespace</code> from 
+the <code>TERRAFORM_VAULT_NAMESPACE_IMPORT</code> environment variable.</p>
+
+<p>Given the following sample Terraform:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">provider</span><span class="w"> </span><span class="nb">vault</span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"vault_mount"</span><span class="w"> </span><span class="nv">"secret"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">namespace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"namespace1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"secrets"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"kv"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>One would run the following import command:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nv">TERRAFORM_VAULT_NAMESPACE_IMPORT</span><span class="o">=</span>namespace1 terraform import vault_mount.secret secrets
+</code></pre></div>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>The import namespace will always be made relative to the <code>namespace</code> of the <code>provider{}</code> block. The <code>TERRAFORM_VAULT_NAMESPACE_IMPORT</code> should only ever be set when importing a Vault resource.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Simple%20namespace%20example"></a><h3 id="simple-namespace-example">Simple namespace example</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="err">provider</span><span class="w"> </span><span class="nb">vault</span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"vault_namespace"</span><span class="w"> </span><span class="nv">"secret"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"secret_ns"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"vault_mount"</span><span class="w"> </span><span class="nv">"secret"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">namespace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">vault_namespace.secret.path</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"secrets"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"kv"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"vault_generic_secret"</span><span class="w"> </span><span class="nv">"secret"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">namespace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">vault_mount.secret.namespace</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"${vault_mount.secret.path}/secret"</span><span class="w"></span>
+<span class="w">  </span><span class="na">data_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"ns"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"secret"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20Provider%20Aliases"></a><h3 id="using-provider-aliases">Using Provider Aliases</h3>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>It is advisable to set the <code>namespace</code> on individual resources and data sources, rather than having to manage multiple <code>provider</code> aliases. See <a href="r/namespace.html">vault_namespace</a> for more information.</p>
+</aside>
+
+<p>The configuration below is a simple example of using the provider block's
+<code>namespace</code> attribute to configure an aliased provider and create a resource
+within that namespace. </p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main provider block with no namespace</span>
+<span class="err">provider</span><span class="w"> </span><span class="nb">vault</span><span class="w"> </span><span class="p">{}</span><span class="c1"></span>
+
+<span class="c1"># create the "everyone" namespace in the default root namespace</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"vault_namespace"</span><span class="w"> </span><span class="nv">"everyone"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"everyone"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># configure an aliased provider, scope to the new namespace.</span>
+<span class="err">provider</span><span class="w"> </span><span class="nb">vault</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"everyone"</span><span class="w"></span>
+<span class="w">  </span><span class="na">namespace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">vault_namespace.everyone.path</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># create a policy in the "everyone" namespace</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"vault_policy"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">vault.everyone</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">vault_namespace.everyone</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"vault_everyone_policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">data.vault_policy_document.list_secrets.hcl</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"vault_policy_document"</span><span class="w"> </span><span class="nv">"list_secrets"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">path</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"secret/*"</span><span class="w"></span>
+<span class="w">    </span><span class="na">capabilities</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"list"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">description</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"allow List on secrets under everyone/"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using this alias configuration, the policy <code>list_secrets</code> is created under the
+<code>everyone</code> namespace, but not under the "root" namespace:</p>
+
+<pre><code>$ vault policy list -namespace=everyone
+default
+vault_everyone_policy
+
+$ vault policy list
+default
+root
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Nested%20Namespaces"></a><h3 id="nested-namespaces">Nested Namespaces</h3>
+
+<p>The example below relies on setting the <code>namespace</code> per resource from a single <code>provider{}</code> block. 
+See the <a href="./resources/namespace.html#nested-namespaces">vault_namespace</a> documentation for a slightly less elaborate example.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">provider</span><span class="w"> </span><span class="nb">vault</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"everyone_ns"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"everyone"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"engineering_ns"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"vault_team_ns"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"vault-team"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"vault_policy_document"</span><span class="w"> </span><span class="nv">"public_secrets"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">path</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"secret/*"</span><span class="w"></span>
+<span class="w">    </span><span class="na">capabilities</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"list"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">description</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"allow List on secrets under everyone/ namespace"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"vault_policy_document"</span><span class="w"> </span><span class="nv">"vault_team_secrets"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">path</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"secret/*"</span><span class="w"></span>
+<span class="w">    </span><span class="na">capabilities</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"create", "read", "update", "delete", "list"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">description</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"allow all on secrets under everyone/engineering/vault-team/"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"vault_namespace"</span><span class="w"> </span><span class="nv">"everyone"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.everyone_ns</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"vault_namespace"</span><span class="w"> </span><span class="nv">"engineering"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">namespace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">vault_namespace.everyone.path</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">var.engineering_ns</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"vault_namespace"</span><span class="w"> </span><span class="nv">"vault_team"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">namespace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">vault_namespace.engineering.path_fq</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">var.vault_team_ns</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"vault_policy"</span><span class="w"> </span><span class="nv">"everyone"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">namespace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">vault_namespace.everyone.path</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"vault_everyone_policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">data.vault_policy_document.vault_team_secrets.hcl</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"vault_policy"</span><span class="w"> </span><span class="nv">"vault_team"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">namespace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">vault_namespace.vault_team.path_fq</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"vault_team_policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">data.vault_policy_document.vault_team_secrets.hcl</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using this configuration, the namespace and policy structure looks like so:</p>
+
+<pre><code>&lt;root&gt;/
+  default
+  root
+  /everyone/
+   default
+   vault_everyone_policy
+    /engineering/
+      default
+      /vault-team/
+      default
+      vault_team_policy
+</code></pre>
+
+<p>Verify the structure with <code>vault</code> directly:</p>
+
+<pre><code>$ vault namespace list
+Keys
+----
+everyone/
+
+$ vault namespace list -namespace=everyone
+Keys
+----
+engineering/
+
+$ vault namespace list -namespace=everyone/engineering
+Keys
+----
+vault-team/
+
+$ vault namespace list -namespace=everyone/engineering/vault-team
+No namespaces found
+
+$ vault policy list -namespace=everyone/engineering/vault-team
+default
+vault_team_policy
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Tutorials"></a><h2 id="tutorials">Tutorials</h2>
+
+<p>Refer to the <a href="https://learn.hashicorp.com/tutorials/vault/codify-mgmt-enterprise">Codify Management of Vault Enterprise Using Terraform</a> tutorial for additional examples using Vault namespaces.</p>
+
+            
+        
+    </body></html>

@@ -1,0 +1,169 @@
+<html><!-- Online page at https://www.terraform.io/cli/cloud/settings --><head>
+                <title>Connect to HCP Terraform</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="connect-to-hcp-terraform">Connect to HCP Terraform</h1>
+
+<p>This topic describes how to connect the Terraform CLI to HCP Terraform. Integrating the CLI with HCP Terraform enables the CLI to act as a client for CLI-drive workflows. Refer to <a href="../../terraform/cloud-docs/run/cli.html">CLI-driven Run Workflow</a> for additional information.</p>
+
+<blockquote>
+  <p><strong>Hands On:</strong> Complete the <a href="../../terraform/tutorials/cloud/cloud-migrate.html">Migrate State to HCP Terraform</a> tutorial to learn more about integrating the CLI with HCP Terraform.</p>
+</blockquote>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Overview"></a><h2 id="overview">Overview</h2>
+
+<p>Connecting the Terraform CLI to HCP Terraform links the working directory that contains your Terraform configurations to one or more HCP Terraform workspaces. This allows team members with access to the workspace to provision and manage infrastructure using HCP Terraform. Additionally, HCP Terraform manages state data so that you do not have to maintain remote state objects. Refer to the following topics for additional information:</p>
+
+<ul>
+<li><a href="../../terraform/language/state.html">State overview</a> in the Terraform configuration language reference.</li>
+<li><a href="../../terraform/cloud-docs/workspaces/state.html">Terraform State in HCP Terraform</a> in the HCP Terraform documentation.</li>
+</ul>
+
+<p>Complete the following steps to connect to HCP Terraform:</p>
+
+<ol>
+<li>Provide credentials to HCP Terraform.</li>
+<li>Define connection settings in your Terraform configuration.</li>
+<li>Initialize the working directory.</li>
+<li>Migrate state data. This step is optional.</li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Requirements"></a><h2 id="requirements">Requirements</h2>
+
+<p>You must have a user profile in HCP Terraform with permissions to create a workspace. Refer to <a href="../../terraform/cloud-docs/users-teams-organizations/permissions.html">Workspace Permissions</a> in the HCP Terraform documentation for additional information.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provide%20credentials"></a><h2 id="provide-credentials">Provide credentials</h2>
+
+<p>You must provide credentials to access HCP Terraform. We recommend using the
+<a href="../../terraform/cli/commands/login.html"><code>terraform login</code></a> command to log into Terraform. You can also provide a user token in the Terraform configuration. Refer to the <a href="../../terraform/language/terraform.html#terraform-cloud-token"><code>token</code></a> attribute in the Terraform configuration reference for additional information.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Define%20connection%20settings"></a><h2 id="define-connection-settings">Define connection settings</h2>
+
+<p>Add a <code>cloud</code> block to your Terraform configuration and configure the connection settings to link the working directory to an HCP Terraform workspace. The <code>cloud</code> block is a member of the <code>terraform</code> block. Refer to the <a href="../../terraform/language/terraform.html"><code>terraform</code> block reference</a> for additional information.</p>
+
+<p>Specify the following settings in the <code>cloud</code> block:</p>
+
+<ul>
+<li><code>organization</code>:  Specifies the name of an HCP Terraform organization to connect to.</li>
+<li><code>workspaces.tags</code>: Specifies either a map of tag strings or a list of key-only string tags (legacy style). Terraform links the working directory to existing workspaces in the organization that have matching tags. If there are no existing workspaces with matching tags, the Terraform CLI prompts you to create a new workspace that applies the tags you specify in this field when you initialize the configuration.</li>
+<li><code>workspaces.name</code>: You can specify the name of an existing workspace to associate with the Terraform configuration instead of using tags. If you configure the <code>name</code>, you cannot use the <code>tags</code> configuration.</li>
+<li><code>workspaces.project</code>: You can specify the name of an existing project. Terraform associates the configuration with workspaces in the project that match the <code>name</code> or <code>tags</code>.</li>
+</ul>
+
+<p>Refer to the <a href="../../terraform/language/terraform.html#terraform-cloud"><code>cloud</code> block reference</a> for details about configuring the <code>cloud</code> block.</p>
+
+<p>In the following example, the configuration links the working directory to all workspaces tagged with <code>networking</code> and <code>source:cli</code> in the <code>networking-development</code> project:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">cloud</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">organization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-org"</span><span class="w"></span>
+<span class="w">    </span><span class="na">hostname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"app.terraform.io"</span><span class="c1"> # Optional; defaults to app.terraform.io</span>
+
+<span class="w">    </span><span class="nb">workspaces</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"networking-development"</span><span class="w"></span>
+
+<span class="w">      </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">layer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"networking"</span><span class="w"></span>
+<span class="w">        </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"cli"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Initialize%20the%20working%20directory"></a><h2 id="initialize-the-working-directory">Initialize the working directory</h2>
+
+<p>After adding or changing a <code>cloud</code> block, run the <a href="../../terraform/cli/commands/init.html"><code>terraform init</code> command</a> to complete the set up.</p>
+
+<p>By default, Terraform uploads a copy of Terraform configurations stored in the working directory when you run the <code>terraform plan</code> or <code>terraform apply</code> command, but you can add a <code>.terraformignore</code> file to the directory and specify files that you do not want to upload to HCP Terraform. Refer to <a href="#exclude-files">Exclude files</a> for additional information.</p>
+
+<p>If the working directory does not have an existing Terraform state file, you can immediately start using Terraform with HCP Terraform. Refer to <a href="../../terraform/cloud-docs/run/cli.html">CLI-driven run workflow</a> for additional information.</p>
+
+<p>If the directory has an existing state file associated with a <code>backend</code> configuration, Terraform prompts you to migrate state from any existing workspaces. Refer to <a href="#migrate-state-data">Migrate state data</a> for next steps.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Migrate%20state%20data"></a><h2 id="migrate-state-data">Migrate state data</h2>
+
+<p>Complete the data migration process when prompted according to one of the following scenarios:</p>
+
+<p>State is stored in a <a href="#local-and-state-backend-migration">local or state backend</a>: If the working directory already has state data in one or more workspaces, Terraform prompts you to migrate the state to new HCP Terraform workspaces.
+State is stored in a <a href="#remote-backend-migration">remote backend</a>: If the working directory is already connected to HCP Terraform with the remote backend, Terraform can continue using the same HCP Terraform workspaces. Change the <code>backend "remote"</code> configuration to a <code>cloud</code> block in this scenario.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Migrate%20local%20state"></a><h3 id="migrate-local-state">Migrate local state</h3>
+
+<p>Run the <code>terraform init</code> command and follow the CLI prompts to migrate state data stored in a local or state backend.</p>
+
+<p>HCP Terraform requires all workspaces to have a name. As a result, Terraform may also prompt you to rename your workspaces during the migration.</p>
+
+<p>Terraform CLI-only workspaces represent multiple environments associated with the same configuration, such as <code>production</code>, <code>staging</code>, and <code>development</code>, but HCP Terraform workspaces can represent completely independent configurations and must have unique names within the HCP Terraform organization.</p>
+
+<p>As a result, Terraform prompts you to rename workspaces according to a pattern relative to their existing names. The pattern is intended to indicate that the workspaces share configuration. A common strategy is <code>&lt;COMPONENT&gt;-&lt;ENVIRONMENT&gt;-&lt;REGION&gt;</code>, for example <code>networking-prod-us-east</code> and <code>networking-staging-us-east</code>. Refer to <a href="../../terraform/cloud-docs/workspaces/naming.html">Workspace Naming</a> in the HCP Terraform documentation for additional information.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Migrate%20remote%20backend"></a><h3 id="migrate-remote-backend">Migrate remote backend</h3>
+
+<p>In the <code>terraform</code> block or <code>terraform.tf</code> file, replace <code>backend "remote"</code> with <code>cloud</code>. Terraform will continue to use the same ste of HCP Terraform workspaces.</p>
+
+<p>The following example migrates the state data for a single workspace named <code>my-app-prod</code> to an HCP Terraform organization named <code>my-org</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="err">-</span><span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"remote"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="err">+</span><span class="w">    </span><span class="nb">cloud</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">       </span><span class="na">organization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-org"</span><span class="w"></span>
+
+<span class="w">       </span><span class="nb">workspaces</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-app-prod"</span><span class="w"></span>
+<span class="w">       </span><span class="p">}</span><span class="w"></span>
+<span class="w">     </span><span class="p">}</span><span class="w"></span>
+<span class="w">   </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>If the <code>terraform</code> block or <code>terraform.tf</code> file uses the <code>prefix</code> argument to connect to multiple workspaces, you can specify a list of key-value string tags in the <code>tags</code> argument instead of using the <code>name</code> argument. During <code>terraform plan</code> or <code>terraform apply</code> operations, Terraform associates the configuration with workspaces that match the specified tags.</p>
+
+<p>The following example replaces the <code>my-app-</code> prefix with the <code>app=mine</code> tag:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="err">-</span><span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"remote"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="err">+</span><span class="w">  </span><span class="nb">cloud</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">     </span><span class="na">organization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-org"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">workspaces</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="err">-</span><span class="w">      </span><span class="na">prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-app-"</span><span class="w"></span>
+<span class="err">+</span><span class="w">      </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="err">+</span><span class="w">        </span><span class="na">app</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mine"</span><span class="w"></span>
+<span class="err">+</span><span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">   </span><span class="p">}</span><span class="w"></span>
+<span class="w"> </span><span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Note that because the <code>cloud</code> block does not support the <code>prefix</code> argument, after you migrate your workspaces to HCP Terraform, you must refer to them by their full name when you use the Terraform CLI. For example, instead of running the <code>terraform workspace select prod</code> command, you would run <code>terraform workspace select my-app-prod</code> instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exclude%20files"></a><h2 id="exclude-files">Exclude files</h2>
+
+<p>When executing a remote <code>plan</code> or <code>apply</code> in a <a href="../../terraform/cloud-docs/run/cli.html">CLI-driven run</a>,
+a copy of your configuration directory is uploaded to HCP Terraform. You can define
+paths to exclude from upload by adding a <code>.terraformignore</code> file at the root of your
+configuration directory. If this file is not present, Terraform still excludes the following directories by default:</p>
+
+<ul>
+<li><code>.git/</code> directories</li>
+<li><code>.terraform/</code> directories (exclusive of <code>.terraform/modules</code>)</li>
+</ul>
+
+<p>The rules for defining <code>.terraformignore</code> are based on
+<a href="https://git-scm.com/book/en/v2/Git-Basics-Recording-Changes-to-the-Repository#_ignoring">.gitignore files</a>:</p>
+
+<ul>
+<li>Terraform ignores comments starting with <code>#</code></li>
+<li>Terraform ignores blank lines.</li>
+<li>End a pattern with a forward slash <code>/</code> to specify a directory.</li>
+<li>Negate a pattern by starting it with an exclamation point <code>!</code>. When ignoring large directories, negation patterns can impact performance. Place negation rules as early as possible within <code>.terraformignore</code> or avoid using them if possible.</li>
+</ul>
+
+<p>Terraform parses the <code>.terraformignore</code> at the root of the configuration directory.</p>
+
+            
+        
+    </body></html>

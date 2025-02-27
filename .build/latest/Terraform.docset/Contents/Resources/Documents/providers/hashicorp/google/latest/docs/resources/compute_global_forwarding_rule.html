@@ -1,0 +1,1475 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_global_forwarding_rule --><head>
+                <title>google_compute_global_forwarding_rule</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="google_compute_global_forwarding_rule">google_compute_global_forwarding_rule</h1>
+
+<p>Represents a GlobalForwardingRule resource. Global forwarding rules are
+used to forward traffic to the correct load balancer for HTTP load
+balancing. Global forwarding rules can only be used for HTTP load
+balancing.</p>
+
+<p>For more information, see https://cloud.google.com/compute/docs/load-balancing/http/</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20External%20Ssl%20Proxy%20Lb%20Mig%20Backend"></a><h2 id="example-usage-external-ssl-proxy-lb-mig-backend">Example Usage - External Ssl Proxy Lb Mig Backend</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># External SSL proxy load balancer with managed instance group backend</span>
+
+<span class="c1"># VPC</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"ssl-proxy-xlb-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="err">google</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># backend subnet</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"ssl-proxy-xlb-subnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.1.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># reserved IP address</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_address"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ssl-proxy-xlb-ip"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+
+<span class="c1"># Self-signed regional SSL certificate for testing</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tls_private_key"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">algorithm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"RSA"</span><span class="w"></span>
+<span class="w">  </span><span class="na">rsa_bits</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="m">2048</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tls_self_signed_cert"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">key_algorithm</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">tls_private_key.default.algorithm</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_key_pem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">tls_private_key.default.private_key_pem</span><span class="c1"></span>
+
+<span class="c1">  # Certificate expires after 12 hours.</span>
+<span class="w">  </span><span class="na">validity_period_hours</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">12</span><span class="c1"></span>
+
+<span class="c1">  # Generate a new certificate if Terraform is run within three</span>
+<span class="c1">  # hours of the certificate's expiration time.</span>
+<span class="w">  </span><span class="na">early_renewal_hours</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="c1"></span>
+
+<span class="c1">  # Reasonable set of uses for a server SSL certificate.</span>
+<span class="w">  </span><span class="na">allowed_uses</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"key_encipherment"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"digital_signature"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"server_auth"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">dns_names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"example.com"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">subject</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">common_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"example.com"</span><span class="w"></span>
+<span class="w">    </span><span class="na">organization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ACME Examples, Inc"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_ssl_certificate"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"default-cert"</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">tls_private_key.default.private_key_pem</span><span class="w"></span>
+<span class="w">  </span><span class="na">certificate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">tls_self_signed_cert.default.cert_pem</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_target_ssl_proxy"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"test-proxy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend_service</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">ssl_certificates</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_ssl_certificate.default.id</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+
+
+<span class="c1"># forwarding rule</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_forwarding_rule"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"ssl-proxy-xlb-forwarding-rule"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="err">google</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_protocol</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"TCP"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"EXTERNAL"</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_range</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"443"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_target_ssl_proxy.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_address</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_global_address.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+
+<span class="c1"># backend service</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_backend_service"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"ssl-proxy-xlb-backend-service"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"SSL"</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"EXTERNAL"</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="na">health_checks</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_health_check.default.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="nb">backend</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance_group_manager.default.instance_group</span><span class="w"></span>
+<span class="w">    </span><span class="na">balancing_mode</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"UTILIZATION"</span><span class="w"></span>
+<span class="w">    </span><span class="na">max_utilization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">1.0</span><span class="w"></span>
+<span class="w">    </span><span class="na">capacity_scaler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">1.0</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_health_check"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"ssl-proxy-health-check"</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="na">check_interval_sec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="nb">tcp_health_check</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"443"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># instance template</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_template"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"ssl-proxy-xlb-mig-template"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="err">google</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"e2-small"</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"allow-health-check"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">network_interface</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.default.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnetwork</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.default.id</span><span class="w"></span>
+<span class="w">    </span><span class="nb">access_config</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">      # add external ip to fetch packages</span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source_image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud/debian-12"</span><span class="w"></span>
+<span class="w">    </span><span class="na">auto_delete</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">boot</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # install nginx and serve a simple web page</span>
+<span class="w">  </span><span class="nb">metadata</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">startup-script</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;-</span><span class="dl">EOF1</span><span class="sh"></span>
+<span class="sh">      #! /bin/bash</span>
+<span class="sh">      set -euo pipefail</span>
+<span class="sh">      export DEBIAN_FRONTEND=noninteractive</span>
+<span class="sh">      sudo apt-get update</span>
+<span class="sh">      sudo apt-get install  -y apache2 jq</span>
+<span class="sh">      sudo a2ensite default-ssl</span>
+<span class="sh">      sudo a2enmod ssl</span>
+<span class="sh">      sudo service apache2 restart</span>
+<span class="sh">      NAME=$(curl -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/hostname")</span>
+<span class="sh">      IP=$(curl -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip")</span>
+<span class="sh">      METADATA=$(curl -f -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/?recursive=True" | jq 'del(.["startup-script"])')</span>
+<span class="sh">      cat &lt;&lt;EOF &gt; /var/www/html/index.html</span>
+<span class="sh">      &lt;h1&gt;SSL Load Balancer&lt;/h1&gt;</span>
+<span class="sh">      &lt;pre&gt;</span>
+<span class="sh">      Name: $NAME</span>
+<span class="sh">      IP: $IP</span>
+<span class="sh">      Metadata: $METADATA</span>
+<span class="sh">      &lt;/pre&gt;</span>
+<span class="sh">      EOF</span>
+<span class="dl">    EOF1</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create_before_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># MIG</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_group_manager"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"ssl-proxy-xlb-mig1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-c"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">named_port</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">    </span><span class="na">port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">443</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">version</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance_template.default.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"primary"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">base_instance_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"vm"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_size</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># allow access from health check ranges</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_firewall"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"ssl-proxy-xlb-fw-allow-hc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google</span><span class="w"></span>
+<span class="w">  </span><span class="na">direction</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"INGRESS"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_ranges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"130.211.0.0/22", "35.191.0.0/16"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="nb">allow</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">protocol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"allow-health-check"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="oics-button" style="float: right; margin: 0 0 -15px">
+  <a href="https://console.cloud.google.com/cloudshell/open?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fterraform-google-modules%2Fdocs-examples.git&amp;cloudshell_image=gcr.io%2Fcloudshell-images%2Fcloudshell%3Alatest&amp;cloudshell_print=.%2Fmotd&amp;cloudshell_tutorial=.%2Ftutorial.md&amp;cloudshell_working_dir=external_tcp_proxy_lb_mig_backend&amp;open_in_editor=main.tf" target="_blank">
+    <img alt="Open in Cloud Shell" src="//gstatic.com/cloudssh/images/open-btn.svg" style="max-height: 44px; margin: 32px auto; max-width: 100%;"/>
+  </a>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20External%20Tcp%20Proxy%20Lb%20Mig%20Backend"></a><h2 id="example-usage-external-tcp-proxy-lb-mig-backend">Example Usage - External Tcp Proxy Lb Mig Backend</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># External TCP proxy load balancer with managed instance group backend</span>
+
+<span class="c1"># VPC</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp-proxy-xlb-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># backend subnet</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp-proxy-xlb-subnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.1.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># reserved IP address</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_address"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp-proxy-xlb-ip"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># forwarding rule</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_forwarding_rule"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp-proxy-xlb-forwarding-rule"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_protocol</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"TCP"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"EXTERNAL"</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_range</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"110"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_target_tcp_proxy.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_address</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_global_address.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_target_tcp_proxy"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"test-proxy-health-check"</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># backend service</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_backend_service"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp-proxy-xlb-backend-service"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"TCP"</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"EXTERNAL"</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="na">health_checks</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_health_check.default.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="nb">backend</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance_group_manager.default.instance_group</span><span class="w"></span>
+<span class="w">    </span><span class="na">balancing_mode</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"UTILIZATION"</span><span class="w"></span>
+<span class="w">    </span><span class="na">max_utilization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">1.0</span><span class="w"></span>
+<span class="w">    </span><span class="na">capacity_scaler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">1.0</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_health_check"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp-proxy-health-check"</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="na">check_interval_sec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">tcp_health_check</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"80"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># instance template</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_template"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp-proxy-xlb-mig-template"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"e2-small"</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"allow-health-check"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">network_interface</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.default.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnetwork</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.default.id</span><span class="w"></span>
+<span class="w">    </span><span class="nb">access_config</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">      # add external ip to fetch packages</span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source_image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud/debian-12"</span><span class="w"></span>
+<span class="w">    </span><span class="na">auto_delete</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">boot</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # install nginx and serve a simple web page</span>
+<span class="w">  </span><span class="nb">metadata</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">startup-script</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;-</span><span class="dl">EOF1</span><span class="sh"></span>
+<span class="sh">      #! /bin/bash</span>
+<span class="sh">      set -euo pipefail</span>
+<span class="sh">      export DEBIAN_FRONTEND=noninteractive</span>
+<span class="sh">      apt-get update</span>
+<span class="sh">      apt-get install -y nginx-light jq</span>
+<span class="sh">      NAME=$(curl -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/hostname")</span>
+<span class="sh">      IP=$(curl -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip")</span>
+<span class="sh">      METADATA=$(curl -f -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/?recursive=True" | jq 'del(.["startup-script"])')</span>
+<span class="sh">      cat &lt;&lt;EOF &gt; /var/www/html/index.html</span>
+<span class="sh">      &lt;pre&gt;</span>
+<span class="sh">      Name: $NAME</span>
+<span class="sh">      IP: $IP</span>
+<span class="sh">      Metadata: $METADATA</span>
+<span class="sh">      &lt;/pre&gt;</span>
+<span class="sh">      EOF</span>
+<span class="dl">    EOF1</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create_before_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># MIG</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_group_manager"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp-proxy-xlb-mig1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-c"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">named_port</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">    </span><span class="na">port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">80</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">version</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance_template.default.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"primary"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">base_instance_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"vm"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_size</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># allow access from health check ranges</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_firewall"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp-proxy-xlb-fw-allow-hc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">direction</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"INGRESS"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_ranges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"130.211.0.0/22", "35.191.0.0/16"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="nb">allow</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">protocol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"allow-health-check"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="oics-button" style="float: right; margin: 0 0 -15px">
+  <a href="https://console.cloud.google.com/cloudshell/open?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fterraform-google-modules%2Fdocs-examples.git&amp;cloudshell_image=gcr.io%2Fcloudshell-images%2Fcloudshell%3Alatest&amp;cloudshell_print=.%2Fmotd&amp;cloudshell_tutorial=.%2Ftutorial.md&amp;cloudshell_working_dir=external_http_lb_mig_backend_custom_header&amp;open_in_editor=main.tf" target="_blank">
+    <img alt="Open in Cloud Shell" src="//gstatic.com/cloudssh/images/open-btn.svg" style="max-height: 44px; margin: 32px auto; max-width: 100%;"/>
+  </a>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20External%20Http%20Lb%20Mig%20Backend%20Custom%20Header"></a><h2 id="example-usage-external-http-lb-mig-backend-custom-header">Example Usage - External Http Lb Mig Backend Custom Header</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># External HTTP load balancer with a CDN-enabled managed instance group backend</span>
+<span class="c1"># and custom request and response headers</span>
+
+<span class="c1"># VPC</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-xlb-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># backend subnet</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-xlb-subnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.1.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># reserved IP address</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_address"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-xlb-static-ip"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># forwarding rule</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_forwarding_rule"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-xlb-forwarding-rule"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_protocol</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"TCP"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"EXTERNAL"</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_range</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"80"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_target_http_proxy.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_address</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_global_address.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># http proxy</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_target_http_proxy"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-xlb-target-http-proxy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">url_map</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_url_map.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># url map</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_url_map"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-xlb-url-map"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># backend service with custom request and response headers</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_backend_service"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-xlb-backend-service"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"HTTP"</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-port"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"EXTERNAL"</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="na">enable_cdn</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">custom_request_headers</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"X-Client-Geo-Location: {client_region_subdivision}, {client_city}"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">custom_response_headers</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"X-Cache-Hit: {cdn_cache_status}"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">health_checks</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_health_check.default.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="nb">backend</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance_group_manager.default.instance_group</span><span class="w"></span>
+<span class="w">    </span><span class="na">balancing_mode</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"UTILIZATION"</span><span class="w"></span>
+<span class="w">    </span><span class="na">capacity_scaler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">1.0</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># instance template</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_template"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-xlb-mig-template"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"e2-small"</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"allow-health-check"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">network_interface</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.default.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnetwork</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.default.id</span><span class="w"></span>
+<span class="w">    </span><span class="nb">access_config</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">      # add external ip to fetch packages</span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source_image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud/debian-12"</span><span class="w"></span>
+<span class="w">    </span><span class="na">auto_delete</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">boot</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # install nginx and serve a simple web page</span>
+<span class="w">  </span><span class="nb">metadata</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">startup-script</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;-</span><span class="dl">EOF1</span><span class="sh"></span>
+<span class="sh">      #! /bin/bash</span>
+<span class="sh">      set -euo pipefail</span>
+
+<span class="sh">      export DEBIAN_FRONTEND=noninteractive</span>
+<span class="sh">      apt-get update</span>
+<span class="sh">      apt-get install -y nginx-light jq</span>
+
+<span class="sh">      NAME=$(curl -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/hostname")</span>
+<span class="sh">      IP=$(curl -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip")</span>
+<span class="sh">      METADATA=$(curl -f -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/?recursive=True" | jq 'del(.["startup-script"])')</span>
+
+<span class="sh">      cat &lt;&lt;EOF &gt; /var/www/html/index.html</span>
+<span class="sh">      &lt;pre&gt;</span>
+<span class="sh">      Name: $NAME</span>
+<span class="sh">      IP: $IP</span>
+<span class="sh">      Metadata: $METADATA</span>
+<span class="sh">      &lt;/pre&gt;</span>
+<span class="sh">      EOF</span>
+<span class="dl">    EOF1</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create_before_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># health check</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_health_check"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-xlb-hc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="nb">http_health_check</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">port_specification</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"USE_SERVING_PORT"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># MIG</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_group_manager"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-xlb-mig1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-c"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">named_port</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"http"</span><span class="w"></span>
+<span class="w">    </span><span class="na">port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">8080</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">version</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance_template.default.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"primary"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">base_instance_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"vm"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_size</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># allow access from health check ranges</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_firewall"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-xlb-fw-allow-hc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">direction</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"INGRESS"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_ranges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"130.211.0.0/22", "35.191.0.0/16"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="nb">allow</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">protocol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"allow-health-check"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="oics-button" style="float: right; margin: 0 0 -15px">
+  <a href="https://console.cloud.google.com/cloudshell/open?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fterraform-google-modules%2Fdocs-examples.git&amp;cloudshell_image=gcr.io%2Fcloudshell-images%2Fcloudshell%3Alatest&amp;cloudshell_print=.%2Fmotd&amp;cloudshell_tutorial=.%2Ftutorial.md&amp;cloudshell_working_dir=global_forwarding_rule_http&amp;open_in_editor=main.tf" target="_blank">
+    <img alt="Open in Cloud Shell" src="//gstatic.com/cloudssh/images/open-btn.svg" style="max-height: 44px; margin: 32px auto; max-width: 100%;"/>
+  </a>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Global%20Forwarding%20Rule%20Http"></a><h2 id="example-usage-global-forwarding-rule-http">Example Usage - Global Forwarding Rule Http</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_forwarding_rule"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"global-rule"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_target_http_proxy.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"80"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_target_http_proxy"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"target-proxy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"a description"</span><span class="w"></span>
+<span class="w">  </span><span class="na">url_map</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_url_map.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_url_map"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"url-map-target-proxy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"a description"</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">host_rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">hosts</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"mysite.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">path_matcher</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"allpaths"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">path_matcher</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"allpaths"</span><span class="w"></span>
+<span class="w">    </span><span class="na">default_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">path_rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">paths</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"/*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="na">service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_backend_service"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"backend"</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"http"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"HTTP"</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">health_checks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_http_health_check.default.id</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_http_health_check"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"check-backend"</span><span class="w"></span>
+<span class="w">  </span><span class="na">request_path</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"/"</span><span class="w"></span>
+<span class="w">  </span><span class="na">check_interval_sec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="oics-button" style="float: right; margin: 0 0 -15px">
+  <a href="https://console.cloud.google.com/cloudshell/open?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fterraform-google-modules%2Fdocs-examples.git&amp;cloudshell_image=gcr.io%2Fcloudshell-images%2Fcloudshell%3Alatest&amp;cloudshell_print=.%2Fmotd&amp;cloudshell_tutorial=.%2Ftutorial.md&amp;cloudshell_working_dir=global_forwarding_rule_internal&amp;open_in_editor=main.tf" target="_blank">
+    <img alt="Open in Cloud Shell" src="//gstatic.com/cloudssh/images/open-btn.svg" style="max-height: 44px; margin: 32px auto; max-width: 100%;"/>
+  </a>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Global%20Forwarding%20Rule%20Internal"></a><h2 id="example-usage-global-forwarding-rule-internal">Example Usage - Global Forwarding Rule Internal</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_forwarding_rule"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"global-rule"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_target_http_proxy.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_range</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"80"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"INTERNAL_SELF_MANAGED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_address</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.0.0.0"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">metadata_filters</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">filter_match_criteria</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MATCH_ANY"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">filter_labels</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"PLANET"</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MARS"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_target_http_proxy"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"target-proxy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"a description"</span><span class="w"></span>
+<span class="w">  </span><span class="na">url_map</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_url_map.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_url_map"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"url-map-target-proxy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"a description"</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">host_rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">hosts</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"mysite.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">path_matcher</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"allpaths"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">path_matcher</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"allpaths"</span><span class="w"></span>
+<span class="w">    </span><span class="na">default_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">path_rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">paths</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"/*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="na">service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_backend_service"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"backend"</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"http"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"HTTP"</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"INTERNAL_SELF_MANAGED"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">backend</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance_group_manager.igm.instance_group</span><span class="w"></span>
+<span class="w">    </span><span class="na">balancing_mode</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"RATE"</span><span class="w"></span>
+<span class="w">    </span><span class="na">capacity_scaler</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">0.4</span><span class="w"></span>
+<span class="w">    </span><span class="na">max_rate_per_instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">50</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">health_checks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_health_check.default.id</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"google_compute_image"</span><span class="w"> </span><span class="nv">"debian_image"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">family</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-11"</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_group_manager"</span><span class="w"> </span><span class="nv">"igm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"igm-internal"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">version</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance_template.instance_template.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"primary"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">base_instance_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"internal-glb"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-f"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_size</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_template"</span><span class="w"> </span><span class="nv">"instance_template"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"template-backend"</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"e2-medium"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">network_interface</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"default"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source_image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.google_compute_image.debian_image.self_link</span><span class="w"></span>
+<span class="w">    </span><span class="na">auto_delete</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">boot</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_health_check"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"check-backend"</span><span class="w"></span>
+<span class="w">  </span><span class="na">check_interval_sec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">tcp_health_check</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"80"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="oics-button" style="float: right; margin: 0 0 -15px">
+  <a href="https://console.cloud.google.com/cloudshell/open?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fterraform-google-modules%2Fdocs-examples.git&amp;cloudshell_image=gcr.io%2Fcloudshell-images%2Fcloudshell%3Alatest&amp;cloudshell_print=.%2Fmotd&amp;cloudshell_tutorial=.%2Ftutorial.md&amp;cloudshell_working_dir=global_forwarding_rule_external_managed&amp;open_in_editor=main.tf" target="_blank">
+    <img alt="Open in Cloud Shell" src="//gstatic.com/cloudssh/images/open-btn.svg" style="max-height: 44px; margin: 32px auto; max-width: 100%;"/>
+  </a>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Global%20Forwarding%20Rule%20External%20Managed"></a><h2 id="example-usage-global-forwarding-rule-external-managed">Example Usage - Global Forwarding Rule External Managed</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_forwarding_rule"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"global-rule"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_target_http_proxy.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_range</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"80"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"EXTERNAL_MANAGED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_tier</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"PREMIUM"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_target_http_proxy"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"target-proxy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"a description"</span><span class="w"></span>
+<span class="w">  </span><span class="na">url_map</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_url_map.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_url_map"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"url-map-target-proxy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"a description"</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">host_rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">hosts</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"mysite.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">path_matcher</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"allpaths"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">path_matcher</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"allpaths"</span><span class="w"></span>
+<span class="w">    </span><span class="na">default_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">path_rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">paths</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"/*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="na">service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_backend_service"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"backend"</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"http"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"HTTP"</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"EXTERNAL_MANAGED"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="oics-button" style="float: right; margin: 0 0 -15px">
+  <a href="https://console.cloud.google.com/cloudshell/open?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fterraform-google-modules%2Fdocs-examples.git&amp;cloudshell_image=gcr.io%2Fcloudshell-images%2Fcloudshell%3Alatest&amp;cloudshell_print=.%2Fmotd&amp;cloudshell_tutorial=.%2Ftutorial.md&amp;cloudshell_working_dir=global_forwarding_rule_hybrid&amp;open_in_editor=main.tf" target="_blank">
+    <img alt="Open in Cloud Shell" src="//gstatic.com/cloudssh/images/open-btn.svg" style="max-height: 44px; margin: 32px auto; max-width: 100%;"/>
+  </a>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Global%20Forwarding%20Rule%20Hybrid"></a><h2 id="example-usage-global-forwarding-rule-hybrid">Example Usage - Global Forwarding Rule Hybrid</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// Roughly mirrors https://cloud.google.com/load-balancing/docs/https/setting-up-ext-https-hybrid</span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"subnetwork_cidr"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.0/24"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-network"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"internal"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-internal-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">resource</span><span class="w"> </span><span class="s2">"google_compute_subnetwork" "internal"</span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-subnetwork"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.internal.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">var.subnetwork_cidr</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_ip_google_access</span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Zonal NEG with GCE_VM_IP_PORT</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network_endpoint_group"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"default-neg"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_port</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"90"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_endpoint_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"GCE_VM_IP_PORT"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Zonal NEG with GCE_VM_IP</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network_endpoint_group"</span><span class="w"> </span><span class="nv">"internal"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"internal-neg"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.internal.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnetwork</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.internal.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_endpoint_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"GCE_VM_IP"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Hybrid connectivity NEG</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network_endpoint_group"</span><span class="w"> </span><span class="nv">"hybrid"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hybrid-neg"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_port</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"90"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-a"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_endpoint_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"NON_GCP_PRIVATE_IP_PORT"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network_endpoint"</span><span class="w"> </span><span class="nv">"hybrid-endpoint"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_endpoint_group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network_endpoint_group.hybrid.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">port</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network_endpoint_group.hybrid.default_port</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_address</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"127.0.0.1"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Backend service for Zonal NEG</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_backend_service"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"backend-default"</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"http"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"HTTP"</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="nb">backend</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network_endpoint_group.default.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">balancing_mode</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"RATE"</span><span class="w"></span>
+<span class="w">    </span><span class="na">max_rate_per_endpoint</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">health_checks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_health_check.default.id</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Backgend service for Hybrid NEG</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_backend_service"</span><span class="w"> </span><span class="nv">"hybrid"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"backend-hybrid"</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"http"</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"HTTP"</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="nb">backend</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group</span><span class="w">                        </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network_endpoint_group.hybrid.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">balancing_mode</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"RATE"</span><span class="w"></span>
+<span class="w">    </span><span class="na">max_rate_per_endpoint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">health_checks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_health_check.default.id</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_health_check"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"health-check"</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="na">check_interval_sec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">tcp_health_check</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"80"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_url_map"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"url-map-target-proxy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"a description"</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">host_rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">hosts</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"mysite.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">path_matcher</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"allpaths"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">path_matcher</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"allpaths"</span><span class="w"></span>
+<span class="w">    </span><span class="na">default_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">path_rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">paths</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"/*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="na">service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">path_rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">paths</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"/hybrid"</span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="na">service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.hybrid.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_target_http_proxy"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"target-proxy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"a description"</span><span class="w"></span>
+<span class="w">  </span><span class="na">url_map</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_url_map.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_forwarding_rule"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"global-rule"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_target_http_proxy.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"80"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="oics-button" style="float: right; margin: 0 0 -15px">
+  <a href="https://console.cloud.google.com/cloudshell/open?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fterraform-google-modules%2Fdocs-examples.git&amp;cloudshell_image=gcr.io%2Fcloudshell-images%2Fcloudshell%3Alatest&amp;cloudshell_print=.%2Fmotd&amp;cloudshell_tutorial=.%2Ftutorial.md&amp;cloudshell_working_dir=global_internal_http_lb_with_mig_backend&amp;open_in_editor=main.tf" target="_blank">
+    <img alt="Open in Cloud Shell" src="//gstatic.com/cloudssh/images/open-btn.svg" style="max-height: 44px; margin: 32px auto; max-width: 100%;"/>
+  </a>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Global%20Internal%20Http%20Lb%20With%20Mig%20Backend"></a><h2 id="example-usage-global-internal-http-lb-with-mig-backend">Example Usage - Global Internal Http Lb With Mig Backend</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Global Internal HTTP load balancer with a managed instance group backend</span>
+
+<span class="c1"># VPC network</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"gilb_network"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-gilb-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># proxy-only subnet</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"proxy_subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-gilb-proxy-subnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"europe-west1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">purpose</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"GLOBAL_MANAGED_PROXY"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"ACTIVE"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.gilb_network.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># backend subnet</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"gilb_subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-gilb-subnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.1.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"europe-west1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.gilb_network.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># forwarding rule</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_forwarding_rule"</span><span class="w"> </span><span class="nv">"google_compute_forwarding_rule"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-gilb-forwarding-rule"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_subnetwork.proxy_subnet</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_protocol</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"TCP"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"INTERNAL_MANAGED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">port_range</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"80"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_target_http_proxy.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.gilb_network.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnetwork</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.gilb_subnet.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># HTTP target proxy</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_target_http_proxy"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-gilb-target-http-proxy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">url_map</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_url_map.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># URL map</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_url_map"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-gilb-url-map"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_backend_service.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># backend service</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_backend_service"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-gilb-backend-subnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">protocol</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"HTTP"</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"INTERNAL_MANAGED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">timeout_sec</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="na">health_checks</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_health_check.default.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="nb">backend</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance_group_manager.mig.instance_group</span><span class="w"></span>
+<span class="w">    </span><span class="na">balancing_mode</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"UTILIZATION"</span><span class="w"></span>
+<span class="w">    </span><span class="na">capacity_scaler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">1.0</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># instance template</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_template"</span><span class="w"> </span><span class="nv">"instance_template"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-gilb-mig-template"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"e2-small"</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"http-server"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">network_interface</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.gilb_network.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnetwork</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.gilb_subnet.id</span><span class="w"></span>
+<span class="w">    </span><span class="nb">access_config</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">      # add external ip to fetch packages</span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source_image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud/debian-12"</span><span class="w"></span>
+<span class="w">    </span><span class="na">auto_delete</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">boot</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # install nginx and serve a simple web page</span>
+<span class="w">  </span><span class="nb">metadata</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">startup-script</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;-</span><span class="dl">EOF1</span><span class="sh"></span>
+<span class="sh">      #! /bin/bash</span>
+<span class="sh">      set -euo pipefail</span>
+
+<span class="sh">      export DEBIAN_FRONTEND=noninteractive</span>
+<span class="sh">      apt-get update</span>
+<span class="sh">      apt-get install -y nginx-light jq</span>
+
+<span class="sh">      NAME=$(curl -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/hostname")</span>
+<span class="sh">      IP=$(curl -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip")</span>
+<span class="sh">      METADATA=$(curl -f -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/?recursive=True" | jq 'del(.["startup-script"])')</span>
+
+<span class="sh">      cat &lt;&lt;EOF &gt; /var/www/html/index.html</span>
+<span class="sh">      &lt;pre&gt;</span>
+<span class="sh">      Name: $NAME</span>
+<span class="sh">      IP: $IP</span>
+<span class="sh">      Metadata: $METADATA</span>
+<span class="sh">      &lt;/pre&gt;</span>
+<span class="sh">      EOF</span>
+<span class="dl">    EOF1</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create_before_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># health check</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_health_check"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-gilb-hc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="nb">http_health_check</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">port_specification</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"USE_SERVING_PORT"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># MIG</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_group_manager"</span><span class="w"> </span><span class="nv">"mig"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-gilb-mig1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"europe-west1-b"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">version</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance_template.instance_template.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"primary"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">base_instance_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"vm"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_size</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># allow all access from IAP and health check ranges</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_firewall"</span><span class="w"> </span><span class="nv">"fw-iap"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-gilb-fw-allow-iap-hc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">direction</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"INGRESS"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.gilb_network.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_ranges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"130.211.0.0/22", "35.191.0.0/16", "35.235.240.0/20"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="nb">allow</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">protocol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># allow http from proxy subnet to backends</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_firewall"</span><span class="w"> </span><span class="nv">"fw-gilb-to-backends"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-gilb-fw-allow-gilb-to-backends"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">direction</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"INGRESS"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.gilb_network.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_ranges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"10.0.0.0/24"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_tags</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"http-server"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="nb">allow</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">protocol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w"></span>
+<span class="w">    </span><span class="na">ports</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"80", "443", "8080"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># test instance</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance"</span><span class="w"> </span><span class="nv">"vm-test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"l7-gilb-test-vm"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"europe-west1-b"</span><span class="w"></span>
+<span class="w">  </span><span class="na">machine_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"e2-small"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">network_interface</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.gilb_network.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnetwork</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.gilb_subnet.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">boot_disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">initialize_params</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"debian-cloud/debian-12"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Private%20Service%20Connect%20Google%20Apis"></a><h2 id="example-usage-private-service-connect-google-apis">Example Usage - Private Service Connect Google Apis</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"network"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-project-name"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"vpc_subnetwork"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.network.project</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-subnetwork"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.2.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.network.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_ip_google_access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_address"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.network.project</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"global-psconnect-ip"</span><span class="w"></span>
+<span class="w">  </span><span class="na">address_type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"INTERNAL"</span><span class="w"></span>
+<span class="w">  </span><span class="na">purpose</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"PRIVATE_SERVICE_CONNECT"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.network.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">address</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"100.100.100.106"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_forwarding_rule"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.network.project</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"globalrule"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"all-apis"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.network.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_address</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_global_address.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="w"></span>
+<span class="w">  </span><span class="nb">service_directory_registrations</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">namespace</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"sd-namespace"</span><span class="w"></span>
+<span class="w">    </span><span class="na">service_directory_region</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"europe-west3"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Private%20Service%20Connect%20Google%20Apis%20No%20Automate%20Dns"></a><h2 id="example-usage-private-service-connect-google-apis-no-automate-dns">Example Usage - Private Service Connect Google Apis No Automate Dns</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"network"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-project-name"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"vpc_subnetwork"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.network.project</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-subnetwork"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.2.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.network.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_ip_google_access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_address"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.network.project</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"global-psconnect-ip"</span><span class="w"></span>
+<span class="w">  </span><span class="na">address_type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"INTERNAL"</span><span class="w"></span>
+<span class="w">  </span><span class="na">purpose</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"PRIVATE_SERVICE_CONNECT"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.network.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">address</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"100.100.100.106"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_forwarding_rule"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="err">google-beta</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.network.project</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"globalrule"</span><span class="w"></span>
+<span class="w">  </span><span class="na">target</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"all-apis"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.network.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_address</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_global_address.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">load_balancing_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">""</span><span class="w"></span>
+<span class="w">  </span><span class="na">no_automate_dns_zone</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>name</code> -
+(Required)
+Name of the resource; provided by the client when the resource is created.
+The name must be 1-63 characters long, and comply with
+<a href="https://www.ietf.org/rfc/rfc1035.txt">RFC1035</a>.
+Specifically, the name must be 1-63 characters long and match the regular
+expression <code>[a-z]([-a-z0-9]*[a-z0-9])?</code> which means the first
+character must be a lowercase letter, and all following characters must
+be a dash, lowercase letter, or digit, except the last character, which
+cannot be a dash.
+For Private Service Connect forwarding rules that forward traffic to Google
+APIs, the forwarding rule name must be a 1-20 characters string with
+lowercase letters and numbers and must start with a letter.</p></li>
+<li><p><code>target</code> -
+(Required)
+The URL of the target resource to receive the matched traffic.  For
+regional forwarding rules, this target must be in the same region as the
+forwarding rule. For global forwarding rules, this target must be a global
+load balancing resource.
+The forwarded traffic must be of a type appropriate to the target object.</p>
+
+<ul>
+<li>For load balancers, see the "Target" column in <a href="https://cloud.google.com/load-balancing/docs/forwarding-rule-concepts#ip_address_specifications">Port specifications</a>.</li>
+<li>For Private Service Connect forwarding rules that forward traffic to Google APIs, provide the name of a supported Google API bundle:</li>
+<li><code>vpc-sc</code> - <a href="https://cloud.google.com/vpc-service-controls/docs/supported-products"> APIs that support VPC Service Controls</a>.</li>
+<li><code>all-apis</code> - <a href="https://cloud.google.com/vpc/docs/private-service-connect#supported-apis">All supported Google APIs</a>.
+For Private Service Connect forwarding rules that forward traffic to managed services, the target must be a service attachment.</li>
+</ul></li>
+</ul>
+
+<hr/>
+
+<ul>
+<li><p><code>description</code> -
+(Optional)
+An optional description of this resource. Provide this property when
+you create the resource.</p></li>
+<li><p><code>ip_address</code> -
+(Optional)
+IP address for which this forwarding rule accepts traffic. When a client
+sends traffic to this IP address, the forwarding rule directs the traffic
+to the referenced <code>target</code>.
+While creating a forwarding rule, specifying an <code>IPAddress</code> is
+required under the following circumstances:</p>
+
+<ul>
+<li>When the <code>target</code> is set to <code>targetGrpcProxy</code> and
+<code>validateForProxyless</code> is set to <code>true</code>, the
+<code>IPAddress</code> should be set to <code>0.0.0.0</code>.</li>
+<li>When the <code>target</code> is a Private Service Connect Google APIs
+bundle, you must specify an <code>IPAddress</code>.
+Otherwise, you can optionally specify an IP address that references an
+existing static (reserved) IP address resource. When omitted, Google Cloud
+assigns an ephemeral IP address.
+Use one of the following formats to specify an IP address while creating a
+forwarding rule:</li>
+<li>IP address number, as in <code>100.1.2.3</code></li>
+<li>IPv6 address range, as in <code>2600:1234::/96</code></li>
+<li>Full resource URL, as in
+<code>https://www.googleapis.com/compute/v1/projects/project_id/regions/region/addresses/address-name</code></li>
+<li>Partial URL or by name, as in:</li>
+<li><code>projects/project_id/regions/region/addresses/address-name</code></li>
+<li><code>regions/region/addresses/address-name</code></li>
+<li><code>global/addresses/address-name</code></li>
+<li><code>address-name</code>
+The forwarding rule's <code>target</code>,
+and in most cases, also the <code>loadBalancingScheme</code>, determine the
+type of IP address that you can use. For detailed information, see
+<a href="https://cloud.google.com/load-balancing/docs/forwarding-rule-concepts#ip_address_specifications">IP address
+specifications</a>.
+When reading an <code>IPAddress</code>, the API always returns the IP
+address number.</li>
+</ul></li>
+<li><p><code>ip_protocol</code> -
+(Optional)
+The IP protocol to which this rule applies.
+For protocol forwarding, valid
+options are <code>TCP</code>, <code>UDP</code>, <code>ESP</code>,
+<code>AH</code>, <code>SCTP</code>, <code>ICMP</code> and
+<code>L3_DEFAULT</code>.
+The valid IP protocols are different for different load balancing products
+as described in <a href="https://cloud.google.com/load-balancing/docs/features#protocols_from_the_load_balancer_to_the_backends">Load balancing
+features</a>.
+Possible values are: <code>TCP</code>, <code>UDP</code>, <code>ESP</code>, <code>AH</code>, <code>SCTP</code>, <code>ICMP</code>.</p></li>
+<li><p><code>ip_version</code> -
+(Optional)
+The IP Version that will be used by this global forwarding rule.
+Possible values are: <code>IPV4</code>, <code>IPV6</code>.</p></li>
+<li><p><code>labels</code> -
+(Optional)
+Labels to apply to this forwarding rule.  A list of key-&gt;value pairs.</p>
+
+<p><strong>Note</strong>: This field is non-authoritative, and will only manage the labels present in your configuration.
+Please refer to the field <code>effective_labels</code> for all of the labels present on the resource.</p></li>
+<li><p><code>load_balancing_scheme</code> -
+(Optional)
+Specifies the forwarding rule type.
+For more information about forwarding rules, refer to
+<a href="https://cloud.google.com/load-balancing/docs/forwarding-rule-concepts">Forwarding rule concepts</a>.
+Default value is <code>EXTERNAL</code>.
+Possible values are: <code>EXTERNAL</code>, <code>EXTERNAL_MANAGED</code>, <code>INTERNAL_MANAGED</code>, <code>INTERNAL_SELF_MANAGED</code>.</p></li>
+<li><p><code>metadata_filters</code> -
+(Optional)
+Opaque filter criteria used by Loadbalancer to restrict routing
+configuration to a limited set xDS compliant clients. In their xDS
+requests to Loadbalancer, xDS clients present node metadata. If a
+match takes place, the relevant routing configuration is made available
+to those proxies.
+For each metadataFilter in this list, if its filterMatchCriteria is set
+to MATCH_ANY, at least one of the filterLabels must match the
+corresponding label provided in the metadata. If its filterMatchCriteria
+is set to MATCH_ALL, then all of its filterLabels must match with
+corresponding labels in the provided metadata.
+metadataFilters specified here can be overridden by those specified in
+the UrlMap that this ForwardingRule references.
+metadataFilters only applies to Loadbalancers that have their
+loadBalancingScheme set to INTERNAL_SELF_MANAGED.
+Structure is <a href="#nested_metadata_filters">documented below</a>.</p></li>
+<li><p><code>network</code> -
+(Optional)
+This field is not used for external load balancing.
+For Internal TCP/UDP Load Balancing, this field identifies the network that
+the load balanced IP should belong to for this Forwarding Rule.
+If the subnetwork is specified, the network of the subnetwork will be used.
+If neither subnetwork nor this field is specified, the default network will
+be used.
+For Private Service Connect forwarding rules that forward traffic to Google
+APIs, a network must be provided.</p></li>
+<li><p><code>port_range</code> -
+(Optional)
+The <code>portRange</code> field has the following limitations:</p>
+
+<ul>
+<li>It requires that the forwarding rule <code>IPProtocol</code> be TCP, UDP, or SCTP,
+and</li>
+<li>It's applicable only to the following products: external passthrough
+Network Load Balancers, internal and external proxy Network Load
+Balancers, internal and external Application Load Balancers, external
+protocol forwarding, and Classic VPN.</li>
+<li>Some products have restrictions on what ports can be used. See
+<a href="https://cloud.google.com/load-balancing/docs/forwarding-rule-concepts#port_specifications">port specifications</a>
+for details.
+For external forwarding rules, two or more forwarding rules cannot use the
+same <code>[IPAddress, IPProtocol]</code> pair, and cannot have overlapping
+<code>portRange</code>s.
+For internal forwarding rules within the same VPC network, two or more
+forwarding rules cannot use the same <code>[IPAddress, IPProtocol]</code> pair, and
+cannot have overlapping <code>portRange</code>s.
+@pattern: \d+(?:-\d+)?</li>
+</ul></li>
+<li><p><code>subnetwork</code> -
+(Optional)
+This field identifies the subnetwork that the load balanced IP should
+belong to for this Forwarding Rule, used in internal load balancing and
+network load balancing with IPv6.
+If the network specified is in auto subnet mode, this field is optional.
+However, a subnetwork must be specified if the network is in custom subnet
+mode or when creating external forwarding rule with IPv6.</p></li>
+<li><p><code>network_tier</code> -
+(Optional)
+This signifies the networking tier used for configuring
+this load balancer and can only take the following values:
+<code>PREMIUM</code>, <code>STANDARD</code>.
+For regional ForwardingRule, the valid values are <code>PREMIUM</code> and
+<code>STANDARD</code>. For GlobalForwardingRule, the valid value is
+<code>PREMIUM</code>.
+If this field is not specified, it is assumed to be <code>PREMIUM</code>.
+If <code>IPAddress</code> is specified, this value must be equal to the
+networkTier of the Address.
+Possible values are: <code>PREMIUM</code>, <code>STANDARD</code>.</p></li>
+<li><p><code>service_directory_registrations</code> -
+(Optional)
+Service Directory resources to register this forwarding rule with.
+Currently, only supports a single Service Directory resource.
+Structure is <a href="#nested_service_directory_registrations">documented below</a>.</p></li>
+<li><p><code>source_ip_ranges</code> -
+(Optional)
+If not empty, this Forwarding Rule will only forward the traffic when the source IP address matches one of the IP addresses or CIDR ranges set here. Note that a Forwarding Rule can only have up to 64 source IP ranges, and this field can only be used with a regional Forwarding Rule whose scheme is EXTERNAL. Each sourceIpRange entry should be either an IP address (for example, 1.2.3.4) or a CIDR range (for example, 1.2.3.0/24).</p></li>
+<li><p><code>allow_psc_global_access</code> -
+(Optional, <a href="https://terraform.io/docs/providers/google/guides/provider_versions.html">Beta</a>)
+This is used in PSC consumer ForwardingRule to control whether the PSC endpoint can be accessed from another region.</p></li>
+<li><p><code>no_automate_dns_zone</code> -
+(Optional)
+This is used in PSC consumer ForwardingRule to control whether it should try to auto-generate a DNS zone or not. Non-PSC forwarding rules do not use this field.</p></li>
+<li><p><code>project</code> - (Optional) The ID of the project in which the resource belongs.
+If it is not provided, the provider project is used.</p></li>
+</ul>
+
+<p><a name="nested_metadata_filters"></a>The <code>metadata_filters</code> block supports:</p>
+
+<ul>
+<li><p><code>filter_match_criteria</code> -
+(Required)
+Specifies how individual filterLabel matches within the list of
+filterLabels contribute towards the overall metadataFilter match.
+MATCH_ANY - At least one of the filterLabels must have a matching
+label in the provided metadata.
+MATCH_ALL - All filterLabels must have matching labels in the
+provided metadata.
+Possible values are: <code>MATCH_ANY</code>, <code>MATCH_ALL</code>.</p></li>
+<li><p><code>filter_labels</code> -
+(Required)
+The list of label value pairs that must match labels in the
+provided metadata based on filterMatchCriteria
+This list must not be empty and can have at the most 64 entries.
+Structure is <a href="#nested_metadata_filters_metadata_filters_filter_labels">documented below</a>.</p></li>
+</ul>
+
+<p><a name="nested_metadata_filters_metadata_filters_filter_labels"></a>The <code>filter_labels</code> block supports:</p>
+
+<ul>
+<li><p><code>name</code> -
+(Required)
+Name of the metadata label. The length must be between
+1 and 1024 characters, inclusive.</p></li>
+<li><p><code>value</code> -
+(Required)
+The value that the label must match. The value has a maximum
+length of 1024 characters.</p></li>
+</ul>
+
+<p><a name="nested_service_directory_registrations"></a>The <code>service_directory_registrations</code> block supports:</p>
+
+<ul>
+<li><p><code>namespace</code> -
+(Optional)
+Service Directory namespace to register the forwarding rule under.</p></li>
+<li><p><code>service_directory_region</code> -
+(Optional)
+[Optional] Service Directory region to register this global forwarding rule under.
+Default to "us-central1". Only used for PSC for Google APIs. All PSC for
+Google APIs Forwarding Rules on the same network should use the same Service
+Directory region.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to the arguments listed above, the following computed attributes are exported:</p>
+
+<ul>
+<li><p><code>id</code> - an identifier for the resource with format <code>projects/{{project}}/global/forwardingRules/{{name}}</code></p></li>
+<li><p><code>psc_connection_id</code> -
+The PSC connection id of the PSC Forwarding Rule.</p></li>
+<li><p><code>psc_connection_status</code> -
+The PSC connection status of the PSC Forwarding Rule. Possible values: <code>STATUS_UNSPECIFIED</code>, <code>PENDING</code>, <code>ACCEPTED</code>, <code>REJECTED</code>, <code>CLOSED</code></p></li>
+<li><p><code>forwarding_rule_id</code> -
+The unique identifier number for the resource. This identifier is defined by the server.</p></li>
+<li><p><code>label_fingerprint</code> -
+The fingerprint used for optimistic locking of this resource.  Used
+internally during updates.</p></li>
+<li><p><code>base_forwarding_rule</code> -
+[Output Only] The URL for the corresponding base Forwarding Rule. By base Forwarding Rule, we mean the Forwarding Rule that has the same IP address, protocol, and port settings with the current Forwarding Rule, but without sourceIPRanges specified. Always empty if the current Forwarding Rule does not have sourceIPRanges specified.</p></li>
+<li><p><code>terraform_labels</code> -
+The combination of labels configured directly on the resource
+and default labels configured on the provider.</p></li>
+<li><p><code>effective_labels</code> -
+All of labels (key/value pairs) present on the resource in GCP, including the labels configured through Terraform, other clients and services.</p></li>
+<li><code>self_link</code> - The URI of the created resource.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p>This resource provides the following
+<a href="https://developer.hashicorp.com/terraform/plugin/sdkv2/resources/retries-and-customizable-timeouts">Timeouts</a> configuration options:</p>
+
+<ul>
+<li><code>create</code> - Default is 20 minutes.</li>
+<li><code>update</code> - Default is 20 minutes.</li>
+<li><code>delete</code> - Default is 20 minutes.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>GlobalForwardingRule can be imported using any of these accepted formats:</p>
+
+<ul>
+<li><code>projects/{{project}}/global/forwardingRules/{{name}}</code></li>
+<li><code>{{project}}/{{name}}</code></li>
+<li><code>{{name}}</code></li>
+</ul>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import GlobalForwardingRule using one of the formats above. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"projects/{{project}}/global/forwardingRules/{{name}}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_global_forwarding_rule.default</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When using the <a href="https://developer.hashicorp.com/terraform/cli/commands/import"><code>terraform import</code> command</a>, GlobalForwardingRule can be imported using one of the formats above. For example:</p>
+
+<pre><code>$ terraform import google_compute_global_forwarding_rule.default projects/{{project}}/global/forwardingRules/{{name}}
+$ terraform import google_compute_global_forwarding_rule.default {{project}}/{{name}}
+$ terraform import google_compute_global_forwarding_rule.default {{name}}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/User%20Project%20Overrides"></a><h2 id="user-project-overrides">User Project Overrides</h2>
+
+<p>This resource supports <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/provider_reference#user_project_override">User Project Overrides</a>.</p>
+
+            
+        
+    </body></html>

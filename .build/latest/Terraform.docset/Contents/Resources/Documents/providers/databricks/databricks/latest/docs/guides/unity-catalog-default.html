@@ -1,0 +1,99 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/unity-catalog-default --><head>
+                <title>Working with Unity Catalog by default</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="working-with-unity-catalog-by-default">Working with Unity Catalog by default</h1>
+
+<p>Databricks began to <a href="https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/get-started#--automatic-enablement-of-unity-catalog">enable new workspaces for Unity Catalog automatically</a> on November 9, 2023, with a rollout proceeding gradually across accounts. Workspaces that were enabled automatically have the following properties:</p>
+
+<ul>
+<li>An automatically-provisioned Unity Catalog metastore (unless a Unity Catalog metastore already existed for the workspace region).</li>
+<li>Default privileges for workspace admins, such as the ability to create a catalog or an external database connection.</li>
+<li>No metastore admin (unless an existing Unity Catalog metastore was used and a metastore admin was already assigned).</li>
+<li>No metastore-level storage for managed tables and managed volumes (unless an existing Unity Catalog metastore with metastore-level storage was used).</li>
+<li>A workspace catalog, which, when originally provisioned, is named after your workspace.</li>
+</ul>
+
+<p>This removes the need to manually enable Unity Catalog following <a href="unity-catalog.md">this guide</a>. However, you may need to adjust your Terraform configuration to account for this accordingly</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Removing%20default%20privileges%20for%20workspace%20admins"></a><h2 id="removing-default-privileges-for-workspace-admins">Removing default privileges for workspace admins</h2>
+
+<p>An account admin may decide to remove the default privileges granted to workspace admins, such as the ability to create a catalog or connection. This can be achieved using <a href="../resources/grants.md">databricks_grants</a>, which will override any metastore-level grants not defined in Terraform</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_current_metastore"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_grants"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">metastore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_current_metastore.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">grant</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">principal</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"Data Engineers"</span><span class="w"></span>
+<span class="w">    </span><span class="na">privileges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"CREATE_CATALOG", "CREATE_EXTERNAL_LOCATION"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">grant</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">principal</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"Data Sharer"</span><span class="w"></span>
+<span class="w">    </span><span class="na">privileges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"CREATE_RECIPIENT", "CREATE_SHARE"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Avoiding%20the%20automatically-provisioned%20Unity%20Catalog%20metastore"></a><h2 id="avoiding-the-automatically-provisioned-unity-catalog-metastore">Avoiding the automatically-provisioned Unity Catalog metastore</h2>
+
+<p>An account admin may pre-create metastores with specific admins in all regions that workspaces will be deployed. This will ensure that new workspaces are automatically assigned to the correct metastore</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"regions"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"ap-northeast-1", "eu-west-1"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_metastore"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">toset</span><span class="p">(</span><span class="nv">var.regions</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"metastore-${each.value}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Mandating%20storage%20for%20new%20catalogs"></a><h2 id="mandating-storage-for-new-catalogs">Mandating storage for new catalogs</h2>
+
+<p>The automatically-provisioned Unity Catalog metastore does not have metastore-level storage, which means each new catalog has to have a storage location defined</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># this would fail with "storage location required" error</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_catalog"</span><span class="w"> </span><span class="nv">"sandbox"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sandbox"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20the%20workspace%20catalog"></a><h2 id="using-the-workspace-catalog">Using the workspace catalog</h2>
+
+<p>The automatically-provisioned workspace catalog is named after the workspace and initially is bound to that workspace only.</p>
+
+<p>To retrieve this catalog using <a href="../data-sources/catalogs.md">databricks_catalogs</a></p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">variable</span><span class="w"> </span><span class="nb">workspace_name</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_catalogs"</span><span class="w"> </span><span class="nv">"all"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_catalog</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="err">for</span><span class="w"> </span><span class="err">each</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">data.databricks_catalogs.all.ids</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="err">each</span><span class="w"> </span><span class="err">if</span><span class="w"> </span><span class="err">str</span><span class="nf">contains</span><span class="p">(</span><span class="err">each</span><span class="p">,</span><span class="w"> </span><span class="nv">var.workspace_name</span><span class="p">)]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>This can then be used to create objects under this catalog, e.g.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_schema"</span><span class="w"> </span><span class="nv">"sandbox"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">catalog_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.default_catalog[0</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"sandbox"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Or bind this catalog to more workspaces</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_catalog_workspace_binding"</span><span class="w"> </span><span class="nv">"default_catalog"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">securable_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.default_catalog[0</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_workspaces.other.workspace_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

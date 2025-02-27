@@ -1,0 +1,194 @@
+<html><!-- Online page at https://www.terraform.io/language/providers/configuration --><head>
+                <title>Provider Configuration</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="provider-configuration">Provider Configuration</h1>
+
+<p>Providers allow Terraform to interact with cloud providers, SaaS providers, and
+other APIs.</p>
+
+<p>Some providers require you to configure them with endpoint URLs, cloud regions,
+or other settings before Terraform can use them. This page documents how to
+configure settings for providers.</p>
+
+<p>Additionally, all Terraform configurations must declare which providers they
+require so that Terraform can install and use them. The
+<a href="../../terraform/language/providers/requirements.html">Provider Requirements</a>
+page documents how to declare providers so Terraform can install them.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Configuration"></a><h2 id="provider-configuration-2">Provider Configuration</h2>
+
+<p>Provider configurations belong in the root module of a Terraform configuration.
+(Child modules receive their provider configurations from the root module; for
+more information, see
+<a href="../../terraform/language/meta-arguments/module-providers.html">The Module <code>providers</code> Meta-Argument</a>
+and <a href="../../terraform/language/modules/develop/providers.html">Module Development: Providers Within Modules</a>.)</p>
+
+<p>A provider configuration is created using a <code>provider</code> block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"acme-app"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The name given in the block header (<code>"google"</code> in this example) is the
+<a href="../../terraform/language/providers/requirements.html#local-names">local name</a> of the provider to
+configure. This provider should already be included in a <code>required_providers</code>
+block.</p>
+
+<p>The body of the block (between <code>{</code> and <code>}</code>) contains configuration arguments for
+the provider. Most arguments in this section are defined by the provider itself;
+in this example both <code>project</code> and <code>region</code> are specific to the <code>google</code>
+provider.</p>
+
+<p>You can use <a href="../../terraform/language/expressions.html">expressions</a> in the values of these
+configuration arguments, but can only reference values that are known before the
+configuration is applied. This means you can safely reference input variables,
+but not attributes exported by resources (with an exception for resource
+arguments that are specified directly in the configuration).</p>
+
+<p>A provider's documentation should list which configuration arguments it expects.
+For providers distributed on the
+<a href="https://registry.terraform.io">Terraform Registry</a>, versioned documentation is
+available on each provider's page, via the "Documentation" link in the
+provider's header.</p>
+
+<p>Some providers can use shell environment variables (or other alternate sources,
+like VM instance profiles) as values for some of their arguments; when
+available, we recommend using this as a way to keep credentials out of your
+version-controlled Terraform code.</p>
+
+<p>There are also two "meta-arguments" that are defined by Terraform itself
+and available for all <code>provider</code> blocks:</p>
+
+<ul>
+<li><a href="#alias-multiple-provider-configurations"><code>alias</code>, for using the same provider with different configurations for different resources</a></li>
+<li><a href="#provider-versions"><code>version</code>, which we no longer recommend</a> (use
+<a href="../../terraform/language/providers/requirements.html">provider requirements</a> instead)</li>
+</ul>
+
+<p>Unlike many other objects in the Terraform language, a <code>provider</code> block may
+be omitted if its contents would otherwise be empty. Terraform assumes an
+empty default configuration for any provider that is not explicitly configured.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/alias%3A%20Multiple%20Provider%20Configurations"></a><h2 id="alias-multiple-provider-configurations"><code>alias</code>: Multiple Provider Configurations</h2>
+
+<p>You can optionally define multiple configurations for the same provider, and
+select which one to use on a per-resource or per-module basis. The primary
+reason for this is to support multiple regions for a cloud platform; other
+examples include targeting multiple Docker hosts, multiple Consul hosts, etc.</p>
+
+<p>To create multiple configurations for a given provider, include multiple
+<code>provider</code> blocks with the same provider name. For each additional non-default
+configuration, use the <code>alias</code> meta-argument to provide an extra name segment.
+For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># The default provider configuration; resources that begin with `aws_` will use</span>
+<span class="c1"># it as the default, and it can be referenced as `aws`.</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Additional provider configuration for west coast region; resources can</span>
+<span class="c1"># reference this as `aws.west`.</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"west"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-2"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>To declare a configuration alias within a module in order to receive an
+alternate provider configuration from the parent module, add the
+<code>configuration_aliases</code> argument to that provider's <code>required_providers</code>
+entry. The following example declares both the <code>mycloud</code> and
+<code>mycloud.alternate</code> provider configuration names within the containing module:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">mycloud</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"mycorp/mycloud"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.0"</span><span class="w"></span>
+<span class="w">      </span><span class="na">configuration_aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="nv">mycloud.alternate</span><span class="w"> </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Default%20Provider%20Configurations"></a><h3 id="default-provider-configurations">Default Provider Configurations</h3>
+
+<p>A <code>provider</code> block without an <code>alias</code> argument is the <em>default</em> configuration
+for that provider. Resources that don't set the <code>provider</code> meta-argument will
+use the default provider configuration that matches the first word of the
+resource type name. (For example, an <code>aws_instance</code> resource uses the default
+<code>aws</code> provider configuration unless otherwise stated.)</p>
+
+<p>If every explicit configuration of a provider has an alias, Terraform uses the
+implied empty configuration as that provider's default configuration. (If the
+provider has any required configuration arguments, Terraform will raise an error
+when resources default to the empty configuration.)</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Referring%20to%20Alternate%20Provider%20Configurations"></a><h3 id="referring-to-alternate-provider-configurations">Referring to Alternate Provider Configurations</h3>
+
+<p>When Terraform needs the name of a provider configuration, it expects a
+reference of the form <code>&lt;PROVIDER NAME&gt;.&lt;ALIAS&gt;</code>. In the example above,
+<code>aws.west</code> would refer to the provider with the <code>us-west-2</code> region.</p>
+
+<p>These references are special expressions. Like references to other named
+entities (for example, <code>var.image_id</code>), they aren't strings and don't need to be
+quoted. But they are only valid in specific meta-arguments of <code>resource</code>,
+<code>data</code>, and <code>module</code> blocks, and can't be used in arbitrary expressions.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Selecting%20Alternate%20Provider%20Configurations"></a><h3 id="selecting-alternate-provider-configurations">Selecting Alternate Provider Configurations</h3>
+
+<p>By default, resources use a default provider configuration (one without an
+<code>alias</code> argument) inferred from the first word of the resource type name.</p>
+
+<p>To use an alternate provider configuration for a resource or data source, set
+its <code>provider</code> meta-argument to a <code>&lt;PROVIDER NAME&gt;.&lt;ALIAS&gt;</code> reference:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.west</span><span class="c1"></span>
+
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>To select alternate provider configurations for a child module, use its
+<code>providers</code> meta-argument to specify which provider configurations should be
+mapped to which local provider names inside the module:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">module</span><span class="w"> </span><span class="nv">"aws_vpc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./aws_vpc"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">providers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.west</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Modules have some special requirements when passing in providers; see
+<a href="../../terraform/language/meta-arguments/module-providers.html">The Module <code>providers</code> Meta-Argument</a>
+for more details. In most cases, only <em>root modules</em> should define provider
+configurations, with all child modules obtaining their provider configurations
+from their parents.</p>
+
+<p><a id="provider-versions"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/version%20%28Deprecated%29"></a><h2 id="version-deprecated"><code>version</code> (Deprecated)</h2>
+
+<p>The <code>version</code> meta-argument specifies a version constraint for a provider, and
+works the same way as the <code>version</code> argument in a
+<a href="../../terraform/language/providers/requirements.html"><code>required_providers</code> block</a>. The version
+constraint in a provider configuration is only used if <code>required_providers</code>
+does not include one for that provider.</p>
+
+<p>~<strong>Warning:</strong> The <code>version</code> argument in provider configurations is deprecated, and we will remove it in a future Terraform version.</p>
+
+<p>In Terraform 0.13 and later, always declare provider version constraints in
+<a href="../../terraform/language/providers/requirements.html">the <code>required_providers</code> block</a>.</p>
+
+            
+        
+    </body></html>

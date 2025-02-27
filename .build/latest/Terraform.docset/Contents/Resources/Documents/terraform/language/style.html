@@ -1,0 +1,700 @@
+<html><!-- Online page at https://www.terraform.io/language/style --><head>
+                <title>Style Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="style-guide">Style Guide</h1>
+
+<p>The flexibility of Terraform's configuration language gives you many options to choose from as you write your code, structure your directories, and test your configuration. While some design decisions depend on your organization's needs or preferences, there are some common patterns that we suggest you adopt. Adopting and adhering to a style guide keeps your Terraform code legible, scalable, and maintainable. </p>
+
+<p>This article discusses best practices and some considerations to keep in mind as you develop your organization's style guide. The article is split into two sections. The first section covers code style recommendations, such as formatting and resource organization. The second section covers operations and workflow recommendations, such as lifecycle management through meta-arguments, versioning, and sensitive data management.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Code%20style"></a><h2 id="code-style">Code style</h2>
+
+<p>Writing Terraform code in a consistent style makes it easier to read and maintain. The following sections discuss code style recommendations, including the following:</p>
+
+<ul>
+<li>Run <code>terraform fmt</code> and <code>terraform validate</code> before committing your code to version control.</li>
+<li>Use a linter such as <a href="https://github.com/terraform-linters/tflint">TFLint</a> to enforce your organization's own coding best practices.</li>
+<li>Use <code>#</code> for single and multi-line comments.</li>
+<li>Use nouns for resource names and do not include the resource type in the name. </li>
+<li>Use underscores to separate multiple words in names. Wrap the resource type and name in double quotes in your resource definition.</li>
+<li>Let your code build on itself: define dependent resources after the resources that reference them.</li>
+<li>Include a type and description for every variable.</li>
+<li>Include a description for every output.</li>
+<li>Avoid overuse of variables and local values.</li>
+<li>Always include a default provider configuration.</li>
+<li>Use <code>count</code> and <code>for_each</code> sparingly.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Code%20formatting"></a><h2 id="code-formatting">Code formatting</h2>
+
+<p>The Terraform parser allows you some flexibility in how you lay out the elements in your configuration files, but the Terraform language also has some idiomatic style conventions which we recommend users always follow for consistency between files and modules written by different teams.</p>
+
+<ul>
+<li>Indent two spaces for each nesting level</li>
+<li><p>When multiple arguments with single-line values appear on consecutive lines at the same nesting level, align their equals signs:</p>
+
+<p><codeblockconfig hideclipboard=""></codeblockconfig></p>
+
+<div class="codehilite"><pre><span></span><code><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"abc123"</span><span class="w"></span>
+<span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"t2.micro"</span><span class="w"></span>
+</code></pre></div>
+
+<p></p></li>
+<li><p>When both arguments and blocks appear together inside a block body, place all of the arguments together at the top and then place nested blocks below them. Use one blank line to separate the arguments from the blocks.</p></li>
+<li>Use empty lines to separate logical groups of arguments within a block.</li>
+<li><p>For blocks that contain both arguments and "meta-arguments" (as defined by the Terraform language semantics), list meta-arguments first and separate them from other arguments with one blank line. Place meta-argument blocks last and separate them from other blocks with one blank line. Refer to <a href="#dynamic-resource-count">dynamic resource count</a> for more information on meta-arguments.</p>
+
+<p><codeblockconfig hideclipboard=""></codeblockconfig></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # meta-argument first</span>
+<span class="w">  </span><span class="na">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"abc123"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"t2.micro"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">network_interface</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # ...</span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # meta-argument block last</span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create_before_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p></p></li>
+<li><p>Top-level blocks should always be separated from one another by one blank line. Nested blocks should also be separated by blank lines, except when grouping together related blocks of the same type (like multiple <code>provisioner</code> blocks in a resource).</p></li>
+<li>Avoid grouping multiple blocks of the same type with other blocks of a different type, unless the block types are defined by semantics to form a family. (For example: <code>root_block_device</code>, <code>ebs_block_device</code> and <code>ephemeral_block_device</code> on <code>aws_instance</code> form a family of block types describing AWS block devices, and can therefore be grouped together and mixed.)</li>
+</ul>
+
+<p>The <code>terraform fmt</code> command formats your Terraform configuration to a subset of the above recommendations. By default, the <code>terraform fmt</code> command will only modify your Terraform code in the directory that you execute it in, but you can include the <code>-recursive</code> flag to modify code in all subdirectories as well.</p>
+
+<p>We recommend that you run <code>terraform fmt</code> before each commit to version control. You can use mechanisms such as <a href="https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks">Git pre-commit hooks</a> to automatically run this command each time you commit your code.</p>
+
+<p>If you use Microsoft VS Code, use the <a href="https://marketplace.visualstudio.com/items?itemName=HashiCorp.terraform">Terraform VS Code extension</a> to enable features such as syntax highlighting and validation, automatic code formatting, and integration with HCP Terraform. If your development environment or text editor supports the <a href="https://microsoft.github.io/language-server-protocol/">Language Server Protocol</a>, you can use the <a href="https://github.com/hashicorp/terraform-ls">Terraform Language Server</a> to access most of the VS Code extension features.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Code%20validation"></a><h2 id="code-validation">Code validation</h2>
+
+<p>The <code>terraform validate</code> command checks that your configuration is syntactically valid and internally consistent. The <code>validate</code> command does not check if argument values are valid for a specific provider, but it will verify that they are the correct type. It does not evaluate any existing state.</p>
+
+<p>The <code>terraform validate</code> command is safe to run automatically and frequently. You can configure your text editor to run this command as a post-save check, define it as a pre-commit hook in a Git repository, or run it as a step in a CI/CD pipeline.</p>
+
+<p>For more information, refer to the <a href="../terraform/cli/commands/validate.html">Terraform <code>validate</code> documentation</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/File%20names"></a><h2 id="file-names">File names</h2>
+
+<p>We recommend the following file naming conventions:</p>
+
+<ul>
+<li>A <code>backend.tf</code> file that contains your <a href="../terraform/language/backend.html">backend configuration</a>. You can define multiple <code>terraform</code> blocks in your configuration to separate your backend configuration from your Terraform and provider versioning configuration. </li>
+<li>A <code>main.tf</code> file that contains all resource and data source blocks.</li>
+<li>A <code>outputs.tf</code> file that contains all output blocks in alphabetical order.</li>
+<li>A <code>providers.tf</code> file that contains all <code>provider</code> blocks and configuration.</li>
+<li>A <code>terraform.tf</code> file that contains a single <code>terraform</code> block which defines your <code>required_version</code> and <code>required_providers</code>.</li>
+<li>A <code>variables.tf</code> file that contains all variable blocks in alphabetical order.</li>
+<li>A <code>locals.tf</code> file that contains local values. Refer to <a href="#local-values">local values</a> for more information.</li>
+<li>A <code>override.tf</code> file that contains override definitions for your configuration. Terraform loads this and all files ending with <code>_override.tf</code> last. Use them sparingly and add comments to the original resource definitions, as these overrides make your code harder to reason about. Refer to the <a href="../terraform/language/files/override.html">override files</a> documentation for more information.</li>
+</ul>
+
+<p>As your codebase grows, limiting it to just these files can become difficult to maintain. If your code becomes hard to navigate due to its size, we recommend that you organize resources and data sources in separate files by logical groups. For example, if your web application requires networking, storage, and compute resources, you might create the following files:</p>
+
+<ul>
+<li>A <code>network.tf</code> file that contains your VPC, subnets, load balancers, and all other networking resources.</li>
+<li>A <code>storage.tf</code> file that contains your object storage and related permissions configuration.</li>
+<li>A <code>compute.tf</code> file that contains your compute instances.</li>
+</ul>
+
+<p>No matter how you decide to split your code, it should be immediately clear where a maintainer can find a specific resource or data source definition.</p>
+
+<p>As your configuration grows, you may need to separate it into multiple state files. The HashiCorp Well-Architected Framework provides more guidance about <a href="../well-architected-framework/operational-excellence/operational-excellence-workspaces-projects.html#workspace-structure">configuration structure and scope</a>. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Linting%20and%20static%20code%20analysis"></a><h2 id="linting-and-static-code-analysis">Linting and static code analysis</h2>
+
+<p>Terraform does not have a built-in linter, but many organizations rely on a third party linting tool such as <a href="https://github.com/terraform-linters/tflint">TFLint</a> to enforce code standards. A linter uses static code analysis to compare your Terraform code against a set of rules. Most linters ship with a default set of rules, but also let you write your own.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Comments"></a><h2 id="comments">Comments</h2>
+
+<p>Write your code so it is easy to understand. Only when necessary, use comments to clarify complexity for other maintainers. </p>
+
+<p>Use <code>#</code> for both single- and multi-line comments. The <code>//</code> and <code>/* */</code> comment syntaxes are not considered idiomatic, but Terraform supports them to remain backwards-compatible with earlier versions of HCL.</p>
+
+<p><codeblockconfig hideclipboard=""></codeblockconfig></p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Each tunnel is responsible for encrypting and decrypting traffic exiting</span>
+<span class="c1"># and leaving its associated gateway.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_vpn_tunnel"</span><span class="w"> </span><span class="nv">"tunnel1"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  ## ...</span>
+</code></pre></div>
+
+<p></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%20naming"></a><h2 id="resource-naming">Resource naming</h2>
+
+<p>Every resource within a configuration must have a unique name. For consistency and readability, use a descriptive noun and separate words with underscores. Do not include the resource type in the resource identifier since the resource address already includes it. Wrap the resource type and name in double quotes.</p>
+
+<p>❌ Bad:</p>
+
+<p><codeblockconfig hideclipboard=""></codeblockconfig></p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">resource</span><span class="w"> </span><span class="err">aws_instance</span><span class="w"> </span><span class="nb">webAPI-aws-instance</span><span class="w"> </span><span class="p">{...}</span><span class="w"></span>
+</code></pre></div>
+
+<p></p>
+
+<p>✅ Good:</p>
+
+<p><codeblockconfig hideclipboard=""></codeblockconfig></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web_api"</span><span class="w"> </span><span class="p">{...}</span><span class="w"></span>
+</code></pre></div>
+
+<p></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%20order"></a><h2 id="resource-order">Resource order</h2>
+
+<p>The order of the resources and data sources in your code does not affect how Terraform builds them, so organize your resources for readability. Terraform determines the creation order based on cross-resource dependencies.</p>
+
+<p>How you order your resources largely depends on the size and complexity of your code, but we recommend defining data sources alongside the resources that reference them. For readability, your Terraform code should “build on itself” — you should define a data source before the resource that references it.</p>
+
+<p>The following example defines an <code>aws_instance</code> that relies on two data sources, <code>aws_ami</code> and <code>aws_availability_zone</code>. For readability and continuity, it defines the data sources before the <code>aws_instance</code> resource.</p>
+
+<p><codeblockconfig hideclipboard=""></codeblockconfig></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_ami"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  ##...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_availability_zones"</span><span class="w"> </span><span class="nv">"available"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  ##...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">ami</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_ami.web.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">availability_zone</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_availability_zones.available.names[0</span><span class="p">]</span><span class="c1"></span>
+<span class="c1">  ##...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p></p>
+
+<p>We recommend following a consistent order for resource parameters:</p>
+
+<ol>
+<li>If present, The <code>count</code> or <code>for_each</code> meta-argument.</li>
+<li>Resource-specific non-block parameters.</li>
+<li>Resource-specific block parameters.</li>
+<li>If required, a <code>lifecycle</code> block.</li>
+<li>If required, the <code>depends_on</code> parameter.</li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Variables"></a><h2 id="variables">Variables</h2>
+
+<p>While variables make your modules more flexible, overusing variables can make code difficult to understand. When deciding whether to expose a variable for a resource setting, consider whether that parameter will change between deployments.</p>
+
+<ul>
+<li>Define a <code>type</code> and a <code>description</code> for every variable. </li>
+<li>If the variable is optional, define a reasonable <code>default</code>. </li>
+<li>For sensitive variables, such as passwords and private keys, set the <code>sensitive</code> parameter to <code>true</code>. Remember that Terraform will still store this value in plain text in its state, but it will not display it when you run <code>terraform plan</code> or <code>terraform apply</code>. Refer to <a href="#secrets-management">secrets management</a> for more information on how to securely handle sensitive values.</li>
+<li><p>Use <a href="../terraform/language/values/variables.html#custom-validation-rules">input variable validation</a> to create additional rules for your variable values in addition to Terraform's type validation. Only use variable validation when your variable values have uniquely restrictive requirements. For example, if your Terraform configuration requires two web instances, add a <code>validation</code> block to enforce it:</p>
+
+<p><codeblockconfig hideclipboard=""></codeblockconfig></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"web_instance_count"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">number</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Number of web instances to deploy. This application requires at least two instances."</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">validation</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">condition</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.web_instance_count</span><span class="w"> </span><span class="err">&gt;</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"This application requires at least two web instances."</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p></p></li>
+</ul>
+
+<p>We recommend following a consistent order for variable parameters:</p>
+
+<ol>
+<li>Type</li>
+<li>Description</li>
+<li>Default (optional)</li>
+<li>Sensitive (optional)</li>
+<li><a href="../terraform/language/values/variables.html#custom-validation-rules">Validation blocks</a></li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Outputs"></a><h2 id="outputs">Outputs</h2>
+
+<p>Output values let you expose data about your infrastructure on the command line and make it easy to reference in other Terraform configurations. Like you would for variables, provide a <code>description</code> for each output. </p>
+
+<p>We recommend that you use the following order for your output parameters:</p>
+
+<ol>
+<li>Description</li>
+<li>Value</li>
+<li>Sensitive (optional)</li>
+</ol>
+
+<p>Every variable and output requires a unique name. For consistency and readability, we recommend that you use a descriptive noun and separate words with underscores.</p>
+
+<p><codeblockconfig hideclipboard=""></codeblockconfig></p>
+
+<p>```terraform
+variable "db<em>disk</em>size" {
+  type        = number
+  description = "Disk size for the API database"
+  default     = 100
+}</p>
+
+<p>variable "db_password" {
+  type        = string
+  description = "Database password"
+  sensitive   = true
+}</p>
+
+<p>output "web<em>public</em>ip" {
+  description = "Public IP of the web instance"
+  value       = aws<em>instance.web.public</em>ip
+}</p>
+
+<pre><code>
+&lt;/CodeBlockConfig&gt;
+
+## Local values
+
+Local values let you reference an [expression](/terraform/language/expressions) or value multiple times. Use local values sparingly, as overuse can make your code harder to understand. 
+
+For example, you can use a local value to create a suffix for the region and environment (for example, `development` or `test`), and append it to multiple resources. 
+
+&lt;CodeBlockConfig hideClipboard&gt;
+
+```terraform
+locals {
+  name_suffix = "${var.region}-${var.environment}"
+}
+
+resource "aws_instance" "web" {
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t3.micro"
+
+  tags = {
+    Name = "web-${local.name_suffix}"
+  }
+}
+</code></pre>
+
+<p></p>
+
+<p>Define local values in one of two places:</p>
+
+<ul>
+<li>If you reference the local value in multiple files, define it in a file named <code>locals.tf</code>.</li>
+<li>If the local is specific to a file, define it at the top of that file.</li>
+</ul>
+
+<p>As for other Terraform objects, use descriptive nouns for local value names and underscores to separate multiple words.</p>
+
+<p>For more information, refer to the <a href="../terraform/language/values/locals.html">local values documentation</a> and the <a href="../terraform/tutorials/configuration-language/locals.html">Simplify Terraform configuration with locals</a> tutorial. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20aliasing"></a><h2 id="provider-aliasing">Provider aliasing</h2>
+
+<p>Provider aliasing lets you define multiple <code>provider</code> blocks for the same Terraform provider. Potential use cases for aliases include provisioning resources in multiple regions within a single configuration. The <code>provider</code> meta-argument for resources and the <code>providers</code> meta-argument for modules specifies which provider to use.</p>
+
+<p><codeblockconfig filename="providers.tf" hideclipboard="" highlight="6"></codeblockconfig></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"west"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-2"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p></p>
+
+<p><codeblockconfig filename="main.tf" hideclipboard="" highlight="2,8-10"></codeblockconfig></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.west</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">module</span><span class="w"> </span><span class="nv">"aws_vpc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./aws_vpc"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">providers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.west</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p></p>
+
+<ul>
+<li>Any provider block that does not define the <code>alias</code> parameter is the default provider configuration. </li>
+<li>Always include a default provider configuration and define all of your providers in the same file. </li>
+<li>If you define multiple instances of a provider, define the default first. </li>
+<li>For non-default providers, define the <code>alias</code> as the first parameter of the <code>provider</code> block.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Dynamic%20resource%20count"></a><h2 id="dynamic-resource-count">Dynamic resource count</h2>
+
+<p>The <code>for_each</code> and <code>count</code> meta-arguments let you create multiple resources from a single <code>resource</code> block depending on run-time conditions. You can use these meta-arguments to make your code flexible and reduce duplicate resource blocks. If the resources are almost identical, use <code>count</code>. If some of arguments need distinct values that you cannot derive from an integer, use <code>for_each</code>.</p>
+
+<p>The <code>for_each</code> meta-argument accepts a <code>map</code> or <code>set</code> value, and Terraform will create an instance of that resource for each element in the value you provide. In the following example, Terraform creates an <code>aws_instance</code> for each of the strings defined in the <code>web_instances</code> variable: "ui", "api", "db" and "metrics". The example uses <code>each.key</code> to give each instance a unique name. The <code>web_private_ips</code> output uses a <a href="https://developer.hashicorp.com/terraform/language/expressions/for">for expression</a> to create a map of instance names and their private IP addresses, while the <code>web_ui_public_ip</code> output addresses the instance with the key "ui" directly.</p>
+
+<p><codeblockconfig hideclipboard=""></codeblockconfig></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"web_instances"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="kt">string</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"A list of instances for the web application"</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"ui"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"api"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"db"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"metrics"</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">toset</span><span class="p">(</span><span class="nv">var.web_instances</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_ami.webapp.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"t3.micro"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"web_${each.key}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">output</span><span class="w"> </span><span class="nv">"web_private_ips"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Private IPs of the web instances"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="err">for</span><span class="w"> </span><span class="err">k</span><span class="p">,</span><span class="w"> </span><span class="err">v</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">aws_instance.web</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="na">k</span><span class="w"> </span><span class="o">=</span><span class="err">&gt;</span><span class="w"> </span><span class="nv">v.private_ip</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">output</span><span class="w"> </span><span class="nv">"web_ui_public_ip"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Public IP of the web UI instance"</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.web</span><span class="p">[</span><span class="s2">"ui"</span><span class="p">].</span><span class="err">public_ip</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p></p>
+
+<p>The above example will create the following output:</p>
+
+<p><codeblockconfig hideclipboard=""></codeblockconfig></p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">web_private_ips</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="s2">"api"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.31.25.29"</span><span class="w"></span>
+<span class="w">  </span><span class="s2">"db"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.31.18.33"</span><span class="w"></span>
+<span class="w">  </span><span class="s2">"metrics"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.31.26.112"</span><span class="w"></span>
+<span class="w">  </span><span class="s2">"ui"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.31.20.142"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="na">web_ui_public_ip</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"18.216.208.182"</span><span class="w"></span>
+</code></pre></div>
+
+<p></p>
+
+<p>Refer to the <a href="../terraform/language/meta-arguments/for_each.html">for_each meta-argument documentation</a> for more examples. </p>
+
+<p>The <code>count</code> meta-argument lets you create multiple instances of a resource from a single resource block. Refer to the <a href="../terraform/language/meta-arguments/count.html">count meta-argument documentation</a> for examples.</p>
+
+<p>A common practice to conditionally create resources is to use the <code>count</code> meta-argument with a <a href="../terraform/language/expressions/conditionals.html">conditional expression</a>. In the following example, Terraform will only create the <code>aws_instance</code> if <code>var.enable_metrics</code> is <code>true</code>.</p>
+
+<p><codeblockconfig hideclipboard="" highlight="8"></codeblockconfig></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"enable_metrics"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"True if the metrics server should be deployed"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">bool</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.enable_metrics</span><span class="w"> </span><span class="p">?</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_ami.webapp.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"t3.micro"</span><span class="c1"></span>
+<span class="c1">  ##...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p></p>
+
+<p>Meta-arguments simplify your code but add complexity, so use them in moderation. If the effect of the meta-argument is not immediately obvious, use a comment for clarification.</p>
+
+<p>To learn more about these meta-arguments, refer to the <a href="../terraform/language/meta-arguments/for_each.html"><code>for_each</code></a> and <a href="../terraform/language/meta-arguments/count.html"><code>count</code></a> documentation.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/.gitignore"></a><h2 id="gitignore">.gitignore</h2>
+
+<p>Define a <code>.gitignore</code> file for your repository to exclude files that you should not publish to version control, such as your state file.</p>
+
+<p>Do not commit:</p>
+
+<ul>
+<li>Your <code>terraform.tfstate</code> state file, including <code>terraform.tfstate.*</code> backup state files.</li>
+<li>Your <code>.terraform.tfstate.lock.info</code> file. Terraform creates and deletes this file automatically when you run a <code>terraform apply</code> command and contains info about your <a href="../terraform/language/state/locking.html">state lock</a></li>
+<li>Your <code>.terraform</code> directory, where Terraform downloads providers and child modules. 
+<a href="../terraform/cli/commands/plan.html#out-filename">Saved plan files</a> that you create when you include the <code>-out</code> flag when you run <code>terraform plan</code>.</li>
+<li>Any <code>.tfvars</code> files that contain sensitive information.</li>
+</ul>
+
+<p>Always commit:</p>
+
+<ul>
+<li>All Terraform code files</li>
+<li>Your <code>.terraform.lock.hcl</code> <a href="../terraform/language/files/dependency-lock.html">dependency lock file</a> </li>
+<li>A <code>.gitignore</code> file that excludes the files listed below</li>
+<li>A <code>README.md</code> to describe the code, input variables, and outputs</li>
+</ul>
+
+<p>For an example, refer to <a href="https://github.com/github/gitignore/blob/main/Terraform.gitignore">GitHub's Terraform .gitignore file</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Workflow%20style"></a><h2 id="workflow-style">Workflow style</h2>
+
+<p>This section reviews standards that enable predictable and secure Terraform workflows, such as:</p>
+
+<ul>
+<li>Pin your Terraform, provider, and module versions.</li>
+<li>Name your module repositories using this three-part name <code>terraform-&lt;PROVIDER&gt;-&lt;NAME&gt;</code> when using the HCP Terraform registry.</li>
+<li>Store local modules at <code>./modules/&lt;module_name&gt;</code>.</li>
+<li>Use the <a href="https://registry.terraform.io/providers/hashicorp/tfe/latest/docs/data-sources/outputs"><code>tfe_outputs</code></a> data source or provider-specific data sources to share state between two state files.</li>
+<li>Protect credentials by using <a href="../terraform/tutorials/cloud/dynamic-credentials.html">dynamic provider credentials</a> or a secrets manager such as HashiCorp Vault.</li>
+<li>Write <a href="../terraform/language/tests.html">tests</a> for your modules.</li>
+<li>Use <a href="../terraform/cloud-docs/policy-enforcement.html">policy enforcement</a> on HCP Terraform to set guardrails for infrastructure operations.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Version%20pinning"></a><h2 id="version-pinning">Version pinning</h2>
+
+<p>To prevent providers and modules upgrades from introducing unintentional changes to your infrastructure, use version pinning. </p>
+
+<p>Specify provider versions using the <a href="../terraform/language/providers/requirements.html#requiring-providers">required_providers block</a>. Terraform <a href="../terraform/language/providers/requirements.html#version-constraints">version constraints</a> support a range of accepted versions. </p>
+
+<p>Pin modules to a specific major and minor version as shown in the example below to ensure stability. You can use looser restrictions if you are certain that the module does not introduce breaking changes outside of major version updates.</p>
+
+<p>We also recommend that you set a minimum required version of the Terraform binary using the <code>required_version</code> in your <code>terraform</code> block. This requires all operators to use a Terraform version that has all of your configuration's required features.</p>
+
+<p><codeblockconfig hideclipboard="" highlight="5,9"></codeblockconfig></p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"5.34.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">required_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&gt;= 1.7"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p></p>
+
+<p>The above example pins the version of the <code>hashicorp/aws</code> provider to version <code>5.34.0</code>, and requires that operators use Terraform <code>1.7</code> or newer.</p>
+
+<p>For modules sourced from a registry, use the <code>version</code> parameter in the <code>module</code> block to pin the version. For local modules, Terraform ignores the <code>version</code> parameter.</p>
+
+<p><codeblockconfig hideclipboard=""></codeblockconfig></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">module</span><span class="w"> </span><span class="nv">"vault_starter"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/vault-starter/aws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1.0.0"</span><span class="c1"></span>
+<span class="c1">  ##...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Module%20repository%20names"></a><h2 id="module-repository-names">Module repository names</h2>
+
+<p>The Terraform registry requires that repositories match a naming convention for all modules that you publish to the registry. Module repositories must use this three-part name <code>terraform-&lt;PROVIDER&gt;-&lt;NAME&gt;</code>, where <code>&lt;NAME&gt;</code> reflects the type of infrastructure the module manages and <code>&lt;PROVIDER&gt;</code> is the main provider the module uses. The <code>&lt;NAME&gt;</code> segment can contain additional hyphens, for example, <code>terraform-google-vault</code> or <code>terraform-aws-ec2-instance</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Module%20structure"></a><h2 id="module-structure">Module structure</h2>
+
+<p>Terraform modules define self-contained, reusable pieces of infrastructure-as-code. </p>
+
+<p>Use modules to group together logically related resources that you need to provision together. For example:</p>
+
+<ul>
+<li>A networking module that defines a VPC, along with its subnets, gateway, and security groups.</li>
+<li>An application module defining all resources required for each deployment. This stack could include web servers, databases, storage, and supported networking.</li>
+</ul>
+
+<p>Review the <a href="../terraform/tutorials/modules/pattern-module-creation.html">module creation recommended pattern documentation</a> and <a href="../terraform/language/modules/develop/structure.html">standard module structure</a> for guidance on how to structure your modules.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Local%20modules"></a><h2 id="local-modules">Local modules</h2>
+
+<p>Local modules are sourced from local disk rather than a remote module registry. We recommend publishing your modules to a module registry, such as the <a href="../terraform/cloud-docs/registry.html">HCP Terraform private registry</a>, to easily version, share, and reuse modules across your organization. If you cannot use a module registry, using local modules can simplify maintaining and updating your code. </p>
+
+<p>We recommend that you define child modules in the <code>./modules/&lt;module_name&gt;</code> directory. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Repository%20structure"></a><h2 id="repository-structure">Repository structure</h2>
+
+<p>How you structure your modules and Terraform configuration in version control significantly impacts versioning and operations. We recommend that you store your actual infrastructure configuration separately from your module code.</p>
+
+<p>Store each module in an individual repository. This lets you independently version each module and makes it easier to publish your modules in the private Terraform registry.</p>
+
+<p>Organize your infrastructure configuration in repositories that group together logically-related resources. For example, a single repository for a web application that requires compute, networking, and database resources . By separating your resources into groups, you limit the number of resources that may be impacted by failures for any operation.</p>
+
+<p>Another approach is to group all modules and infrastructure configuration into a single monolithic repository, or monorepo. For example, a monorepo may define a collection of local modules for each component of the infrastructure stack, and deploy them in the root module.</p>
+
+<p><codeblockconfig hideclipboard=""></codeblockconfig></p>
+
+<pre><code>.
+├── modules
+│   ├── function
+│   │   ├── main.tf      # contains aws_iam_role, aws_lambda_function
+│   │   ├── outputs.tf
+│   │   └── variables.tf
+│   ├── queue
+│   │   ├── main.tf      # contains aws_sqs_queue
+│   │   ├── outputs.tf
+│   │   └── variables.tf
+│   └── vpc
+│       ├── main.tf      # contains aws_vpc, aws_subnet
+│       ├── outputs.tf
+│       └── variables.tf
+├── main.tf
+├── outputs.tf
+└── variables.tf
+</code></pre>
+
+<p></p>
+
+<p>The advantage of monolithic repositories is having a single source of truth that tracks every infrastructure change. However, monolithic repositories can complicate your CI/CD automation: since any code change triggers a deployment that operates on your entire repository, your workflow must target only the modified directories. You also lose the granular access control, since anyone with repository access can modify any file in it. </p>
+
+<p>If your organization requires a monolithic approach, HCP Terraform and Terraform Enterprise let you scope a workspace to a specific directory in a repository, simplifying your workflows.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Branching%20strategy"></a><h2 id="branching-strategy">Branching strategy</h2>
+
+<p>To collaborate on your Terraform code, we recommend using the <a href="https://docs.github.com/en/get-started/quickstart/github-flow">GitHub flow</a>. This approach uses short-lived branches to help your team quickly review, test, and merge changes to your code. To make changes to your code, you would:</p>
+
+<ol>
+<li>Create a new branch from your main branch</li>
+<li>Write, commit, and push your changes to the new branch</li>
+<li>Create a pull request</li>
+<li>Review the changes with your team</li>
+<li>Merge the pull request</li>
+<li>Delete the branch</li>
+</ol>
+
+<p>HCP Terraform and Terraform Enterprise can run <a href="../terraform/cloud-docs/run/ui.html#speculative-plans-on-pull-requests">speculative plans for pull requests</a>. These speculative plans run automatically when you create or update a pull request, and you can use them to see the effect that your changes will have on your infrastructure before you merge them to your main branch. When you merge your pull request, HCP Terraform will start a new run to apply these changes.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Multiple%20environments"></a><h2 id="multiple-environments">Multiple environments</h2>
+
+<p>We recommend that your repository's <code>main</code> branch be the source of truth for all environments. For HCP Terraform and Terraform Enterprise users, we recommend that you use separate workspaces for each environment. For larger codebases, we recommend that you split your resources across multiple workspaces to prevent large state files and limit unintended consequences from changes. For example, you could structure your code as follows:</p>
+
+<p><codeblockconfig hideclipboard=""></codeblockconfig></p>
+
+<pre><code>.
+├── compute
+│   ├── main.tf
+│   ├── outputs.tf
+│   └── variables.tf
+├── database
+│   ├── main.tf
+│   ├── outputs.tf
+│   └── variables.tf
+└── networking
+    ├── main.tf
+    ├── outputs.tf
+    └── variables.tf
+</code></pre>
+
+<p></p>
+
+<p>In this scenario, you would create three workspaces per environment. For example, your production environment would have a <code>prod-compute</code>, <code>prod-database</code>, and <code>prod-networking</code> workspace. Read more about <a href="../well-architected-framework/operational-excellence/operational-excellence-workspaces-projects.html">Terraform workspace and project best practices</a>. </p>
+
+<p>If you do not use HCP Terraform or Terraform Enterprise, we recommend that you use modules to encapsulate your configuration, and use a directory for each environment so that each one has a separate state file. The configuration in each of these directories would call the local modules, each with parameters specific to their environment. This also lets you maintain separate variable and backend configurations for each environment. </p>
+
+<p><codeblockconfig hideclipboard=""></codeblockconfig></p>
+
+<pre><code>├── modules
+│   ├── compute
+│   │   └── main.tf
+│   ├── database
+│   │   └── main.tf
+│   └── network
+│       └── main.tf
+├── dev
+│   ├── backend.tf
+│   ├── main.tf
+│   └── variables.tf
+├── prod
+│   ├── backend.tf
+│   ├── main.tf
+│   └── variables.tf
+└── staging
+    ├── backend.tf
+    ├── main.tf
+    └── variables.tf
+</code></pre>
+
+<p></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/State%20sharing"></a><h2 id="state-sharing">State sharing</h2>
+
+<p>Since your state contains sensitive information, avoid sharing full state files when possible. </p>
+
+<p>If you use HCP Terraform or Terraform Enterprise and need to reference resources across workspaces, use the <a href="https://registry.terraform.io/providers/hashicorp/tfe/latest/docs/data-sources/outputs"><code>tfe_outputs</code></a> data source.</p>
+
+<p>If you do not use HCP Terraform or Terraform Enterprise but still need to reference data about other infrastructure resources, use data sources to query the provider. For example, you can use the <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/instance"><code>aws_instance</code> data source</a> to look up an AWS EC2 instance by its ID or tags.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Secrets%20management"></a><h2 id="secrets-management">Secrets management</h2>
+
+<p>If you do not configure remote state storage, the Terraform CLI stores the entire state in plaintext on the local disk. State can include sensitive data, such as passwords and private keys. HCP Terraform and Terraform Enterprise provide state encryption through HashiCorp Vault.</p>
+
+<p>If you use HCP Terraform or Terraform Enterprise, we recommend the following:</p>
+
+<ul>
+<li>When using Terraform Enterprise, define and enforce a Sentinel policy to prevent use of the <code>local_exec</code> provisioner or external data sources.</li>
+<li>When using HCP Terraform or Terraform Enterprise, use <a href="../terraform/tutorials/cloud/dynamic-credentials.html">dynamic provider credentials</a> to avoid using long-lived static credentials.</li>
+</ul>
+
+<p>If you use Terraform Community Edition, we recommend the following:</p>
+
+<ul>
+<li>Configure provider credentials using provider-specific environment variables.</li>
+<li>Access secrets from a secrets management system such as HashiCorp Vault with the <a href="https://registry.terraform.io/providers/hashicorp/vault/latest/docs">Terraform Vault provider</a>. Be aware that Terraform will still write these values in plaintext to your state file.</li>
+</ul>
+
+<p>If you use a custom CI/CD pipeline, review your CI/CD tool's best practices for managing sensitive values. Most tools let you access sensitive values as environment variables. For more information, refer to your CI/CD documentation.</p>
+
+<ul>
+<li><a href="https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions">Using secrets in GitHub Actions</a></li>
+<li><a href="https://docs.gitlab.com/ee/ci/pipelines/pipeline_security.html">Gitlab pipeline security</a></li>
+<li><a href="../well-architected-framework/security/security-cicd-vault.html">Integrate Vault into your CI/CD pipeline</a></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Integration%20and%20unit%20testing"></a><h2 id="integration-and-unit-testing">Integration and unit testing</h2>
+
+<p>Terraform tests let you validate your modules and catch breaking changes. We recommend that you write tests for your Terraform modules and run them just as you run your tests for your application code, such as pre-merge check in your pull requests or as a prerequisite step in your automated CI/CD pipeline.</p>
+
+<p>Tests differ from validation methods such as variable validation, preconditions, postconditions, and check blocks. These features focus on verifying the infrastructure deployed by your code, while tests validate the behavior and logic of your code itself. For more information, refer to the <a href="../terraform/language/tests.html">Terraform test documentation</a> and the <a href="../terraform/tutorials/configuration-language/test.html">Write Terraform tests tutorial</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Policy"></a><h2 id="policy">Policy</h2>
+
+<p>Policies are rules that HCP Terraform enforces on Terraform runs. You can use policies to validate that the Terraform plan complies with your organization's best practices. For example, you can write policies that:</p>
+
+<ul>
+<li>Limit the size of a web instance</li>
+<li>Check for required resource tags</li>
+<li>Block deployments on Fridays</li>
+<li>Enforce security configuration and cost management</li>
+</ul>
+
+<p>We recommend that you store policies in a separate VCS repository from your Terraform code.</p>
+
+<p>For more information, refer to the <a href="../terraform/cloud-docs/policy-enforcement.html">policy enforcement documentation</a>, as well as the <a href="../terraform/tutorials/policy.html">enforce policy with Sentinel</a> and <a href="../terraform/tutorials/cloud/drift-and-opa.html">detect infrastructure drift and enforce OPA policies</a> tutorials.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Next%20steps"></a><h2 id="next-steps">Next steps</h2>
+
+<p>This article introduces some considerations to keep in mind as you standardize your organization's Terraform style guidelines. Enforcing a standard way of writing and organizing your Terraform code across your organization ensures that it is readable, maintainable, and shareable.</p>
+
+<p>To learn more Terraform adoption best practices, refer to <a href="../terraform/intro/phases.html">Phases of Terraform adoption</a>.</p>
+
+            
+        
+    </body></html>

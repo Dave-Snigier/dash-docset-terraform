@@ -1,0 +1,75 @@
+<html><!-- Online page at https://registry.terraform.io/providers/DataDog/datadog/latest/docs/guides/monitors --><head>
+                <title>Monitor Resource Examples</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <a class="dashAnchor" name="//apple_ref/cpp/Section/Monitor%20Resource%20Examples"></a><h3 id="monitor-resource-examples">Monitor Resource Examples</h3>
+
+<p>This page lists examples of how to create different Datadog monitor types within Terraform. This list is non exhaustive and will be updated over time to provide more examples.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Composite%20Monitors"></a><h2 id="composite-monitors">Composite Monitors</h2>
+
+<p>You can compose monitors of all types in order to define more specific alert conditions (see the <a href="https://docs.datadoghq.com/monitors/monitor_types/composite/">doc</a>). You just need to reuse the ID of your <code>datadog_monitor</code> resources. You can also compose any monitor with a <code>datadog_synthetics_test</code> by passing the computed <code>monitor_id</code> attribute in the query.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"datadog_monitor"</span><span class="w"> </span><span class="nv">"bar"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Composite Monitor"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"composite"</span><span class="w"></span>
+<span class="w">  </span><span class="na">message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"This is a message"</span><span class="w"></span>
+<span class="w">  </span><span class="na">query</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"${datadog_monitor.foo.id} || ${datadog_synthetics_test.foo.monitor_id}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Watchdog%20Monitors"></a><h2 id="watchdog-monitors">Watchdog Monitors</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"datadog_monitor"</span><span class="w"> </span><span class="nv">"watchdog_monitor"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Watchdog detected an anomaly: {{event.title}}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"event-v2 alert"</span><span class="w"></span>
+<span class="w">  </span><span class="na">message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Watchdog monitor created from Terraform"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"events(\"source:watchdog story_category:apm env:test_env\").rollup(\"count\").by(\"story_key,service,resource_name\").last(\"30m\") &gt; 0"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"terraform:true"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Anomaly%20Monitors"></a><h2 id="anomaly-monitors">Anomaly Monitors</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"datadog_monitor"</span><span class="w"> </span><span class="nv">"cpu_anomalous"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Anomalous CPU usage"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"query alert"</span><span class="w"></span>
+<span class="w">  </span><span class="na">message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CPU utilization is outside normal bounds"</span><span class="w"></span>
+<span class="w">  </span><span class="na">query</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"avg(last_4h):anomalies(ewma_20(avg:system.cpu.system{env:prod,service:website}.as_rate()), 'robust', 3, direction='below', alert_window='last_30m', interval=60, count_default_zero='true', seasonality='weekly') &gt;= 1"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">monitor_thresholds</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">critical</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">1.0</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">monitor_threshold_windows</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">trigger_window</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"last_30m"</span><span class="w"></span>
+<span class="w">    </span><span class="na">recovery_window</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"last_30m"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">renotify_interval</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">60</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Process%20Monitors"></a><h2 id="process-monitors">Process Monitors</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"datadog_monitor"</span><span class="w"> </span><span class="nv">"process_alert_example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Process Alert Monitor"</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"process alert"</span><span class="w"></span>
+<span class="w">  </span><span class="na">message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Multiple Java processes running on example-tag"</span><span class="w"></span>
+<span class="w">  </span><span class="na">query</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"processes('java').over('example-tag').rollup('count').last('10m') &gt; 1"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">monitor_thresholds</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">critical</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">1.0</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">renotify_interval</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">60</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

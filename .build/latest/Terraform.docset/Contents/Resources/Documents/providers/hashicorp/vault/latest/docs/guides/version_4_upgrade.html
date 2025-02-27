@@ -1,0 +1,492 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/vault/latest/docs/guides/version_4_upgrade --><head>
+                <title>Terraform Vault Provider 4.X Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-vault-provider-4x-upgrade-guide">Terraform Vault Provider 4.X Upgrade Guide</h1>
+
+<p>Version <code>4.X</code> of the Vault provider for Terraform is a major release and
+includes some changes that you will need to consider when upgrading. This guide
+is intended to help with that process and focuses only on the changes necessary
+to upgrade from version <code>3.X</code> to <code>4.X</code>.</p>
+
+<p>Most of the changes outlined in this guide have been previously marked as
+deprecated in the Terraform <code>plan</code>/<code>apply</code> output throughout previous provider
+releases, up to and including 3.25.0. These changes, such as deprecation notices,
+can always be found in the <a href="https://github.com/hashicorp/terraform-provider-vault/blob/master/CHANGELOG.md">CHANGELOG</a>.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you are upgrading from <code>1.9.x</code>. Please follow the <a href="./version_2_upgrade.html">2.0.0 Upgrade Guide</a> before proceeding any further.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you are upgrading from <code>2.24.x</code>. Please follow the <a href="./version_3_upgrade.html">3.0.0 Upgrade Guide</a> before proceeding any further.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Why%20version%204.X%3F"></a><h2 id="why-version-4x">Why version 4.X?</h2>
+
+<p>We introduced version <code>4.X</code> of the Vault provider in order to make
+performance improvements for deployments that manage many Vault secret or auth
+engine mounts. This improvement required changes to the underlying Vault API
+calls, which in turn would require policy adjustments in environments where
+permissions are least privilege.</p>
+
+<p>The change was deemed significant enough to warrant the major version bump.
+In addition to the aforementioned performance improvements, all previously deprecated fields
+and resources have been removed.</p>
+
+<p>While you may see some small changes in your configurations as a result of
+these changes, we don't expect you'll need to make any major refactorings.
+However, please pay special attention to the changes noted in the <a href="#provider-policy-changes">Provider Policy Changes</a> section.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/What%20performance%20improvements%20should%20we%20expect%20to%20see%3F"></a><h2 id="what-performance-improvements-should-we-expect-to-see">What performance improvements should we expect to see?</h2>
+
+<p>Version <code>4.X</code> changed the READ operations across many resources to call Vault
+API's to only fetch mount metadata necessary for the resource.  Previously,
+these resources were calling a Vault API which returned mount metadata for all
+enabled mounts. This would result in a substantially higher CPU and memory
+footprint for the provider in cases where a given Vault server has a large
+number of secret/auth mounts.</p>
+
+<p>The following is the list of resources that should see performance improvements
+when many mounts are enabled in Vault:</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20sources"></a><h4 id="data-sources">Data sources</h4>
+
+<ul>
+<li><code>vault_auth_backend</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resources"></a><h4 id="resources">Resources</h4>
+
+<ul>
+<li><code>vault_auth_backend</code></li>
+<li><code>vault_aws_secret_backend</code></li>
+<li><code>vault_azure_secret_backend</code></li>
+<li><code>vault_consul_secret_backend</code></li>
+<li><code>vault_database_secrets_mount</code></li>
+<li><code>vault_gcp_auth_backend</code></li>
+<li><code>vault_gcp_secret_backend</code></li>
+<li><code>vault_github_auth_backend</code></li>
+<li><code>vault_jwt_auth_backend</code></li>
+<li><code>vault_kubernetes_secret_backend</code></li>
+<li><code>vault_ldap_auth_backend</code></li>
+<li><code>vault_ldap_secret_backend</code></li>
+<li><code>vault_mount</code></li>
+<li><code>vault_okta_auth_backend</code></li>
+<li><code>vault_pki_secret_backend_cert</code></li>
+<li><code>vault_pki_secret_backend_intermediate_set_signed</code></li>
+<li><code>vault_pki_secret_backend_root_cert</code></li>
+<li><code>vault_pki_secret_backend_sign</code></li>
+<li><code>vault_rabbitmq_secret_backend</code></li>
+<li><code>vault_terraform_cloud_secret_backend</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/What%20Vault%20server%20versions%20are%20supported%20in%20version%204.X%3F"></a><h2 id="what-vault-server-versions-are-supported-in-version-4x">What Vault server versions are supported in version 4.X?</h2>
+
+<p>The Vault provider will be dropping Vault version support for Vault &lt;= <code>1.10.x</code>.
+This means that only Vault server version <code>1.11.x</code> and greater will be supported.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/What%20is%20the%20impact%20of%20these%20changes%3F"></a><h2 id="what-is-the-impact-of-these-changes">What is the impact of these changes?</h2>
+
+<p>With this change, Vault will require read policies to be set at the path level.
+For example, instead of permissions at <code>sys/auth</code> you must set permissions at
+the <code>sys/mounts/auth/:path</code> level. Please refer to the details in the
+<a href="#provider-policy-changes">Provider Policy Changes</a> section.</p>
+
+<p>The changes in this case are blocking but not destructive. That is, deployments
+will fail until the required Vault policy adjustments have been made.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Which%20Terraform%20versions%20are%20supported%3F"></a><h2 id="which-terraform-versions-are-supported">Which Terraform versions are supported?</h2>
+
+<p>Terraform versions <code>1.0.x</code> and greater are fully supported.</p>
+
+<p>Please see the <a href="https://www.terraform.io/upgrade-guides/index.html">Terraform Upgrade Guide</a>
+for more info about upgrading Terraform.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/I%20accidentally%20upgraded%20to%204.X%2C%20how%20do%20I%20downgrade%20to%203.X%3F"></a><h2 id="i-accidentally-upgraded-to-4x-how-do-i-downgrade-to-3x">I accidentally upgraded to 4.X, how do I downgrade to 3.X?</h2>
+
+<p>If you've inadvertently upgraded to <code>4.X</code>, first see the
+<a href="#provider-version-configuration">Provider Version Configuration Guide</a> to lock
+your provider version; if you've constrained the provider to a lower version
+such as shown in the previous version example in that guide, Terraform will pull
+in a <code>3.X</code> series release on <code>terraform init</code>.</p>
+
+<p>If you've only run <code>terraform init</code> or <code>terraform plan</code>, your state will not
+have been modified and downgrading your provider is sufficient.</p>
+
+<p>If you've run <code>terraform refresh</code> or <code>terraform apply</code>, Terraform may have made
+state changes in the meantime.</p>
+
+<ul>
+<li>If you're using a <em>local</em> state, <code>terraform refresh</code> with a downgraded
+provider is likely sufficient to revert your state.</li>
+<li>If you're using a <em>remote</em> state backend
+<ul>
+<li>That does not support versioning, see the local state instructions above</li>
+<li>That supports <em>versioning</em> you can revert the Terraform state file to a previous
+version by hand. If you do so and Terraform created resources as part of a
+<code>terraform apply</code>, you'll need to either <code>terraform import</code> them or delete
+them by hand.</li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrade%20Topics"></a><h2 id="upgrade-topics">Upgrade Topics</h2>
+
+<!-- TOC depthFrom:2 depthTo:2 -->
+
+<ul>
+<li><a href="#provider-version-configuration">Provider Version Configuration</a></li>
+<li><a href="#provider-policy-changes">Provider Policy Changes</a>
+<ul>
+<li><a href="#auth-method-resource-changes">Auth method resource changes</a></li>
+<li><a href="#secret-engine-resource-changes">Secret engine resource changes</a></li>
+</ul></li>
+<li><a href="#deprecated-field-removals">Deprecated Field Removals</a>
+<ul>
+<li><a href="#ad-secret-backend">AD Secret Backend</a></li>
+<li><a href="#ad-secret-backend"><code>length</code></a></li>
+<li><a href="#ad-secret-backend"><code>formatter</code></a></li>
+<li><a href="#cert-auth-backend-role">Cert Auth Backend: <code>allowed_organization_units</code></a></li>
+<li><a href="#console-backend-role">Consul Backend Role: <code>token_type</code></a></li>
+<li><a href="#identity-group-member-entities">Identity Group Member Entities: <code>group_name</code></a></li>
+<li><a href="#ldap-secret-backend">LDAP Secret Backend: <code>length</code></a></li>
+<li><a href="#pki-root-cert">PKI Root Cert: <code>serial</code></a></li>
+<li><a href="#pki-root-sign-intermediate">PKI Root Sign Intermediate: <code>serial</code></a></li>
+<li><a href="#pki-sign">PKI Root Sign: <code>serial</code></a></li>
+<li><a href="#ssh-backend-role">SSH Backend Role: <code>allowed_user_key_lengths</code></a></li>
+<li><a href="#transit-secret-backend-key">Transit Secret Backend Key: <code>auto_rotate_interval</code></a></li>
+</ul></li>
+</ul>
+
+<!-- /TOC -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Version%20Configuration"></a><h2 id="provider-version-configuration">Provider Version Configuration</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Before upgrading to version <code>4.X</code>, it is recommended to upgrade to the most recent version of the provider (<code>3.25.0</code>) and ensure that your environment successfully runs <a href="https://www.terraform.io/docs/commands/plan.html"><code>terraform plan</code></a> without unexpected changes or deprecation notices.</p>
+</aside>
+
+<p>It is recommended to use <a href="https://www.terraform.io/docs/configuration/providers.html#provider-versions">version constraints</a>
+when configuring Terraform providers. If you are following that recommendation,
+update the version constraints in your Terraform configuration and run
+<a href="https://www.terraform.io/docs/commands/init.html"><code>terraform init</code></a> to download
+the new version.</p>
+
+<p>If you aren't using version constraints, you can use <code>terraform init -upgrade</code>
+in order to upgrade your provider to the latest released version.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"vault"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 3.25.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"vault"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 4.0.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Policy%20Changes"></a><h2 id="provider-policy-changes">Provider Policy Changes</h2>
+
+<p>Version <code>4.X</code> of the Vault provider made changes to the underlying Vault API
+calls, which in turn may require policy adjustments in environments where
+permissions are least privilege.</p>
+
+<p>Please see the <a href="https://developer.hashicorp.com/vault/docs/concepts/policies#capabilities">Capabilities</a>
+section of the Vault Policies documentation for more information on Vault
+policies.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Note the <code>4.0.0</code> release required read permissions at <code>sys/auth/:path</code> which was a sudo endpoint. The <code>4.1.0</code> release changed that to instead require permissions at the <code>sys/mounts/auth/:path</code> level and sudo is no longer required.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Auth%20method%20resource%20changes"></a><h3 id="auth-method-resource-changes">Auth method resource changes</h3>
+
+<p>The below table specifies what changed between version 3.X and 4.X for the
+following resources:</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20sources"></a><h4 id="data-sources-2">Data sources</h4>
+
+<ul>
+<li><code>vault_auth_backend</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resources"></a><h4 id="resources-2">Resources</h4>
+
+<ul>
+<li><code>vault_auth_backend</code></li>
+<li><code>vault_gcp_auth_backend</code></li>
+<li><code>vault_github_auth_backend</code></li>
+<li><code>vault_jwt_auth_backend</code></li>
+<li><code>vault_ldap_auth_backend</code></li>
+<li><code>vault_okta_auth_backend</code></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Note that the table below does not include any additional policies the individual resources might require.</p>
+</aside>
+
+<table>
+<thead>
+  <tr>
+    <th colspan="2">3.X</th>
+    <th colspan="2">4.X</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td>Method</td>
+    <td>Path</td>
+    <td>Method</td>
+    <td>Path</td>
+  </tr>
+  <tr>
+    <td>GET</td>
+    <td>sys/auth</td>
+    <td>GET</td>
+    <td>sys/mounts/auth/:path</td>
+  </tr>
+</tbody>
+</table>
+
+<p>For example, in version 3.X the <code>vault_gcp_auth_backend</code> resource retrieves
+mount metadata with the GET <code>sys/auth</code> HTTP operation which corresponds to the
+following policy in Vault:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">path</span><span class="w"> </span><span class="s2">"sys/auth"</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">capabilities</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"read"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In version 4.X the <code>vault_gcp_auth_backend</code> resource retrieves mount metadata
+with the GET <code>sys/mounts/auth/:path</code> HTTP operation which corresponds to the following
+policy in Vault:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">path</span><span class="w"> </span><span class="s2">"sys/mounts/auth/gcp"</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">capabilities</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"read"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Secret%20engine%20resource%20changes"></a><h3 id="secret-engine-resource-changes">Secret engine resource changes</h3>
+
+<p>The below table specifies what changed between version 3.X and 4.X for the
+following resources:</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resources"></a><h4 id="resources-3">Resources</h4>
+
+<ul>
+<li><code>vault_aws_secret_backend</code></li>
+<li><code>vault_azure_secret_backend</code></li>
+<li><code>vault_consul_secret_backend</code></li>
+<li><code>vault_database_secrets_mount</code></li>
+<li><code>vault_gcp_secret_backend</code></li>
+<li><code>vault_kubernetes_secret_backend</code></li>
+<li><code>vault_ldap_secret_backend</code></li>
+<li><code>vault_mount</code></li>
+<li><code>vault_pki_secret_backend_cert</code></li>
+<li><code>vault_pki_secret_backend_intermediate_set_signed</code></li>
+<li><code>vault_pki_secret_backend_root_cert</code></li>
+<li><code>vault_pki_secret_backend_sign</code></li>
+<li><code>vault_rabbitmq_secret_backend</code></li>
+<li><code>vault_terraform_cloud_secret_backend</code></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Note that the table below does not include any additional policies the individual resources might require.</p>
+</aside>
+
+<table>
+<thead>
+  <tr>
+    <th colspan="2">3.X</th>
+    <th colspan="2">4.X</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td>Method</td>
+    <td>Path</td>
+    <td>Method</td>
+    <td>Path</td>
+  </tr>
+  <tr>
+    <td>GET</td>
+    <td>sys/mounts</td>
+    <td>GET</td>
+    <td>sys/mounts/:path</td>
+  </tr>
+</tbody>
+</table>
+
+<p>For example, in version 3.X the <code>vault_gcp_secret_backend</code> resource retrieves
+mount metadata with the GET <code>sys/mounts</code> HTTP operation which corresponds to the
+following policy in Vault:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">path</span><span class="w"> </span><span class="s2">"sys/mounts"</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">capabilities</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"read"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In version 4.X the <code>vault_gcp_secret_backend</code> resource retrieves mount metadata
+with the GET <code>sys/mounts/:path</code> HTTP operation which corresponds to the following
+policy in Vault:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">path</span><span class="w"> </span><span class="s2">"sys/mounts/gcp"</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">capabilities</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"read"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The below table specifies what changed between version 3.X and 4.X for the
+following resources:</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resources"></a><h4 id="resources-4">Resources</h4>
+
+<ul>
+<li><code>vault_ad_secret_backend</code></li>
+<li><code>vault_nomad_secret_backend</code></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Note that the table below does not include any additional policies the individual resources might require.</p>
+</aside>
+
+<table>
+<thead>
+  <tr>
+    <th colspan="2">3.X</th>
+    <th colspan="2">4.X</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td>Method</td>
+    <td>Path</td>
+    <td>Method</td>
+    <td>Path</td>
+  </tr>
+  <tr>
+    <td>GET</td>
+    <td>sys/mounts/:path/tune</td>
+    <td>GET</td>
+    <td>sys/mounts/:path</td>
+  </tr>
+</tbody>
+</table>
+
+<p>For example, in version 3.X the <code>vault_nomad_secret_backend</code> resource retrieves
+mount tune metadata with the GET <code>sys/mounts/:path/tune</code> HTTP operation which
+corresponds to the following policy in Vault:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">path</span><span class="w"> </span><span class="s2">"sys/mounts/nomad/tune"</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">capabilities</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"read"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In version 4.X the <code>vault_nomad_secret_backend</code> resource retrieves mount metadata
+with the GET <code>sys/mounts/:path</code> HTTP operation which corresponds to the following
+policy in Vault:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="err">path</span><span class="w"> </span><span class="s2">"sys/mounts/nomad"</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">capabilities</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"read"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecated%20Field%20Removals"></a><h2 id="deprecated-field-removals">Deprecated Field Removals</h2>
+
+<p>The following deprecated fields have been removed:</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/AD%20Secret%20Backend"></a><h3 id="ad-secret-backend">AD Secret Backend</h3>
+
+<ul>
+<li><p><code>length</code> - removed from the <code>vault_ad_secret_backend</code> resource.</p></li>
+<li><p><code>formatter</code> - removed from the <code>vault_ad_secret_backend</code> resource.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Cert%20Auth%20Backend%20Role"></a><h3 id="cert-auth-backend-role">Cert Auth Backend Role</h3>
+
+<ul>
+<li><code>allowed_organization_units</code> - removed from the <code>vault_cert_auth_backend_role</code> resource.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Consul%20Backend%20Role"></a><h3 id="consul-backend-role">Consul Backend Role</h3>
+
+<ul>
+<li><code>token_type</code> - removed from the <code>vault_consul_secret_backend_role</code> resource.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Identity%20Group%20Member%20Entities"></a><h3 id="identity-group-member-entities">Identity Group Member Entities</h3>
+
+<ul>
+<li><code>group_name</code> - removed from the <code>vault_identity_group_member_entity_ids</code> resource.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/LDAP%20Secret%20Backend"></a><h3 id="ldap-secret-backend">LDAP Secret Backend</h3>
+
+<ul>
+<li><code>length</code> - removed from the <code>vault_ldap_secret_backend</code> resource.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/PKI%20Root%20Cert"></a><h3 id="pki-root-cert">PKI Root Cert</h3>
+
+<ul>
+<li><code>serial</code> - removed from the <code>vault_pki_secret_backend_root_cert</code> resource. Use <code>serial_number</code> instead.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/PKI%20Root%20Sign%20Intermediate"></a><h3 id="pki-root-sign-intermediate">PKI Root Sign Intermediate</h3>
+
+<ul>
+<li><code>serial</code> - removed from the <code>vault_pki_secret_backend_root_sign_intermediate</code> resource. Use <code>serial_number</code> instead.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/PKI%20Root%20Sign"></a><h3 id="pki-root-sign">PKI Root Sign</h3>
+
+<ul>
+<li><code>serial</code> - removed from the <code>vault_pki_secret_backend_sign</code> resource. Use <code>serial_number</code> instead.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/SSH%20Backend%20Role"></a><h3 id="ssh-backend-role">SSH Backend Role</h3>
+
+<ul>
+<li><code>allowed_user_key_lengths</code> - removed from the <code>vault_ssh_secret_backend_role</code>
+resource. Use <code>allowed_user_key_config</code> instead.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Transit%20Secret%20Backend%20Key"></a><h3 id="transit-secret-backend-key">Transit Secret Backend Key</h3>
+
+<ul>
+<li><code>auto_rotate_interval</code> - removed from the <code>vault_transit_secret_backend_key</code>
+resource. Use <code>auto_rotate_period</code> instead.</li>
+</ul>
+
+            
+        
+    </body></html>

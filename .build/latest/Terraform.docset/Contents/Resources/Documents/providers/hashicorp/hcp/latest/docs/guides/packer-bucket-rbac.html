@@ -1,0 +1,56 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/hcp/latest/docs/guides/packer-bucket-rbac --><head>
+                <title>Managing HCP Packer Bucket IAM Policies</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="managing-hcp-packer-bucket-iam-policies">Managing HCP Packer Bucket IAM Policies</h1>
+
+<p>You can grant specific users, service principals, or groups contributor or admin level access to a specific HCP Packer bucket using either a <code>hcp_packer_bucket_iam_binding</code> or <code>hcp_packer_bucket_iam_policy</code> resource.  Whenever a user is invited to a project they will have read level access to all resources, but you can restrict which of the principals in your project can maintain specific buckets.</p>
+
+<p>A resource's policy is a list of bindings to assign roles to multiple users, groups, or service principals. The <code>hcp_packer_bucket_iam_policy</code> resource sets the Bucket IAM policy and replaces any existing policy.</p>
+
+<p>The following example assigns the role <code>contributor</code> to a user principal and a service principal for the <code>production</code> bucket.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"hcp_iam_policy"</span><span class="w"> </span><span class="nv">"mypolicy"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bindings</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"roles/contributor"</span><span class="w"></span>
+<span class="w">      </span><span class="na">principals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"user-principal-id-1"</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"service-principal-id-1"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_packer_bucket"</span><span class="w"> </span><span class="nv">"production"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"production"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_packer_bucket_iam_policy"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_packer_bucket.production.resource_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_data</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">data.hcp_iam_policy.mypolicy.policy_data</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The following example assigns role contriubtor for a service principal to the production bucket, and also preserves existing bindings.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_service_principal"</span><span class="w"> </span><span class="nv">"my-sp"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-sp"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_packer_bucket"</span><span class="w"> </span><span class="nv">"production"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"production"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_packer_bucket_iam_binding"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_packer_bucket.production.resource_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_service_principal.my-sp.resource_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"roles/contributor"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

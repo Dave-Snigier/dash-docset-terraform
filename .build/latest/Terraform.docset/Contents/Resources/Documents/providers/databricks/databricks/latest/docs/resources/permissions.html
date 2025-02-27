@@ -1,0 +1,1063 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/permissions --><head>
+                <title>databricks_permissions</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_permissions-resource">databricks_permissions Resource</h1>
+
+<p>This resource allows you to generically manage <a href="https://docs.databricks.com/security/access-control/index.html">access control</a> in Databricks workspaces. It ensures that only _admins_, _authenticated principal_ and those declared within <code>access_control</code> blocks would have specified access. It is not possible to remove management rights from _admins_ group.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This resource is _authoritative_ for permissions on objects. Configuring this resource for an object will <strong>OVERWRITE</strong> any existing permissions of the same type unless imported, and changes made outside of Terraform will be reset.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>It is not possible to lower permissions for <code>admins</code>, so Databricks Terraform Provider removes those <code>access_control</code> blocks automatically.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If multiple permission levels are specified for an identity (e.g. <code>CAN_RESTART</code> and <code>CAN_MANAGE</code> for a cluster), only the highest level permission is returned and will cause permanent drift.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>To manage access control on service principals, use <a href="access_control_rule_set.md">databricks_access_control_rule_set</a>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Cluster%20usage"></a><h2 id="cluster-usage">Cluster usage</h2>
+
+<p>It's possible to separate <a href="https://docs.databricks.com/security/access-control/cluster-acl.html">cluster access control</a> to three different permission levels: <code>CAN_ATTACH_TO</code>, <code>CAN_RESTART</code> and <code>CAN_MANAGE</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"ds"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Data Science"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_spark_version"</span><span class="w"> </span><span class="nv">"latest"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_node_type"</span><span class="w"> </span><span class="nv">"smallest"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">local_disk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_cluster"</span><span class="w"> </span><span class="nv">"shared_autoscaling"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"Shared Autoscaling"</span><span class="w"></span>
+<span class="w">  </span><span class="na">spark_version</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_spark_version.latest.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_type_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_node_type.smallest.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">autotermination_minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">60</span><span class="w"></span>
+<span class="w">  </span><span class="nb">autoscale</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">min_workers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">    </span><span class="na">max_workers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"cluster_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_cluster.shared_autoscaling.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_ATTACH_TO"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_RESTART"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.ds.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Cluster%20Policy%20usage"></a><h2 id="cluster-policy-usage">Cluster Policy usage</h2>
+
+<p>Cluster policies allow creation of <a href="cluster.md">clusters</a>, that match <a href="https://docs.databricks.com/administration-guide/clusters/policies.html">given policy</a>. It's possible to assign <code>CAN_USE</code> permission to users and groups:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"ds"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Data Science"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_cluster_policy"</span><span class="w"> </span><span class="nv">"something_simple"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Some simple policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">definition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"spark_conf.spark.hadoop.javax.jdo.option.ConnectionURL"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"type"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"forbidden"</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"spark_conf.spark.secondkey"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"type"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"forbidden"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"policy_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_policy_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_cluster_policy.something_simple.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.ds.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_USE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_USE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Instance%20Pool%20usage"></a><h2 id="instance-pool-usage">Instance Pool usage</h2>
+
+<p><a href="instance_pool.md">Instance Pools</a> access control <a href="https://docs.databricks.com/security/access-control/pool-acl.html">allows to</a> assign <code>CAN_ATTACH_TO</code> and <code>CAN_MANAGE</code> permissions to users, service principals, and groups. It's also possible to grant creation of Instance Pools to individual <a href="group.md#allow_instance_pool_create">groups</a> and <a href="user.md#allow_instance_pool_create">users</a>, <a href="service_principal.md#allow_instance_pool_create">service principals</a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_node_type"</span><span class="w"> </span><span class="nv">"smallest"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">local_disk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_instance_pool"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_pool_name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Reserved Instances"</span><span class="w"></span>
+<span class="w">  </span><span class="na">idle_instance_autotermination_minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">60</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_type_id</span><span class="w">                          </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_node_type.smallest.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">min_idle_instances</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">  </span><span class="na">max_capacity</span><span class="w">                          </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"pool_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_pool_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_instance_pool.this.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_ATTACH_TO"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Job%20usage"></a><h2 id="job-usage">Job usage</h2>
+
+<p>There are four assignable <a href="https://docs.databricks.com/security/access-control/jobs-acl.html#job-permissions">permission levels</a> for <a href="job.md">databricks_job</a>: <code>CAN_VIEW</code>, <code>CAN_MANAGE_RUN</code>, <code>IS_OWNER</code>, and <code>CAN_MANAGE</code>. Admins are granted the <code>CAN_MANAGE</code> permission by default, and they can assign that permission to non-admin users, and service principals.</p>
+
+<ul>
+<li>The creator of a job has <code>IS_OWNER</code> permission. Destroying <code>databricks_permissions</code> resource for a job would revert ownership to the creator.</li>
+<li>A job must have exactly one owner. If a resource is changed and no owner is specified, the currently authenticated principal would become the new owner of the job. Nothing would change, per se, if the job was created through Terraform.</li>
+<li>A job cannot have a group as an owner.</li>
+<li>Jobs triggered through _Run Now_ assume the permissions of the job owner and not the user, and service principal who issued Run Now.</li>
+<li>Read <a href="https://docs.databricks.com/security/access-control/jobs-acl.html">main documentation</a> for additional detail.</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_service_principal"</span><span class="w"> </span><span class="nv">"aws_principal"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"main"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_spark_version"</span><span class="w"> </span><span class="nv">"latest"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_node_type"</span><span class="w"> </span><span class="nv">"smallest"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">local_disk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_job"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"Featurization"</span><span class="w"></span>
+<span class="w">  </span><span class="na">max_concurrent_runs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">task_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"task1"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">new_cluster</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">num_workers</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">300</span><span class="w"></span>
+<span class="w">      </span><span class="na">spark_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_spark_version.latest.id</span><span class="w"></span>
+<span class="w">      </span><span class="na">node_type_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_node_type.smallest.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">notebook_task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">notebook_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/Production/MakeFeatures"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"job_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">job_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_job.this.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_VIEW"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE_RUN"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">service_principal_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_service_principal.aws_principal.application_id</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"IS_OWNER"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Delta%20Live%20Tables%20usage"></a><h2 id="delta-live-tables-usage">Delta Live Tables usage</h2>
+
+<p>There are four assignable <a href="https://docs.databricks.com/security/access-control/dlt-acl.html#delta-live-tables-permissions">permission levels</a> for <a href="pipeline.md">databricks_pipeline</a>: <code>CAN_VIEW</code>, <code>CAN_RUN</code>, <code>CAN_MANAGE</code>, and <code>IS_OWNER</code>. Admins are granted the <code>CAN_MANAGE</code> permission by default, and they can assign that permission to non-admin users, and service principals.</p>
+
+<ul>
+<li>The creator of a DLT Pipeline has <code>IS_OWNER</code> permission. Destroying <code>databricks_permissions</code> resource for a pipeline would revert ownership to the creator.</li>
+<li>A DLT pipeline must have exactly one owner. If a resource is changed and no owner is specified, the currently authenticated principal would become the new owner of the pipeline. Nothing would change, per se, if the pipeline was created through Terraform.</li>
+<li>A DLT pipeline cannot have a group as an owner.</li>
+<li>DLT Pipelines triggered through _Start_ assume the permissions of the pipeline owner and not the user, and service principal who issued Run Now.</li>
+<li>Read <a href="https://docs.databricks.com/security/access-control/dlt-acl.html">main documentation</a> for additional detail.</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_current_user"</span><span class="w"> </span><span class="nv">"me"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_notebook"</span><span class="w"> </span><span class="nv">"dlt_demo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">content_base64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">base64encode</span><span class="p">(</span><span class="o">&lt;&lt;-</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="sh">    import dlt</span>
+<span class="sh">    json_path = "/databricks-datasets/wikipedia-datasets/data-001/clickstream/raw-uncompressed-json/2015_2_clickstream.json"</span>
+<span class="sh">    @dlt.table(</span>
+<span class="sh">       comment="The raw wikipedia clickstream dataset, ingested from /databricks-datasets."</span>
+<span class="sh">    )</span>
+<span class="sh">    def clickstream_raw():</span>
+<span class="sh">        return (spark.read.format("json").load(json_path))</span>
+<span class="dl">    EOT</span>
+<span class="w">  </span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">language</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PYTHON"</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.databricks_current_user.me.home}/DLT_Demo"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_pipeline"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"DLT Demo Pipeline (${data.databricks_current_user.me.alphanumeric})"</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/test/tf-pipeline"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">configuration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">key1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"value1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"value2"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">library</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">notebook</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_notebook.dlt_demo.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">continuous</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="nb">filters</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">include</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"com.databricks.include"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">exclude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"com.databricks.exclude"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"dlt_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">pipeline_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_pipeline.this.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_VIEW"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Notebook%20usage"></a><h2 id="notebook-usage">Notebook usage</h2>
+
+<p>Valid <a href="https://docs.databricks.com/security/access-control/workspace-acl.html#notebook-permissions">permission levels</a> for <a href="notebook.md">databricks_notebook</a> are: <code>CAN_READ</code>, <code>CAN_RUN</code>, <code>CAN_EDIT</code>, and <code>CAN_MANAGE</code>.</p>
+
+<p>A notebook could be specified by using either <code>notebook_path</code> or <code>notebook_id</code> attribute.  The value for the <code>notebook_id</code> is the object ID of the resource in the Databricks Workspace that is exposed as <code>object_id</code> attribute of the <code>databricks_notebook</code> resource as shown below.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_notebook"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">content_base64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">base64encode</span><span class="p">(</span><span class="s2">"# Welcome to your Python notebook"</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"/Production/ETL/Features"</span><span class="w"></span>
+<span class="w">  </span><span class="na">language</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"PYTHON"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"notebook_usage_by_path"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">notebook_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_notebook.this.path</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_READ"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_RUN"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_EDIT"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"notebook_usage_by_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">notebook_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_notebook.this.object_id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_READ"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_RUN"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_EDIT"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>when importing a permissions resource, only the <code>notebook_id</code> is filled!</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Workspace%20file%20usage"></a><h2 id="workspace-file-usage">Workspace file usage</h2>
+
+<p>Valid permission levels for <a href="workspace_file.md">databricks_workspace_file</a> are: <code>CAN_READ</code>, <code>CAN_RUN</code>, <code>CAN_EDIT</code>, and <code>CAN_MANAGE</code>.</p>
+
+<p>A workspace file could be specified by using either <code>workspace_file_path</code> or <code>workspace_file_id</code> attribute.  The value for the <code>workspace_file_id</code> is the object ID of the resource in the Databricks Workspace that is exposed as <code>object_id</code> attribute of the <code>databricks_workspace_file</code> resource as shown below.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_workspace_file"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">content_base64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">base64encode</span><span class="p">(</span><span class="s2">"print('Hello World')"</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"/Production/ETL/Features.py"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"workspace_file_usage_by_path"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_file_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_workspace_file.this.path</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_READ"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_RUN"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_EDIT"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"workspace_file_usage_by_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_file_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_workspace_file.this.object_id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_READ"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_RUN"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_EDIT"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>when importing a permissions resource, only the <code>workspace_file_id</code> is filled!</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Folder%20usage"></a><h2 id="folder-usage">Folder usage</h2>
+
+<p>Valid <a href="https://docs.databricks.com/security/access-control/workspace-acl.html#folder-permissions">permission levels</a> for folders of <a href="directory.md">databricks_directory</a> are: <code>CAN_READ</code>, <code>CAN_RUN</code>, <code>CAN_EDIT</code>, and <code>CAN_MANAGE</code>. Notebooks and experiments in a folder inherit all permissions settings of that folder. For example, a user (or service principal) that has <code>CAN_RUN</code> permission on a folder has <code>CAN_RUN</code> permission on the notebooks in that folder.</p>
+
+<ul>
+<li>All users can list items in the folder without any permissions.</li>
+<li>All users (or service principals) have <code>CAN_MANAGE</code> permission for items in the Workspace &gt; Shared Icon Shared folder. You can grant <code>CAN_MANAGE</code> permission to notebooks and folders by moving them to the Shared Icon Shared folder.</li>
+<li>All users (or service principals) have <code>CAN_MANAGE</code> permission for objects the user creates.</li>
+<li>User home directory - The user (or service principal) has <code>CAN_MANAGE</code> permission. All other users (or service principals) can list their directories.</li>
+</ul>
+
+<p>A folder could be specified by using either <code>directory_path</code> or <code>directory_id</code> attribute.  The value for the <code>directory_id</code> is the object ID of the resource in the Databricks Workspace that is exposed as <code>object_id</code> attribute of the <code>databricks_directory</code> resource as shown below.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_directory"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/Production/ETL"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"folder_usage_by_path"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">directory_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_directory.this.path</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_READ"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_RUN"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_EDIT"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"folder_usage_by_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">directory_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_directory.this.object_id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_READ"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_RUN"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_EDIT"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>when importing a permissions resource, only the <code>directory_id</code> is filled!</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Repos%20usage"></a><h2 id="repos-usage">Repos usage</h2>
+
+<p>Valid <a href="https://docs.databricks.com/security/access-control/workspace-acl.html">permission levels</a> for <a href="repo.md">databricks_repo</a> are: <code>CAN_READ</code>, <code>CAN_RUN</code>, <code>CAN_EDIT</code>, and <code>CAN_MANAGE</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_repo"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://github.com/user/demo.git"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"repo_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">repo_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_repo.this.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_READ"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_RUN"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_EDIT"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/MLflow%20Experiment%20usage"></a><h2 id="mlflow-experiment-usage">MLflow Experiment usage</h2>
+
+<p>Valid <a href="https://docs.databricks.com/security/access-control/workspace-acl.html#mlflow-experiment-permissions-1">permission levels</a> for <a href="mlflow_experiment.md">databricks_mlflow_experiment</a> are: <code>CAN_READ</code>, <code>CAN_EDIT</code>, and <code>CAN_MANAGE</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_current_user"</span><span class="w"> </span><span class="nv">"me"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mlflow_experiment"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.databricks_current_user.me.home}/Sample"</span><span class="w"></span>
+<span class="w">  </span><span class="na">artifact_location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"dbfs:/tmp/my-experiment"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"My MLflow experiment description"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"experiment_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">experiment_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mlflow_experiment.this.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_READ"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_EDIT"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/MLflow%20Model%20usage"></a><h2 id="mlflow-model-usage">MLflow Model usage</h2>
+
+<p>Valid <a href="https://docs.databricks.com/security/access-control/workspace-acl.html#mlflow-model-permissions-1">permission levels</a> for <a href="mlflow_model.md">databricks_mlflow_model</a> are: <code>CAN_READ</code>, <code>CAN_EDIT</code>, <code>CAN_MANAGE_STAGING_VERSIONS</code>, <code>CAN_MANAGE_PRODUCTION_VERSIONS</code>, and <code>CAN_MANAGE</code>. You can also manage permissions for all MLflow models by <code>registered_model_id = "root"</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mlflow_model"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SomePredictions"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"model_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">registered_model_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mlflow_model.this.registered_model_id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_READ"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE_PRODUCTION_VERSIONS"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE_STAGING_VERSIONS"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Model%20serving%20usage"></a><h2 id="model-serving-usage">Model serving usage</h2>
+
+<p>Valid permission levels for <a href="model_serving.md">databricks_model_serving</a> are: <code>CAN_VIEW</code>, <code>CAN_QUERY</code>, and <code>CAN_MANAGE</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_model_serving"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-test"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">served_models</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod_model"</span><span class="w"></span>
+<span class="w">      </span><span class="na">model_name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"test"</span><span class="w"></span>
+<span class="w">      </span><span class="na">model_version</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"1"</span><span class="w"></span>
+<span class="w">      </span><span class="na">workload_size</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"Small"</span><span class="w"></span>
+<span class="w">      </span><span class="na">scale_to_zero_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"ml_serving_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">serving_endpoint_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_model_serving.this.serving_endpoint_id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_VIEW"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_QUERY"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Mosaic%20AI%20Vector%20Search%20usage"></a><h2 id="mosaic-ai-vector-search-usage">Mosaic AI Vector Search usage</h2>
+
+<p>Valid permission levels for <a href="vector_search_endpoint.md">databricks_vector_search_endpoint</a> are: <code>CAN_USE</code> and <code>CAN_MANAGE</code>.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>You need to use the <code>endpoint_id</code> attribute of <code>databricks_vector_search_endpoint</code> as value for <code>vector_search_endpoint_id</code>, not the <code>id</code>!</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_vector_search_endpoint"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"vector-search-test"</span><span class="w"></span>
+<span class="w">  </span><span class="na">endpoint_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"STANDARD"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"vector_search_endpoint_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vector_search_endpoint_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_vector_search_endpoint.this.endpoint_id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_USE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Passwords%20usage"></a><h2 id="passwords-usage">Passwords usage</h2>
+
+<p>By default on AWS deployments, all admin users can sign in to Databricks using either SSO or their username and password, and all API users can authenticate to the Databricks REST APIs using their username and password. As an admin, you <a href="https://docs.databricks.com/administration-guide/users-groups/single-sign-on/index.html#optional-configure-password-access-control">can limit</a> admin users’ and API users’ ability to authenticate with their username and password by configuring <code>CAN_USE</code> permissions using password access control.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"guests"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Guest Users"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"password_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">authorization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"passwords"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.guests.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_USE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Token%20usage"></a><h2 id="token-usage">Token usage</h2>
+
+<p>It is required to have at least 1 personal access token in the workspace before you can manage tokens permissions.</p>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>Warning</em>
+    <p>There can be only one <code>authorization = "tokens"</code> permissions resource per workspace, otherwise there'll be a permanent configuration drift. After applying changes, users who previously had either <code>CAN_USE</code> or <code>CAN_MANAGE</code> permission but no longer have either permission have their access to token-based authentication revoked. Their active tokens are immediately deleted (revoked).</p>
+</aside>
+
+<p>Only <a href="https://docs.databricks.com/administration-guide/access-control/tokens.html">possible permission</a> to assign to non-admin group is <code>CAN_USE</code>, where _admins_ <code>CAN_MANAGE</code> all tokens:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"token_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">authorization</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tokens"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_USE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_USE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/SQL%20warehouse%20usage"></a><h2 id="sql-warehouse-usage">SQL warehouse usage</h2>
+
+<p><a href="https://docs.databricks.com/sql/user/security/access-control/sql-endpoint-acl.html">SQL warehouses</a> have four possible permissions: <code>CAN_USE</code>, <code>CAN_MONITOR</code>, <code>CAN_MANAGE</code> and <code>IS_OWNER</code>:</p>
+
+<ul>
+<li>The creator of a warehouse has <code>IS_OWNER</code> permission. Destroying <code>databricks_permissions</code> resource for a warehouse would revert ownership to the creator.</li>
+<li>A warehouse must have exactly one owner. If a resource is changed and no owner is specified, the currently authenticated principal would become the new owner of the warehouse. Nothing would change, per se, if the warehouse was created through Terraform.</li>
+<li>A warehouse cannot have a group as an owner.</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_current_user"</span><span class="w"> </span><span class="nv">"me"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_sql_endpoint"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"Endpoint of ${data.databricks_current_user.me.alphanumeric}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_size</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"Small"</span><span class="w"></span>
+<span class="w">  </span><span class="na">max_num_clusters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">custom_tags</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">key</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"City"</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Amsterdam"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"endpoint_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">sql_endpoint_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_sql_endpoint.this.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_USE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Dashboard%20usage"></a><h2 id="dashboard-usage">Dashboard usage</h2>
+
+<p><a href="https://docs.databricks.com/en/dashboards/tutorials/manage-permissions.html">Dashboards</a> have four possible permissions: <code>CAN_READ</code>, <code>CAN_RUN</code>, <code>CAN_EDIT</code> and <code>CAN_MANAGE</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_dashboard"</span><span class="w"> </span><span class="nv">"dashboard"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"TF New Dashboard"</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"dashboard_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">dashboard_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_dashboard.dashboard.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_RUN"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Legacy%20SQL%20Dashboard%20usage"></a><h2 id="legacy-sql-dashboard-usage">Legacy SQL Dashboard usage</h2>
+
+<p><a href="https://docs.databricks.com/sql/user/security/access-control/dashboard-acl.html">Legacy SQL dashboards</a> have three possible permissions: <code>CAN_VIEW</code>, <code>CAN_RUN</code> and <code>CAN_MANAGE</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"sql_dashboard_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">sql_dashboard_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3244325"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_RUN"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/SQL%20Query%20usage"></a><h2 id="sql-query-usage">SQL Query usage</h2>
+
+<p><a href="https://docs.databricks.com/sql/user/security/access-control/query-acl.html">SQL queries</a> have three possible permissions: <code>CAN_VIEW</code>, <code>CAN_RUN</code> and <code>CAN_MANAGE</code>:</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you do not define an <code>access_control</code> block granting <code>CAN_MANAGE</code> explictly for the user calling this provider, Databricks Terraform Provider will add <code>CAN_MANAGE</code> permission for the caller. This is a failsafe to prevent situations where the caller is locked out from making changes to the targeted <code>databricks_sql_query</code> resource when backend API do not apply permission inheritance correctly.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"query_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">sql_query_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3244325"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_RUN"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/SQL%20Alert%20usage"></a><h2 id="sql-alert-usage">SQL Alert usage</h2>
+
+<p><a href="https://docs.databricks.com/sql/user/security/access-control/alert-acl.html">SQL alerts</a> have three possible permissions: <code>CAN_VIEW</code>, <code>CAN_RUN</code> and <code>CAN_MANAGE</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"auto"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Automation"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"alert_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">sql_alert_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3244325"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.auto.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_RUN"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Databricks%20Apps%20usage"></a><h2 id="databricks-apps-usage">Databricks Apps usage</h2>
+
+<p><a href="https://docs.databricks.com/en/dev-tools/databricks-apps/index.html">Databricks Apps</a> have two possible permissions: <code>CAN_USE</code> and <code>CAN_MANAGE</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"eng"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Engineering"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"app_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">app_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"myapp"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_USE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.eng.display_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_MANAGE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Instance%20Profiles"></a><h2 id="instance-profiles">Instance Profiles</h2>
+
+<p><a href="instance_profile.md">Instance Profiles</a> are not managed by General Permissions API and therefore <a href="group_instance_profile.md">databricks_group_instance_profile</a> and <a href="user_instance_profile.md">databricks_user_instance_profile</a> should be used to allow usage of specific AWS EC2 IAM roles to users or groups.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Secrets"></a><h2 id="secrets">Secrets</h2>
+
+<p>One can control access to <a href="secret.md">databricks_secret</a> through <code>initial_manage_principal</code> argument on <a href="secret_scope.md">databricks_secret_scope</a> or <a href="secret_acl.md">databricks_secret_acl</a>, so that users (or service principals) can <code>READ</code>, <code>WRITE</code> or <code>MANAGE</code> entries within secret scope.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Tables%2C%20Views%20and%20Databases"></a><h2 id="tables-views-and-databases">Tables, Views and Databases</h2>
+
+<p>General Permissions API does not apply to access control for tables and they have to be managed separately using the <a href="sql_permissions.md">databricks_sql_permissions</a> resource, though you're encouraged to use Unity Catalog or migrate to it.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Access%20with%20Unity%20Catalog"></a><h2 id="data-access-with-unity-catalog">Data Access with Unity Catalog</h2>
+
+<p>Initially in Unity Catalog all users have no access to data, which has to be later assigned through <a href="grants.md">databricks_grants</a> or <a href="grant.md">databricks_grant</a> resource.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>One type argument and at least one access control block argument are required.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Type%20Argument"></a><h3 id="type-argument">Type Argument</h3>
+
+<p>Exactly one of the following arguments is required:</p>
+
+<ul>
+<li><code>app_name</code> - <a href="app.md">app</a> name</li>
+<li><code>cluster_id</code> - <a href="cluster.md">cluster</a> id</li>
+<li><code>cluster_policy_id</code> - <a href="cluster_policy.md">cluster policy</a> id</li>
+<li><code>instance_pool_id</code> - <a href="instance_pool.md">instance pool</a> id</li>
+<li><code>job_id</code> - <a href="job.md">job</a> id</li>
+<li><code>pipeline_id</code> - <a href="pipeline.md">pipeline</a> id</li>
+<li><code>notebook_id</code> - ID of <a href="notebook.md">notebook</a> within workspace</li>
+<li><code>notebook_path</code> - path of notebook</li>
+<li><code>directory_id</code> - <a href="notebook.md">directory</a> id</li>
+<li><code>directory_path</code> - path of directory</li>
+<li><code>repo_id</code> - <a href="repo.md">repo</a> id</li>
+<li><code>repo_path</code> - path of databricks repo directory(<code>/Repos/&lt;username&gt;/...</code>)</li>
+<li><code>experiment_id</code> - <a href="mlflow_experiment.md">MLflow experiment</a> id</li>
+<li><code>registered_model_id</code> - <a href="mlflow_model.md">MLflow registered model</a> id</li>
+<li><code>serving_endpoint_id</code> - <a href="model_serving.md">Model Serving</a> endpoint id.</li>
+<li><code>vector_search_endpoint_id</code> - <a href="vector_search_endpoint.md">Vector Search</a> endpoint id.</li>
+<li><code>authorization</code> - either <a href="https://docs.databricks.com/administration-guide/access-control/tokens.html"><code>tokens</code></a> or <a href="https://docs.databricks.com/administration-guide/users-groups/single-sign-on/index.html#configure-password-permission"><code>passwords</code></a>.</li>
+<li><code>sql_endpoint_id</code> - <a href="sql_endpoint.md">SQL warehouse</a> id</li>
+<li><code>sql_dashboard_id</code> - <a href="sql_dashboard.md">SQL dashboard</a> id</li>
+<li><code>sql_query_id</code> - <a href="sql_query.md">SQL query</a> id</li>
+<li><code>sql_alert_id</code> - <a href="https://docs.databricks.com/sql/user/security/access-control/alert-acl.html">SQL alert</a> id</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Access%20Control%20Argument"></a><h3 id="access-control-argument">Access Control Argument</h3>
+
+<p>One or more <code>access_control</code> blocks are required to actually set the permission levels:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_group.datascience.display_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_USE"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Arguments for the <code>access_control</code> block are:</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>It is not possible to lower permissions for <code>admins</code> or your own user anywhere from <code>CAN_MANAGE</code> level, so Databricks Terraform Provider <a href="https://github.com/databricks/terraform-provider-databricks/blob/main/permissions/resource_permissions.go#L324-L332">removes</a> those <code>access_control</code> blocks automatically.</p>
+</aside>
+
+<ul>
+<li><code>permission_level</code> - (Required) permission level according to specific resource. See examples above for the reference.</li>
+</ul>
+
+<p>Exactly one of the below arguments is required:</p>
+
+<ul>
+<li><code>user_name</code> - (Optional) name of the <a href="user.md">user</a>.</li>
+<li><code>service_principal_name</code> - (Optional) Application ID of the <a href="service_principal.md#application_id">service_principal</a>.</li>
+<li><code>group_name</code> - (Optional) name of the <a href="group.md">group</a>. We recommend setting permissions on groups.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - Canonical unique identifier for the permissions in form of <code>/&lt;object type&gt;/&lt;object id&gt;</code>.</li>
+<li><code>object_type</code> - type of permissions.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>The resource permissions can be imported using the object id</p>
+
+<div class="codehilite"><pre><span></span><code>terraform import databricks_permissions.this /&lt;object type&gt;/&lt;object id&gt;
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import%20Example"></a><h3 id="import-example">Import Example</h3>
+
+<p>Configuration file:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mlflow_model"</span><span class="w"> </span><span class="nv">"model"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"example_model"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MLflow registered model"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"model_usage"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">registered_model_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mlflow_model.model.registered_model_id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_READ"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Import command:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform import databricks_permissions.model_usage /registered-models/&lt;registered_model_id&gt;
+</code></pre></div>
+
+            
+        
+    </body></html>

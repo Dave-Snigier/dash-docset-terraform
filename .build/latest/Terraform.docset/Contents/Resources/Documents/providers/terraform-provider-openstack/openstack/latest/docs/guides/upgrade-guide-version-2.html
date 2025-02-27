@@ -1,0 +1,222 @@
+<html><!-- Online page at https://registry.terraform.io/providers/terraform-provider-openstack/openstack/latest/docs/guides/upgrade-guide-version-2 --><head>
+                <title>Terraform Openstack Provider Version 2 Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>The provider go module version has been updated to <code>v2</code> in the <code>2.1.0</code> release. Downstream users should check the changelog of the <code>2.1.0</code> release as well before changing to the <code>v2</code> module.</p>
+</aside>
+
+<p>Version 2.0.0 of the Openstack provider for Terraform is a major release and includes some changes that you will need to consider when upgrading. We intend this guide to help with that process.</p>
+
+<p>We previously marked most of the changes we outline in this guide as deprecated in the Terraform plan/apply output throughout previous provider releases. You can find these changes, including deprecation notices, in the <a href="https://github.com/terraform-provider-openstack/terraform-provider-openstack/blob/main/CHANGELOG.md">Terraform Openstack Provider CHANGELOG</a>.</p>
+
+<p>Upgrade topics:</p>
+
+<ul>
+<li><a href="#provider-version-configuration">Provider Version Configuration</a></li>
+<li><a href="#neutron-lbaas-deprecation">Neutron LBaaS Deprecation</a>
+<ul>
+<li><a href="#provider-configuration-option">Provider configuration option</a></li>
+<li><a href="#changes-for-users-of-octavia">Changes for users of Octavia</a></li>
+<li><a href="#changes-for-users-of-neutron-lbaas">Changes for users of Neutron-LBaaS</a></li>
+</ul></li>
+<li><a href="#other-removals">Other Removals</a>
+<ul>
+<li><a href="#remove-multiattach-from-blockstoragevolumev3">Remove multiattach from volume_v2</a></li>
+<li><a href="#remove-dhcpdisabled-from-networkingsubnetv2-data-source">Remove dhcp_disabled from subnet_v2 data source</a></li>
+<li><a href="#remove-updateat-from-imagesimagev2">Remove update_at from image_v2</a></li>
+<li><a href="#remove-instanceid-from-blockstoragevolumeattachv2">Remove instance_id from blockstorage_volume_attach_v2</a></li>
+<li><a href="#remove-member-from-lbpoolv1">Remove member from lb_pool_v1</a></li>
+<li><a href="#remove-allocationpools-from-networkingsubnetv2">Remove allocation_pools from subnet_v2</a></li>
+<li><a href="#remove-externalgateway-from-networkingrouterv2">Remove external_gateway from router_v2</a></li>
+<li><a href="#remove-floatingip-from-computeinstancev2">Remove floating_ip from instance_v2</a></li>
+<li><a href="#remove-volume-from-computeinstancev2">Remove volume from instance_v2</a></li>
+<li><a href="#remove-sortkey-and-sortdir-from-glance-data-sources">Remove sort_key and sort_dir from glance data sources</a></li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Version%20Configuration"></a><h2 id="provider-version-configuration">Provider Version Configuration</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Before upgrading to version 2.0.0, upgrade to the most recent 1.X.Y version of the provider and ensure that your environment successfully runs <a href="https://www.terraform.io/docs/commands/plan.html"><code>terraform plan</code></a>. You should not see changes you don't expect.</p>
+</aside>
+
+<p>Use <a href="https://www.terraform.io/docs/configuration/providers.html#provider-versions">version constraints when configuring Terraform providers</a>. If you are following that recommendation, update the version constraints in your Terraform configuration and run <a href="https://www.terraform.io/docs/commands/init.html"><code>terraform init -upgrade</code></a> to download the new version.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">openstack</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-provider-openstack/openstack"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.54.1"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"openstack"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # Configuration options</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Update to the latest 2.0.0. version:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">openstack</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-provider-openstack/openstack"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 2.0.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"openstack"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # Configuration options</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Neutron%20LBaaS%20Deprecation"></a><h2 id="neutron-lbaas-deprecation">Neutron LBaaS Deprecation</h2>
+
+<p>Neutron LBaaS has been deprecated since Queens(2018-02-28) and removed in Train(2019-10-16). Support for it is removed in <code>2.0.0</code>. <code>lb_XYZ_v2</code> resources support only Octavia.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20configuration%20option"></a><h3 id="provider-configuration-option">Provider configuration option</h3>
+
+<p>The provider configuration option <code>use_octavia</code> has been removed, since the provider always uses octavia. So the provider configuration below:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"openstack"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="p">...</span><span class="w"></span>
+<span class="w">  </span><span class="na">use_octavia</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="err">/</span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Should be updated into:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"openstack"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="p">...</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20for%20users%20of%20Octavia"></a><h3 id="changes-for-users-of-octavia">Changes for users of Octavia</h3>
+
+<p>The upgrade should be transparent for all loadbalancer resources that are already using Octavia. Therefore there is <strong>no action required</strong> by the user before/after the upgrade.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20for%20users%20of%20Neutron-LBaaS"></a><h3 id="changes-for-users-of-neutron-lbaas">Changes for users of Neutron-LBaaS</h3>
+
+<p>Neutron-LBaaS will not be supported, therefore any loadbalancer resources <strong>cannot be managed</strong> through terraform-provider-openstack in 2.0.0 and beyond. Cloud-administrator should consider upgrading from Neutron-LBaaS to Octavia.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Other%20removals"></a><h2 id="other-removals">Other removals</h2>
+
+<p>Various deprecated attributes have been removed from resources and data sources</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Remove%20multiattach%20from%20blockstorage_volume_v3"></a><h3 id="remove-multiattach-from-blockstorage_volume_v3">Remove multiattach from blockstorage_volume_v3</h3>
+
+<p><code>multiattach</code> is no longer possible on <code>blockstorage_volume_v3</code> resource. Instead the volume type that the volume uses has to be marked as multiattach as shown below:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"openstack_blockstorage_volume_type_v3"</span><span class="w"> </span><span class="nv">"multiattach"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"multiattach"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Multiattach-enabled volume type"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">extra_specs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">multiattach</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;is&gt; True"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>More details on <a href="https://docs.openstack.org/cinder/latest/admin/volume-multiattach.html#multiattach-volume-type">multiattach volumes types</a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Remove%20dhcp_disabled%20from%20networking_subnet_v2%20data%20source"></a><h3 id="remove-dhcp_disabled-from-networking_subnet_v2-data-source">Remove dhcp_disabled from networking_subnet_v2 data source</h3>
+
+<p><code>dhcp_disabled</code> has been removed from <code>openstack_networking_subnet_v2</code> data source. <code>dhcp_enabled</code> should be used instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Remove%20update_at%20from%20images_image_v2"></a><h3 id="remove-update_at-from-images_image_v2">Remove update_at from images_image_v2</h3>
+
+<p><code>update_at</code> has been removed from <code>openstack_images_image_v2</code> resource. <code>updated_at</code> should be used instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Remove%20instance_id%20from%20blockstorage_volume_attach_v2"></a><h3 id="remove-instance_id-from-blockstorage_volume_attach_v2">Remove instance_id from blockstorage_volume_attach_v2</h3>
+
+<p><code>instance_id</code> has been removed from <code>openstack_blockstorage_volume_attach_v2</code> resource. This attribute was deprecated and did not perform any actions or have any functional impact. As such, its removal is transparent to the end-users and requires no changes to your existing configurations.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Remove%20member%20from%20lb_pool_v1"></a><h3 id="remove-member-from-lb_pool_v1">Remove member from lb_pool_v1</h3>
+
+<p><code>member</code> block has been removed from <code>openstack_lb_pool_v1</code> resource. <code>openstack_lb_member_v1</code> resource should be used instead. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Remove%20allocation_pools%20from%20networking_subnet_v2"></a><h3 id="remove-allocation_pools-from-networking_subnet_v2">Remove allocation_pools from networking_subnet_v2</h3>
+
+<p><code>allocation_pools</code> has been removed from <code>openstack_networking_subnet_v2</code> resource. <code>allocation_pool</code> should be used instead. It is advisable to switch <strong>before</strong> the upgrade to <code>2.0.0</code>. The change will be transparent.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Remove%20external_gateway%20from%20networking_router_v2"></a><h3 id="remove-external_gateway-from-networking_router_v2">Remove external_gateway from networking_router_v2</h3>
+
+<p><code>external_gateway</code> has been removed from <code>openstack_networking_router_v2</code> resource. <code>external_network_id</code> should be used instead. It is advisable to switch <strong>before</strong> the upgrade to <code>2.0.0</code>. The change will be transparent.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Remove%20floating_ip%20from%20compute_instance_v2"></a><h3 id="remove-floating_ip-from-compute_instance_v2">Remove floating_ip from compute_instance_v2</h3>
+
+<p><code>floating_ip</code> has been removed from <code>openstack_compute_instance_v2</code> resource. This attribute was deprecated and did not perform any actions or have any functional impact. As such, its removal is transparent to the end-users and requires no changes to your existing configurations.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Remove%20volume%20from%20compute_instance_v2"></a><h3 id="remove-volume-from-compute_instance_v2">Remove volume from compute_instance_v2</h3>
+
+<p><code>volume</code> has been removed from <code>openstack_compute_instance_v2</code> resource. This attribute was deprecated and did not perform any actions or have any functional impact. As such, its removal is transparent to the end-users and requires no changes to your existing configurations.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Remove%20sort_key%20and%20sort_dir%20from%20glance%20data%20sources"></a><h3 id="remove-sort_key-and-sort_dir-from-glance-data-sources">Remove sort_key and sort_dir from glance data sources</h3>
+
+<p><code>sort_key</code> and <code>sort_dir</code> has been removed from <code>openstack_images_image_v2</code> and <code>openstack_images_image_ids_v2</code> data sources. <code>sort</code> should be used instead.</p>
+
+<p>For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"openstack_images_image_ids_v2"</span><span class="w"> </span><span class="nv">"images"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name_regex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"^Ubuntu 16\\.04.*-amd64"</span><span class="w"></span>
+<span class="w">  </span><span class="na">sort_key</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"updated_at"</span><span class="w"></span>
+<span class="w">  </span><span class="na">sort_dir</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"asc"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Should be changed into:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"openstack_images_image_ids_v2"</span><span class="w"> </span><span class="nv">"images"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name_regex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"^Ubuntu 16\\.04.*-amd64"</span><span class="w"></span>
+<span class="w">  </span><span class="na">sort</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"updated_at:asc"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Remove%20host_route%20from%20networking_subnet_v2"></a><h3 id="remove-host_route-from-networking_subnet_v2">Remove host_route from networking_subnet_v2</h3>
+
+<p><code>host_route</code> block has been removed from <code>openstack_networking_subnet_v2</code> resource. This attribute has been deprecated and <code>openstack_networking_subnet_route_v2</code> resource should be used instead. The switch should be done before upgrading to <code>2.0.0</code> and it might require importing resources. Example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"openstack_networking_subnet_v2"</span><span class="w"> </span><span class="nv">"subnet_1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"subnet_1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">openstack_networking_network_v2.network_1.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"192.168.199.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">4</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">host_routes</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">destination_cidr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.1.0/24"</span><span class="w"></span>
+<span class="w">    </span><span class="na">next_hop</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"192.168.199.254"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>should be changed into:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"openstack_networking_subnet_v2"</span><span class="w"> </span><span class="nv">"subnet_1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"subnet_1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">openstack_networking_network_v2.network_1.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"192.168.199.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">4</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"openstack_networking_subnet_route_v2"</span><span class="w"> </span><span class="nv">"subnet_route_1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">openstack_networking_subnet_v2.subnet_1.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.1.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">next_hop</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"192.168.199.254"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>If the user does not want routes to be deleted and recreated, a removal of the subnet resource from the state should be done, subnet resource updated and then import the subnet and subnet_route resource.</p>
+
+            
+        
+    </body></html>

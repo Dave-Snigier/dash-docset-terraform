@@ -1,0 +1,182 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/gcp-private-service-connect-workspace --><head>
+                <title>Provisioning Databricks workspaces on GCP with Private Service Connect</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="provisioning-databricks-workspaces-on-gcp-with-private-service-connect">Provisioning Databricks workspaces on GCP with Private Service Connect</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Refer to the <a href="https://registry.terraform.io/modules/databricks/examples/databricks/latest">Databricks Terraform Registry modules</a> for Terraform modules and examples to deploy Azure Databricks resources.</p>
+</aside>
+
+<p>Secure a workspace with private connectivity and mitigate data exfiltration risks by <a href="https://docs.gcp.databricks.com/administration-guide/cloud-configurations/gcp/private-service-connect.html">enabling Google Private Service Connect (PSC) on the workspace</a>. This guide assumes that you are already familiar with Hashicorp Terraform and provisioned some of the Google Compute Cloud infrastructure with it.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20a%20GCP%20service%20account%20for%20Databricks%20Provisioning%20and%20Authenticate%20with%20Databricks%20account%20API"></a><h2 id="creating-a-gcp-service-account-for-databricks-provisioning-and-authenticate-with-databricks-account-api">Creating a GCP service account for Databricks Provisioning and Authenticate with Databricks account API</h2>
+
+<p>To work with Databricks in GCP in an automated way, please create a service account and manually add it in the <a href="https://accounts.gcp.databricks.com/users">Accounts Console</a> as an account admin. Databricks account-level APIs can only be called by account owners and account admins, and can only be authenticated using Google-issued OIDC tokens. The simplest way to do this would be via <a href="https://cloud.google.com/sdk/gcloud">Google Cloud CLI</a>. For details, please refer to <a href="gcp_workspace.md">Provisioning Databricks workspaces on GCP</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20a%20VPC%20network"></a><h2 id="creating-a-vpc-network">Creating a VPC network</h2>
+
+<p>The very first step is VPC creation with the necessary resources. Please consult <a href="https://docs.gcp.databricks.com/administration-guide/cloud-configurations/gcp/customer-managed-vpc.html">main documentation page</a> for <strong>the most complete and up-to-date details on networking</strong>. A GCP VPC is registered as <a href="../resources/mws_networks.md">databricks_mws_networks</a> resource.</p>
+
+<p>To enable <a href="https://docs.gcp.databricks.com/administration-guide/cloud-configurations/gcp/private-service-connect.html#two-private-service-connect-options">back-end Private Service Connect (data plane to control plane)</a>, configure the network with the two back-end VPC endpoints:</p>
+
+<ul>
+<li>Back-end VPC endpoint for <a href="https://docs.gcp.databricks.com/security/secure-cluster-connectivity.html">Secure cluster connectivity</a> relay</li>
+<li>Back-end VPC endpoint for REST APIs</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Note: If you want to implement the front-end VPC endpoint as well for the connections from users to to the Databricks web application, REST API, and Databricks Connect API over a Virtual Private Cloud (VPC) endpoint, use the transit (bastion) VPC. Once the front-end endpoint is created, use the databricks_mws_private_access_settings resource to control which VPC endpoints can connect to the UI or API of any workspace that attaches this private access settings object.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"dbx_private_vpc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">var.google_project</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-network-${random_string.suffix.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"network-with-private-secondary-ip-ranges"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"test-dbx-${random_string.suffix.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.dbx_private_vpc.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">secondary_ip_range</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">range_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"pods"</span><span class="w"></span>
+<span class="w">    </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">secondary_ip_range</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">range_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"svc"</span><span class="w"></span>
+<span class="w">    </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.2.0.0/20"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_ip_google_access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_router"</span><span class="w"> </span><span class="nv">"router"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-router-${random_string.suffix.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.network-with-private-secondary-ip-ranges.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.dbx_private_vpc.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_router_nat"</span><span class="w"> </span><span class="nv">"nat"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                               </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-router-nat-${random_string.suffix.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">router</span><span class="w">                             </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_router.router.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">                             </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_router.router.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">nat_ip_allocate_option</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"AUTO_ONLY"</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_subnetwork_ip_ranges_to_nat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ALL_SUBNETWORKS_ALL_IP_RANGES"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"backend_rest_vpce"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"vpce-backend-rest-${random_string.suffix.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">gcp_vpc_endpoint_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">project_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">var.google_project</span><span class="w"></span>
+<span class="w">    </span><span class="na">psc_endpoint_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.backend_rest_psce</span><span class="w"></span>
+<span class="w">    </span><span class="na">endpoint_region</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.network-with-private-secondary-ip-ranges.region</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_vpc_endpoint"</span><span class="w"> </span><span class="nv">"relay_vpce"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_endpoint_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"vpce-relay-${random_string.suffix.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">gcp_vpc_endpoint_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">project_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">var.google_project</span><span class="w"></span>
+<span class="w">    </span><span class="na">psc_endpoint_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.relay_psce</span><span class="w"></span>
+<span class="w">    </span><span class="na">endpoint_region</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.network-with-private-secondary-ip-ranges.region</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_networks"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.accounts</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"test-demo-${random_string.suffix.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">gcp_network_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network_project_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">var.google_project</span><span class="w"></span>
+<span class="w">    </span><span class="na">vpc_id</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.dbx_private_vpc.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnet_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.network-with-private-secondary-ip-ranges.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnet_region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.network-with-private-secondary-ip-ranges.region</span><span class="w"></span>
+<span class="w">    </span><span class="na">pod_ip_range_name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"pods"</span><span class="w"></span>
+<span class="w">    </span><span class="na">service_ip_range_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"svc"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">vpc_endpoints</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">dataplane_relay</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">databricks_mws_vpc_endpoint.relay_vpce.vpc_endpoint_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">rest_api</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">databricks_mws_vpc_endpoint.backend_rest_vpce.vpc_endpoint_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20a%20Databricks%20Workspace"></a><h2 id="creating-a-databricks-workspace">Creating a Databricks Workspace</h2>
+
+<p>Once <a href="#creating-a-vpc-network">the VPC</a> is set up, you can create Databricks workspace through <a href="../resources/mws_workspaces.md">databricks_mws_workspaces</a> resource.</p>
+
+<p>For a workspace to support any of the Private Service Connect connectivity scenarios, the workspace must be created with an attached <a href="../resources/mws_private_access_settings.md">databricks_mws_private_access_settings</a> resource.</p>
+
+<p>Code that creates workspaces and code that <a href="workspace-management.md">manages workspaces</a> must be in separate terraform modules to avoid common confusion between <code>provider = databricks.accounts</code> and <code>provider = databricks.created_workspace</code>. This is why we specify <code>databricks_host</code> and <code>databricks_token</code> outputs, which have to be used in the latter modules.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you experience technical difficulties with rolling out resources in this example, please make sure that <a href="../index.md#environment-variables">environment variables</a> don't <a href="../index.md#empty-provider-block">conflict with other</a> provider block attributes. When in doubt, please run <code>TF_LOG=DEBUG terraform apply</code> to enable <a href="https://www.terraform.io/docs/internals/debugging.html">debug mode</a> through the <a href="https://www.terraform.io/docs/cli/config/environment-variables.html#tf_log"><code>TF_LOG</code></a> environment variable. Look specifically for <code>Explicit and implicit attributes</code> lines, which should indicate authentication attributes used. The other common reason for technical difficulties might be related to missing <code>alias</code> attribute in <code>provider "databricks" {}</code> blocks or <code>provider</code> attribute in <code>resource "databricks_..." {}</code> blocks. Please make sure to read <a href="https://www.terraform.io/docs/language/providers/configuration.html#alias-multiple-provider-configurations"><code>alias</code>: Multiple Provider Configurations</a> documentation article.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_private_access_settings"</span><span class="w"> </span><span class="nv">"pas"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_access_settings_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"pas-${random_string.suffix.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.network-with-private-secondary-ip-ranges.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">public_access_enabled</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_access_level</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"ACCOUNT"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_workspaces"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.accounts</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">workspace_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-demo-test-${random_string.suffix.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.network-with-private-secondary-ip-ranges.region</span><span class="w"></span>
+<span class="w">  </span><span class="nb">cloud_resource_container</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">gcp</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">project_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.google_project</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">private_access_settings_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_private_access_settings.pas.private_access_settings_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_id</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_networks.this.network_id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">gke_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">connectivity_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PRIVATE_NODE_PUBLIC_MASTER"</span><span class="w"></span>
+<span class="w">    </span><span class="na">master_ip_range</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.3.0.0/28"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">token</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">comment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Terraform"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # this makes sure that the NAT is created for outbound traffic before creating the workspace</span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_router_nat.nat</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"databricks_host"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_workspaces.this.workspace_url</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"databricks_token"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_mws_workspaces.this.token[0].token_value</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20resources%20and%20Authentication%20is%20not%20configured%20errors"></a><h3 id="data-resources-and-authentication-is-not-configured-errors">Data resources and Authentication is not configured errors</h3>
+
+<p><em>In Terraform 0.13 and later</em>, data resources have the same dependency resolution behavior <a href="https://www.terraform.io/docs/language/resources/behavior.html#resource-dependencies">as defined for managed resources</a>. Most data resources make an API call to a workspace. If a workspace doesn't exist yet, <code>default auth: cannot configure default credentials</code> error is raised. To work around this issue and guarantee proper lazy authentication with data resources, you should add <code>depends_on = [databricks_mws_workspaces.this]</code> to the body. This issue doesn't occur if workspace is created <em>in one module</em> and resources <a href="workspace-management.md">within the workspace</a> are created <em>in another</em>. We do not recommend using Terraform 0.12 and earlier if your usage involves data resources.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_current_user"</span><span class="w"> </span><span class="nv">"me"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">databricks_mws_workspaces.this</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

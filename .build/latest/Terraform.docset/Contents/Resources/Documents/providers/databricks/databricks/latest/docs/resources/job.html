@@ -1,0 +1,704 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/job --><head>
+                <title>databricks_job</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_job-resource">databricks_job Resource</h1>
+
+<p>The <code>databricks_job</code> resource allows you to manage <a href="https://docs.databricks.com/jobs.html">Databricks Jobs</a> to run non-interactive code in a <a href="cluster.md">databricks_cluster</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>In Terraform configuration, it is recommended to define tasks in alphabetical order of their <code>task_key</code> arguments, so that you get consistent and readable diff. Whenever tasks are added or removed, or <code>task_key</code> is renamed, you'll observe a change in the majority of tasks. It's related to the fact that the current version of the provider treats <code>task</code> blocks as an ordered list. Alternatively, <code>task</code> block could have been an unordered set, though end-users would see the entire block replaced upon a change in single property of the task.</p>
+</aside>
+
+<p>It is possible to create <a href="https://docs.databricks.com/data-engineering/jobs/jobs-user-guide.html">a Databricks job</a> using <code>task</code> blocks. A single task is defined with the <code>task</code> block containing one of the <code>*_task</code> blocks, <code>task_key</code>, and additional arguments described below.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_job"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Job with multiple tasks"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"This job executes multiple tasks on a shared job cluster, which will be provisioned as part of execution, and terminated once all tasks are finished."</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">job_cluster</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">job_cluster_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"j"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">new_cluster</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">num_workers</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">      </span><span class="na">spark_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_spark_version.latest.id</span><span class="w"></span>
+<span class="w">      </span><span class="na">node_type_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_node_type.smallest.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">task_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"a"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">new_cluster</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">num_workers</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">      </span><span class="na">spark_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_spark_version.latest.id</span><span class="w"></span>
+<span class="w">      </span><span class="na">node_type_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_node_type.smallest.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">notebook_task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">notebook_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_notebook.this.path</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">task_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"b"</span><span class="c1"></span>
+<span class="c1">    //this task will only run after task a</span>
+<span class="w">    </span><span class="nb">depends_on</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">task_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"a"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">existing_cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_cluster.shared.id</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">spark_jar_task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">main_class_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"com.acme.data.Main"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">task_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"c"</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">job_cluster_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"j"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">notebook_task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">notebook_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_notebook.this.path</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+<span class="c1">  //this task starts a Delta Live Tables pipline update</span>
+<span class="w">  </span><span class="nb">task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">task_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"d"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">pipeline_task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">pipeline_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_pipeline.this.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The resource supports the following arguments:</p>
+
+<ul>
+<li><code>name</code> - (Optional) An optional name for the job. The default value is Untitled.</li>
+<li><code>description</code> - (Optional) An optional description for the job. The maximum length is 1024 characters in UTF-8 encoding.</li>
+<li><code>task</code> - (Optional) A list of task specification that the job will execute. See <a href="#task-configuration-block">task Configuration Block</a> below.</li>
+<li><code>job_cluster</code> - (Optional) A list of job <a href="cluster.md">databricks_cluster</a> specifications that can be shared and reused by tasks of this job. Libraries cannot be declared in a shared job cluster. You must declare dependent libraries in task settings. <em>Multi-task syntax</em></li>
+<li><code>schedule</code> - (Optional) An optional periodic schedule for this job. The default behavior is that the job runs when triggered by clicking Run Now in the Jobs UI or sending an API request to runNow. See <a href="#schedule-configuration-block">schedule Configuration Block</a> below.</li>
+<li><code>trigger</code> - (Optional) The conditions that triggers the job to start. See <a href="#trigger-configuration-block">trigger Configuration Block</a> below.</li>
+<li><code>continuous</code>- (Optional) Configuration block to configure pause status. See <a href="#continuous-configuration-block">continuous Configuration Block</a>.</li>
+<li><code>queue</code> - (Optional) The queue status for the job. See <a href="#queue-configuration-block">queue Configuration Block</a> below.</li>
+<li><code>always_running</code> - (Optional, Deprecated) (Bool) Whenever the job is always running, like a Spark Streaming application, on every update restart the current active run or start it again, if nothing it is not running. False by default. Any job runs are started with <code>parameters</code> specified in <code>spark_jar_task</code> or <code>spark_submit_task</code> or <code>spark_python_task</code> or <code>notebook_task</code> blocks.</li>
+<li><code>run_as</code> - (Optional) The user or the service prinicipal the job runs as. See <a href="#run_as-configuration-block">run_as Configuration Block</a> below.</li>
+<li><p><code>control_run_state</code> - (Optional) (Bool) If true, the Databricks provider will stop and start the job as needed to ensure that the active run for the job reflects the deployed configuration. For continuous jobs, the provider respects the <code>pause_status</code> by stopping the current active run. This flag cannot be set for non-continuous jobs.</p>
+
+<p>When migrating from <code>always_running</code> to <code>control_run_state</code>, set <code>continuous</code> as follows:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">continuous</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+<li><p><code>library</code> - (Optional) (List) An optional list of libraries to be installed on the cluster that will execute the job. See <a href="#library-configuration-block">library Configuration Block</a> below.</p></li>
+<li><code>git_source</code> - (Optional) Specifices the a Git repository for task source code. See <a href="#git_source-configuration-block">git_source Configuration Block</a> below.</li>
+<li><code>parameter</code> - (Optional) Specifices job parameter for the job. See <a href="#parameter-configuration-block">parameter Configuration Block</a></li>
+<li><code>timeout_seconds</code> - (Optional) (Integer) An optional timeout applied to each run of this job. The default behavior is to have no timeout.</li>
+<li><code>min_retry_interval_millis</code> - (Optional) (Integer) An optional minimal interval in milliseconds between the start of the failed run and the subsequent retry run. The default behavior is that unsuccessful runs are immediately retried.</li>
+<li><code>max_concurrent_runs</code> - (Optional) (Integer) An optional maximum allowed number of concurrent runs of the job. Defaults to <em>1</em>.</li>
+<li><code>email_notifications</code> - (Optional) (List) An optional set of email addresses notified when runs of this job begins, completes or fails. The default behavior is to not send any emails. This field is a block and is <a href="#email_notifications-configuration-block">documented below</a>.</li>
+<li><code>webhook_notifications</code> - (Optional) (List) An optional set of system destinations (for example, webhook destinations or Slack) to be notified when runs of this job begins, completes or fails. The default behavior is to not send any notifications. This field is a block and is <a href="#webhook_notifications-configuration-block">documented below</a>.</li>
+<li><code>notification_settings</code> - (Optional) An optional block controlling the notification settings on the job level <a href="#notification_settings-configuration-block">documented below</a>.</li>
+<li><code>health</code> - (Optional) An optional block that specifies the health conditions for the job <a href="#health-configuration-block">documented below</a>.</li>
+<li><code>tags</code> - (Optional) An optional map of the tags associated with the job. See <a href="#tags-configuration-map">tags Configuration Map</a></li>
+<li><code>budget_policy_id</code> - (Optional) The ID of the user-specified budget policy to use for this job. If not specified, a default budget policy may be applied when creating or modifying the job.</li>
+<li><code>edit_mode</code> - (Optional) If <code>"UI_LOCKED"</code>, the user interface for the job will be locked. If <code>"EDITABLE"</code> (the default), the user interface will be editable.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/task%20Configuration%20Block"></a><h3 id="task-configuration-block">task Configuration Block</h3>
+
+<p>This block describes individual tasks:</p>
+
+<ul>
+<li><code>task_key</code> - (Required) string specifying an unique key for a given task.</li>
+<li><code>*_task</code> - (Required) one of the specific task blocks described below:
+<ul>
+<li><code>clean_rooms_notebook_task</code></li>
+<li><code>condition_task</code></li>
+<li><code>dbt_task</code></li>
+<li><code>for_each_task</code></li>
+<li><code>notebook_task</code></li>
+<li><code>pipeline_task</code></li>
+<li><code>python_wheel_task</code></li>
+<li><code>run_job_task</code></li>
+<li><code>spark_jar_task</code></li>
+<li><code>spark_python_task</code></li>
+<li><code>spark_submit_task</code></li>
+<li><code>sql_task</code></li>
+</ul></li>
+<li><code>depends_on</code> - (Optional) block specifying dependency(-ies) for a given task.</li>
+<li><code>description</code> - (Optional) description for this task.</li>
+<li><code>disable_auto_optimization</code> - (Optional) A flag to disable auto optimization in serverless tasks.</li>
+<li><code>email_notifications</code> - (Optional) An optional block to specify a set of email addresses notified when this task begins, completes or fails. The default behavior is to not send any emails. This block is <a href="#email_notifications-configuration-block">documented below</a>.</li>
+<li><code>environment_key</code> - (Optional) identifier of an <code>environment</code> block that is used to specify libraries.  Required for some tasks (<code>spark_python_task</code>, <code>python_wheel_task</code>, ...) running on serverless compute.</li>
+<li><code>existing_cluster_id</code> - (Optional) Identifier of the <a href="cluster.md">interactive cluster</a> to run job on.  <em>Note: running tasks on interactive clusters may lead to increased costs!</em></li>
+<li><code>health</code> - (Optional) block described below that specifies health conditions for a given task.</li>
+<li><code>job_cluster_key</code> - (Optional) Identifier of the Job cluster specified in the <code>job_cluster</code> block.</li>
+<li><code>library</code> - (Optional) (Set) An optional list of libraries to be installed on the cluster that will execute the job.</li>
+<li><code>max_retries</code> - (Optional) (Integer) An optional maximum number of times to retry an unsuccessful run. A run is considered to be unsuccessful if it completes with a <code>FAILED</code> or <code>INTERNAL_ERROR</code> lifecycle state. The value -1 means to retry indefinitely and the value 0 means to never retry. The default behavior is to never retry. A run can have the following lifecycle state: <code>PENDING</code>, <code>RUNNING</code>, <code>TERMINATING</code>, <code>TERMINATED</code>, <code>SKIPPED</code> or <code>INTERNAL_ERROR</code>.</li>
+<li><code>min_retry_interval_millis</code> - (Optional) (Integer) An optional minimal interval in milliseconds between the start of the failed run and the subsequent retry run. The default behavior is that unsuccessful runs are immediately retried.</li>
+<li><code>new_cluster</code> - (Optional) Task will run on a dedicated cluster.  See <a href="cluster.md">databricks_cluster</a> documentation for specification. <em>Some parameters, such as <code>autotermination_minutes</code>, <code>is_pinned</code>, <code>workload_type</code> aren't supported!</em></li>
+<li><code>retry_on_timeout</code> - (Optional) (Bool) An optional policy to specify whether to retry a job when it times out. The default behavior is to not retry on timeout.</li>
+<li><code>run_if</code> - (Optional) An optional value indicating the condition that determines whether the task should be run once its dependencies have been completed. One of <code>ALL_SUCCESS</code>, <code>AT_LEAST_ONE_SUCCESS</code>, <code>NONE_FAILED</code>, <code>ALL_DONE</code>, <code>AT_LEAST_ONE_FAILED</code> or <code>ALL_FAILED</code>. When omitted, defaults to <code>ALL_SUCCESS</code>.</li>
+<li><code>timeout_seconds</code> - (Optional) (Integer) An optional timeout applied to each run of this job. The default behavior is to have no timeout.</li>
+<li><code>webhook_notifications</code> - (Optional) (List) An optional set of system destinations (for example, webhook destinations or Slack) to be notified when runs of this task begins, completes or fails. The default behavior is to not send any notifications. This field is a block and is documented below.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If no <code>job_cluster_key</code>, <code>existing_cluster_id</code>, or <code>new_cluster</code> were specified in task definition, then task will executed using serverless compute.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/clean_rooms_notebook_task%20Configuration%20Block"></a><h4 id="clean_rooms_notebook_task-configuration-block">clean_rooms_notebook_task Configuration Block</h4>
+
+<p>The <code>clean_rooms_notebook_task</code> runs a clean rooms notebook.  The following attributes are supported:</p>
+
+<ul>
+<li><code>clean_room_name</code> (Required) The clean room that the notebook belongs to.</li>
+<li><code>notebook_name</code> (Required) Name of the notebook being run.</li>
+<li><code>notebook_base_parameters</code> (Optional) (Map) Base parameters to be used for the clean room notebook job.</li>
+<li><code>etag</code> (Optional) Checksum to validate the freshness of the notebook resource.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/condition_task%20Configuration%20Block"></a><h4 id="condition_task-configuration-block">condition_task Configuration Block</h4>
+
+<p>The <code>condition_task</code> specifies a condition with an outcome that can be used to control the execution of dependent tasks.</p>
+
+<ul>
+<li><code>left</code> - The left operand of the condition task. It could be a string value, job state, or a parameter reference.</li>
+<li><code>right</code> - The right operand of the condition task. It could be a string value, job state, or parameter reference.</li>
+<li><code>op</code> - The string specifying the operation used to compare operands.  Currently, following operators are supported: <code>EQUAL_TO</code>, <code>GREATER_THAN</code>, <code>GREATER_THAN_OR_EQUAL</code>, <code>LESS_THAN</code>, <code>LESS_THAN_OR_EQUAL</code>, <code>NOT_EQUAL</code>. (Check the <a href="https://docs.databricks.com/api/workspace/jobs/create">API docs</a> for the latest information).</li>
+</ul>
+
+<p>This task does not require a cluster to execute and does not support retries or notifications.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/dbt_task%20Configuration%20Block"></a><h4 id="dbt_task-configuration-block">dbt_task Configuration Block</h4>
+
+<ul>
+<li><code>commands</code> - (Required) (Array) Series of dbt commands to execute in sequence. Every command must start with "dbt".</li>
+<li><code>source</code> - (Optional) The source of the project. Possible values are <code>WORKSPACE</code> and <code>GIT</code>.  Defaults to <code>GIT</code> if a <code>git_source</code> block is present in the job definition.</li>
+<li><code>project_directory</code> - (Required when <code>source</code> is <code>WORKSPACE</code>) The path where dbt should look for <code>dbt_project.yml</code>. Equivalent to passing <code>--project-dir</code> to the dbt CLI.
+<ul>
+<li>If <code>source</code> is <code>GIT</code>: Relative path to the directory in the repository specified in the <code>git_source</code> block. Defaults to the repository's root directory when not specified.</li>
+<li>If <code>source</code> is <code>WORKSPACE</code>: Absolute path to the folder in the workspace.</li>
+</ul></li>
+<li><code>profiles_directory</code> - (Optional) The relative path to the directory in the repository specified by <code>git_source</code> where dbt should look in for the <code>profiles.yml</code> file. If not specified, defaults to the repository's root directory. Equivalent to passing <code>--profile-dir</code> to a dbt command.</li>
+<li><code>catalog</code> - (Optional) The name of the catalog to use inside Unity Catalog.</li>
+<li><code>schema</code> - (Optional) The name of the schema dbt should run in. Defaults to <code>default</code>.</li>
+<li><code>warehouse_id</code> - (Optional) The ID of the SQL warehouse that dbt should execute against.</li>
+</ul>
+
+<p>You also need to include a <code>git_source</code> block to configure the repository that contains the dbt project.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/for_each_task%20Configuration%20Block"></a><h4 id="for_each_task-configuration-block">for_each_task Configuration Block</h4>
+
+<ul>
+<li><code>concurrency</code> - (Optional) Controls the number of active iteration task runs. Default is 20, maximum allowed is 100.</li>
+<li><code>inputs</code> - (Required) (String) Array for task to iterate on. This can be a JSON string or a reference to an array parameter.</li>
+<li><code>task</code> - (Required) Task to run against the <code>inputs</code> list.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/notebook_task%20Configuration%20Block"></a><h4 id="notebook_task-configuration-block">notebook_task Configuration Block</h4>
+
+<ul>
+<li><code>notebook_path</code> - (Required) The path of the <a href="notebook.md#path">databricks_notebook</a> to be run in the Databricks workspace or remote repository. For notebooks stored in the Databricks workspace, the path must be absolute and begin with a slash. For notebooks stored in a remote repository, the path must be relative. This field is required.</li>
+<li><code>source</code> - (Optional) Location type of the notebook, can only be <code>WORKSPACE</code> or <code>GIT</code>. When set to <code>WORKSPACE</code>, the notebook will be retrieved from the local Databricks workspace. When set to <code>GIT</code>, the notebook will be retrieved from a Git repository defined in <code>git_source</code>. If the value is empty, the task will use <code>GIT</code> if <code>git_source</code> is defined and <code>WORKSPACE</code> otherwise.</li>
+<li><code>base_parameters</code> - (Optional) (Map) Base parameters to be used for each run of this job. If the run is initiated by a call to run-now with parameters specified, the two parameters maps will be merged. If the same key is specified in base_parameters and in run-now, the value from run-now will be used. If the notebook takes a parameter that is not specified in the job’s base_parameters or the run-now override parameters, the default value from the notebook will be used. Retrieve these parameters in a notebook using <code>dbutils.widgets.get</code>.</li>
+<li><code>warehouse_id</code> - (Optional) ID of the (the <a href="sql_endpoint.md">databricks_sql_endpoint</a>) that will be used to execute the task with SQL notebook.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/pipeline_task%20Configuration%20Block"></a><h4 id="pipeline_task-configuration-block">pipeline_task Configuration Block</h4>
+
+<ul>
+<li><code>pipeline_id</code> - (Required) The pipeline's unique ID.</li>
+<li><code>full_refresh</code> - (Optional) (Bool) Specifies if there should be full refresh of the pipeline.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The following configuration blocks are only supported inside a <code>task</code> block</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/python_wheel_task%20Configuration%20Block"></a><h4 id="python_wheel_task-configuration-block">python_wheel_task Configuration Block</h4>
+
+<ul>
+<li><code>entry_point</code> - (Optional) Python function as entry point for the task</li>
+<li><code>package_name</code> - (Optional) Name of Python package</li>
+<li><code>parameters</code> - (Optional) Parameters for the task</li>
+<li><code>named_parameters</code> - (Optional) Named parameters for the task</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/run_job_task%20Configuration%20Block"></a><h4 id="run_job_task-configuration-block">run_job_task Configuration Block</h4>
+
+<ul>
+<li><code>job_id</code> - (Required)(String) ID of the job</li>
+<li><code>job_parameters</code> - (Optional)(Map) Job parameters for the task</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/spark_jar_task%20Configuration%20Block"></a><h4 id="spark_jar_task-configuration-block">spark_jar_task Configuration Block</h4>
+
+<ul>
+<li><code>parameters</code> - (Optional) (List) Parameters passed to the main method.</li>
+<li><code>main_class_name</code> - (Optional) The full name of the class containing the main method to be executed. This class must be contained in a JAR provided as a library. The code should use <code>SparkContext.getOrCreate</code> to obtain a Spark context; otherwise, runs of the job will fail.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/spark_python_task%20Configuration%20Block"></a><h4 id="spark_python_task-configuration-block">spark_python_task Configuration Block</h4>
+
+<ul>
+<li><code>python_file</code> - (Required) The URI of the Python file to be executed. <a href="dbfs_file.md#path">databricks_dbfs_file</a>, cloud file URIs (e.g. <code>s3:/</code>, <code>abfss:/</code>, <code>gs:/</code>), workspace paths and remote repository are supported. For Python files stored in the Databricks workspace, the path must be absolute and begin with <code>/Repos</code>. For files stored in a remote repository, the path must be relative. This field is required.</li>
+<li><code>source</code> - (Optional) Location type of the Python file, can only be <code>GIT</code>. When set to <code>GIT</code>, the Python file will be retrieved from a Git repository defined in <code>git_source</code>.</li>
+<li><code>parameters</code> - (Optional) (List) Command line parameters passed to the Python file.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/spark_submit_task%20Configuration%20Block"></a><h4 id="spark_submit_task-configuration-block">spark_submit_task Configuration Block</h4>
+
+<p>You can invoke Spark submit tasks only on new clusters. <strong>In the <code>new_cluster</code> specification, <code>libraries</code> and <code>spark_conf</code> are not supported</strong>. Instead, use --jars and --py-files to add Java and Python libraries and <code>--conf</code> to set the Spark configuration. By default, the Spark submit job uses all available memory (excluding reserved memory for Databricks services). You can set <code>--driver-memory</code>, and <code>--executor-memory</code> to a smaller value to leave some room for off-heap usage. <strong>Please use <code>spark_jar_task</code>, <code>spark_python_task</code> or <code>notebook_task</code> wherever possible</strong>.</p>
+
+<ul>
+<li><code>parameters</code> - (Optional) (List) Command-line parameters passed to spark submit.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/sql_task%20Configuration%20Block"></a><h4 id="sql_task-configuration-block">sql_task Configuration Block</h4>
+
+<p>One of the <code>query</code>, <code>dashboard</code> or <code>alert</code> needs to be provided.</p>
+
+<ul>
+<li><code>warehouse_id</code> - (Required) ID of the (the <a href="sql_endpoint.md">databricks_sql_endpoint</a>) that will be used to execute the task.  Only Serverless &amp; Pro warehouses are supported right now.</li>
+<li><code>parameters</code> - (Optional) (Map) parameters to be used for each run of this task. The SQL alert task does not support custom parameters.</li>
+<li><code>query</code> - (Optional) block consisting of single string field: <code>query_id</code> - identifier of the Databricks Query (<a href="query.md">databricks_query</a>).</li>
+<li><code>dashboard</code> - (Optional) block consisting of following fields:
+<ul>
+<li><code>dashboard_id</code> - (Required) (String) identifier of the Databricks SQL Dashboard <a href="sql_dashboard.md">databricks_sql_dashboard</a>.</li>
+<li><code>subscriptions</code> - (Optional) a list of subscription blocks consisting out of one of the required fields: <code>user_name</code> for user emails or <code>destination_id</code> - for Alert destination's identifier.</li>
+<li><code>custom_subject</code> - (Optional) string specifying a custom subject of email sent.</li>
+<li><code>pause_subscriptions</code> - (Optional) flag that specifies if subscriptions are paused or not.</li>
+</ul></li>
+<li><code>alert</code> - (Optional) block consisting of following fields:
+<ul>
+<li><code>alert_id</code> - (Required) (String) identifier of the Databricks Alert (<a href="alert.md">databricks_alert</a>).</li>
+<li><code>subscriptions</code> - (Optional) a list of subscription blocks consisting out of one of the required fields: <code>user_name</code> for user emails or <code>destination_id</code> - for Alert destination's identifier.</li>
+<li><code>pause_subscriptions</code> - (Optional) flag that specifies if subscriptions are paused or not.</li>
+</ul></li>
+<li><code>file</code> - (Optional) block consisting of single string fields:
+<ul>
+<li><code>source</code> - (Optional) The source of the project. Possible values are <code>WORKSPACE</code> and <code>GIT</code>.</li>
+<li><code>path</code> - If <code>source</code> is <code>GIT</code>: Relative path to the file in the repository specified in the <code>git_source</code> block with SQL commands to execute. If <code>source</code> is <code>WORKSPACE</code>: Absolute path to the file in the workspace with SQL commands to execute.</li>
+</ul></li>
+</ul>
+
+<p>Example</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_job"</span><span class="w"> </span><span class="nv">"sql_aggregation_job"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Example SQL Job"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">task_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"run_agg_query"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">sql_task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">warehouse_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_sql_endpoint.sql_job_warehouse.id</span><span class="w"></span>
+<span class="w">      </span><span class="nb">query</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">query_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_sql_query.agg_query.id</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">task_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"run_dashboard"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">sql_task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">warehouse_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_sql_endpoint.sql_job_warehouse.id</span><span class="w"></span>
+<span class="w">      </span><span class="nb">dashboard</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">dashboard_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_sql_dashboard.dash.id</span><span class="w"></span>
+<span class="w">        </span><span class="nb">subscriptions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">user_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"user@domain.com"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">task_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"run_alert"</span><span class="w"></span>
+<span class="w">    </span><span class="nb">sql_task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">warehouse_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_sql_endpoint.sql_job_warehouse.id</span><span class="w"></span>
+<span class="w">      </span><span class="nb">alert</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">alert_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_sql_alert.alert.id</span><span class="w"></span>
+<span class="w">        </span><span class="nb">subscriptions</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="na">user_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"user@domain.com"</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/library%20Configuration%20Block"></a><h4 id="library-configuration-block">library Configuration Block</h4>
+
+<p>This block descripes an optional library to be installed on the cluster that will execute the job (as part of a task execution). For multiple libraries, use multiple blocks. If the job specifies more than one task, these blocks needs to be placed within the task block. Please consult <a href="cluster.md#library-configuration-block">libraries section of the databricks_cluster</a> resource for more information.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_job"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">task_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"some_task"</span><span class="c1"></span>
+<span class="c1">    # ....</span>
+<span class="w">    </span><span class="nb">library</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">pypi</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">package</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"databricks-mosaic==0.3.14"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/depends_on%20Configuration%20Block"></a><h4 id="depends_on-configuration-block">depends_on Configuration Block</h4>
+
+<p>This block describes upstream dependencies of a given task. For multiple upstream dependencies, use multiple blocks.</p>
+
+<ul>
+<li><code>task_key</code> - (Required) The name of the task this task depends on.</li>
+<li><code>outcome</code> - (Optional, string) Can only be specified on condition task dependencies. The outcome of the dependent task that must be met for this task to run. Possible values are <code>"true"</code> or <code>"false"</code>.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Similar to the tasks themselves, each dependency inside the task need to be declared in alphabetical order with respect to task_key in order to get consistent Terraform diffs.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/environment%20Confaguration%20Block"></a><h3 id="environment-confaguration-block">environment Confaguration Block</h3>
+
+<p>This block describes <a href="https://docs.databricks.com/en/compute/serverless/dependencies.html">an Environment</a> that is used to specify libraries used by the tasks running on serverless compute.  This block contains following attributes:</p>
+
+<ul>
+<li><code>environment_key</code> - an unique identifier of the Environment.  It will be referenced from <code>environment_key</code> attribute of corresponding task.</li>
+<li><code>spec</code> - block describing the Environment. Consists of following attributes:
+<ul>
+<li><code>client</code> - (Required, string) client version used by the environment.</li>
+<li><code>dependencies</code> - (list of strings) List of pip dependencies, as supported by the version of pip in this environment. Each dependency is a pip requirement file line.  See <a href="https://docs.databricks.com/api/workspace/jobs/create#environments-spec-dependencies">API docs</a> for more information.</li>
+</ul></li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">environment</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">spec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">dependencies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"foo==0.0.1", "-r /Workspace/test/requirements.txt"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">client</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"1"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">environment_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Default"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/run_as%20Configuration%20Block"></a><h3 id="run_as-configuration-block">run_as Configuration Block</h3>
+
+<p>The <code>run_as</code> block allows specifying the user or the service principal that the job runs as. If not specified, the job runs as the user or service
+principal that created the job. Only one of <code>user_name</code> or <code>service_principal_name</code> can be specified.</p>
+
+<ul>
+<li><code>user_name</code> - (Optional) The email of an active workspace user. Non-admin users can only set this field to their own email.</li>
+<li><code>service_principal_name</code> - (Optional) The application ID of an active service principal. Setting this field requires the <code>servicePrincipal/user</code> role.</li>
+</ul>
+
+<p>Example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_job"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+<span class="w">  </span><span class="nb">run_as</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">service_principal_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"8d23ae77-912e-4a19-81e4-b9c3f5cc9349"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/job_cluster%20Configuration%20Block"></a><h3 id="job_cluster-configuration-block">job_cluster Configuration Block</h3>
+
+<p><a href="https://docs.databricks.com/jobs.html#use-shared-job-clusters">Shared job cluster</a> specification. Allows multiple tasks in the same job run to reuse the cluster.</p>
+
+<ul>
+<li><code>job_cluster_key</code> - (Required) Identifier that can be referenced in <code>task</code> block, so that cluster is shared between tasks</li>
+<li><code>new_cluster</code> - Block with almost the same set of parameters as for <a href="cluster.md">databricks_cluster</a> resource, except following (check the <a href="https://docs.databricks.com/api/workspace/jobs/create#job_clusters-new_cluster">REST API documentation for full list of supported parameters</a>):
+<ul>
+<li><code>autotermination_minutes</code> - isn't supported</li>
+<li><code>is_pinned</code> - isn't supported</li>
+<li><code>workload_type</code> - isn't supported</li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/schedule%20Configuration%20Block"></a><h3 id="schedule-configuration-block">schedule Configuration Block</h3>
+
+<ul>
+<li><code>quartz_cron_expression</code> - (Required) A <a href="http://www.quartz-scheduler.org/documentation/quartz-2.3.0/tutorials/crontrigger.html">Cron expression using Quartz syntax</a> that describes the schedule for a job. This field is required.</li>
+<li><code>timezone_id</code> - (Required) A Java timezone ID. The schedule for a job will be resolved with respect to this timezone. See Java TimeZone for details. This field is required.</li>
+<li><code>pause_status</code> - (Optional) Indicate whether this schedule is paused or not. Either <code>PAUSED</code> or <code>UNPAUSED</code>. When the <code>pause_status</code> field is omitted and a schedule is provided, the server will default to using <code>UNPAUSED</code> as a value for <code>pause_status</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/continuous%20Configuration%20Block"></a><h3 id="continuous-configuration-block">continuous Configuration Block</h3>
+
+<ul>
+<li><code>pause_status</code> - (Optional) Indicate whether this continuous job is paused or not. Either <code>PAUSED</code> or <code>UNPAUSED</code>. When the <code>pause_status</code> field is omitted in the block, the server will default to using <code>UNPAUSED</code> as a value for <code>pause_status</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/queue%20Configuration%20Block"></a><h3 id="queue-configuration-block">queue Configuration Block</h3>
+
+<p>This block describes the queue settings of the job:</p>
+
+<ul>
+<li><code>enabled</code> - (Required) If true, enable queueing for the job.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/trigger%20Configuration%20Block"></a><h3 id="trigger-configuration-block">trigger Configuration Block</h3>
+
+<ul>
+<li><code>pause_status</code> - (Optional) Indicate whether this trigger is paused or not. Either <code>PAUSED</code> or <code>UNPAUSED</code>. When the <code>pause_status</code> field is omitted in the block, the server will default to using <code>UNPAUSED</code> as a value for <code>pause_status</code>.</li>
+<li><code>periodic</code> - (Optional) configuration block to define a trigger for Periodic Triggers consisting of the following attributes:
+<ul>
+<li><code>interval</code> - (Required) Specifies the interval at which the job should run. This value is required.</li>
+<li><code>unit</code> - (Required) Options are {"DAYS", "HOURS", "WEEKS"}.</li>
+</ul></li>
+<li><code>file_arrival</code> - (Optional) configuration block to define a trigger for <a href="https://learn.microsoft.com/en-us/azure/databricks/workflows/jobs/file-arrival-triggers">File Arrival events</a> consisting of following attributes:
+<ul>
+<li><code>url</code> - (Required) URL to be monitored for file arrivals. The path must point to the root or a subpath of the external location. Please note that the URL must have a trailing slash character (<code>/</code>).</li>
+<li><code>min_time_between_triggers_seconds</code> - (Optional) If set, the trigger starts a run only after the specified amount of time passed since the last time the trigger fired. The minimum allowed value is 60 seconds.</li>
+<li><code>wait_after_last_change_seconds</code> - (Optional) If set, the trigger starts a run only after no file activity has occurred for the specified amount of time. This makes it possible to wait for a batch of incoming files to arrive before triggering a run. The minimum allowed value is 60 seconds.</li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/git_source%20Configuration%20Block"></a><h3 id="git_source-configuration-block">git_source Configuration Block</h3>
+
+<p>This block is used to specify Git repository information &amp; branch/tag/commit that will be used to pull source code from to execute a job. Supported options are:</p>
+
+<ul>
+<li><code>url</code> - (Required) URL of the Git repository to use.</li>
+<li><code>provider</code> - (Optional, if it's possible to detect Git provider by host name) case insensitive name of the Git provider.  Following values are supported right now (could be a subject for change, consult <a href="https://docs.databricks.com/dev-tools/api/latest/repos.html">Repos API documentation</a>): <code>gitHub</code>, <code>gitHubEnterprise</code>, <code>bitbucketCloud</code>, <code>bitbucketServer</code>, <code>azureDevOpsServices</code>, <code>gitLab</code>, <code>gitLabEnterpriseEdition</code>.</li>
+<li><code>branch</code> - name of the Git branch to use. Conflicts with <code>tag</code> and <code>commit</code>.</li>
+<li><code>tag</code> - name of the Git branch to use. Conflicts with <code>branch</code> and <code>commit</code>.</li>
+<li><code>commit</code> - hash of Git commit to use. Conflicts with <code>branch</code> and <code>tag</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/parameter%20Configuration%20Block"></a><h3 id="parameter-configuration-block">parameter Configuration Block</h3>
+
+<p>This block defines a job-level parameter for the job. You can define several job-level parameters for the job. Supported options are:</p>
+
+<ul>
+<li><code>name</code> - (Required) The name of the defined parameter. May only contain alphanumeric characters, <code>_</code>, <code>-</code>, and <code>.</code>.</li>
+<li><code>default</code> - (Required) Default value of the parameter.</li>
+</ul>
+
+<p><em>You can use this block only together with <code>task</code> blocks, not with the legacy tasks specification!</em></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/email_notifications%20Configuration%20Block"></a><h3 id="email_notifications-configuration-block">email_notifications Configuration Block</h3>
+
+<p>This block can be configured on both job and task levels for corresponding effect.</p>
+
+<ul>
+<li><code>on_start</code> - (Optional) (List) list of emails to notify when the run starts.</li>
+<li><code>on_success</code> - (Optional) (List) list of emails to notify when the run completes successfully.</li>
+<li><code>on_failure</code> - (Optional) (List) list of emails to notify when the run fails.</li>
+<li><code>on_duration_warning_threshold_exceeded</code> - (Optional) (List) list of emails to notify when the duration of a run exceeds the threshold specified by the <code>RUN_DURATION_SECONDS</code> metric in the <code>health</code> block.</li>
+</ul>
+
+<p>The following parameter is only available for the job level configuration.</p>
+
+<ul>
+<li><code>no_alert_for_skipped_runs</code> - (Optional) (Bool) don't send alert for skipped runs. (It's recommended to use the corresponding setting in the <code>notification_settings</code> configuration block).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/webhook_notifications%20Configuration%20Block"></a><h3 id="webhook_notifications-configuration-block">webhook_notifications Configuration Block</h3>
+
+<p>Each entry in <code>webhook_notification</code> block takes a list <code>webhook</code> blocks. The field is documented below.</p>
+
+<ul>
+<li><code>on_start</code> - (Optional) (List) list of notification IDs to call when the run starts. A maximum of 3 destinations can be specified.</li>
+<li><code>on_success</code> - (Optional) (List) list of notification IDs to call when the run completes successfully. A maximum of 3 destinations can be specified.</li>
+<li><code>on_failure</code> - (Optional) (List) list of notification IDs to call when the run fails. A maximum of 3 destinations can be specified.</li>
+<li><code>on_duration_warning_threshold_exceeded</code> - (Optional) (List) list of notification IDs to call when the duration of a run exceeds the threshold specified by the <code>RUN_DURATION_SECONDS</code> metric in the <code>health</code> block.</li>
+</ul>
+
+<p>Note that the <code>id</code> is not to be confused with the name of the alert destination. The <code>id</code> can be retrieved through the API or the URL of Databricks UI <code>https://&lt;workspace host&gt;/sql/destinations/&lt;notification id&gt;?o=&lt;workspace id&gt;</code></p>
+
+<p>Example</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">webhook_notifications</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">on_failure</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"fb99f3dc-a0a0-11ed-a8fc-0242ac120002"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/webhook%20Configuration%20Block"></a><h3 id="webhook-configuration-block">webhook Configuration Block</h3>
+
+<ul>
+<li><code>id</code> - ID of the system notification that is notified when an event defined in <code>webhook_notifications</code> is triggered.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The following configuration blocks can be standalone or nested inside a <code>task</code> block</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/notification_settings%20Configuration%20Block"></a><h3 id="notification_settings-configuration-block">notification_settings Configuration Block</h3>
+
+<p>This block controls notification settings for both email &amp; webhook notifications.
+It can be configured on both job and task level for corresponding effect.</p>
+
+<ul>
+<li><code>no_alert_for_skipped_runs</code> - (Optional) (Bool) don't send alert for skipped runs.</li>
+<li><code>no_alert_for_canceled_runs</code> - (Optional) (Bool) don't send alert for cancelled runs.</li>
+</ul>
+
+<p>The following parameter is only available on task level.</p>
+
+<ul>
+<li><code>alert_on_last_attempt</code> - (Optional) (Bool) do not send notifications to recipients specified in <code>on_start</code> for the retried runs and do not send notifications to recipients specified in <code>on_failure</code> until the last retry of the run.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/health%20Configuration%20Block"></a><h3 id="health-configuration-block">health Configuration Block</h3>
+
+<p>This block describes health conditions for a given job or an individual task. It consists of the following attributes:</p>
+
+<ul>
+<li><code>rules</code> - (List) list of rules that are represented as objects with the following attributes:
+<ul>
+<li><code>metric</code> - (Required) string specifying the metric to check.  The only supported metric is <code>RUN_DURATION_SECONDS</code> (check <a href="https://docs.databricks.com/api/workspace/jobs/create">Jobs REST API documentation</a> for the latest information).</li>
+<li><code>op</code> - (Required) string specifying the operation used to evaluate the given metric. The only supported operation is <code>GREATER_THAN</code>.</li>
+<li><code>value</code> - (Required) integer value used to compare to the given metric.</li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/tags%20Configuration%20Map"></a><h3 id="tags-configuration-map">tags Configuration Map</h3>
+
+<p><code>tags</code> - (Optional) (Map) An optional map of the tags associated with the job. Specified tags will be used as cluster tags for job clusters.</p>
+
+<p>Example</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_job"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">environment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"dev"</span><span class="w"></span>
+<span class="w">    </span><span class="na">owner</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"dream-team"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - ID of the job</li>
+<li><code>url</code> - URL of the job on the given workspace</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Access%20Control"></a><h2 id="access-control">Access Control</h2>
+
+<p>By default, all users can create and modify jobs unless an administrator <a href="https://docs.databricks.com/administration-guide/access-control/jobs-acl.html">enables jobs access control</a>. With jobs access control, individual permissions determine a user’s abilities.</p>
+
+<ul>
+<li><a href="permissions.md#Job-usage">databricks_permissions</a> can control which groups or individual users can <em>Can View</em>, <em>Can Manage Run</em>, and <em>Can Manage</em>.</li>
+<li><a href="cluster_policy.md">databricks_cluster_policy</a> can control which kinds of clusters users can create for jobs.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Single-task%20syntax%20%28deprecated%29"></a><h2 id="single-task-syntax-deprecated">Single-task syntax (deprecated)</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Deprecated</em>
+    <p>Please define tasks in a <code>task</code> block rather than using single-task syntax.</p>
+</aside>
+
+<p>This syntax uses Jobs API 2.0 to create a job with a single task. Only a subset of arguments above is supported (<code>name</code>, <code>libraries</code>, <code>email_notifications</code>, <code>webhook_notifications</code>, <code>timeout_seconds</code>, <code>max_retries</code>, <code>min_retry_interval_millis</code>, <code>retry_on_timeout</code>, <code>schedule</code>, <code>max_concurrent_runs</code>), and only a single block of <code>notebook_task</code>, <code>spark_jar_task</code>, <code>spark_python_task</code>, <code>spark_submit_task</code> and <code>pipeline_task</code> can be specified.</p>
+
+<p>The job cluster is specified using either of the below argument:</p>
+
+<ul>
+<li><code>new_cluster</code> - (Optional) Same set of parameters as for <a href="cluster.md">databricks_cluster</a> resource.</li>
+<li><code>existing_cluster_id</code> - (Optional) If existing_cluster_id, the ID of an existing <a href="cluster.md">cluster</a> that will be used for all runs of this job. When running jobs on an existing cluster, you may need to manually restart the cluster if it stops responding. We strongly suggest to use <code>new_cluster</code> for greater reliability.</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_current_user"</span><span class="w"> </span><span class="nv">"me"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_spark_version"</span><span class="w"> </span><span class="nv">"latest"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_node_type"</span><span class="w"> </span><span class="nv">"smallest"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">local_disk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_notebook"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.databricks_current_user.me.home}/Terraform"</span><span class="w"></span>
+<span class="w">  </span><span class="na">language</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PYTHON"</span><span class="w"></span>
+<span class="w">  </span><span class="na">content_base64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">base64encode</span><span class="p">(</span><span class="o">&lt;&lt;-</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="sh">    # created from ${abspath(path.module)}</span>
+<span class="sh">    display(spark.range(10))</span>
+<span class="dl">    EOT</span>
+<span class="w">  </span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_job"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Terraform Demo (${data.databricks_current_user.me.alphanumeric})"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">new_cluster</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">num_workers</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">    </span><span class="na">spark_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_spark_version.latest.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">node_type_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_node_type.smallest.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">notebook_task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">notebook_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_notebook.this.path</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"notebook_url"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_notebook.this.url</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"job_url"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_job.this.url</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p>The <code>timeouts</code> block allows you to specify <code>create</code> and <code>update</code> timeouts if you have an <code>always_running</code> job. Please launch <code>TF_LOG=DEBUG terraform apply</code> whenever you observe timeout issues.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">timeouts</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">create</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"20m"</span><span class="w"></span>
+<span class="w">  </span><span class="na">update</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"20m"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>The resource job can be imported using the id of the job</p>
+
+<div class="codehilite"><pre><span></span><code>terraform import databricks_job.this &lt;job-id&gt;
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are often used in the same context:</p>
+
+<ul>
+<li><a href="../guides/workspace-management.md">End to end workspace management</a> guide.</li>
+<li><a href="cluster.md">databricks_cluster</a> to create <a href="https://docs.databricks.com/clusters/index.html">Databricks Clusters</a>.</li>
+<li><a href="cluster_policy.md">databricks_cluster_policy</a> to create a <a href="cluster.md">databricks_cluster</a> policy, which limits the ability to create clusters based on a set of rules.</li>
+<li><a href="../data-sources/current_user.md">databricks_current_user</a> data to retrieve information about <a href="user.md">databricks_user</a> or <a href="service_principal.md">databricks_service_principal</a>, that is calling Databricks REST API.</li>
+<li><a href="../data-sources/dbfs_file.md">databricks_dbfs_file</a> data to get file content from <a href="https://docs.databricks.com/data/databricks-file-system.html">Databricks File System (DBFS)</a>.</li>
+<li><a href="../data-sources/dbfs_file_paths.md">databricks_dbfs_file_paths</a> data to get list of file names from get file content from <a href="https://docs.databricks.com/data/databricks-file-system.html">Databricks File System (DBFS)</a>.</li>
+<li><a href="dbfs_file.md">databricks_dbfs_file</a> to manage relatively small files on <a href="https://docs.databricks.com/data/databricks-file-system.html">Databricks File System (DBFS)</a>.</li>
+<li><a href="global_init_script.md">databricks_global_init_script</a> to manage <a href="https://docs.databricks.com/clusters/init-scripts.html#global-init-scripts">global init scripts</a>, which are run on all <a href="cluster.md#init_scripts">databricks_cluster</a> and <a href="job.md#new_cluster">databricks_job</a>.</li>
+<li><a href="instance_pool.md">databricks_instance_pool</a> to manage <a href="https://docs.databricks.com/clusters/instance-pools/index.html">instance pools</a> to reduce <a href="cluster.md">cluster</a> start and auto-scaling times by maintaining a set of idle, ready-to-use instances.</li>
+<li><a href="instance_profile.md">databricks_instance_profile</a> to manage AWS EC2 instance profiles that users can launch <a href="cluster.md">databricks_cluster</a> and access data, like <a href="mount.md">databricks_mount</a>.</li>
+<li><a href="../data-sources/jobs.md">databricks_jobs</a> data to get all jobs and their names from a workspace.</li>
+<li><a href="library.md">databricks_library</a> to install a <a href="https://docs.databricks.com/libraries/index.html">library</a> on <a href="cluster.md">databricks_cluster</a>.</li>
+<li><a href="../data-sources/node_type.md">databricks_node_type</a> data to get the smallest node type for <a href="cluster.md">databricks_cluster</a> that fits search criteria, like amount of RAM or number of cores.</li>
+<li><a href="notebook.md">databricks_notebook</a> to manage <a href="https://docs.databricks.com/notebooks/index.html">Databricks Notebooks</a>.</li>
+<li><a href="pipeline.md">databricks_pipeline</a> to deploy <a href="https://docs.databricks.com/data-engineering/delta-live-tables/index.html">Delta Live Tables</a>.</li>
+<li><a href="repo.md">databricks_repo</a> to manage <a href="https://docs.databricks.com/repos.html">Databricks Repos</a>.</li>
+<li><a href="../data-sources/spark_version.md">databricks_spark_version</a> data to get <a href="https://docs.databricks.com/runtime/dbr.html">Databricks Runtime (DBR)</a> version that could be used for <code>spark_version</code> parameter in <a href="cluster.md">databricks_cluster</a> and other resources.</li>
+<li><a href="workspace_conf.md">databricks_workspace_conf</a> to manage workspace configuration for expert usage.</li>
+</ul>
+
+            
+        
+    </body></html>

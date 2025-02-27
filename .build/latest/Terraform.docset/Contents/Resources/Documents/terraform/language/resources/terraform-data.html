@@ -1,0 +1,81 @@
+<html><!-- Online page at https://www.terraform.io/language/resources/terraform-data --><head>
+                <title>The terraform_data Managed Resource Type</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="the-terraform_data-managed-resource-type">The <code>terraform_data</code> Managed Resource Type</h1>
+
+<p>The <code>terraform_data</code> implements the standard resource lifecycle, but does not directly take any other actions. 
+You can use the <code>terraform_data</code> resource without requiring or configuring a provider. It is always available through a built-in provider with the <a href="../../terraform/language/providers/requirements.html#source-addresses">source address</a> <code>terraform.io/builtin/terraform</code>.</p>
+
+<p>The <code>terraform_data</code> resource is useful for storing values which need to follow a manage resource lifecycle, and for triggering provisioners when there is no other logical managed resource in which to place them.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20%28data%20for%20replace_triggered_by%29"></a><h2 id="example-usage-data-for-replace_triggered_by">Example Usage (data for <code>replace_triggered_by</code>)</h2>
+
+<p><a href="../../terraform/language/meta-arguments/lifecycle.html#replace_triggered_by">The <code>replace_triggered_by</code> lifecycle argument</a> requires all of the given addresses to be for resources, because the decision to force replacement is based on the planned actions for all of the mentioned resources.</p>
+
+<p>Plain data values such as <a href="../../terraform/language/values/locals.html">Local Values</a> and <a href="../../terraform/language/values/variables.html">Input Variables</a> don't have any side-effects to plan against and so they aren't valid in <code>replace_triggered_by</code>. You can use <code>terraform_data</code>'s behavior of planning an action each time <code>input</code> changes to <em>indirectly</em> use a plain value to trigger replacement.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"revision"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"terraform_data"</span><span class="w"> </span><span class="nv">"replacement"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.revision</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># This resource has no convenient attribute which forces replacement,</span>
+<span class="c1"># but can now be replaced by any change to the revision variable value.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"example_database"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">replace_triggered_by</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">terraform_data.replacement</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20%28null_resource%20replacement%29"></a><h2 id="example-usage-null_resource-replacement">Example Usage (<code>null_resource</code> replacement)</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"database"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># A use-case for terraform_data is as a do-nothing container</span>
+<span class="c1"># for arbitrary actions taken by a provisioner.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"terraform_data"</span><span class="w"> </span><span class="nv">"bootstrap"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">triggers_replace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">aws_instance.web.id</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nv">aws_instance.database.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"local-exec"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"bootstrap-hosts.sh"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>input</code> - (Optional) A value which will be stored in the instance state, and reflected in the <code>output</code> attribute after apply.</p></li>
+<li><p><code>triggers_replace</code> - (Optional) A value which is stored in the instance state, and will force replacement when the value changes.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to the above, the following attributes are exported:</p>
+
+<ul>
+<li><p><code>id</code> - A string value unique to the resource instance.</p></li>
+<li><p><code>output</code> - The computed value derived from the <code>input</code> argument. During a plan where <code>output</code> is unknown, it will still be of the same type as <code>input</code>.</p></li>
+</ul>
+
+            
+        
+    </body></html>

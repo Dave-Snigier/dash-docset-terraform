@@ -1,0 +1,78 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/data-sources/aws_assume_role_policy --><head>
+                <title>databricks_aws_assume_role_policy</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_aws_assume_role_policy-data-source">databricks_aws_assume_role_policy Data Source</h1>
+
+<p>This data source constructs necessary AWS STS assume role policy for you.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>End-to-end example of provisioning Cross-account IAM role with <a href="../resources/mws_credentials.md">databricks_mws_credentials</a> and <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role">aws_iam_role</a>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Account Id that could be found in the top right corner of https://accounts.cloud.databricks.com/"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_aws_crossaccount_policy"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_policy"</span><span class="w"> </span><span class="nv">"cross_account_policy"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-crossaccount-iam-policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_aws_crossaccount_policy.this.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_aws_assume_role_policy"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">external_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"cross_account"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-crossaccount-iam-role"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_aws_assume_role_policy.this.json</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Grants Databricks full access to VPC resources"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role_policy_attachment"</span><span class="w"> </span><span class="nv">"cross_account"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_policy.cross_account_policy.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.cross_account.name</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// required only in case of multi-workspace setup</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_credentials"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">credentials_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-creds"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_arn</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.cross_account.arn</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<ul>
+<li><code>external_id</code> (Required) Account Id that could be found in the top right corner of <a href="https://accounts.cloud.databricks.com/">Accounts Console</a>.</li>
+<li><code>aws_partition</code> - (Optional) AWS partition. The options are <code>aws</code> or <code>aws-us-gov</code>. Defaults to <code>aws</code></li>
+<li><code>for_log_delivery</code> (Optional) Either or not this assume role policy should be created for usage log delivery. Defaults to false.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>json</code> - AWS IAM Policy JSON document</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are used in the same context:</p>
+
+<ul>
+<li><a href="../guides/aws-e2-firewall-hub-and-spoke.md">Provisioning AWS Databricks workspaces with a Hub &amp; Spoke firewall for data exfiltration protection</a> guide</li>
+<li><a href="aws_bucket_policy.md">databricks_aws_bucket_policy</a> data to configure a simple access policy for AWS S3 buckets, so that Databricks can access data in it.</li>
+<li><a href="aws_crossaccount_policy.md">databricks_aws_crossaccount_policy</a> data to construct the necessary AWS cross-account policy for you, which is based on <a href="https://docs.databricks.com/administration-guide/account-api/iam-role.html#language-Your%C2%A0VPC,%C2%A0default">official documentation</a>.</li>
+</ul>
+
+            
+        
+    </body></html>

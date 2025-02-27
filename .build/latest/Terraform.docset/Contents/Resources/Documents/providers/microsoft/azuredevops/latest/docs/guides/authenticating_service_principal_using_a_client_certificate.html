@@ -1,0 +1,79 @@
+<html><!-- Online page at https://registry.terraform.io/providers/microsoft/azuredevops/latest/docs/guides/authenticating_service_principal_using_a_client_certificate --><head>
+                <title>Azure DevOps Provider: Authenticating to a Service Principal with a Client Certificate</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="azure-devops-provider-authenticating-to-a-service-principal-with-a-client-certificate">Azure DevOps Provider: Authenticating to a Service Principal with a Client Certificate</h1>
+
+<p>The Azure DevOps provider supports service principals through a variety of authentication methods, including client certificates.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Service%20Principal%20Configuration"></a><h2 id="service-principal-configuration">Service Principal Configuration</h2>
+
+<ol>
+<li><p>Create a Service Principal in <a href="https://learn.microsoft.com/en-us/azure/active-directory/develop/howto-create-service-principal-portal">Azure portal</a> or
+using <a href="https://learn.microsoft.com/en-us/azure/active-directory/develop/howto-authenticate-service-principal-powershell">Azure PowerShell</a> and generate a certificate for it. You do not need to assign the service principal any roles in Azure Ad.</p></li>
+<li><p><a href="https://learn.microsoft.com/en-us/azure/devops/integrate/get-started/authentication/service-principal-managed-identity?view=azure-devops#2-add-and-manage-service-principal-in-an-azure-devops-organization">Add the service principal to your Azure DevOps Organization.</a></p></li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Configuration"></a><h2 id="provider-configuration">Provider Configuration</h2>
+
+<p>The provider will need the Directory (tenant) ID and the Application (client) ID from the Azure AD app registration. They may be provided via the <code>ARM_TENANT_ID</code> and <code>ARM_CLIENT_ID</code> environment variables, or in the provider configuration block with the <code>tenant_id</code> and <code>client_id</code> attributes.</p>
+
+<p>The certificate may be provided as a base64 string, or by a file on the filesystem with the <code>ARM_CLIENT_CERTIFICATE</code> or <code>ARM_CLIENT_CERTIFICATE_PATH</code> environment variables, or in the provider configuration block with the <code>client_certificate</code> or <code>client_certificate_path</code> attributes. To use powershell to base64 encode a .pfx file use <code>[convert]::ToBase64String((Get-Content -path "cert_with_private_key.pfx" -Encoding byte))</code>. Note that base64 is <strong>NOT</strong> a security function, and the base64 string should be handled with the same precautions as the original file.</p>
+
+<p>A certificate password may be specified with the <code>ARM_CLIENT_CERTIFICATE_PASSWORD</code> environment variable, or in the provider configuration block with the <code>client_certificate_password</code> attribute.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Providing%20the%20certificate%20through%20the%20file%20system"></a><h3 id="providing-the-certificate-through-the-file-system">Providing the certificate through the file system</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azuredevops</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"microsoft/azuredevops"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&gt;=0.1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azuredevops"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">org_service_url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://dev.azure.com/my-org"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000001"</span><span class="w"></span>
+<span class="w">  </span><span class="na">tenant_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000001"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_certificate_path</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"C:\\cert.pfx"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_certificate_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"cert password"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azuredevops_project"</span><span class="w"> </span><span class="nv">"project"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Test Project"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Test Project Description"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Providing%20the%20certificate%20as%20a%20base64%20encoded%20string"></a><h3 id="providing-the-certificate-as-a-base64-encoded-string">Providing the certificate as a base64 encoded string</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azuredevops</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"microsoft/azuredevops"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&gt;=0.1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azuredevops"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">org_service_url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://dev.azure.com/my-org"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000001"</span><span class="w"></span>
+<span class="w">  </span><span class="na">tenant_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000001"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_certificate</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"MII....lots.and.lots.of.ascii.characters"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_certificate_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"cert password"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azuredevops_project"</span><span class="w"> </span><span class="nv">"project"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Test Project"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Test Project Description"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

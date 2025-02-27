@@ -1,0 +1,126 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azurestack/latest/docs/guides/service_principal_client_certificate --><head>
+                <title>Azure Stack Provider: Authenticating using a Service Principal using a Client Certificate</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="azure-stack-provider-authenticating-using-a-service-principal-using-a-client-certificate">Azure Stack Provider: Authenticating using a Service Principal using a Client Certificate</h1>
+
+<p>Terraform supports authenticating to Azure Stack using <a href="azure_cli.html">the Azure CLI</a> or a Service Principal, either <a href="service_principal_client_secret.html">using a Client Secret</a> or using a Client Certificate (which is detailed in this guide).</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20a%20Service%20Principal"></a><h2 id="creating-a-service-principal">Creating a Service Principal</h2>
+
+<p>A Service Principal is an application within Azure Active Directory which can have authentication tokens associated with it. In this example we'll generate a new certificate, then create and assign it to a Service Principal; so that it can be used for authentication.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20a%20Service%20Principal%20in%20the%20Azure%20Portal"></a><h3 id="creating-a-service-principal-in-the-azure-portal">Creating a Service Principal in the Azure Portal</h3>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This needs to be completed in the main Azure (Public) Portal - not the Azure Stack Portal.</p>
+</aside>
+
+<p>There are three tasks needed to create a Service Principal via <a href="https://portal.azure.com">the Azure Portal</a>:</p>
+
+<ol>
+<li>Generating a Certificate which can be used for Authentication</li>
+<li>Create an Application in Azure Active Directory (which acts as a Service Principal) and then associating the Certificate with it</li>
+<li>Grant the Application access to manage resources in your Azure Subscription</li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/1.%20Generating%20a%20Certificate"></a><h3 id="1-generating-a-certificate">1. Generating a Certificate</h3>
+
+<p>Firstly we need to create a certificate which can be used for authentication. To do that we're going to generate a Certificate Signing Request (also known as a CSR) using <code>openssl</code> (this can also be achieved using PowerShell, however that's outside the scope of this document):</p>
+
+<div class="codehilite"><pre><span></span><code>$ openssl req <span class="se">\</span>
+   -newkey rsa:4096 -nodes -keyout <span class="s2">"service-principal.key"</span> <span class="se">\</span>
+   -out <span class="s2">"service-principal.csr"</span>
+</code></pre></div>
+
+<p>We can now sign that Certificate Signing Request, in this example we're going to self-sign this certificate using the Key we just generated; however it's also possible to do this using a Certificate Authority. In order to do that we're again going to use <code>openssl</code>:</p>
+
+<div class="codehilite"><pre><span></span><code>$ openssl x509 <span class="se">\</span>
+  -signkey <span class="s2">"service-principal.key"</span> <span class="se">\</span>
+  -in <span class="s2">"service-principal.csr"</span> <span class="se">\</span>
+  -req -days <span class="m">365</span> -out <span class="s2">"service-principal.crt"</span>
+</code></pre></div>
+
+<p>Finally we can generate a PFX file which can be used to authenticate with Azure:</p>
+
+<pre><code>$ openssl pkcs12 -export -out "service-principal.pfx" -inkey "service-principal.key" -in "service-principal.crt"
+</code></pre>
+
+<p>Now that we've generated a certificate, we can create the Azure Active Directory application.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/2.%20Creating%20an%20Application%20in%20Azure%20Active%20Directory"></a><h3 id="2-creating-an-application-in-azure-active-directory">2. Creating an Application in Azure Active Directory</h3>
+
+<p>Firstly navigate to <a href="https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/Overview">the <strong>Azure Active Directory</strong> overview</a> within the Azure Portal - <a href="https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RegisteredApps/RegisteredApps/Overview">then select the <strong>App Registration</strong> blade</a> and click <strong>Endpoints</strong> at the top of the <strong>App Registration</strong> blade. A list of URIs will be displayed and you need to locate the URI for <strong>OAUTH 2.0 AUTHORIZATION ENDPOINT</strong> which contains a GUID. This is your Tenant ID / the <code>tenant_id</code> field mentioned above.</p>
+
+<p>Next, navigate back to <a href="https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RegisteredApps/RegisteredApps/Overview">the <strong>App Registration</strong> blade</a> - from here we'll create the Application in Azure Active Directory. To do this click <strong>Add</strong> at the top to add a new Application within Azure Active Directory. On this page, set the following values then press <strong>Create</strong>:</p>
+
+<ul>
+<li><strong>Name</strong> - this is a friendly identifier and can be anything (e.g. "Terraform")</li>
+<li><strong>Application Type</strong> - this should be set to "Web app / API"</li>
+<li><strong>Sign-on URL</strong> - this can be anything, providing it's a valid URI (e.g. https://terra.form)</li>
+</ul>
+
+<p>Once that's done - select the Application you just created in <a href="https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RegisteredApps/RegisteredApps/Overview">the <strong>App Registration</strong> blade</a>. At the top of this page, the "Application ID" GUID is the <code>client_id</code> you'll need.</p>
+
+<p>Finally need to associate the Client Certificate with the Azure Active Directory Application - to do this select <strong>Settings</strong> and then <strong>Keys</strong>. This screen displays the Passwords (Client Secrets) and Public Keys (Client Certificates) which are associated with this Azure Active Directory Application.</p>
+
+<p>The Public Key associated with the generated Certificate can be uploaded by selecting <strong>Upload Public Key</strong>, selecting the file which should be uploaded (in the example above, this'd be <code>service-principal.crt</code>) - and then hitting <strong>Save</strong>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/3.%20Granting%20the%20Application%20access%20to%20manage%20resources%20in%20your%20Azure%20and%20Azure%20Stack%20Subscriptions"></a><h3 id="3-granting-the-application-access-to-manage-resources-in-your-azure-and-azure-stack-subscriptions">3. Granting the Application access to manage resources in your Azure and Azure Stack Subscriptions</h3>
+
+<p>Once the Application exists in Azure Active Directory - we can grant it permissions to modify resources in the Subscription. To do this, <a href="https://portal.azure.com/#blade/Microsoft_Azure_Billing/SubscriptionsBlade">navigate to the <strong>Subscriptions</strong> blade within the Azure Portal</a>, then select the Subscription you wish to use, then click <strong>Access Control (IAM)</strong>, and finally <strong>Add</strong>.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This will only give SPN access to your Azure Subscription - This is <strong>NOT</strong> required to interact with Azure Stack. To allow SPN access to Azure Stack you need to do it under Azure Stack Subscription <a href="https://portal.{region}.{domain}/#blade/Microsoft_Azure_Billing/SubscriptionsBlade">navigate to the <strong>Subscriptions</strong> blade within the Azure Stack Portal</a>, then select the Subscription you wish to use, then click <strong>Access Control (IAM)</strong>, and finally <strong>Add</strong>.</p>
+</aside>
+
+<p>Firstly, specify a Role which grants the appropriate permissions needed for the Service Principal (for example, <code>Contributor</code> will grant Read/Write on all resources in the Subscription). There's more information about <a href="https://azure.microsoft.com/en-gb/documentation/articles/role-based-access-built-in-roles/">the built in roles available here</a>.</p>
+
+<p>Secondly, search for and select the name of the Application created in Azure Active Directory to assign it this role - then press <strong>Save</strong>.</p>
+
+<p>At this point the newly created Azure Active Directory Application should be associated with the Certificate that we generated earlier (which can be used as a Client Certificate) - and should have permissions to the Azure Subscription.</p>
+
+<p>It should then be possible to configure these credentials in Terraform, either by using setting the relevant Environment Variables:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span> <span class="nv">ARM_METADATA_HOST</span><span class="o">=</span><span class="s2">"management.region.mycloud.ca"</span>
+<span class="nb">export</span> <span class="nv">ARM_CLIENT_CERTIFICATE_PASSWORD</span><span class="o">=</span><span class="s2">"hello-world"</span>
+<span class="nb">export</span> <span class="nv">ARM_CLIENT_CERTIFICATE_PATH</span><span class="o">=</span><span class="s2">"/Users/myuser/keys/service-principal.pfx"</span>
+<span class="nb">export</span> <span class="nv">ARM_CLIENT_ID</span><span class="o">=</span><span class="s2">"00000000-0000-0000-0000-000000000000"</span>
+<span class="nb">export</span> <span class="nv">ARM_SUBSCRIPTION_ID</span><span class="o">=</span><span class="s2">"00000000-0000-0000-0000-000000000000"</span>
+<span class="nb">export</span> <span class="nv">ARM_TENANT_ID</span><span class="o">=</span><span class="s2">"00000000-0000-0000-0000-000000000000"</span>
+</code></pre></div>
+
+<p>and then using the following Provider Block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azurestack"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # whilst the `version` attribute is optional, we'd recommend pinning to a particular version</span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=1.0.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Alternatively you can define these fields within the Provider Block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azurestack"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # whilst the `version` attribute is optional, we'd recommend pinning to a particular version</span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=1.0.0"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">metadata_host</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://management.region.mycloud.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_certificate_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-password"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_certificate_path</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"./service-principal.pfx"</span><span class="w"></span>
+<span class="w">  </span><span class="na">subscription_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="w">  </span><span class="na">tenant_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>More information on <a href="../index.html#argument-reference">the fields supported in the Provider block can be found here</a>.</p>
+
+            
+        
+    </body></html>

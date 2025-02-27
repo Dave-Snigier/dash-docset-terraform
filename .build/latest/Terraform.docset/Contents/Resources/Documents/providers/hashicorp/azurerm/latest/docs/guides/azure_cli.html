@@ -1,0 +1,200 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/guides/azure_cli --><head>
+                <title>Azure Provider: Authenticating using the Azure CLI</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="azure-provider-authenticating-using-the-azure-cli">Azure Provider: Authenticating using the Azure CLI</h1>
+
+<p>Terraform supports a number of different methods for authenticating to Azure:</p>
+
+<ul>
+<li>Authenticating to Azure using the Azure CLI (which is covered in this guide)</li>
+<li><a href="managed_service_identity.html">Authenticating to Azure using Managed Service Identity</a></li>
+<li><a href="service_principal_client_certificate.html">Authenticating to Azure using a Service Principal and a Client Certificate</a></li>
+<li><a href="service_principal_client_secret.html">Authenticating to Azure using a Service Principal and a Client Secret</a></li>
+<li><a href="service_principal_oidc.html">Authenticating to Azure using a Service Principal and Open ID Connect</a></li>
+<li><a href="aks_workload_identity.html">Authenticating to Azure using AKS Workload Identity</a></li>
+</ul>
+
+<hr/>
+
+<p>We recommend using either a Service Principal or Managed Service Identity when running Terraform non-interactively (such as when running Terraform in a CI server) - and authenticating using the Azure CLI when running Terraform locally.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Important%20Notes%20about%20Authenticating%20using%20the%20Azure%20CLI"></a><h2 id="important-notes-about-authenticating-using-the-azure-cli">Important Notes about Authenticating using the Azure CLI</h2>
+
+<ul>
+<li>Prior to version 1.20, the AzureRM Provider used a different method of authorizing via the Azure CLI where credentials reset after an hour - as such, we'd recommend upgrading to version 1.20 or later of the AzureRM Provider.</li>
+<li>Terraform only supports authenticating using the <code>az</code> CLI (and this must be available on your PATH) - authenticating using the older <code>azure</code> CLI or PowerShell Cmdlets are not supported.</li>
+<li>Prior to version 3.44, authenticating via the Azure CLI was only supported when using a User Account. For example <code>az login --service-principal</code> was not supported and you had to use either a <a href="service_principal_client_secret.html">Client Secret</a> or a <a href="service_principal_client_certificate.html">Client Certificate</a>. From 3.44 upwards, authenticating via the Azure CLI is supported when using a Service Principal or Managed Identity.</li>
+</ul>
+
+<hr/>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Logging%20into%20the%20Azure%20CLI"></a><h2 id="logging-into-the-azure-cli">Logging into the Azure CLI</h2>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>If you're using the <strong>China</strong> or <strong>Government</strong> Azure Clouds - you'll need to first configure the Azure CLI to work with that Cloud.  You can do this by running:</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code>az cloud <span class="nb">set</span> --name AzureChinaCloud<span class="p">|</span>AzureUSGovernment
+</code></pre></div>
+
+<hr/>
+
+<p>Firstly, login to the Azure CLI using a User, Service Principal or Managed Identity.</p>
+
+<p>User Account:</p>
+
+<div class="codehilite"><pre><span></span><code>az login
+</code></pre></div>
+
+<p>Service Principal with a Secret:</p>
+
+<div class="codehilite"><pre><span></span><code>az login --service-principal -u <span class="s2">"CLIENT_ID"</span> -p <span class="s2">"CLIENT_SECRET"</span> --tenant <span class="s2">"TENANT_ID"</span>
+</code></pre></div>
+
+<p>Service Principal with a Certificate:</p>
+
+<div class="codehilite"><pre><span></span><code>az login --service-principal -u <span class="s2">"CLIENT_ID"</span> -p <span class="s2">"CERTIFICATE_PEM"</span> --tenant <span class="s2">"TENANT_ID"</span>
+</code></pre></div>
+
+<p>Service Principal with Open ID Connect (for use in CI / CD):</p>
+
+<div class="codehilite"><pre><span></span><code>az login --service-principal -u <span class="s2">"CLIENT_ID"</span> --tenant <span class="s2">"TENANT_ID"</span>
+</code></pre></div>
+
+<p>Managed Identity:</p>
+
+<div class="codehilite"><pre><span></span><code>az login --identity
+
+or
+
+az login --identity --username <span class="s2">"CLIENT_ID"</span>
+</code></pre></div>
+
+<hr/>
+
+<p>Once logged in - it's possible to list the Subscriptions associated with the account via:</p>
+
+<div class="codehilite"><pre><span></span><code>az account list
+</code></pre></div>
+
+<p>The output (similar to below) will display one or more Subscriptions - with the <code>id</code> field being the <code>subscription_id</code> field referenced above.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">[</span><span class="w"></span>
+<span class="w">  </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"cloudName"</span><span class="p">:</span><span class="w"> </span><span class="s2">"AzureCloud"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"isDefault"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PAYG Subscription"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"state"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Enabled"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"tenantId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"user"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"user@example.com"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"user"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">]</span><span class="w"></span>
+</code></pre></div>
+
+<p>Should you have more than one Subscription, you can specify the Subscription to use via the following command:</p>
+
+<div class="codehilite"><pre><span></span><code>az account <span class="nb">set</span> --subscription<span class="o">=</span><span class="s2">"SUBSCRIPTION_ID"</span>
+</code></pre></div>
+
+<hr/>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20Azure%20CLI%20authentication%20in%20Terraform"></a><h2 id="configuring-azure-cli-authentication-in-terraform">Configuring Azure CLI authentication in Terraform</h2>
+
+<p>Now that we're logged into the Azure CLI - we can configure Terraform to use these credentials.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>In version 4.0 of the Azure Provider, it's now required to specify the Azure Subscription ID when configuring a provider instance in your configuration. This can be done by specifying the <code>subscription_id</code> provider property, or by exporting the <code>ARM_SUBSCRIPTION_ID</code> environment variable. More information can be found in the <a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/guides/4.0-upgrade-guide#specifying-subscription-id-is-now-mandatory">Azure Resource Manager: 4.0 Upgrade Guide</a>.</p>
+</aside>
+
+<p>To configure Terraform to use the Default Subscription defined in the Azure CLI - we can use the following Provider block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># We strongly recommend using the required_providers block to set the</span>
+<span class="c1"># Azure Provider source and version being used</span>
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azurerm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azurerm"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=4.1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Configure the Microsoft Azure Provider</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>More information on <a href="../index.html#argument-reference">the fields supported in the Provider block can be found here</a>.</p>
+
+<p>At this point running either <code>terraform plan</code> or <code>terraform apply</code> should allow Terraform to run using the Azure CLI to authenticate.</p>
+
+<hr/>
+
+<p>It's also possible to configure Terraform to use a specific Subscription - for example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># We strongly recommend using the required_providers block to set the</span>
+<span class="c1"># Azure Provider source and version being used</span>
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azurerm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azurerm"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=4.1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Configure the Microsoft Azure Provider</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">subscription_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>More information on <a href="../index.html#argument-reference">the fields supported in the Provider block can be found here</a>.</p>
+
+<p>At this point running either <code>terraform plan</code> or <code>terraform apply</code> should allow Terraform to run using the Azure CLI to authenticate.</p>
+
+<hr/>
+
+<p>If you're looking to use Terraform across Tenants - it's possible to do this by configuring the Tenant ID field in the Provider block, as shown below:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># We strongly recommend using the required_providers block to set the</span>
+<span class="c1"># Azure Provider source and version being used</span>
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azurerm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azurerm"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=4.1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Configure the Microsoft Azure Provider</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">subscription_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="w">  </span><span class="na">tenant_id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"11111111-1111-1111-1111-111111111111"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>More information on <a href="../index.html#argument-reference">the fields supported in the Provider block can be found here</a>.</p>
+
+<p>At this point running either <code>terraform plan</code> or <code>terraform apply</code> should allow Terraform to run using the Azure CLI to authenticate.</p>
+
+            
+        
+    </body></html>

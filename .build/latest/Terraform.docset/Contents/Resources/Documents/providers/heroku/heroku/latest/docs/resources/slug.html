@@ -1,0 +1,143 @@
+<html><!-- Online page at https://registry.terraform.io/providers/heroku/heroku/latest/docs/resources/slug --><head>
+                <title>heroku_slug</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="heroku_slug">heroku_slug</h1>
+
+<p>Provides a <a href="https://devcenter.heroku.com/articles/platform-api-reference#slug">Heroku Slug</a>
+resource.</p>
+
+<p>This resource supports uploading a pre-generated archive file of executable code, making it possible to launch apps
+directly from a Terraform config. This resource does not itself generate the slug archive.
+<a href="https://devcenter.heroku.com/articles/platform-api-deploying-slugs">A guide to creating slug archives</a> is available
+in the Heroku Dev Center.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Minimal%20Example"></a><h2 id="minimal-example">Minimal Example</h2>
+
+<p>Create a ready-to-release slug:</p>
+
+<ul>
+<li><code>file_url</code> or <code>file_path</code> must reference a file containing a slug archive of executable code
+and must follow the prescribed layout from <a href="https://devcenter.heroku.com/articles/platform-api-deploying-slugs#create-slug-archive">Create slug archive</a>
+in the Heroku Dev Center (nested within an <code>./app</code> directory)</li>
+<li>The archive may be created by an external build system, downloaded from another Heroku app,
+or otherwise provided outside of the context of this Terraform resource</li>
+<li>If the content (SHA256) of <code>file_path</code> changes, then a new resource will be forced on the next plan/apply;
+if the file does not exist, the difference is ignored.</li>
+<li>The <code>file_url</code> is only fetched during resource creation. To trigger another fetch the <code>file_url</code> should be changed,
+then a new resource will be forced on the next plan/apply.</li>
+</ul>
+
+<pre><code>resource "heroku_app" "foobar" {
+  name = "foobar"
+  region = "us"
+}
+
+resource "heroku_slug" "foobar" {
+  app_id   = heroku_app.foobar.id
+  file_url = "https://github.com/heroku/terraform-provider-heroku/raw/master/heroku/test-fixtures/slug.tgz"
+
+  process_types = {
+    web = "ruby server.rb"
+  }
+}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>Complete config to launch a Heroku app:</p>
+
+<pre><code>resource "heroku_app" "foobar" {
+    name = "foobar"
+    region = "us"
+}
+
+# Create a slug for the app with a local slug archive file
+resource "heroku_slug" "foobar" {
+  app_id                         = heroku_app.foobar.id
+  buildpack_provided_description = "Ruby"
+  // The slug archive file must already exist
+  file_path                      = "slug.tgz"
+
+  process_types = {
+    web = "ruby server.rb"
+  }
+}
+
+# Deploy a release to the app with the slug
+resource "heroku_app_release" "foobar" {
+  app_id  = heroku_app.foobar.id
+  slug_id = heroku_slug.foobar.id
+}
+
+# Launch the app's web process by scaling-up
+resource "heroku_formation" "foobar" {
+  app_id     = heroku_app.foobar.id
+  type       = "web"
+  quantity   = 1
+  size       = "Standard-1x"
+  depends_on = ["heroku_app_release.foobar"]
+}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>app_id</code> - (Required) Heroku app ID (do not use app name)</li>
+<li><code>buildpack_provided_description</code> - Description of language or app framework, <code>"Ruby/Rack"</code>;
+displayed as the app's language in the Heroku Dashboard</li>
+<li><code>checksum</code> - Hash of the slug for verifying its integrity, auto-generated from contents of <code>file_path</code> or <code>file_url</code>,
+<code>SHA256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</code></li>
+<li><code>commit</code> - Identification of the code with your version control system (eg: SHA of the git HEAD), <code>"60883d9e8947a57e04dc9124f25df004866a2051"</code></li>
+<li><code>commit_description</code> - Description of the provided commit</li>
+<li><code>file_path</code> - (Required unless <code>file_url</code> is set) Local path to a slug archive, <code>"slugs/current.tgz"</code></li>
+<li><code>file_url</code> - (Required unless <code>file_path</code> is set) <strong>https</strong> URL to a slug archive, <code>"https://example.com/slugs/app-v1.tgz"</code></li>
+<li><code>process_types</code> - (Required) Map of <a href="https://devcenter.heroku.com/articles/process-model">processes to launch on Heroku Dynos</a></li>
+<li><code>stack</code> - Name or ID of the <a href="https://devcenter.heroku.com/articles/stack">Heroku stack</a></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>The following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - The ID of the slug</li>
+<li><code>app</code> - The ID or unique name of the Heroku app</li>
+<li><code>blob</code> - Slug archive (compressed tar of executable code)
+<ul>
+<li><code>method</code> - HTTP method to upload the archive</li>
+<li><code>url</code> - Pre-signed, expiring URL to upload the archive</li>
+</ul></li>
+<li><code>buildpack_provided_description</code> - Description of language or app framework, <code>"Ruby/Rack"</code></li>
+<li><code>checksum</code> - Hash of the slug for verifying its integrity, auto-generated from contents of <code>file_path</code> or <code>file_url</code></li>
+<li><code>commit</code> - Identification of the code with your version control system (eg: SHA of the git HEAD), <code>"60883d9e8947a57e04dc9124f25df004866a2051"</code></li>
+<li><code>commit_description</code> - Description of the provided commit</li>
+<li><code>process_types</code> - Map of <a href="https://devcenter.heroku.com/articles/process-model">processes to launch on Heroku Dynos</a></li>
+<li><code>size</code> - Slug archive filesize in bytes</li>
+<li><code>stack</code> - <a href="https://devcenter.heroku.com/articles/stack">Heroku stack</a> name</li>
+<li><code>stack_id</code> - <a href="https://devcenter.heroku.com/articles/stack">Heroku stack</a> ID</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Existing slugs can be imported using the combination of the application name, a colon, and the slug ID.</p>
+
+<p>For example:</p>
+
+<pre><code>$ terraform import heroku_slug.foobar bazbux:4f1db8ef-ed5c-4c42-a3d6-3c28262d5abc
+</code></pre>
+
+<ul>
+<li><code>foobar</code> is the <strong>heroku_slug</strong> resource's name</li>
+<li><code>bazbux</code> is the Heroku app name (or ID) that the slug belongs to</li>
+<li><code>:</code> separates the app identifier &amp; the slug identifier</li>
+<li><code>4f1db8ef…</code> is the slug ID</li>
+</ul>
+
+            
+        
+    </body></html>

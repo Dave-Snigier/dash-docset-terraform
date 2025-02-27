@@ -1,0 +1,206 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/ec2_transit_gateway_route_table_routes --><head>
+                <title>aws_ec2_transit_gateway_route_table_routes</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="data-source-aws_ec2_transit_gateway_route_table_routes">Data Source: aws_ec2_transit_gateway_route_table_routes</h1>
+
+<p>Provides informations for routes of a specific transit gateway, such as state, type, cidr</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_route_table_routes"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">filter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"type"</span><span class="w"></span>
+<span class="w">    </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"propagated"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway_route_table.example.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Complexe%20use%20case%20with%20transit%20gateway%20peering"></a><h3 id="complexe-use-case-with-transit-gateway-peering">Complexe use case with transit gateway peering</h3>
+
+<p>This example allow to create a mesh of transit gateway for différent regions routing all traffic to on-prem VPN</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_route_table_association</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"disable"</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_route_table_propagation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"disable"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_vpc_attachment"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_ids</span><span class="w">                                      </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="err">for</span><span class="w"> </span><span class="err">s</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">aws_subnet.private</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nv">s.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_id</span><span class="w">                              </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway.this[0].id</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">                                          </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_default_route_table_association</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_default_route_table_propagation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">                                      </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_subnet.private</span><span class="p">,</span><span class="w"> </span><span class="nv">aws_subnet.public</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_route_table"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.my_transit_gateway_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_route_table_association"</span><span class="w"> </span><span class="nv">"vpc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_attachment_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway_vpc_attachment.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.my_transit_gateway_id_route_table</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_route_table_association"</span><span class="w"> </span><span class="nv">"vpn"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_attachment_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpn_connection.this[0].transit_gateway_attachment_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.my_transit_gateway_id_route_table</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_route_table_propagation"</span><span class="w"> </span><span class="nv">"vpc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_attachment_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway_vpc_attachment.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway_route_table.this.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_route_table_propagation"</span><span class="w"> </span><span class="nv">"vpn"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_attachment_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpn_connection.this[0].transit_gateway_attachment_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway_route_table.this.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"eu-central-1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eu-central-1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway"</span><span class="w"> </span><span class="nv">"eu-central-1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_route_table_association</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"disable"</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_route_table_propagation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"disable"</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                        </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.eu-central-1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_peering_attachment"</span><span class="w"> </span><span class="nv">"eu-central-1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_region</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"eu-central-1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_transit_gateway_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway.eu-central-1.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway.this[0].id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"TGW mesh from eu-central-1"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_route_table"</span><span class="w"> </span><span class="nv">"eu-central-1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway.eu-central-1.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">({</span><span class="w"> </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"wl-transit-gateway-routetable-eu-central-1"</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="nv">local.global_tags</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.eu-central-1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_peering_attachment_accepter"</span><span class="w"> </span><span class="nv">"eu-central-1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_attachment_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway_peering_attachment.eu-central-1.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                      </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.eu-central-1</span><span class="w"></span>
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Accepter TGW peering eu-central-1"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_vpc_attachments"</span><span class="w"> </span><span class="nv">"filtered-eu-central-1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.eu-central-1</span><span class="w"></span>
+<span class="w">  </span><span class="nb">filter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"state"</span><span class="w"></span>
+<span class="w">    </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"pendingAcceptance", "available"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_vpc_attachment"</span><span class="w"> </span><span class="nv">"unit-eu-central-1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">toset</span><span class="p">(</span><span class="nv">data.aws_ec2_transit_gateway_vpc_attachments.filtered-eu-central-1.ids</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.eu-central-1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">trusted_aws_accounts_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{}</span><span class="c1"> # add to this list all account ids you trust</span>
+
+<span class="w">  </span><span class="na">trusted_vpc_attachments_list_eu-central-1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">compact</span><span class="p">([</span><span class="err">for</span><span class="w"> </span><span class="err">k</span><span class="p">,</span><span class="w"> </span><span class="err">tva</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">data.aws_ec2_transit_gateway_vpc_attachment.unit-eu-central-1</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nf">contains</span><span class="p">(</span><span class="nv">local.trusted_aws_accounts_ids</span><span class="p">,</span><span class="w"> </span><span class="nf">lookup</span><span class="p">(</span><span class="err">tva</span><span class="p">,</span><span class="w"> </span><span class="s2">"vpc_owner_id", "")) ? tva.id : ""</span><span class="p">])</span><span class="c1"></span>
+<span class="c1">  ## create a map with all vpc attachments trusted to be able to use for_each to avoid conflict on plan/apply ##</span>
+<span class="w">  </span><span class="na">trusted_vpc_attachements_eu-central-1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">toset</span><span class="p">(</span><span class="nf">sort</span><span class="p">(</span><span class="nv">local.trusted_vpc_attachments_list_eu-central-1</span><span class="p">))</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_vpc_attachment_accepter"</span><span class="w"> </span><span class="nv">"trusted_accounts_eu-central-1_tgw"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w">                                        </span><span class="o">=</span><span class="w"> </span><span class="nv">local.trusted_vpc_attachements_eu-central-1</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_attachment_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_default_route_table_propagation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_default_route_table_association</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">                                            </span><span class="o">=</span><span class="w"> </span><span class="nv">local.global_tags</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                                        </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.eu-central-1</span><span class="w"></span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">prevent_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">    </span><span class="na">ignore_changes</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="err">subnet_ids</span><span class="p">,</span><span class="w"> </span><span class="err">id</span><span class="p">,</span><span class="w"> </span><span class="err">dns_support</span><span class="p">,</span><span class="w"> </span><span class="err">security_group_referencing_support</span><span class="p">,</span><span class="w"> </span><span class="err">ipv</span><span class="m">6</span><span class="err">_support</span><span class="p">,</span><span class="w"> </span><span class="err">transit_gateway_id</span><span class="p">,</span><span class="w"> </span><span class="err">vpc_id</span><span class="p">,</span><span class="w"> </span><span class="err">vpc_owner_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_route_table_association"</span><span class="w"> </span><span class="nv">"trusted_accounts_eu-central-1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway_vpc_attachment_accepter.trusted_accounts_eu-central-1_tgw</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_attachment_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value.transit_gateway_attachment_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway_route_table.eu-central-1.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.eu-central-1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_route_table_propagation"</span><span class="w"> </span><span class="nv">"trusted_accounts_eu-central-1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway_vpc_attachment_accepter.trusted_accounts_eu-central-1_tgw</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_attachment_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value.transit_gateway_attachment_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway_route_table.eu-central-1.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.eu-central-1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_route_table_routes"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">filter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"type"</span><span class="w"></span>
+<span class="w">    </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"propagated"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway_route_table.eu-central-1.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.eu-central-1</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_ec2_transit_gateway_route_table_propagation.trusted_accounts_eu-central-1</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ec2_transit_gateway_route"</span><span class="w"> </span><span class="nv">"default-region-to-eu-central-1"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">for_each</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="err">for</span><span class="w"> </span><span class="err">r</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">data.aws_ec2_transit_gateway_route_table_routes.test.routes</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nv">r.destination_cidr_block</span><span class="w"> </span><span class="p">=</span><span class="err">&gt;</span><span class="w"> </span><span class="err">r</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidr_block</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">each.key</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_route_table_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway_route_table.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">transit_gateway_attachment_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ec2_transit_gateway_peering_attachment.eu-central-1.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>filter</code> - (Required) Custom filter block as described below.</li>
+<li><code>transit_gateway_route_table_id</code> - (Required) Identifier of EC2 Transit Gateway Route Table.</li>
+</ul>
+
+<p>More complex filters can be expressed using one or more <code>filter</code> sub-blocks,
+which take the following arguments:</p>
+
+<ul>
+<li><code>name</code> - (Required) Name of the field to filter by, as defined by
+<a href="https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_SearchTransitGatewayRoutes.html">the underlying AWS API</a>.</li>
+<li><code>values</code> - (Required) Set of values that are accepted for the given field.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - The transit gateway route table id suffixed by <code>-routes</code></li>
+<li><code>routes</code> - List of Transit Gateway Routes.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Routes%20list%20Attributes%20Reference"></a><h4 id="routes-list-attributes-reference">Routes list Attributes Reference</h4>
+
+<ul>
+<li><code>destination_cidr_block</code> - The CIDR used for route destination matches.</li>
+<li><code>prefix_list_id</code> - The ID of the prefix list used for destination matches.</li>
+<li><code>state</code> - The current state of the route, can be <code>active</code>, <code>deleted</code>, <code>pending</code>, <code>blackhole</code>, <code>deleting</code>.</li>
+<li><code>transit_gateway_route_table_announcement_id</code> - The id of the transit gateway route table announcement, most of the time it is an empty string.</li>
+<li><code>type</code> - The type of the route, can be <code>propagated</code> or <code>static</code>.</li>
+</ul>
+
+            
+        
+    </body></html>

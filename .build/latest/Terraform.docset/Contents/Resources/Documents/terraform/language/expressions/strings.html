@@ -1,0 +1,276 @@
+<html><!-- Online page at https://www.terraform.io/language/expressions/strings --><head>
+                <title>Strings and Templates</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="strings-and-templates">Strings and Templates</h1>
+
+<p>String literals are the most complex kind of literal expression in
+Terraform, and also the most commonly used.</p>
+
+<p>Terraform supports both a quoted syntax and a "heredoc" syntax for strings.
+Both of these syntaxes support template sequences for interpolating values and
+manipulating text.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Quoted%20Strings"></a><h2 id="quoted-strings">Quoted Strings</h2>
+
+<p>A quoted string is a series of characters delimited by straight double-quote
+characters (<code>"</code>).</p>
+
+<pre><code>"hello"
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Escape%20Sequences"></a><h3 id="escape-sequences">Escape Sequences</h3>
+
+<p>In quoted strings, the backslash character serves as an escape
+sequence, with the following characters selecting the escape behavior:</p>
+
+<table>
+<thead>
+<tr>
+  <th>Sequence</th>
+  <th>Replacement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>\n</code></td>
+  <td>Newline</td>
+</tr>
+<tr>
+  <td><code>\r</code></td>
+  <td>Carriage Return</td>
+</tr>
+<tr>
+  <td><code>\t</code></td>
+  <td>Tab</td>
+</tr>
+<tr>
+  <td><code>\"</code></td>
+  <td>Literal quote (without terminating the string)</td>
+</tr>
+<tr>
+  <td><code>\\</code></td>
+  <td>Literal backslash</td>
+</tr>
+<tr>
+  <td><code>\uNNNN</code></td>
+  <td>Unicode character from the basic multilingual plane (NNNN is four hex digits)</td>
+</tr>
+<tr>
+  <td><code>\UNNNNNNNN</code></td>
+  <td>Unicode character from supplementary planes (NNNNNNNN is eight hex digits)</td>
+</tr>
+</tbody>
+</table>
+
+<p>There are also two special escape sequences that do not use backslashes:</p>
+
+<table>
+<thead>
+<tr>
+  <th>Sequence</th>
+  <th>Replacement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>$${</code></td>
+  <td>Literal <code>${</code>, without beginning an interpolation sequence.</td>
+</tr>
+<tr>
+  <td><code>%%{</code></td>
+  <td>Literal <code>%{</code>, without beginning a template directive sequence.</td>
+</tr>
+</tbody>
+</table>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Heredoc%20Strings"></a><h2 id="heredoc-strings">Heredoc Strings</h2>
+
+<p>Terraform also supports a "heredoc" style of string literal inspired by Unix
+shell languages, which allows multi-line strings to be expressed more clearly.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="o">&lt;&lt;</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="sh">hello</span>
+<span class="sh">world</span>
+<span class="dl">EOT</span>
+</code></pre></div>
+
+<p>A heredoc string consists of:</p>
+
+<ul>
+<li>An opening sequence consisting of:
+<ul>
+<li>A heredoc marker (<code>&lt;&lt;</code> or <code>&lt;&lt;-</code> — two less-than signs, with an optional hyphen for indented heredocs)</li>
+<li>A delimiter word of your own choosing</li>
+<li>A line break</li>
+</ul></li>
+<li>The contents of the string, which can span any number of lines</li>
+<li>The delimiter word you chose, alone on its own line (with indentation allowed for indented heredocs)</li>
+</ul>
+
+<p>The <code>&lt;&lt;</code> marker followed by any identifier at the end of a line introduces the
+sequence. Terraform then processes the following lines until it finds one that
+consists entirely of the identifier given in the introducer.</p>
+
+<p>In the above example, <code>EOT</code> is the identifier selected. Any identifier is
+allowed, but conventionally this identifier is in all-uppercase and begins with
+<code>EO</code>, meaning "end of". <code>EOT</code> in this case stands for "end of text".</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Generating%20JSON%20or%20YAML"></a><h3 id="generating-json-or-yaml">Generating JSON or YAML</h3>
+
+<p>Don't use "heredoc" strings to generate JSON or YAML. Instead, use
+<a href="../../terraform/language/functions/jsonencode.html">the <code>jsonencode</code> function</a> or
+<a href="../../terraform/language/functions/yamlencode.html">the <code>yamlencode</code> function</a> so that Terraform
+can be responsible for guaranteeing valid JSON or YAML syntax.
+  </p><div class="codehilite"><pre><span></span><code><span class="na">example</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+  <span class="w">  </span><span class="na">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+  <span class="w">  </span><span class="na">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hello"</span><span class="w"></span>
+  <span class="p">})</span><span class="w"></span>
+  </code></pre></div><p></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Indented%20Heredocs"></a><h3 id="indented-heredocs">Indented Heredocs</h3>
+
+<p>The standard heredoc form (shown above) treats all space characters as literal
+spaces. If you don't want each line to begin with spaces, then each line must be
+flush with the left margin, which can be awkward for expressions in an
+indented block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">block</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="sh">hello</span>
+<span class="sh">world</span>
+<span class="dl">EOT</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>To improve on this, Terraform also accepts an <em>indented</em> heredoc string variant
+that is introduced by the <code>&lt;&lt;-</code> sequence:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">block</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;-</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="sh">  hello</span>
+<span class="sh">    world</span>
+<span class="dl">  EOT</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In this case, Terraform analyses the lines in the sequence to find the one
+with the smallest number of leading spaces, and then trims that many spaces
+from the beginning of all of the lines, leading to the following result:</p>
+
+<pre><code>hello
+  world
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Escape%20Sequences"></a><h3 id="escape-sequences-2">Escape Sequences</h3>
+
+<p>Backslash sequences are not interpreted as escapes in a heredoc string
+expression. Instead, the backslash character is interpreted literally.</p>
+
+<p>Heredocs support two special escape sequences that do not use backslashes:</p>
+
+<table>
+<thead>
+<tr>
+  <th>Sequence</th>
+  <th>Replacement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>$${</code></td>
+  <td>Literal <code>${</code>, without beginning an interpolation sequence.</td>
+</tr>
+<tr>
+  <td><code>%%{</code></td>
+  <td>Literal <code>%{</code>, without beginning a template directive sequence.</td>
+</tr>
+</tbody>
+</table>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/String%20Templates"></a><h2 id="string-templates">String Templates</h2>
+
+<p>Within quoted and heredoc string expressions, the sequences <code>${</code> and <code>%{</code> begin
+<em>template sequences</em>. Templates let you directly embed expressions into a string
+literal, to dynamically construct strings from other values.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Interpolation"></a><h3 id="interpolation">Interpolation</h3>
+
+<p>A <code>${ ... }</code> sequence is an <em>interpolation,</em> which evaluates the expression
+given between the markers, converts the result to a string if necessary, and
+then inserts it into the final string:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="s2">"Hello, ${var.name}!"</span><span class="w"></span>
+</code></pre></div>
+
+<p>In the above example, the named object <code>var.name</code> is accessed and its value
+inserted into the string, producing a result like "Hello, Juan!".</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Directives"></a><h3 id="directives">Directives</h3>
+
+<p>A <code>%{ ... }</code> sequence is a <em>directive</em>, which allows for conditional
+results and iteration over collections, similar to conditional
+and <code>for</code> expressions.</p>
+
+<p>The following directives are supported:</p>
+
+<ul>
+<li><p>The <code>%{if &lt;BOOL&gt;}</code>/<code>%{else}</code>/<code>%{endif}</code> directive chooses between two templates based
+on the value of a bool expression:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="s2">"Hello, %{ if var.name != "" }${var.name}%{ else }unnamed%{ endif }!"</span><span class="w"></span>
+</code></pre></div>
+
+<p>The <code>else</code> portion may be omitted, in which case the result is an empty
+string if the condition expression returns <code>false</code>.</p></li>
+<li><p>The <code>%{for &lt;NAME&gt; in &lt;COLLECTION&gt;}</code> / <code>%{endfor}</code> directive iterates over the
+elements of a given collection or structural value and evaluates a given
+template once for each element, concatenating the results together:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="o">&lt;&lt;</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="sh">%{ for ip in aws_instance.example[*].private_ip }</span>
+<span class="sh">server ${ip}</span>
+<span class="sh">%{ endfor }</span>
+<span class="dl">EOT</span>
+</code></pre></div>
+
+<p>The name given immediately after the <code>for</code> keyword is used as a temporary
+variable name which can then be referenced from the nested template.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Whitespace%20Stripping"></a><h3 id="whitespace-stripping">Whitespace Stripping</h3>
+
+<p>To allow template directives to be formatted for readability without adding
+unwanted spaces and newlines to the result, all template sequences can include
+optional <em>strip markers</em> (<code>~</code>), immediately after the opening characters or
+immediately before the end. When a strip marker is present, the template
+sequence consumes all of the literal whitespace (spaces and newlines) either
+before the sequence (if the marker appears at the beginning) or after (if the
+marker appears at the end):</p>
+
+<div class="codehilite"><pre><span></span><code><span class="o">&lt;&lt;</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="sh">%{ for ip in aws_instance.example[*].private_ip ~}</span>
+<span class="sh">server ${ip}</span>
+<span class="sh">%{ endfor ~}</span>
+<span class="dl">EOT</span>
+</code></pre></div>
+
+<p>In the above example, the newline after each of the directives is not included
+in the output, but the newline after the <code>server ${ip}</code> sequence is retained,
+causing only one line to be generated for each element:</p>
+
+<pre><code>server 10.1.16.154
+server 10.1.16.1
+server 10.1.16.34
+</code></pre>
+
+<p>When using template directives, we recommend always using the "heredoc" string
+literal form and then formatting the template over multiple lines for
+readability. Quoted string literals should usually include only interpolation
+sequences.</p>
+
+            
+        
+    </body></html>

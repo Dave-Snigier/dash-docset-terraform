@@ -1,0 +1,110 @@
+<html><!-- Online page at https://registry.terraform.io/providers/auth0/auth0/latest/docs/guides/generate_terraform_config --><head>
+                <title>Auto-generating Terraform config files from Auth0 tenant</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="auto-generating-terraform-config-files-from-auth0-tenant">Auto-generating Terraform config files from Auth0 tenant</h1>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This guide refers to Auth0 CLI functionality that is _experimental_ and may change in future versions.</p>
+</aside>
+
+<p>Adopting Terraform for a mature Auth0 tenant can be daunting. Developers often face the challenge of manually importing numerous resources, necessitating the retrieval of multiple IDs. At times, they resort to manual Terraform configuration to match the tenant's resources.</p>
+
+<p>Fortunately, the <a href="https://auth0.github.io/auth0-cli/">Auth0 CLI</a> simplifies this process by auto-generating Terraform configuration files from an Auth0 tenant. This guide instructs developers on using the Auth0 CLI to auto-generate these files, enabling rapid transition to Terraform in minutes, not days.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Pre-requisites%3A"></a><h2 id="pre-requisites">Pre-requisites:</h2>
+
+<ul>
+<li><strong>Auth0 CLI v1.1.0+</strong> – Auth0's official CLI. This tool will be performing the heavy lifting. Specifically requires versions 1.1.0 and up. See: <a href="https://auth0.github.io/auth0-cli/">Auth0 CLI installation instructions</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/1.%20Create%20Dedicated%20M2M%20Application%20for%20TF%20Provider"></a><h2 id="1-create-dedicated-m2m-application-for-tf-provider">1. Create Dedicated M2M Application for TF Provider</h2>
+
+<p>Establish an authenticated link between the Auth0 Terraform provider and the Auth0 tenant you wish to generate config for. This can be done by creating a dedicated machine-to-machine (M2M) application (client).</p>
+
+<p>Follow the <a href="https://registry.terraform.io/providers/auth0/auth0/latest/docs/guides/quickstart#create-a-machine-to-machine-application">Terraform Quickstart Guide</a> for instructions. Note the <strong>domain</strong>, <strong>client ID</strong>, and <strong>client secret</strong> values, as they are required in the next step.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/2.%20Set%20Environment%20Variables%20for%20TF%20Provider"></a><h2 id="2-set-environment-variables-for-tf-provider">2. Set Environment Variables for TF Provider</h2>
+
+<p>In your terminal, set the following environment variables, replacing <code>AUTH0_DOMAIN</code>, <code>AUTH0_CLIENT_ID</code>, and <code>AUTH0_CLIENT_SECRET</code> with the values noted in step 1:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span> <span class="nv">AUTH0_DOMAIN</span><span class="o">=</span>***********
+<span class="nb">export</span> <span class="nv">AUTH0_CLIENT_ID</span><span class="o">=</span>***********
+<span class="nb">export</span> <span class="nv">AUTH0_CLIENT_SECRET</span><span class="o">=</span>***********
+</code></pre></div>
+
+<p><strong>Note:</strong> Environment variables are the simplest and most secure way to pass credentials to the provider. Refer to the <a href="https://registry.terraform.io/providers/auth0/auth0/latest/docs#example-usage">related documentation</a> for alternatives.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/3.%20Authenticate%20with%20Auth0%20CLI"></a><h2 id="3-authenticate-with-auth0-cli">3. Authenticate with Auth0 CLI</h2>
+
+<p>Like the Terraform Provider, the Auth0 CLI requires an authentication link to the Auth0 tenant you wish to generate config for. To begin the authentication step, run:</p>
+
+<div class="codehilite"><pre><span></span><code>auth0 login
+</code></pre></div>
+
+<p>Follow the interactive prompts to complete the authentication process.</p>
+
+<p>Authenticating as a user is the simplest and quickest way to authenticate with the CLI but authenticating as a machine is also a valid option. However, it is recommended to use a separate machine-to-machine client than the one created in step 1.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>It is required to authenticate the Auth0 CLI and TF provider to the same domain. The resulting auto-generated configuration is portable thereafter.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/4.%20Run%20tf%20generate%20Command"></a><h2 id="4-run-tf-generate-command">4. Run <code>tf generate</code> Command</h2>
+
+<p>With the Auth0 CLI authenticated to your tenant, initiate Terraform configuration auto-generation by running:</p>
+
+<pre><code>auth0 tf generate --output-dir tmp-auth0-tf
+</code></pre>
+
+<p>This command fetches relevant data from Auth0 and facilitates resource import using the Auth0 Terraform provider on the developer's behalf. You may want to isolate the auto-generated config from your current directory. In the above example, the output directory <code>tmp-auth0-tf</code> is used.</p>
+
+<p>Follow the command's prompts and instructions. A successful run will produce an <code>auth0_generated.tf</code> file that produces no errors when <code>./terraform plan</code> is run. In certain cases it may be necessary to troubleshoot minor Terraform issues.</p>
+
+<p>Some files are expected to be created during this process:</p>
+
+<ul>
+<li><code>auth0_main.tf</code> – Establishes the Auth0 Terraform provider with specific versions for auto-generated config.</li>
+<li><code>auth0_import.tf</code> – Contains all resources' import blocks, including names and IDs. Related: <a href="https://developer.hashicorp.com/terraform/language/import">Hashicorp Import Blocks</a>.</li>
+<li><code>terraform</code> binary – A local Terraform binary instance for auto-generation. Pinned to a specific version.</li>
+<li><code>auth0_generated.tf</code> – The final Terraform resource artifact representing your Auth0 tenant.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/5.%20Review%20and%20Apply%20Terraform%20Config"></a><h2 id="5-review-and-apply-terraform-config">5. Review and Apply Terraform Config</h2>
+
+<p>Once you've executed the <code>auth0 tf generate</code> command and have created the <code>auth0_generated.tf</code> artifact, it is advised to spot-check it to ensure that all expected resources are present and no egregious errors exist.</p>
+
+<p>It is at the developer's discretion to decide whether to immediately apply this generated configuration. Applying the configuration instructs Terraform to align your Auth0 tenant with the contents of these configuration files.</p>
+
+<p>Alternatively, you can choose not to apply the configuration immediately. Instead, retain the generated Terraform configuration files for reference or modification. These files offer a valuable snapshot of your Auth0 tenant's configuration at the time of generation. Using the generated configuration files in this manner grants you the flexibility to adjust them to your needs or apply them to different Auth0 tenants as necessary.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Note%20About%20Sensitive%20Values"></a><h2 id="note-about-sensitive-values">Note About Sensitive Values</h2>
+
+<p>While the generated Terraform config appears complete, it cannot export sensitive values like secrets and keys.</p>
+
+<p>If configuring the same tenant as the one exported, immediate alterations may not be necessary. However, when applying this configuration to other tenants, you might need to supplement those values after the fact to ensure proper operation. Review the <code>auth0_generated.tf</code> file for properties commented with <code># sensitive</code>. These are fields that may require replacements.</p>
+
+<p><strong>Example:</strong>
+In the below example, both <code>credentials.access_key_id</code> and <code>credentials.api_key</code> properties are marked as sensitive.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># __generated__ by Terraform from "52745e4d-278c-4b6b-8cac-a27e457215d6"</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"auth0_email_provider"</span><span class="w"> </span><span class="nv">"email_provider"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default_from_address</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mailing-daemon@travel0.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">enabled</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"smtp"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">credentials</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">access_key_id</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="kt">null</span><span class="c1"> # sensitive</span>
+<span class="w">    </span><span class="na">api_key</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="kt">null</span><span class="c1"> # sensitive</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

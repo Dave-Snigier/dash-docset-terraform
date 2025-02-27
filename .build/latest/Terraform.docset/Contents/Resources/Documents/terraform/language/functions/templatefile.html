@@ -1,0 +1,146 @@
+<html><!-- Online page at https://www.terraform.io/language/functions/templatefile --><head>
+                <title>templatefile</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="templatefile-function"><code>templatefile</code> Function</h1>
+
+<p><code>templatefile</code> reads the file at the given path and renders its content
+as a template using a supplied set of template variables.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nf">templatefile</span><span class="p">(</span><span class="err">path</span><span class="p">,</span><span class="w"> </span><span class="err">vars</span><span class="p">)</span><span class="w"></span>
+</code></pre></div>
+
+<p>The template syntax is the same as for
+<a href="../../terraform/language/expressions/strings.html#string-templates">string templates</a>
+in the main Terraform language, including interpolation sequences delimited with
+<code>${</code> ... <code>}</code>. This function just allows longer template sequences to be factored
+out into a separate file for readability.</p>
+
+<p>The "vars" argument must be an object. Within the template file, each of the
+keys in the map is available as a variable for interpolation. The template may
+also use any other function available in the Terraform language, except that
+recursive calls to <code>templatefile</code> are not permitted. Variable names must
+each start with a letter, followed by zero or more letters, digits, or
+underscores.</p>
+
+<p>Strings in the Terraform language are sequences of Unicode characters, so
+this function will interpret the file contents as UTF-8 encoded text and
+return the resulting Unicode characters. If the file contains invalid UTF-8
+sequences then this function will produce an error.</p>
+
+<p>This function can be used only with files that already exist on disk at the
+beginning of a Terraform run. Functions do not participate in the dependency
+graph, so this function cannot be used with files that are generated
+dynamically during a Terraform operation.</p>
+
+<p><code>*.tftpl</code> is the recommended naming pattern to use for your template files.
+Terraform will not prevent you from using other names, but following this
+convention will help your editor understand the content and likely provide
+better editing experience as a result.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Examples"></a><h2 id="examples">Examples</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Lists"></a><h3 id="lists">Lists</h3>
+
+<p>Given a template file <code>backends.tftpl</code> with the following content:</p>
+
+<pre><code>%{ for addr in ip_addrs ~}
+backend ${addr}:${port}
+%{ endfor ~}
+</code></pre>
+
+<p>The <code>templatefile</code> function renders the template:</p>
+
+<pre><code>&gt; templatefile("${path.module}/backends.tftpl", { port = 8080, ip_addrs = ["10.0.0.1", "10.0.0.2"] })
+backend 10.0.0.1:8080
+backend 10.0.0.2:8080
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Maps"></a><h3 id="maps">Maps</h3>
+
+<p>Given a template file <code>config.tftpl</code> with the following content:</p>
+
+<pre><code>%{ for config_key, config_value in config }
+set ${config_key} = ${config_value}
+%{ endfor ~}
+</code></pre>
+
+<p>The <code>templatefile</code> function renders the template:</p>
+
+<pre><code>&gt; templatefile(
+               "${path.module}/config.tftpl",
+               {
+                 config = {
+                   "x"   = "y"
+                   "foo" = "bar"
+                   "key" = "value"
+                 }
+               }
+              )
+set foo = bar
+set key = value
+set x = y
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Generating%20JSON%20or%20YAML%20from%20a%20template"></a><h3 id="generating-json-or-yaml-from-a-template">Generating JSON or YAML from a template</h3>
+
+<p>If the string you want to generate will be in JSON or YAML syntax, it's
+often tricky and tedious to write a template that will generate valid JSON or
+YAML that will be interpreted correctly when using lots of individual
+interpolation sequences and directives.</p>
+
+<p>Instead, you can write a template that consists only of a single interpolated
+call to either <a href="../../terraform/language/functions/jsonencode.html"><code>jsonencode</code></a> or
+<a href="../../terraform/language/functions/yamlencode.html"><code>yamlencode</code></a>, specifying the value to encode using
+<a href="../../terraform/language/expressions.html">normal Terraform expression syntax</a>
+as in the following examples:</p>
+
+<pre><code>${jsonencode({
+  "backends": [for addr in ip_addrs : "${addr}:${port}"],
+})}
+</code></pre>
+
+<pre><code>${yamlencode({
+  "backends": [for addr in ip_addrs : "${addr}:${port}"],
+})}
+</code></pre>
+
+<p>Given the same input as the <code>backends.tftpl</code> example in the previous section,
+this will produce a valid JSON or YAML representation of the given data
+structure, without the need to manually handle escaping or delimiters.
+In the latest examples above, the repetition based on elements of <code>ip_addrs</code> is
+achieved by using a
+<a href="../../terraform/language/expressions/for.html"><code>for</code> expression</a>
+rather than by using
+<a href="../../terraform/language/expressions/strings.html#directives">template directives</a>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="nt">"backends"</span><span class="p">:[</span><span class="s2">"10.0.0.1:8080"</span><span class="p">,</span><span class="s2">"10.0.0.2:8080"</span><span class="p">]}</span><span class="w"></span>
+</code></pre></div>
+
+<p>If the resulting template is small, you can choose instead to write
+<code>jsonencode</code> or <code>yamlencode</code> calls inline in your main configuration files, and
+avoid creating separate template files at all:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend_config_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"backends"</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="err">for</span><span class="w"> </span><span class="err">addr</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">ip_addrs</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"${addr}:${port}"</span><span class="p">],</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>For more information, see the main documentation for
+<a href="../../terraform/language/functions/jsonencode.html"><code>jsonencode</code></a> and <a href="../../terraform/language/functions/yamlencode.html"><code>yamlencode</code></a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Functions"></a><h2 id="related-functions">Related Functions</h2>
+
+<ul>
+<li><a href="../../terraform/language/functions/file.html"><code>file</code></a> reads a file from disk and returns its literal contents
+without any template interpretation.</li>
+<li><a href="../../terraform/language/functions/templatestring.html"><code>templatestring</code></a> takes a simple reference to a string value containing the template and renders its content.</li>
+</ul>
+
+            
+        
+    </body></html>

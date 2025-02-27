@@ -1,0 +1,203 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/cluster_policy --><head>
+                <title>databricks_cluster_policy</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_cluster_policy-resource">databricks_cluster_policy Resource</h1>
+
+<p>This resource creates a <a href="cluster.md">cluster</a> policy, which limits the ability to create clusters based on a set of rules. The policy rules limit the attributes or attribute values available for <a href="cluster.md">cluster</a> creation. <a href="cluster.md">cluster</a> policies have ACLs that limit their use to specific users and groups. Only admin users can create, edit, and delete policies. Admin users also have access to all policies.</p>
+
+<p>Cluster policies let you:</p>
+
+<ul>
+<li>Limit users to create clusters with prescribed settings.</li>
+<li>Simplify the user interface and enable more users to create their own clusters (by fixing and hiding some values).</li>
+<li>Control cost by limiting per <a href="cluster.md">cluster</a> maximum cost (by setting limits on attributes whose values contribute to hourly price).</li>
+</ul>
+
+<p>Cluster policy permissions limit which policies a user can select in the Policy drop-down when the user creates a cluster:</p>
+
+<ul>
+<li>If no policies have been created in the workspace, the Policy drop-down does not display.</li>
+<li>A user who has <a href="cluster.md">cluster</a> create permission can select the <code>Free form</code> policy and create fully-configurable clusters.</li>
+<li>A user who has both <a href="cluster.md">cluster</a> create permission and access to <a href="cluster.md">cluster</a> policies can select the Free form policy and policies they have access to.</li>
+<li>A user that has access to only <a href="cluster.md">cluster</a> policies, can select the policies they have access to.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>Let us take a look at an example of how you can manage two teams: Marketing and Data Engineering. In the following scenario we want the marketing team to have a really good query experience, so we enabled delta cache for them. On the other hand we want the data engineering team to be able to utilize bigger clusters so we increased the dbus per hour that they can spend. This strategy allows your marketing users and data engineering users to use Databricks in a self service manner but have a different experience in regards to security and performance. And down the line if you need to add more global settings you can propagate them through the "base <a href="cluster.md">cluster</a> policy".</p>
+
+<p><code>modules/base-cluster-policy/main.tf</code> could look like:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"team"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Team that performs the work"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"policy_overrides"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Cluster policy overrides"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">default_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"dbus_per_hour"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"type"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"range"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"maxValue"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"autotermination_minutes"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"type"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"fixed"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"value"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="m">20</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"hidden"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"custom_tags.Team"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"type"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"fixed"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"value"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nv">var.team</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_cluster_policy"</span><span class="w"> </span><span class="nv">"fair_use"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.team} cluster policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">definition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">(</span><span class="nf">merge</span><span class="p">(</span><span class="nv">local.default_policy</span><span class="p">,</span><span class="w"> </span><span class="nv">var.policy_overrides</span><span class="p">))</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">libraries</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">pypi</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">package</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"databricks-sdk==0.12.0"</span><span class="c1"></span>
+<span class="c1">      // repo can also be specified here</span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">libraries</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">maven</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">coordinates</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"com.oracle.database.jdbc:ojdbc8:XXXX"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_permissions"</span><span class="w"> </span><span class="nv">"can_use_cluster_policyinstance_profile"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_policy_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_cluster_policy.fair_use.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">access_control</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">group_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">var.team</span><span class="w"></span>
+<span class="w">    </span><span class="na">permission_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CAN_USE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>And custom instances of that base policy module for our marketing and data engineering teams would look like:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">module</span><span class="w"> </span><span class="nv">"marketing_compute_policy"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"../modules/databricks-cluster-policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">team</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"marketing"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">policy_overrides</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    // only the marketing team will benefit from delta cache this way</span>
+<span class="w">    </span><span class="s2">"spark_conf.spark.databricks.io.cache.enabled"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"type"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"fixed"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"value"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"true"</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">module</span><span class="w"> </span><span class="nv">"engineering_compute_policy"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"../modules/databricks-cluster-policy"</span><span class="w"></span>
+<span class="w">  </span><span class="na">team</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"engineering"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">policy_overrides</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"dbus_per_hour"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"type"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"range"</span><span class="p">,</span><span class="c1"></span>
+<span class="c1">      // only the engineering team are allowed to spin up big clusters</span>
+<span class="w">      </span><span class="s2">"maxValue"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="m">50</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Overriding%20the%20built-in%20cluster%20policies"></a><h3 id="overriding-the-built-in-cluster-policies">Overriding the built-in cluster policies</h3>
+
+<p>You can override built-in cluster policies by creating a <code>databricks_cluster_policy</code> resource with following attributes:</p>
+
+<ul>
+<li><code>name</code> - the name of the built-in cluster policy.</li>
+<li><code>policy_family_id</code> - the ID of the cluster policy family used for built-in cluster policy.</li>
+<li><code>policy_family_definition_overrides</code> - settings to override in the built-in cluster policy.</li>
+</ul>
+
+<p>You can obtain the list of defined cluster policies families using the <code>databricks policy-families list</code> command of the new <a href="https://docs.databricks.com/en/dev-tools/cli/index.html">Databricks CLI</a>, or via <a href="https://docs.databricks.com/api/workspace/policyfamilies/list">list policy families</a> REST API.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">personal_vm_override</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"autotermination_minutes"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"type"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"fixed"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"value"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="m">220</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"hidden"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"custom_tags.Team"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"type"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"fixed"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"value"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nv">var.team</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_cluster_policy"</span><span class="w"> </span><span class="nv">"personal_vm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_family_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"personal-vm"</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_family_definition_overrides</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">(</span><span class="nv">local.personal_vm_override</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                               </span><span class="o">=</span><span class="w"> </span><span class="s2">"Personal Compute"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>name</code> - (Required) Cluster policy name. This must be unique. Length must be between 1 and 100 characters.</li>
+<li><code>description</code> - (Optional) Additional human-readable description of the cluster policy.</li>
+<li><code>definition</code> - Policy definition: JSON document expressed in <a href="https://docs.databricks.com/administration-guide/clusters/policies.html#cluster-policy-definition">Databricks Policy Definition Language</a>. Cannot be used with <code>policy_family_id</code></li>
+<li><code>max_clusters_per_user</code> - (Optional, integer) Maximum number of clusters allowed per user. When omitted, there is no limit. If specified, value must be greater than zero.</li>
+<li><code>policy_family_definition_overrides</code>(Optional) Policy definition JSON document expressed in Databricks Policy Definition Language. The JSON document must be passed as a string and cannot be embedded in the requests. You can use this to customize the policy definition inherited from the policy family. Policy rules specified here are merged into the inherited policy definition.</li>
+<li><code>policy_family_id</code> (Optional) ID of the policy family. The cluster policy's policy definition inherits the policy family's policy definition. Cannot be used with <code>definition</code>. Use <code>policy_family_definition_overrides</code> instead to customize the policy definition.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/libraries%20Configuration%20Block%20%28Optional%29"></a><h3 id="libraries-configuration-block-optional">libraries Configuration Block (Optional)</h3>
+
+<p>One must specify each library in a separate configuration block, that will be installed on the cluster that uses a given cluster policy. See <a href="cluster.md#library-configuration-block">databricks_cluster</a> for more details about supported library types.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - Canonical unique identifier for the cluster policy. This is equal to <code>policy_id</code>.</li>
+<li><code>policy_id</code> - Canonical unique identifier for the cluster policy.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>The resource cluster policy can be imported using the policy id:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform import databricks_cluster_policy.this &lt;cluster-policy-id&gt;
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are often used in the same context:</p>
+
+<ul>
+<li><a href="../guides/workspace-management.md">Dynamic Passthrough Clusters for a Group</a> guide.</li>
+<li><a href="../guides/workspace-management.md">End to end workspace management</a> guide.</li>
+<li><a href="../data-sources/clusters.md">databricks_clusters</a> data to retrieve a list of <a href="cluster.md">databricks_cluster</a> ids.</li>
+<li><a href="cluster.md">databricks_cluster</a> to create <a href="https://docs.databricks.com/clusters/index.html">Databricks Clusters</a>.</li>
+<li><a href="../data-sources/current_user.md">databricks_current_user</a> data to retrieve information about <a href="user.md">databricks_user</a> or <a href="service_principal.md">databricks_service_principal</a>, that is calling Databricks REST API.</li>
+<li><a href="global_init_script.md">databricks_global_init_script</a> to manage <a href="https://docs.databricks.com/clusters/init-scripts.html#global-init-scripts">global init scripts</a>, which are run on all <a href="cluster.md#init_scripts">databricks_cluster</a> and <a href="job.md#new_cluster">databricks_job</a>.</li>
+<li><a href="instance_pool.md">databricks_instance_pool</a> to manage <a href="https://docs.databricks.com/clusters/instance-pools/index.html">instance pools</a> to reduce <a href="cluster.md">cluster</a> start and auto-scaling times by maintaining a set of idle, ready-to-use instances.</li>
+<li><a href="instance_profile.md">databricks_instance_profile</a> to manage AWS EC2 instance profiles that users can launch <a href="cluster.md">databricks_cluster</a> and access data, like <a href="mount.md">databricks_mount</a>.</li>
+<li><a href="ip_access_list.md">databricks_ip_access_list</a> to allow access from <a href="https://docs.databricks.com/security/network/ip-access-list.html">predefined IP ranges</a>.</li>
+<li><a href="library.md">databricks_library</a> to install a <a href="https://docs.databricks.com/libraries/index.html">library</a> on <a href="cluster.md">databricks_cluster</a>.</li>
+<li><a href="../data-sources/node_type.md">databricks_node_type</a> data to get the smallest node type for <a href="cluster.md">databricks_cluster</a> that fits search criteria, like amount of RAM or number of cores.</li>
+<li><a href="permissions.md">databricks_permissions</a> to manage <a href="https://docs.databricks.com/security/access-control/index.html">access control</a> in Databricks workspace.</li>
+<li><a href="../data-sources/spark_version.md">databricks_spark_version</a> data to get <a href="https://docs.databricks.com/runtime/dbr.html">Databricks Runtime (DBR)</a> version that could be used for <code>spark_version</code> parameter in <a href="cluster.md">databricks_cluster</a> and other resources.</li>
+<li><a href="user_instance_profile.md">databricks_user_instance_profile</a> to attach <a href="instance_profile.md">databricks_instance_profile</a> (AWS) to <a href="user.md">databricks_user</a>.</li>
+<li><a href="workspace_conf.md">databricks_workspace_conf</a> to manage workspace configuration for expert usage.</li>
+</ul>
+
+            
+        
+    </body></html>

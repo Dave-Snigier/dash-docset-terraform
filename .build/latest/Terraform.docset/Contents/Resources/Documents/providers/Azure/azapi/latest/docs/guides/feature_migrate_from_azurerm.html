@@ -1,0 +1,217 @@
+<html><!-- Online page at https://registry.terraform.io/providers/Azure/azapi/latest/docs/guides/feature_migrate_from_azurerm --><head>
+                <title>Feature: Migrate from Azurerm</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <a class="dashAnchor" name="//apple_ref/cpp/Section/Introduction"></a><h2 id="introduction">Introduction</h2>
+
+<p>This guide is intended to help you migrate your existing AzureRM resources to AzApi in Terraform Module. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Prerequisites"></a><h2 id="prerequisites">Prerequisites</h2>
+
+<ul>
+<li><a href="https://www.terraform.io/downloads.html">Terraform</a> version 1.8.0 or later</li>
+<li><a href="https://marketplace.visualstudio.com/items?itemName=azapi-vscode.azapi">AzAPI VSCode extension</a> version 2.1.0 or later</li>
+<li><a href="https://registry.terraform.io/providers/azure/azapi">Terraform AzAPI provider</a> version 2.1.0 or later</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Migration%20Steps"></a><h2 id="migration-steps">Migration Steps</h2>
+
+<p>This guide will walk you through the steps to migrate your existing AzureRM resources to AzApi in Terraform Module. 
+It will use <a href="https://github.com/Azure/terraform-azurerm-avm-ptn-aks-dev">terraform-azurerm-avm-ptn-aks-dev</a> as an example.
+The target is to migrate the <code>azurerm_management_lock</code> to <code>azapi_resource</code> in the module.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%201%3A%20Deploy%20the%20resources%20in%20root%20module"></a><h3 id="step-1-deploy-the-resources-in-root-module">Step 1: Deploy the resources in root module</h3>
+
+<p>The migration flow only works with deployed resources. And it only supports the resources in the root module.</p>
+
+<p>Please add the necessary terraform code to deploy the resources in the root module. In the <code>terraform-azurerm-avm-ptn-aks-dev</code> example, you can add the following code to deploy the <code>azurerm_management_lock</code> resource.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// provider.tf</span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">subscription_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// terraform.tfvars</span>
+
+<span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"eastus"</span><span class="w"></span>
+<span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"heng-aks"</span><span class="c1"> // name of an existing resource group</span>
+<span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"henglutest"</span><span class="w"></span>
+<span class="nb">lock</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="c1">    // enable the lock</span>
+<span class="w">  </span><span class="na">kind</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CanNotDelete"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mylock"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After adding the code, run <code>terraform init</code> and <code>terraform apply</code> to deploy the resources.</p>
+
+<p><strong>Note</strong>: Please use the Azure CLI to authenticate with Azure before running the <code>terraform</code> commands.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%202%3A%20Migrate%20the%20resources%20in%20the%20module"></a><h3 id="step-2-migrate-the-resources-in-the-module">Step 2: Migrate the resources in the module</h3>
+
+<p>Select the resource you want to migrate, in this example, it is the <code>azurerm_management_lock</code> resource block.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># required AVM resources interfaces</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_management_lock"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.lock</span><span class="w"> </span><span class="p">!=</span><span class="w"> </span><span class="kt">null</span><span class="w"> </span><span class="p">?</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">lock_level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.lock.kind</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nf">coalesce</span><span class="p">(</span><span class="nv">var.lock.name</span><span class="p">,</span><span class="w"> </span><span class="s2">"lock-${var.lock.kind}"</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">scope</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_kubernetes_cluster.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">notes</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">var.lock.kind</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Then you can see a light bulb icon on the left side of the resource block. Click on the light bulb icon and select <code>Migrate to AzAPI Provider</code>.</p>
+
+<p>After clicking on the <code>Migrate to AzAPI Provider</code>, you will see a progress bar showing the migration progress.  </p>
+
+<p>Below is the migrated code block.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># # required AVM resources interfaces</span>
+<span class="c1"># resource "azurerm_management_lock" "this" {</span>
+<span class="c1">#   count = var.lock != null ? 1 : 0</span>
+<span class="c1"># </span>
+<span class="c1">#   lock_level = var.lock.kind</span>
+<span class="c1">#   name       = coalesce(var.lock.name, "lock-${var.lock.kind}")</span>
+<span class="c1">#   scope      = azurerm_kubernetes_cluster.this.id</span>
+<span class="c1">#   notes      = var.lock.kind == "CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."</span>
+<span class="c1"># }</span>
+<span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_management_lock.this</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.lock_this</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"lock_this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Authorization/locks@2020-05-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_kubernetes_cluster.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"mylock"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">properties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"CanNotDelete"</span><span class="w"></span>
+<span class="w">      </span><span class="na">notes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Cannot delete the resource or its child resources."</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">ignore_casing</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">ignore_missing_property</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">schema_validation_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The generated code may not be perfect, you may need to update rest of the code manually. For example, the reference to the original resource block is not updated to the new resource block. You can update the reference manually.</p>
+
+<p>Now if you run <code>terraform plan</code> command, you will see below output:</p>
+
+<div class="codehilite"><pre><span></span><code>Terraform will perform the following actions:
+
+  <span class="c1"># azurerm_management_lock.this[0] has moved to azapi_resource.lock_this[0]</span>
+    resource <span class="s2">"azapi_resource"</span> <span class="s2">"lock_this"</span> <span class="o">{</span>
+        <span class="nv">id</span>                        <span class="o">=</span> <span class="s2">"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/heng-aks/providers/Microsoft.ContainerService/managedClusters/aks-henglutest/providers/Microsoft.Authorization/locks/mylock"</span>
+        <span class="nv">name</span>                      <span class="o">=</span> <span class="s2">"mylock"</span>
+        <span class="c1"># (7 unchanged attributes hidden)</span>
+    <span class="o">}</span>
+
+Plan: <span class="m">0</span> to add, <span class="m">0</span> to change, <span class="m">0</span> to destroy.
+</code></pre></div>
+
+<p>If you want to migrate other resources, you can repeat the above steps after running <code>terraform apply</code> to apply the changes.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%203%3A%20Update%20the%20migrated%20code"></a><h3 id="step-3-update-the-migrated-code">Step 3: Update the migrated code</h3>
+
+<p>The migrated code is using literal values. You need to update the code to use expressions and variables like the original code.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"lock_this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.lock</span><span class="w"> </span><span class="p">!=</span><span class="w"> </span><span class="kt">null</span><span class="w"> </span><span class="p">?</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Authorization/locks@2020-05-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_kubernetes_cluster.this.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nf">coalesce</span><span class="p">(</span><span class="nv">var.lock.name</span><span class="p">,</span><span class="w"> </span><span class="s2">"lock-${var.lock.kind}"</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="nb">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">properties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.lock.kind</span><span class="w"></span>
+<span class="w">      </span><span class="na">notes</span><span class="w"> </span><span class="o">=</span><span class="nv">var.lock.kind</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">ignore_casing</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">ignore_missing_property</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">schema_validation_enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>It is also possible to rename the <code>azapi_resource</code> label, for example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">moved</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">from</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_management_lock.this</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.cluster_lock</span><span class="c1"> // previously azapi_resource.lock_this</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"cluster_lock"</span><span class="w"> </span><span class="p">{</span><span class="c1"> // previously azapi_resource.lock_this</span>
+<span class="w">  </span><span class="p">...</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>After updating the code, if you run <code>terraform plan</code> command, you will see below output:</p>
+
+<div class="codehilite"><pre><span></span><code>Terraform will perform the following actions:
+
+  <span class="c1"># azurerm_management_lock.this[0] has moved to azapi_resource.cluster_lock[0]</span>
+    resource <span class="s2">"azapi_resource"</span> <span class="s2">"cluster_lock"</span> <span class="o">{</span>
+        <span class="nv">id</span>                        <span class="o">=</span> <span class="s2">"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/heng-aks/providers/Microsoft.ContainerService/managedClusters/aks-henglutest/providers/Microsoft.Authorization/locks/mylock"</span>
+        <span class="nv">name</span>                      <span class="o">=</span> <span class="s2">"mylock"</span>
+        <span class="c1"># (7 unchanged attributes hidden)</span>
+    <span class="o">}</span>
+
+Plan: <span class="m">0</span> to add, <span class="m">0</span> to change, <span class="m">0</span> to destroy.
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%204%3A%20Clean%20up"></a><h3 id="step-4-clean-up">Step 4: Clean up</h3>
+
+<p>After updating the migrated code, you can destroy the deployed resources by running <code>terraform destroy</code> command.</p>
+
+<p>Then you can remove the original code block from the module.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// main.tf</span>
+
+<span class="c1">// Below code block is the original code, you can remove it after the migration</span>
+<span class="c1"># resource "azurerm_management_lock" "this" {</span>
+<span class="c1">#   count = var.lock != null ? 1 : 0</span>
+<span class="c1"># </span>
+<span class="c1">#   lock_level = var.lock.kind</span>
+<span class="c1">#   name       = coalesce(var.lock.name, "lock-${var.lock.kind}")</span>
+<span class="c1">#   scope      = azurerm_kubernetes_cluster.this.id</span>
+<span class="c1">#   notes      = var.lock.kind == "CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."</span>
+<span class="c1"># }</span>
+</code></pre></div>
+
+<p>Also, you can remove the <code>provider.tf</code> and <code>terraform.tfvars</code> files from the module.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Frequently%20Asked%20Questions"></a><h2 id="frequently-asked-questions">Frequently Asked Questions</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Why%20do%20I%20need%20to%20deploy%20the%20resources%20in%20the%20root%20module%3F"></a><h3 id="why-do-i-need-to-deploy-the-resources-in-the-root-module">Why do I need to deploy the resources in the root module?</h3>
+
+<p>The migration flow generates new azapi resources based on the existing azurerm resources. Currently, the migration flow only supports the resources in the root module and will improve in the future.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Why%20do%20I%20need%20to%20authenticate%20with%20Azure%20CLI%3F"></a><h3 id="why-do-i-need-to-authenticate-with-azure-cli">Why do I need to authenticate with Azure CLI?</h3>
+
+<p>The migration flow needs to authenticate with Azure to access the existing resources and generate new azapi resource code. The Azure CLI authentication is easy to use in multiple terraform used in the migration flow. It will improve in the future.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/How%20long%20does%20the%20migration%20take%3F"></a><h3 id="how-long-does-the-migration-take">How long does the migration take?</h3>
+
+<p>The first migration may take a longer time(1~2 minutes, depending on the network speed) because it needs to download the necessary providers. The subsequent migrations will be faster(about 15s).</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/How%20about%20migrating%20multiple%20resources%3F"></a><h3 id="how-about-migrating-multiple-resources">How about migrating multiple resources?</h3>
+
+<p>The migration flow supports migrating multiple resources at the same time. You can select multiple resource blocks and click on the light bulb icon to migrate them.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/How%20about%20migrating%20resources%20from%20azapi%20to%20azurerm%3F"></a><h3 id="how-about-migrating-resources-from-azapi-to-azurerm">How about migrating resources from azapi to azurerm?</h3>
+
+<p>The <code>azurerm</code> provider doesn't support <code>moved</code> block yet. The migration will support migrating resources from <code>azapi</code> to <code>azurerm</code> in the future.</p>
+
+            
+        
+    </body></html>

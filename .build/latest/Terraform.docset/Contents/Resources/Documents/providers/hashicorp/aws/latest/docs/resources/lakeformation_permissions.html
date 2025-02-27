@@ -1,0 +1,330 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lakeformation_permissions --><head>
+                <title>aws_lakeformation_permissions</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_lakeformation_permissions">Resource: aws_lakeformation_permissions</h1>
+
+<p>Grants permissions to the principal to access metadata in the Data Catalog and data organized in underlying data storage such as Amazon S3. Permissions are granted to a principal, in a Data Catalog, relative to a Lake Formation resource, which includes the Data Catalog, databases, tables, LF-tags, and LF-tag policies. For more information, see <a href="https://docs.aws.amazon.com/lake-formation/latest/dg/security-data-access.html">Security and Access Control to Metadata and Data in Lake Formation</a>.</p>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>WARNING</em>
+    <p>Lake Formation permissions are not in effect by default within AWS. Using this resource will not secure your data and will result in errors if you do not change the security settings for existing resources and the default security settings for new resources. See <a href="#default-behavior-and-iamallowedprincipals">Default Behavior and <code>IAMAllowedPrincipals</code></a> for additional details.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>In general, the <code>principal</code> should _NOT_ be a Lake Formation administrator or the entity (e.g., IAM role) that is running Terraform. Administrators have implicit permissions. These should be managed by granting or not granting administrator rights using <code>aws_lakeformation_data_lake_settings</code>, _not_ with this resource.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Default%20Behavior%20and%20IAMAllowedPrincipals"></a><h2 id="default-behavior-and-iamallowedprincipals">Default Behavior and <code>IAMAllowedPrincipals</code></h2>
+
+<p><strong>_Lake Formation permissions are not in effect by default within AWS._</strong> <code>IAMAllowedPrincipals</code> (i.e., <code>IAM_ALLOWED_PRINCIPALS</code>) conflicts with individual Lake Formation permissions (i.e., non-<code>IAMAllowedPrincipals</code> permissions), will cause unexpected behavior, and may result in errors.</p>
+
+<p>When using Lake Formation, choose ONE of the following options as they are mutually exclusive:</p>
+
+<ol>
+<li>Use this resource (<code>aws_lakeformation_permissions</code>), change the default security settings using <a href="../resources/lakeformation_data_lake_settings.html"><code>aws_lakeformation_data_lake_settings</code></a>, and remove existing <code>IAMAllowedPrincipals</code> permissions</li>
+<li>Use <code>IAMAllowedPrincipals</code> without <code>aws_lakeformation_permissions</code></li>
+</ol>
+
+<p>This example shows removing the <code>IAMAllowedPrincipals</code> default security settings and making the caller a Lake Formation admin. Since <code>create_database_default_permissions</code> and <code>create_table_default_permissions</code> are not set in the <a href="../resources/lakeformation_data_lake_settings.html"><code>aws_lakeformation_data_lake_settings</code></a> resource, they are cleared.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_caller_identity"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_session_context"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_caller_identity.current.arn</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lakeformation_data_lake_settings"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">admins</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">data.aws_iam_session_context.current.issuer_arn</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>To remove existing <code>IAMAllowedPrincipals</code> permissions, use the <a href="https://console.aws.amazon.com/lakeformation/">AWS Lake Formation Console</a> or <a href="https://awscli.amazonaws.com/v2/documentation/api/latest/reference/lakeformation/batch-revoke-permissions.html">AWS CLI</a>.</p>
+
+<p><code>IAMAllowedPrincipals</code> is a hook to maintain backwards compatibility with AWS Glue. <code>IAMAllowedPrincipals</code> is a pseudo-entity group that acts like a Lake Formation principal. The group includes any IAM users and roles that are allowed access to your Data Catalog resources by your IAM policies.</p>
+
+<p>This is Lake Formation's default behavior:</p>
+
+<ul>
+<li>Lake Formation grants <code>Super</code> permission to <code>IAMAllowedPrincipals</code> on all existing AWS Glue Data Catalog resources.</li>
+<li>Lake Formation enables "Use only IAM access control" for new Data Catalog resources.</li>
+</ul>
+
+<p>For more details, see <a href="https://docs.aws.amazon.com/lake-formation/latest/dg/change-settings.html">Changing the Default Security Settings for Your Data Lake</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Problem%20Using%20IAMAllowedPrincipals"></a><h3 id="problem-using-iamallowedprincipals">Problem Using <code>IAMAllowedPrincipals</code></h3>
+
+<p>AWS does not support combining <code>IAMAllowedPrincipals</code> permissions and non-<code>IAMAllowedPrincipals</code> permissions. Doing so results in unexpected permissions and behaviors. For example, this configuration grants a user <code>SELECT</code> on a column in a table.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_glue_catalog_database"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sadabate"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_glue_catalog_table"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"abelt"</span><span class="w"></span>
+<span class="w">  </span><span class="na">database_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_glue_catalog_database.test.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">storage_descriptor</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">columns</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"event"</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"string"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lakeformation_permissions"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">permissions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"SELECT"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam:us-east-1:123456789012:user/SanHolo"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">table_with_columns</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">database_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_glue_catalog_table.example.database_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_glue_catalog_table.example.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">column_names</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"event"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The resulting permissions depend on whether the table had <code>IAMAllowedPrincipals</code> (IAP) permissions or not.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Result With IAP</th>
+  <th>Result Without IAP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>SELECT</code> column wildcard (i.e., all columns)</td>
+  <td><code>SELECT</code> on <code>"event"</code> (as expected)</td>
+</tr>
+</tbody>
+</table>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ALLIAMPrincipals%20group"></a><h2 id="alliamprincipals-group"><code>ALLIAMPrincipals</code> group</h2>
+
+<p>AllIAMPrincipals is a pseudo-entity group that acts like a Lake Formation principal. The group includes all IAMs in the account that is defined.</p>
+
+<p>resource "aws_lakeformation_permissions" "example" {
+  permissions = ["SELECT"]
+  principal   = "123456789012:IAMPrincipals"</p>
+
+<p>table_with_columns {
+    database_name = aws_glue_catalog_table.example.database_name
+    name          = aws_glue_catalog_table.example.name
+    column_names  = ["event"]
+  }
+}</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20Lake%20Formation%20Permissions"></a><h2 id="using-lake-formation-permissions">Using Lake Formation Permissions</h2>
+
+<p>Lake Formation grants implicit permissions to data lake administrators, database creators, and table creators. These implicit permissions cannot be revoked _per se_. If this resource reads implicit permissions, it will attempt to revoke them, which causes an error when the resource is destroyed.</p>
+
+<p>There are two ways to avoid these errors. First, and the way we recommend, is to avoid using this resource with principals that have implicit permissions. A second, error-prone option, is to grant explicit permissions (and <code>permissions_with_grant_option</code>) to "overwrite" a principal's implicit permissions, which you can then revoke with this resource. For more information, see <a href="https://docs.aws.amazon.com/lake-formation/latest/dg/implicit-permissions.html">Implicit Lake Formation Permissions</a>.</p>
+
+<p>If the <code>principal</code> is also a data lake administrator, AWS grants implicit permissions that can cause errors using this resource. For example, AWS implicitly grants a <code>principal</code>/administrator <code>permissions</code> and <code>permissions_with_grant_option</code> of <code>ALL</code>, <code>ALTER</code>, <code>DELETE</code>, <code>DESCRIBE</code>, <code>DROP</code>, <code>INSERT</code>, and <code>SELECT</code> on a table. If you use this resource to explicitly grant the <code>principal</code>/administrator <code>permissions</code> but _not_ <code>permissions_with_grant_option</code> of <code>ALL</code>, <code>ALTER</code>, <code>DELETE</code>, <code>DESCRIBE</code>, <code>DROP</code>, <code>INSERT</code>, and <code>SELECT</code> on the table, this resource will read the implicit <code>permissions_with_grant_option</code> and attempt to revoke them when the resource is destroyed. Doing so will cause an <code>InvalidInputException: No permissions revoked</code> error because you cannot revoke implicit permissions _per se_. To workaround this problem, explicitly grant the <code>principal</code>/administrator <code>permissions</code> _and_ <code>permissions_with_grant_option</code>, which can then be revoked. Similarly, granting a <code>principal</code>/administrator permissions on a table with columns and providing <code>column_names</code>, will result in a <code>InvalidInputException: Permissions modification is invalid</code> error because you are narrowing the implicit permissions. Instead, set <code>wildcard</code> to <code>true</code> and remove the <code>column_names</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Grant%20Permissions%20For%20A%20Lake%20Formation%20S3%20Resource"></a><h3 id="grant-permissions-for-a-lake-formation-s3-resource">Grant Permissions For A Lake Formation S3 Resource</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lakeformation_permissions"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.workflow_role.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">permissions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"DATA_LOCATION_ACCESS"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">data_location</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_lakeformation_resource.example.arn</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Grant%20Permissions%20For%20A%20Glue%20Catalog%20Database"></a><h3 id="grant-permissions-for-a-glue-catalog-database">Grant Permissions For A Glue Catalog Database</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lakeformation_permissions"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.workflow_role.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">permissions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"CREATE_TABLE", "ALTER", "DROP"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">database</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_glue_catalog_database.example.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">catalog_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"110376042874"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Grant%20Permissions%20Using%20Tag-Based%20Access%20Control"></a><h3 id="grant-permissions-using-tag-based-access-control">Grant Permissions Using Tag-Based Access Control</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_lakeformation_permissions"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">principal</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.sales_role.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">permissions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"CREATE_TABLE", "ALTER", "DROP"</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lf_tag_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"DATABASE"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">expression</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">key</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Team"</span><span class="w"></span>
+<span class="w">      </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"Sales"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">expression</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">key</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Environment"</span><span class="w"></span>
+<span class="w">      </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"Dev", "Production"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>permissions</code> – (Required) List of permissions granted to the principal. Valid values may include <code>ALL</code>, <code>ALTER</code>, <code>ASSOCIATE</code>, <code>CREATE_DATABASE</code>, <code>CREATE_TABLE</code>, <code>DATA_LOCATION_ACCESS</code>, <code>DELETE</code>, <code>DESCRIBE</code>, <code>DROP</code>, <code>INSERT</code>, and <code>SELECT</code>. For details on each permission, see <a href="https://docs.aws.amazon.com/lake-formation/latest/dg/lf-permissions-reference.html">Lake Formation Permissions Reference</a>.</li>
+<li><code>principal</code> – (Required) Principal to be granted the permissions on the resource. Supported principals include <code>IAM_ALLOWED_PRINCIPALS</code> (see <a href="#default-behavior-and-iamallowedprincipals">Default Behavior and <code>IAMAllowedPrincipals</code></a> above), IAM roles, users, groups, Federated Users, SAML groups and users, QuickSight groups, OUs, and organizations as well as AWS account IDs for cross-account permissions. For more information, see <a href="https://docs.aws.amazon.com/lake-formation/latest/dg/lf-permissions-reference.html">Lake Formation Permissions Reference</a>.</li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>We highly recommend that the <code>principal</code> _NOT_ be a Lake Formation administrator (granted using <code>aws_lakeformation_data_lake_settings</code>). The entity (e.g., IAM role) running Terraform will most likely need to be a Lake Formation administrator. As such, the entity will have implicit permissions and does not need permissions granted through this resource.</p>
+</aside>
+
+<p>One of the following is required:</p>
+
+<ul>
+<li><code>catalog_resource</code> - (Optional) Whether the permissions are to be granted for the Data Catalog. Defaults to <code>false</code>.</li>
+<li><code>data_cells_filter</code> - (Optional) Configuration block for a data cells filter resource. Detailed below.</li>
+<li><code>data_location</code> - (Optional) Configuration block for a data location resource. Detailed below.</li>
+<li><code>database</code> - (Optional) Configuration block for a database resource. Detailed below.</li>
+<li><code>lf_tag</code> - (Optional) Configuration block for an LF-tag resource. Detailed below.</li>
+<li><code>lf_tag_policy</code> - (Optional) Configuration block for an LF-tag policy resource. Detailed below.</li>
+<li><code>table</code> - (Optional) Configuration block for a table resource. Detailed below.</li>
+<li><code>table_with_columns</code> - (Optional) Configuration block for a table with columns resource. Detailed below.</li>
+</ul>
+
+<p>The following arguments are optional:</p>
+
+<ul>
+<li><code>catalog_id</code> – (Optional) Identifier for the Data Catalog. By default, the account ID. The Data Catalog is the persistent metadata store. It contains database definitions, table definitions, and other control information to manage your Lake Formation environment.</li>
+<li><code>permissions_with_grant_option</code> - (Optional) Subset of <code>permissions</code> which the principal can pass.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/data_cells_filter"></a><h3 id="data_cells_filter">data_cells_filter</h3>
+
+<ul>
+<li><code>database_name</code> - (Required) The name of the database.</li>
+<li><code>name</code> - (Required) The name of the data cells filter.</li>
+<li><code>table_catalog_id</code> - (Required) The ID of the Data Catalog.</li>
+<li><code>table_name</code> - (Required) The name of the table.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/data_location"></a><h3 id="data_location">data_location</h3>
+
+<p>The following argument is required:</p>
+
+<ul>
+<li><code>arn</code> – (Required) Amazon Resource Name (ARN) that uniquely identifies the data location resource.</li>
+</ul>
+
+<p>The following argument is optional:</p>
+
+<ul>
+<li><code>catalog_id</code> - (Optional) Identifier for the Data Catalog where the location is registered with Lake Formation. By default, it is the account ID of the caller.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/database"></a><h3 id="database">database</h3>
+
+<p>The following argument is required:</p>
+
+<ul>
+<li><code>name</code> – (Required) Name of the database resource. Unique to the Data Catalog.</li>
+</ul>
+
+<p>The following argument is optional:</p>
+
+<ul>
+<li><code>catalog_id</code> - (Optional) Identifier for the Data Catalog. By default, it is the account ID of the caller.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/lf_tag"></a><h3 id="lf_tag">lf_tag</h3>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>key</code> – (Required) The key-name for the tag.</li>
+<li><code>values</code> - (Required) A list of possible values an attribute can take.</li>
+</ul>
+
+<p>The following argument is optional:</p>
+
+<ul>
+<li><code>catalog_id</code> - (Optional) Identifier for the Data Catalog. By default, it is the account ID of the caller.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/lf_tag_policy"></a><h3 id="lf_tag_policy">lf_tag_policy</h3>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>resource_type</code> – (Required) The resource type for which the tag policy applies. Valid values are <code>DATABASE</code> and <code>TABLE</code>.</li>
+<li><code>expression</code> - (Required) A list of tag conditions that apply to the resource's tag policy. Configuration block for tag conditions that apply to the policy. See <a href="#expression"><code>expression</code></a> below.</li>
+</ul>
+
+<p>The following argument is optional:</p>
+
+<ul>
+<li><code>catalog_id</code> - (Optional) Identifier for the Data Catalog. By default, it is the account ID of the caller.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/expression"></a><h4 id="expression">expression</h4>
+
+<ul>
+<li><code>key</code> – (Required) The key-name of an LF-Tag.</li>
+<li><code>values</code> - (Required) A list of possible values of an LF-Tag.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/table"></a><h3 id="table">table</h3>
+
+<p>The following argument is required:</p>
+
+<ul>
+<li><code>database_name</code> – (Required) Name of the database for the table. Unique to a Data Catalog.</li>
+<li><code>name</code> - (Required, at least one of <code>name</code> or <code>wildcard</code>) Name of the table.</li>
+<li><code>wildcard</code> - (Required, at least one of <code>name</code> or <code>wildcard</code>) Whether to use a wildcard representing every table under a database. Defaults to <code>false</code>.</li>
+</ul>
+
+<p>The following arguments are optional:</p>
+
+<ul>
+<li><code>catalog_id</code> - (Optional) Identifier for the Data Catalog. By default, it is the account ID of the caller.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/table_with_columns"></a><h3 id="table_with_columns">table_with_columns</h3>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>column_names</code> - (Required, at least one of <code>column_names</code> or <code>wildcard</code>) Set of column names for the table.</li>
+<li><code>database_name</code> – (Required) Name of the database for the table with columns resource. Unique to the Data Catalog.</li>
+<li><code>name</code> – (Required) Name of the table resource.</li>
+<li><code>wildcard</code> - (Required, at least one of <code>column_names</code> or <code>wildcard</code>) Whether to use a column wildcard. If <code>excluded_column_names</code> is included, <code>wildcard</code> must be set to <code>true</code> to avoid Terraform reporting a difference.</li>
+</ul>
+
+<p>The following arguments are optional:</p>
+
+<ul>
+<li><code>catalog_id</code> - (Optional) Identifier for the Data Catalog. By default, it is the account ID of the caller.</li>
+<li><code>excluded_column_names</code> - (Optional) Set of column names for the table to exclude. If <code>excluded_column_names</code> is included, <code>wildcard</code> must be set to <code>true</code> to avoid Terraform reporting a difference.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports no additional attributes.</p>
+
+            
+        
+    </body></html>

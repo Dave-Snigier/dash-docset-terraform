@@ -1,0 +1,124 @@
+<html><!-- Online page at https://registry.terraform.io/providers/gitlabhq/gitlab/latest/docs/guides/version-16 --><head>
+                <title>Upgrade to Terraform GitLab Provider Version 16.0</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="upgrade-to-terraform-gitlab-provider-version-160">Upgrade to Terraform GitLab Provider Version 16.0</h1>
+
+<p>The GitLab 16.0 major milestone introduced a couple of breaking changes that this
+release addresses. In addition, the provider itself breaks a bunch of interfaces 
+which may require actions on the users side. These are described below:</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Change%20of%20resource%20id%20formats"></a><h2 id="change-of-resource-id-formats">Change of resource id formats</h2>
+
+<p><strong>Affected resources</strong>:</p>
+
+<ul>
+<li><code>gitlab_deploy_token</code></li>
+<li><code>gitlab_deploy_key</code></li>
+<li><code>gitlab_project_hook</code></li>
+<li><code>gitlab_group_label</code></li>
+<li><code>gitlab_project_label</code></li>
+<li><code>gitlab_pipeline_schedule_variable</code></li>
+<li><code>gitlab_group_ldap_link</code></li>
+<li><code>gitlab_pipeline_trigger</code></li>
+<li><code>gitlab_pipeline_schedule</code></li>
+</ul>
+
+<p>Some resource <code>id</code> formats weren't uniquely identifiable and did not contain
+all the information to retrieve a particular resource from the GitLab API
+given this id.</p>
+
+<p>Therefore, you may need to change your <code>terraform import</code> commands to use fully
+identifiable resource ids as described in the respective docs.
+This may also affect any use of the <code>id</code> attribute (<code>gitlab_*.*.id</code>) access in
+your Terraform configuration code.</p>
+
+<p>For <code>gitlab_deploy_key</code> and <code>gitlab_pipeline_schedule</code> you need
+to use the <code>deploy_key_id</code> and <code>pipeline_schedule_id</code> attributes, respectively to
+refer to them in sub-resources, like <code>gitlab_deploy_key_enable</code> and <code>gitlab_pipeline_schedule_variable</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Change%20variable%20value%20attribute%20to%20non-sensitive"></a><h2 id="change-variable-value-attribute-to-non-sensitive">Change variable <code>value</code> attribute to non-sensitive</h2>
+
+<p><strong>Affected resources</strong>:</p>
+
+<ul>
+<li><code>gitlab_instance_variable</code></li>
+<li><code>gitlab_group_variable</code></li>
+<li><code>gitlab_project_variable</code></li>
+</ul>
+
+<p>The <code>value</code> attribute of the <code>gitlab_*_variable</code> resources has been changed
+from <code>sensitive</code> to non-sensitive.</p>
+
+<p>Therefore, you may want to use the <code>sensitive()</code> or <code>nonsensitive()</code> Terraform functions.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Require%20expires_at%20attribute%20for%20Project%20Access%20Tokens"></a><h2 id="require-expires_at-attribute-for-project-access-tokens">Require <code>expires_at</code> attribute for Project Access Tokens</h2>
+
+<p>The <code>expires_at</code> attribate for the <code>gitlab_project_access_token</code> resource is required in
+version 16.0.0.</p>
+
+<p>In 16.0.1 and later, this attribute is optional again due to GitLab applying a default 
+when it's empty, however setting it to a date too far in the future may cause an error
+depending on the configuration of your GitLab instance.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Change%20project_id%20attribute%20to%20project"></a><h2 id="change-project_id-attribute-to-project">Change <code>project_id</code> attribute to <code>project</code></h2>
+
+<p><strong>Affected resources</strong>:</p>
+
+<ul>
+<li><code>gitlab_project_freeze_period</code></li>
+<li><code>gitlab_project_level_mr_approvals</code></li>
+<li><code>gitlab_project_membership</code></li>
+<li><code>gitlab_project_share_group</code></li>
+</ul>
+
+<p>Some resources used a <code>project_id</code> attribute to identify a project by numerical id.
+This attribute has been removed in favor of a new <code>project</code> attribute which supports
+both numerical ids and full paths to the project to identify id.
+This aligns with the rest of the project-scoped resources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Change%20group_id%20attribute%20to%20group"></a><h2 id="change-group_id-attribute-to-group">Change <code>group_id</code> attribute to <code>group</code></h2>
+
+<ul>
+<li><code>gitlab_group_ldap_link</code></li>
+</ul>
+
+<p>Some resources used a <code>group_id</code> attribute to identify a group by numerical id.
+This attribute has been removed in favor of a new <code>group</code> attribute which supports
+both numerical ids and full paths to the group to identify id.
+This aligns with the rest of the group-scoped resources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecate%20gitlab_service_%2A%20resources"></a><h2 id="deprecate-gitlab_service_-resources">Deprecate <code>gitlab_service_*</code> resources</h2>
+
+<p>All the <code>gitlab_service_*</code> resources have been deprecated in favor
+of the new <code>gitlab_integration_*</code> resources.
+Make sure to adapt to the new ones within the next 3 releases as we'll be
+removing the <code>gitlab_service_*</code> resources with the upcoming 16.3 release.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deprecate%20gitlab_label%20resource"></a><h2 id="deprecate-gitlab_label-resource">Deprecate <code>gitlab_label</code> resource</h2>
+
+<p>The <code>gitlab_label</code> resource has been deprecated in favor of the new
+<code>gitlab_project_label</code> resource.
+Make sure to adapt to the new resource within the next 3 releases as we'll be
+removing the <code>gitlab_label</code> resource with the upcoming 16.3 release.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Remove%20support%20for%20unencoded%20test%20in%20gitlab_repository_file"></a><h2 id="remove-support-for-unencoded-test-in-gitlab_repository_file">Remove support for unencoded test in <code>gitlab_repository_file</code></h2>
+
+<p>Support for non-base64 encoded text in <code>gitlab_repository_file</code> has been removed.
+If unencoded values are used, terraform will now return an error noting 
+<code>Invalid base64 string in "content"</code>. 
+Instead, use the <a href="https://developer.hashicorp.com/terraform/language/functions/base64encode"><code>base64encode()</code></a>
+function from terraform to encode any values if they are not already encoded.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Misc%20removals"></a><h2 id="misc-removals">Misc removals</h2>
+
+<ul>
+<li>The <code>gitlab_managed_license</code> resource has been removed. There is no longer an upstream GitLab API for it.</li>
+<li>The <code>operations_access_level</code> attribute was removed from the <code>gitlab_project</code> resource and data sources.</li>
+</ul>
+
+            
+        
+    </body></html>

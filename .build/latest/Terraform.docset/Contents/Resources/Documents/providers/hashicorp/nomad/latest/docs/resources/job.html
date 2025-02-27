@@ -1,0 +1,308 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/nomad/latest/docs/resources/job --><head>
+                <title>nomad_job</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="nomad_job">nomad_job</h1>
+
+<p>Manages a job registered in Nomad.</p>
+
+<p>This can be used to initialize your cluster with system jobs, common services,
+and more. In day to day Nomad use it is common for developers to submit jobs to
+Nomad directly, such as for general app deployment. In addition to these apps, a
+Nomad cluster often runs core system services that are ideally setup during
+infrastructure creation. This resource is ideal for the latter type of job, but
+can be used to manage any job within Nomad.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Warning</em>
+    <p>this resource will store any sensitive values placed in <code>consul_token</code> or <code>vault_token</code> in the Terraform's state file. Take care to <a href="../docs/state/sensitive-data.html">protect your state file</a>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>Registering a job from a jobspec file:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"nomad_job"</span><span class="w"> </span><span class="nv">"app"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">jobspec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="p">(</span><span class="s2">"${path.module}/jobspec.hcl"</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Registering a job from an inline jobspec. This is less realistic but
+is an example of how it is possible. More likely, the contents will
+be paired with something such as the
+<a href="https://www.terraform.io/docs/providers/template/d/file.html">template_file</a>
+resource to render parameterized jobspecs.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"nomad_job"</span><span class="w"> </span><span class="nv">"app"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">jobspec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="sh">job "foo" {</span>
+<span class="sh">  datacenters = ["dc1"]</span>
+<span class="sh">  type        = "service"</span>
+<span class="sh">  group "foo" {</span>
+<span class="sh">    task "foo" {</span>
+<span class="sh">      driver = "raw_exec"</span>
+<span class="sh">      config {</span>
+<span class="sh">        command = "/bin/sleep"</span>
+<span class="sh">        args    = ["1"]</span>
+<span class="sh">      }</span>
+
+<span class="sh">      resources {</span>
+<span class="sh">        cpu    = 20</span>
+<span class="sh">        memory = 10</span>
+<span class="sh">      }</span>
+
+<span class="sh">      logs {</span>
+<span class="sh">        max_files     = 3</span>
+<span class="sh">        max_file_size = 10</span>
+<span class="sh">      }</span>
+<span class="sh">    }</span>
+<span class="sh">  }</span>
+<span class="sh">}</span>
+<span class="dl">EOT</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/JSON%20jobspec"></a><h2 id="json-jobspec">JSON jobspec</h2>
+
+<p>The input jobspec can also be provided as JSON instead of HCL by setting the
+argument <code>json</code> to <code>true</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"nomad_job"</span><span class="w"> </span><span class="nv">"app"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">jobspec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="p">(</span><span class="s2">"${path.module}/jobspec.json"</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">json</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When using JSON, the input jobspec should have the same structured used by the
+<a href="https://www.nomadproject.io/api-docs/json-jobs/">Nomad API</a>. The Nomad CLI
+can translate HCL jobs to JSON:</p>
+
+<pre><code>nomad job run -output my-job.nomad &gt; my-job.json
+</code></pre>
+
+<p>Or you can also use the <a href="https://www.nomadproject.io/api-docs/jobs/#parse-job"><code>/v1/jobs/parse</code></a>
+API endpoint.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Variables"></a><h3 id="variables">Variables</h3>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Warning</em>
+    <p>mixing Nomad HCL2 variables and Terraform values may result in plan failures. It's best to avoid using variables in job files and instead use [string templates][tf_docs_string_template] or render a file with the [<code>templatefile</code>][tf_docs_templatefile] Terraform function.</p>
+</aside>
+
+<p>HCL2 variables can be passed from Terraform to the jobspec parser through the
+<code>vars</code> attribute inside the <code>hcl2</code> block. The variable must also be declared
+inside the jobspec as an <a href="https://www.nomadproject.io/docs/job-specification/hcl2/variables#declaring-an-input-variable">input variable</a>.</p>
+
+<p>Due to the way resource attributes are stored in the Terraform state, the
+values must be provided as strings.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"nomad_job"</span><span class="w"> </span><span class="nv">"app"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">hcl2</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">vars</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"restart_attempts"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"5"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"datacenters"</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"[\"dc1\", \"dc2\"]"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">jobspec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="err">variable "datacenters" {</span>
+<span class="err">  type = list(string)</span>
+<span class="err">}</span>
+
+<span class="err">variable "restart_attempts" {</span>
+<span class="err">  type = number</span>
+<span class="err">}</span>
+
+<span class="err">job "foo-hcl2" {</span>
+<span class="err">  datacenters = var.datacenters</span>
+
+<span class="err">  restart {</span>
+<span class="err">    attempts = var.restart_attempts</span>
+<span class="err">    ...</span>
+<span class="err">  }</span>
+<span class="err">  ...</span>
+<span class="err">}</span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"datacenters"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="kt">string</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"restart_attempts"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">number</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">job</span><span class="w"> </span><span class="s2">"foo-hcl2"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">datacenters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.datacenters</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">restart</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">attempts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.restart_attempts</span><span class="w"></span>
+<span class="w">    </span><span class="p">...</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">...</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Variables must have known-values at plan time. This means that you will not be
+able to reference values from resources that don't exist in the Terraform state
+yet. Instead, use <a href="https://www.terraform.io/language/expressions/strings#string-templates">string templates</a> or the
+<a href="https://www.terraform.io/docs/configuration/functions/templatefile.html"><code>templatefile</code></a> Terraform function to provide a fully
+rendered jobspec.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"random_pet"</span><span class="w"> </span><span class="nv">"random_dc"</span><span class="w"> </span><span class="p">{}</span><span class="c1"></span>
+
+<span class="c1"># This resource will fail to plan because random_pet.random_dc.id is unknown.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"nomad_job"</span><span class="w"> </span><span class="nv">"job_with_hcl2"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">jobspec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="sh">variable "datacenter" {</span>
+<span class="sh">  type = string</span>
+<span class="sh">}</span>
+
+<span class="sh">job "example" {</span>
+<span class="sh">  datacenters = [var.datacenter]</span>
+<span class="sh">  ...</span>
+<span class="sh">}</span>
+<span class="dl">EOT</span>
+
+<span class="w">  </span><span class="nb">hcl2</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">vars</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">datacenter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">random_pet.random_dc.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># This will work since Terraform will provide a fully rendered jobspec once it</span>
+<span class="c1"># knows the value of random_pet.random_dc.id.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"nomad_job"</span><span class="w"> </span><span class="nv">"job_with_hcl2"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">jobspec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="sh">job "example" {</span>
+<span class="sh">  datacenters = ["${random_pet.random_dc.id}"]</span>
+<span class="sh">  ...</span>
+<span class="sh">}</span>
+<span class="dl">EOT</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Filesystem%20functions"></a><h3 id="filesystem-functions">Filesystem functions</h3>
+
+<p>Please note that <a href="https://www.nomadproject.io/docs/job-specification/hcl2/functions/file/abspath">filesystem functions</a>
+will create an implicit dependency in your Terraform configuration. For
+example, Terraform will not be able to detect changes to files loaded using the
+<a href="https://www.nomadproject.io/docs/job-specification/hcl2/functions/file/file"><code>file</code></a>
+function inside a jobspec.</p>
+
+<p>To avoid confusion, these functions are disabled by default. To enable them
+set <code>allow_fs</code> to <code>true</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"nomad_job"</span><span class="w"> </span><span class="nv">"app"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">jobspec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">file</span><span class="p">(</span><span class="s2">"${path.module}/jobspec.hcl"</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">hcl2</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">allow_fs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>If you do need to track changes to external files, you can use the
+<a href="https://registry.terraform.io/providers/hashicorp/local/latest/docs/data-sources/file"><code>local_file</code></a>
+data source and the <a href="https://www.terraform.io/docs/configuration/functions/templatefile.html"><code>templatefile</code></a> function to load the
+local file into Terraform and then render its content into the jobspec:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.tf</span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"local_file"</span><span class="w"> </span><span class="nv">"index_html"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">filename</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${path.module}/index.html"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"nomad_job"</span><span class="w"> </span><span class="nv">"nginx"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">jobspec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">templatefile</span><span class="p">(</span><span class="s2">"${path.module}/nginx.nomad.tpl"</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">index_html</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.local_file.index_html.content</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># nginx.nomad.tpl</span>
+
+<span class="err">job</span><span class="w"> </span><span class="s2">"nginx"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">...</span><span class="w"></span>
+<span class="w">      </span><span class="nb">template</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">data</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">EOF</span><span class="sh"></span>
+<span class="sh">${index_html}</span>
+<span class="dl">EOF</span>
+<span class="w">        </span><span class="na">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"local/www/index.html"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="p">...</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Tracking%20Jobspec%20Changes"></a><h2 id="tracking-jobspec-changes">Tracking Jobspec Changes</h2>
+
+<p>The Nomad API allows <a href="https://developer.hashicorp.com/nomad/api-docs/jobs#submission">submitting the raw jobspec when registering and updating
+jobs</a>. If
+available, the job submission source is used to detect changes to the <code>jobspec</code>
+and <code>hcl2.vars</code> arguments.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>jobspec</code> <code>(string: &lt;required&gt;)</code> - The contents of the jobspec to register.</p></li>
+<li><p><code>deregister_on_destroy</code> <code>(boolean: true)</code> - Determines if the job will be
+deregistered when this resource is destroyed in Terraform.</p></li>
+<li><p><code>purge_on_destroy</code> <code>(boolean: false)</code> - Set this to true if you want the job to
+be purged when the resource is destroyed.</p></li>
+<li><p><code>deregister_on_id_change</code> <code>(boolean: true)</code> - Determines if the job will be
+deregistered if the ID of the job in the jobspec changes.</p></li>
+<li><p><code>rerun_if_dead</code> <code>(boolean: false)</code> - Set this to true to force the job to run
+again if its status is <code>dead</code>.</p></li>
+<li><p><code>detach</code> <code>(boolean: true)</code> - If true, the provider will return immediately
+after creating or updating, instead of monitoring.</p></li>
+<li><p><code>policy_override</code> <code>(boolean: false)</code> - Determines if the job will override any
+soft-mandatory Sentinel policies and register even if they fail.</p></li>
+<li><p><code>json</code> <code>(boolean: false)</code> - Set this to <code>true</code> if your jobspec is structured with
+JSON instead of the default HCL.</p></li>
+<li><p><code>hcl2</code> <code>(block: optional)</code> - Options for the HCL2 jobspec parser.</p>
+
+<ul>
+<li><code>allow_fs</code> <code>(boolean: false)</code> - Set this to <code>true</code> to be able to use
+<a href="#filesystem-functions">HCL2 filesystem functions</a></li>
+</ul></li>
+<li><p><code>consul_token</code> <code>(string: &lt;optional&gt;)</code> - Consul token used when registering this job.
+Will fallback to the value declared in Nomad provider configuration, if any.</p></li>
+<li><p><code>vault_token</code> <code>(string: &lt;optional&gt;)</code> - Vault token used when registering this job.
+Will fallback to the value declared in Nomad provider configuration, if any.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h3 id="timeouts">Timeouts</h3>
+
+<p><code>nomad_job</code> provides the following <a href="https://www.terraform.io/docs/configuration/blocks/resources/syntax.html#operation-timeouts"><code>Timeouts</code></a> configuration
+options when <a href="#detach"><code>detach</code></a> is set to <code>false</code>:</p>
+
+<ul>
+<li><code>create</code> <code>(string: "5m")</code> - Timeout when registering a new job.</li>
+<li><code>update</code> <code>(string: "5m")</code> - Timeout when updating an existing job.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Importing%20Jobs"></a><h2 id="importing-jobs">Importing Jobs</h2>
+
+<p>Jobs are imported using the pattern <code>&lt;job ID&gt;@&lt;namespace&gt;</code>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">$ </span>terraform import nomad_job.example example@my-namespace
+<span class="go">nomad_job.example: Importing from ID "example@my-namespace"...</span>
+<span class="go">nomad_job.example: Import prepared!</span>
+<span class="go">  Prepared nomad_job for import</span>
+<span class="go">nomad_job.example: Refreshing state... [id=example@my-namespace]</span>
+
+<span class="go">Import successful!</span>
+
+<span class="go">The resources that were imported are shown above. These resources are now in</span>
+<span class="go">your Terraform state and will henceforth be managed by Terraform.</span>
+</code></pre></div>
+
+            
+        
+    </body></html>

@@ -1,0 +1,172 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/hcp/latest/docs --><head>
+                <title>HashiCorp Cloud Platform (HCP) Provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="hashicorp-cloud-platform-hcp-provider">HashiCorp Cloud Platform (HCP) Provider</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Please refer to the provider's <a href="https://github.com/hashicorp/terraform-provider-hcp/releases">Release Notes</a> for critical fixes.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Consul on Azure is available. See the <a href="https://developer.hashicorp.com/consul/tutorials/cloud-deploy-automation/consul-end-to-end-overview">Get started with end-to-end deployment configuration</a> tutorial.</p>
+</aside>
+
+<p>The HCP provider provides resources to manage <a href="https://cloud.hashicorp.com/">HashiCorp Cloud Platform</a> (HCP) resources.</p>
+
+<p><img alt="HCP Architecture Diagram" src="https://content.hashicorp.com/api/assets?product=hcp-docs&amp;version=refs/heads/main&amp;asset=public/img/docs/hcp-arch-diagram.png"/></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Authenticating%20with%20HCP"></a><h2 id="authenticating-with-hcp">Authenticating with HCP</h2>
+
+<p>The HCP provider supports authentication via a Client ID and a Client Secret. The <a href="guides/auth.md">authentication guide</a> describes how to obtain client credentials.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Getting%20Started"></a><h2 id="getting-started">Getting Started</h2>
+
+<p>Everything in HashiCorp Cloud Platform (HCP) starts with the HashiCorp Virtual Network (HVN).</p>
+
+<p>HVNs enable you to deploy HashiCorp Cloud products without having to manage the networking details. They give you a simple setup for creating a network on AWS, in the region of your choice, and with the option to specify a CIDR range.</p>
+
+<p>Creating a network peering from your HVN will allow you to connect and launch AWS resources to your HCP account.
+Peer your Amazon VPC with your HVN to enable resource access. After creating, you will need to accept the peering request and set up your VPC’s security groups and routing table on your AWS account. The Amazon VPC can be managed with the <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs">AWS provider</a>.</p>
+
+<p>Once you have an HVN, HCP Consul and HCP Vault enable you to quickly deploy Consul and Vault clusters in AWS across a variety of environments while offloading the operations burden to the SRE experts at HashiCorp.</p>
+
+<p>One final note: with a fully deployed HCP Consul, you need to deploy Consul clients inside of the peered VPC to fully access your Consul features.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// Pin the version</span>
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">hcp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/hcp"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 0.104.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Configure the provider</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"hcp"</span><span class="w"> </span><span class="p">{}</span><span class="c1"></span>
+
+<span class="c1">// Use the cloud provider AWS to provision resources that will be connected to HCP</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"aws"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Create an HVN</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn"</span><span class="w"> </span><span class="nv">"example_hvn"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcp-tf-example-hvn"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cloud_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.25.16.0/20"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Create a peering connection between two HVNs</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn"</span><span class="w"> </span><span class="nv">"second_example_hvn"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcp-tf-second-example-hvn"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cloud_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.18.16.0/20"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn_peering_connection"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.example_hvn.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.second_example_hvn.self_link</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Create a VPC for the HVN to peer into</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"main"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.25.0.0/20"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_arn"</span><span class="w"> </span><span class="nv">"main"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.main.arn</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc_peering_connection_accepter"</span><span class="w"> </span><span class="nv">"main"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_peering_connection_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_aws_network_peering.example_peering.provider_peering_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_accept</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Create a network peering between the HVN and the AWS VPC</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_aws_network_peering"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.example_hvn.hvn_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">peering_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcp-tf-example-peering"</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vpc_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.main.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.main.owner_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vpc_region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_arn.main.region</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Create an HVN route that targets your HCP network peering and matches your AWS VPC's CIDR block</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn_route"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.hvn.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_route_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcp-tf-example-hvn-route"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.main.cidr_block</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_link</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_aws_network_peering.example.self_link</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Create a Consul cluster in the same region and cloud provider as the HVN</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_consul_cluster"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.example_hvn.hvn_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcp-tf-example-consul-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">tier</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"development"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Create a Vault cluster in the same region and cloud provider as the HVN</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_vault_cluster"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hcp-tf-example-vault-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.example_hvn.hvn_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<!-- schema generated by tfplugindocs -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Schema"></a><h2 id="schema">Schema</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Optional"></a><h3 id="optional">Optional</h3>
+
+<ul>
+<li><code>client_id</code> (String) The OAuth2 Client ID for API operations.</li>
+<li><code>client_secret</code> (String) The OAuth2 Client Secret for API operations.</li>
+<li><code>credential_file</code> (String) The path to an HCP credential file to use to authenticate the provider to HCP. You can alternatively set the HCP_CRED_FILE environment variable to point at a credential file as well. Using a credential file allows you to authenticate the provider as a service principal via client credentials or dynamically based on Workload Identity Federation.</li>
+<li><code>project_id</code> (String) The default project in which resources should be created.</li>
+<li><code>workload_identity</code> (Block List) Allows authenticating the provider by exchanging the OAuth 2.0 access token or OpenID Connect token specified in the <code>token_file</code> for a HCP service principal using Workload Identity Federation. (see <a href="#nestedblock--workload_identity">below for nested schema</a>)</li>
+</ul>
+
+<p><a id="nestedblock--workload_identity"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Nested%20Schema%20for%20workload_identity"></a><h3 id="nested-schema-for-workload_identity">Nested Schema for <code>workload_identity</code></h3>
+
+<p>Required:</p>
+
+<ul>
+<li><code>resource_name</code> (String) The resource_name of the Workload Identity Provider to exchange the token with.</li>
+</ul>
+
+<p>Optional:</p>
+
+<ul>
+<li><code>token</code> (String) The JWT token retrieved from an OpenID Connect (OIDC) or OAuth2 provider. At least one of <code>token_file</code> or <code>token</code> must be set, if both are set then <code>token</code> takes precedence.</li>
+<li><code>token_file</code> (String) The path to a file containing a JWT token retrieved from an OpenID Connect (OIDC) or OAuth2 provider. At least one of <code>token_file</code> or <code>token</code> must be set, if both are set then <code>token</code> takes precedence.
+<aside class="admonition note">
+<strong>note</strong>
+<em>note</em>
+<p>See the <a href="guides/auth.md">authentication guide</a> about a use case when specifying <code>project_id</code> is needed.</p>
+</aside></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/API"></a><h2 id="api">API</h2>
+
+<p>The terraform provider accesses <a href="https://developer.hashicorp.com/hcp/docs/hcp/api">HCP API</a> to facilitate workflows.</p>
+
+<p>In addition to the documentation provided, the provider also accesses <a href="https://status.hashicorp.com/">HashiCorp Services Status page</a>.</p>
+
+<p>For more information about HCP, please review our <a href="https://developer.hashicorp.com/hcp/docs/">documentation page</a>.</p>
+
+            
+        
+    </body></html>

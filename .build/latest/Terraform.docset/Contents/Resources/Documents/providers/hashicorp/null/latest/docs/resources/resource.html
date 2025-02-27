@@ -1,0 +1,71 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource --><head>
+                <title>null_resource</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="null_resource">null_resource</h1>
+
+<p>The <code>null_resource</code> resource implements the standard resource lifecycle but takes no further action. On Terraform 1.4 and later, use the <a href="https://developer.hashicorp.com/terraform/language/resources/terraform-data"><code>terraform_data</code> resource type</a> instead. Terraform 1.9 and later support the <code>moved</code> configuration block from <code>null_resource</code> to <code>terraform_data</code>.</p>
+
+<p>The <code>triggers</code> argument allows specifying an arbitrary set of values that, when changed, will cause the resource to be replaced.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"cluster"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="w"></span>
+<span class="w">  </span><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"ami-0dcc1e21636832c5d"</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"m5.large"</span><span class="c1"></span>
+
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># The primary use-case for the null resource is as a do-nothing container</span>
+<span class="c1"># for arbitrary actions taken by a provisioner.</span>
+<span class="c1">#</span>
+<span class="c1"># In this example, three EC2 instances are created and then a</span>
+<span class="c1"># null_resource instance is used to gather data about all three</span>
+<span class="c1"># and execute a single action that affects them all. Due to the triggers</span>
+<span class="c1"># map, the null_resource will be replaced each time the instance ids</span>
+<span class="c1"># change, and thus the remote-exec provisioner will be re-run.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"null_resource"</span><span class="w"> </span><span class="nv">"cluster"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # Changes to any instance of the cluster requires re-provisioning</span>
+<span class="w">  </span><span class="nb">triggers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">cluster_instance_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">join</span><span class="p">(</span><span class="s2">","</span><span class="p">,</span><span class="w"> </span><span class="nv">aws_instance.cluster</span><span class="p">[</span><span class="err">*</span><span class="p">].</span><span class="err">id</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # Bootstrap script can run on any instance of the cluster</span>
+<span class="c1">  # So we just choose the first in this case</span>
+<span class="w">  </span><span class="nb">connection</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">host</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span><span class="nv">aws_instance.cluster</span><span class="p">[</span><span class="err">*</span><span class="p">].</span><span class="err">public_ip</span><span class="p">,</span><span class="w"> </span><span class="m">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"remote-exec"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # Bootstrap script called with private_ip of each node in the cluster</span>
+<span class="w">    </span><span class="na">inline</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"bootstrap-cluster.sh ${join(" "</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_instance.cluster</span><span class="p">[</span><span class="err">*</span><span class="p">].</span><span class="err">private_ip</span><span class="p">)}</span><span class="err">"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<!-- schema generated by tfplugindocs -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Schema"></a><h2 id="schema">Schema</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Optional"></a><h3 id="optional">Optional</h3>
+
+<ul>
+<li><code>triggers</code> (Map of String) A map of arbitrary strings that, when changed, will force the null resource to be replaced, re-running any associated provisioners.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Read-Only"></a><h3 id="read-only">Read-Only</h3>
+
+<ul>
+<li><code>id</code> (String) This is set to a random value at create time.</li>
+</ul>
+
+            
+        
+    </body></html>

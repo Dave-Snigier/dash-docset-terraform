@@ -1,0 +1,432 @@
+<html><!-- Online page at https://www.terraform.io/language/providers/requirements --><head>
+                <title>Provider Requirements</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="provider-requirements">Provider Requirements</h1>
+
+<p>Terraform relies on plugins called "providers" to interact with remote systems.
+Terraform configurations must declare which providers they require, so that
+Terraform can install and use them. This page documents how to declare providers
+so Terraform can install them.</p>
+
+<p>Additionally, some providers require configuration (like endpoint URLs or cloud
+regions) before they can be used. The <a href="../../terraform/language/providers/configuration.html">Provider
+Configuration</a> page documents how
+to configure settings for providers.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This page is about a feature of Terraform 0.13 and later; it also describes how to use the more limited version of that feature that was available in Terraform 0.12.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Requiring%20Providers"></a><h2 id="requiring-providers">Requiring Providers</h2>
+
+<p>Each Terraform module must declare which providers it requires, so that
+Terraform can install and use them. Provider requirements are declared in a
+<code>required_providers</code> block.</p>
+
+<p>A provider requirement consists of a local name, a source location, and a
+version constraint:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">mycloud</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"mycorp/mycloud"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The <code>required_providers</code> block must be nested inside the top-level
+<a href="../../terraform/language/terraform.html"><code>terraform</code> block</a> (which can also contain other settings).</p>
+
+<p>Each argument in the <code>required_providers</code> block enables one provider. The key
+determines the provider's <a href="#local-names">local name</a> (its unique identifier
+within this module), and the value is an object with the following elements:</p>
+
+<ul>
+<li><p><code>source</code> - the global <a href="#source-addresses">source address</a> for the
+provider you intend to use, such as <code>hashicorp/aws</code>.</p></li>
+<li><p><code>version</code> - a <a href="#version-constraints">version constraint</a> specifying
+which subset of available provider versions the module is compatible with.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The <code>name = { source, version }</code> syntax for <code>required_providers</code> was added in Terraform v0.13. Previous versions of Terraform used a version constraint string instead of an object (like <code>mycloud = "~&gt; 1.0"</code>), and had no way to specify provider source addresses. If you want to write a module that works with both Terraform v0.12 and v0.13, see <a href="#v0-12-compatible-provider-requirements">v0.12-Compatible Provider Requirements</a> below.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Names%20and%20Addresses"></a><h2 id="names-and-addresses">Names and Addresses</h2>
+
+<p>Each provider has two identifiers:</p>
+
+<ul>
+<li>A unique <em>source address,</em> which is only used when requiring a provider.</li>
+<li>A <em>local name,</em> which is used everywhere else in a Terraform module.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Prior to Terraform 0.13, providers only had local names, since Terraform could only automatically download providers distributed by HashiCorp.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Local%20Names"></a><h3 id="local-names">Local Names</h3>
+
+<p>Local names are module-specific, and are assigned when requiring a provider.
+Local names must be unique per-module.</p>
+
+<p>Outside of the <code>required_providers</code> block, Terraform configurations always refer
+to providers by their local names. For example, the following configuration
+declares <code>mycloud</code> as the local name for <code>mycorp/mycloud</code>, then uses that local
+name when <a href="../../terraform/language/providers/configuration.html">configuring the provider</a>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">mycloud</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"mycorp/mycloud"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"mycloud"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Users of a provider can choose any local name for it. However, nearly every
+provider has a <em>preferred local name,</em> which it uses as a prefix for all of its
+resource types. (For example, resources from <code>hashicorp/aws</code> all begin with
+<code>aws</code>, like <code>aws_instance</code> or <code>aws_security_group</code>.)</p>
+
+<p>Whenever possible, you should use a provider's preferred local name. This makes
+your configurations easier to understand, and lets you omit the <code>provider</code>
+meta-argument from most of your resources. (If a resource doesn't specify which
+provider configuration to use, Terraform interprets the first word of the
+resource type as a local provider name.)</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Source%20Addresses"></a><h3 id="source-addresses">Source Addresses</h3>
+
+<p>A provider's source address is its global identifier. It also specifies the
+primary location where Terraform can download it.</p>
+
+<p>Source addresses consist of three parts delimited by slashes (<code>/</code>), as
+follows:</p>
+
+<p><code>[&lt;HOSTNAME&gt;/]&lt;NAMESPACE&gt;/&lt;TYPE&gt;</code></p>
+
+<p>Examples of valid provider source address formats include:</p>
+
+<ul>
+<li><code>NAMESPACE/TYPE</code></li>
+<li><code>HOSTNAME/NAMESPACE/TYPE</code></li>
+</ul>
+
+<ul>
+<li><p><strong>Hostname</strong> (optional): The hostname of the Terraform registry that
+distributes the provider. If omitted, this defaults to
+<code>registry.terraform.io</code>, the hostname of
+<a href="https://registry.terraform.io/">the public Terraform Registry</a>.</p></li>
+<li><p><strong>Namespace:</strong> An organizational namespace within the specified registry.
+For the public Terraform Registry and for HCP Terraform's private registry,
+this represents the organization that publishes the provider. This field
+may have other meanings for other registry hosts.</p></li>
+<li><p><strong>Type:</strong> A short name for the platform or system the provider manages. Must
+be unique within a particular namespace on a particular registry host.</p>
+
+<p>The type is usually the provider's preferred local name. (There are
+exceptions; for example,
+<a href="https://registry.terraform.io/providers/hashicorp/google-beta/latest"><code>hashicorp/google-beta</code></a>
+is an alternate release channel for <code>hashicorp/google</code>, so its preferred
+local name is <code>google</code>. If in doubt, check the provider's documentation.)</p></li>
+</ul>
+
+<p>For example,
+<a href="https://registry.terraform.io/providers/hashicorp/http">the official HTTP provider</a>
+belongs to the <code>hashicorp</code> namespace on <code>registry.terraform.io</code>, so its
+source address is <code>registry.terraform.io/hashicorp/http</code> or, more commonly, just
+<code>hashicorp/http</code>.</p>
+
+<p>The source address with all three components given explicitly is called the
+provider's <em>fully-qualified address</em>. You will see fully-qualified address in
+various outputs, like error messages, but in most cases a simplified display
+version is used. This display version omits the source host when it is the
+public registry, so you may see the shortened version <code>"hashicorp/random"</code> instead
+of <code>"registry.terraform.io/hashicorp/random"</code>.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you omit the <code>source</code> argument when requiring a provider, Terraform uses an implied source address of <code>registry.terraform.io/hashicorp/&lt;LOCAL NAME&gt;</code>. This is a backward compatibility feature to support the transition to Terraform 0.13; in modules that require 0.13 or later, we recommend using explicit source addresses for all providers.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Handling%20Local%20Name%20Conflicts"></a><h3 id="handling-local-name-conflicts">Handling Local Name Conflicts</h3>
+
+<p>Whenever possible, we recommend using a provider's preferred local name, which
+is usually the same as the "type" portion of its source address.</p>
+
+<p>However, it's sometimes necessary to use two providers with the same preferred
+local name in the same module, usually when the providers are named after a
+generic infrastructure type. Terraform requires unique local names for each
+provider in a module, so you'll need to use a non-preferred name for at least
+one of them.</p>
+
+<p>When this happens, we recommend combining each provider's namespace with
+its type name to produce compound local names with a dash:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # In the rare situation of using two providers that</span>
+<span class="c1">    # have the same type name -- "http" in this example --</span>
+<span class="c1">    # use a compound local name to distinguish them.</span>
+<span class="w">    </span><span class="nb">hashicorp-http</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/http"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 2.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">mycorp-http</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"mycorp/http"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># References to these providers elsewhere in the</span>
+<span class="c1"># module will use these compound local names.</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"mycorp-http"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"http"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">hashicorp-http</span><span class="c1"></span>
+<span class="c1">  #...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Terraform won't be able to guess either provider's name from its resource types,
+so you'll need to specify a <code>provider</code> meta-argument for every affected
+resource. However, readers and maintainers of your module will be able to easily
+understand what's happening, and avoiding confusion is much more important than
+avoiding typing.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Version%20Constraints"></a><h2 id="version-constraints">Version Constraints</h2>
+
+<p>Each provider plugin has its own set of available versions, allowing the
+functionality of the provider to evolve over time. Each provider dependency you
+declare should have a <a href="../../terraform/language/expressions/version-constraints.html">version constraint</a> given in
+the <code>version</code> argument so Terraform can select a single version per provider
+that all modules are compatible with.</p>
+
+<p>The <code>version</code> argument is optional; if omitted, Terraform will accept any
+version of the provider as compatible. However, we strongly recommend specifying
+a version constraint for every provider your module depends on.</p>
+
+<p>To ensure Terraform always installs the same provider versions for a given
+configuration, you can use Terraform CLI to create a
+<a href="../../terraform/language/files/dependency-lock.html">dependency lock file</a>
+and commit it to version control along with your configuration. If a lock file
+is present, HCP Terraform, CLI, and Enterprise will all obey it when
+installing providers.</p>
+
+<blockquote>
+  <p><strong>Hands-on:</strong> Try the <a href="../../terraform/tutorials/configuration-language/provider-versioning.html">Lock and Upgrade Provider Versions</a> tutorial.</p>
+</blockquote>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Best%20Practices%20for%20Provider%20Versions"></a><h3 id="best-practices-for-provider-versions">Best Practices for Provider Versions</h3>
+
+<p>Each module should at least declare the minimum provider version it is known
+to work with, using the <code>&gt;=</code> version constraint syntax:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">mycloud</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&gt;= 1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>A module intended to be used as the root of a configuration — that is, as the
+directory where you'd run <code>terraform apply</code> — should also specify the
+<em>maximum</em> provider version it is intended to work with, to avoid accidental
+upgrades to incompatible new versions. The <code>~&gt;</code> operator is a convenient
+shorthand for allowing the rightmost component of a version to increment. The
+following example uses the operator to allow only patch releases within a
+specific minor release:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">mycloud</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.0.4"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Do not use <code>~&gt;</code> (or other maximum-version constraints) for modules you intend to
+reuse across many configurations, even if you know the module isn't compatible
+with certain newer versions. Doing so can sometimes prevent errors, but more
+often it forces users of the module to update many modules simultaneously when
+performing routine upgrades. Specify a minimum version, document any known
+incompatibilities, and let the root module manage the maximum version.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Built-in%20Providers"></a><h2 id="built-in-providers">Built-in Providers</h2>
+
+<p>Most Terraform providers are distributed separately as plugins, but there
+is one provider that is built into Terraform itself. This provider enables
+<a href="../../terraform/language/state/remote-state-data.html">the <code>terraform_remote_state</code> data source</a>.</p>
+
+<p>Because this provider is built into Terraform, you don't need to declare it
+in the <code>required_providers</code> block in order to use its features. However, for
+consistency it <em>does</em> have a special provider source address, which is
+<code>terraform.io/builtin/terraform</code>. This address may sometimes appear in
+Terraform's error messages and other output in order to unambiguously refer
+to the built-in provider, as opposed to a hypothetical third-party provider
+with the type name "terraform".</p>
+
+<p>There is also an existing provider with the source address
+<code>hashicorp/terraform</code>, which is an older version of the now-built-in provider
+that was used by older versions of Terraform. <code>hashicorp/terraform</code> is not
+compatible with Terraform v0.11 or later and should never be declared in a
+<code>required_providers</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/In-house%20Providers"></a><h2 id="in-house-providers">In-house Providers</h2>
+
+<p>Anyone can develop and distribute their own Terraform providers. See
+the <a href="../../terraform/tutorials/providers.html">Call APIs with Terraform Providers</a>
+tutorials for more about provider development.</p>
+
+<p>Some organizations develop their own providers to configure
+proprietary systems, and wish to use these providers from Terraform without
+publishing them on the public Terraform Registry.</p>
+
+<p>One option for distributing such a provider is to run an in-house <em>private</em>
+registry, by implementing
+<a href="../../terraform/internals/provider-registry-protocol.html">the provider registry protocol</a>.</p>
+
+<p>Running an additional service just to distribute a single provider internally
+may be undesirable, so Terraform also supports
+<a href="../../terraform/cli/config/config-file.html#provider-installation">other provider installation methods</a>,
+including placing provider plugins directly in specific directories in the
+local filesystem, via <em>filesystem mirrors</em>.</p>
+
+<p>All providers must have a <a href="#source-addresses">source address</a> that includes
+(or implies) the hostname of a registry, but that hostname does not need to
+provide an actual registry service. For in-house providers that you intend to
+distribute from a local filesystem directory, you can use an arbitrary hostname
+in a domain your organization controls.</p>
+
+<p>For example, if your corporate domain were <code>example.com</code> then you might choose
+to use <code>terraform.example.com</code> as your placeholder hostname, even if that
+hostname doesn't actually resolve in DNS. You can then choose any namespace and
+type you wish to represent your in-house provider under that hostname, giving
+a source address like <code>terraform.example.com/examplecorp/ourcloud</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">mycloud</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform.example.com/examplecorp/ourcloud"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&gt;= 1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>To make version 1.0.0 of this provider available for installation from the
+local filesystem, choose one of the
+<a href="../../terraform/cli/config/config-file.html#implied-local-mirror-directories">implied local mirror directories</a>
+and create a directory structure under it like this:</p>
+
+<pre><code>terraform.example.com/examplecorp/ourcloud/1.0.0
+</code></pre>
+
+<p>Under that <code>1.0.0</code> directory, create one additional directory representing the
+platform where you are running Terraform, such as <code>linux_amd64</code> for Linux on
+an AMD64/x64 processor, and then place the provider plugin executable and any
+other needed files in that directory.</p>
+
+<p>Thus, on a Windows system, the provider plugin executable file might be at the
+following path:</p>
+
+<pre><code>terraform.example.com/examplecorp/ourcloud/1.0.0/windows_amd64/terraform-provider-ourcloud.exe
+</code></pre>
+
+<p>If you later decide to switch to using a real private provider registry rather
+than distribute binaries out of band, you can deploy the registry server at
+<code>terraform.example.com</code> and retain the same namespace and type names, in which
+case your existing modules will require no changes to locate the same provider
+using your registry server.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/v0.12-Compatible%20Provider%20Requirements"></a><h2 id="v012-compatible-provider-requirements">v0.12-Compatible Provider Requirements</h2>
+
+<p>Explicit provider source addresses were introduced with Terraform v0.13, so the
+full provider requirements syntax is not supported by Terraform v0.12.</p>
+
+<p>However, in order to allow writing modules that are compatible with both
+Terraform v0.12 and v0.13, versions of Terraform between v0.12.26 and v0.13
+will accept but ignore the <code>source</code> argument in a <code>required_providers</code> block.</p>
+
+<p>Consider the following example written for Terraform v0.13:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Terraform v0.12.26 will accept syntax like the above but will understand it
+in the same way as the following v0.12-style syntax:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.0"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In other words, Terraform v0.12.26 ignores the <code>source</code> argument and considers
+only the <code>version</code> argument, using the given <a href="#local-names">local name</a> as the
+un-namespaced provider type to install.</p>
+
+<p>When writing a module that is compatible with both Terraform v0.12.26 and
+Terraform v0.13.0 or later, you must follow the following additional rules so
+that both versions will select the same provider to install:</p>
+
+<ul>
+<li><p>Use only providers that can be automatically installed by Terraform v0.12.
+Third-party providers, such as community providers in the Terraform Registry,
+cannot be selected by Terraform v0.12 because it does not support the
+hierarchical source address namespace.</p></li>
+<li><p>Ensure that your chosen local name exactly matches the "type" portion of the
+source address given in the <code>source</code> argument, such as both being "aws" in
+the examples above, because Terraform v0.12 will use the local name to
+determine which provider plugin to download and install.</p></li>
+<li><p>If the provider belongs to the <code>hashicorp</code> namespace, as with the
+<code>hashicorp/aws</code> provider shown above, omit the <code>source</code> argument and allow
+Terraform v0.13 to select the <code>hashicorp</code> namespace by default.</p></li>
+<li><p>Provider type names must always be written in lowercase. Terraform v0.13
+treats provider source addresses as case-insensitive, but Terraform v0.12
+considers its legacy-style provider names to be case-sensitive. Using
+lowercase will ensure that the name is selectable by both Terraform major
+versions.</p></li>
+</ul>
+
+<p>This compatibility mechanism is provided as a temporary transitional aid only.
+When Terraform v0.12 detects a use of the new <code>source</code> argument it doesn't
+understand, it will emit a warning to alert the user that it is disregarding
+the source address given in that argument.</p>
+
+            
+        
+    </body></html>

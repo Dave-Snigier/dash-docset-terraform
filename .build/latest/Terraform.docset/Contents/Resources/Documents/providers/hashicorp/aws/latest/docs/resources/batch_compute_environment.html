@@ -1,0 +1,288 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/batch_compute_environment --><head>
+                <title>aws_batch_compute_environment</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_batch_compute_environment">Resource: aws_batch_compute_environment</h1>
+
+<p>Creates a AWS Batch compute environment. Compute environments contain the Amazon ECS container instances that are used to run containerized batch jobs.</p>
+
+<p>For information about AWS Batch, see <a href="http://docs.aws.amazon.com/batch/latest/userguide/what-is-batch.html">What is AWS Batch?</a> .
+For information about compute environment, see <a href="http://docs.aws.amazon.com/batch/latest/userguide/compute_environments.html">Compute Environments</a> .</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>To prevent a race condition during environment deletion, make sure to set <code>depends_on</code> to the related <code>aws_iam_role_policy_attachment</code>; otherwise, the policy may be destroyed too soon and the compute environment will then get stuck in the <code>DELETING</code> state, see [Troubleshooting AWS Batch][3] .</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/EC2%20Type"></a><h3 id="ec2-type">EC2 Type</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"ec2_assume_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Service"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"ec2.amazonaws.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"sts:AssumeRole"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"ecs_instance_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"ecs_instance_role"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.ec2_assume_role.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role_policy_attachment"</span><span class="w"> </span><span class="nv">"ecs_instance_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.ecs_instance_role.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_instance_profile"</span><span class="w"> </span><span class="nv">"ecs_instance_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ecs_instance_role"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.ecs_instance_role.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"batch_assume_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Service"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"batch.amazonaws.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"sts:AssumeRole"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"aws_batch_service_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws_batch_service_role"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.batch_assume_role.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role_policy_attachment"</span><span class="w"> </span><span class="nv">"aws_batch_service_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.aws_batch_service_role.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_security_group"</span><span class="w"> </span><span class="nv">"sample"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws_batch_compute_environment_security_group"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">egress</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">from_port</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">    </span><span class="na">to_port</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">    </span><span class="na">protocol</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"-1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">cidr_blocks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"0.0.0.0/0"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"sample"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.0.0/16"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_subnet"</span><span class="w"> </span><span class="nv">"sample"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.sample.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.1.0/24"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_placement_group"</span><span class="w"> </span><span class="nv">"sample"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"sample"</span><span class="w"></span>
+<span class="w">  </span><span class="na">strategy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"cluster"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_batch_compute_environment"</span><span class="w"> </span><span class="nv">"sample"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">compute_environment_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sample"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">compute_resources</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_instance_profile.ecs_instance_role.arn</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"c4.large"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">max_vcpus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">16</span><span class="w"></span>
+<span class="w">    </span><span class="na">min_vcpus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">placement_group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_placement_group.sample.name</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">security_group_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_security_group.sample.id</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">subnets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_subnet.sample.id</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"EC2"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">service_role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.aws_batch_service_role.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"MANAGED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_iam_role_policy_attachment.aws_batch_service_role</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Fargate%20Type"></a><h3 id="fargate-type">Fargate Type</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_batch_compute_environment"</span><span class="w"> </span><span class="nv">"sample"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">compute_environment_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sample"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">compute_resources</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">max_vcpus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">16</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">security_group_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_security_group.sample.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">subnets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_subnet.sample.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"FARGATE"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">service_role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.aws_batch_service_role.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"MANAGED"</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_iam_role_policy_attachment.aws_batch_service_role</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Setting%20Update%20Policy"></a><h3 id="setting-update-policy">Setting Update Policy</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_batch_compute_environment"</span><span class="w"> </span><span class="nv">"sample"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">compute_environment_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sample"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">compute_resources</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">allocation_strategy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"BEST_FIT_PROGRESSIVE"</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_role</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_instance_profile.ecs_instance.arn</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_type</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"optimal"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">max_vcpus</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="m">4</span><span class="w"></span>
+<span class="w">    </span><span class="na">min_vcpus</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">    </span><span class="na">security_group_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_security_group.sample.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="nv">aws_subnet.sample.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"EC2"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">update_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">job_execution_timeout_minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">30</span><span class="w"></span>
+<span class="w">    </span><span class="na">terminate_jobs_on_update</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"MANAGED"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<ul>
+<li><code>compute_environment_name</code> - (Optional, Forces new resource) The name for your compute environment. Up to 128 letters (uppercase and lowercase), numbers, and underscores are allowed. If omitted, Terraform will assign a random, unique name.</li>
+<li><code>compute_environment_name_prefix</code> - (Optional, Forces new resource) Creates a unique compute environment name beginning with the specified prefix. Conflicts with <code>compute_environment_name</code>.</li>
+<li><code>compute_resources</code> - (Optional) Details of the compute resources managed by the compute environment. This parameter is required for managed compute environments. See details below.</li>
+<li><code>eks_configuration</code> - (Optional) Details for the Amazon EKS cluster that supports the compute environment. See details below.</li>
+<li><code>service_role</code> - (Optional) The full Amazon Resource Name (ARN) of the IAM role that allows AWS Batch to make calls to other AWS services on your behalf.</li>
+<li><code>state</code> - (Optional) The state of the compute environment. If the state is <code>ENABLED</code>, then the compute environment accepts jobs from a queue and can scale out automatically based on queues. Valid items are <code>ENABLED</code> or <code>DISABLED</code>. Defaults to <code>ENABLED</code>.</li>
+<li><code>tags</code> - (Optional) Key-value map of resource tags. If configured with a provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a> present, tags with matching keys will overwrite those defined at the provider-level.</li>
+<li><code>type</code> - (Required) The type of the compute environment. Valid items are <code>MANAGED</code> or <code>UNMANAGED</code>.</li>
+<li><code>update_policy</code> - (Optional) Specifies the infrastructure update policy for the compute environment. See details below.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/compute_resources"></a><h3 id="compute_resources">compute_resources</h3>
+
+<ul>
+<li><code>allocation_strategy</code> - (Optional) The allocation strategy to use for the compute resource in case not enough instances of the best fitting instance type can be allocated. For valid values, refer to the <a href="https://docs.aws.amazon.com/batch/latest/APIReference/API_ComputeResource.html#Batch-Type-ComputeResource-allocationStrategy">AWS documentation</a>. Defaults to <code>BEST_FIT</code>. This parameter isn't applicable to jobs running on Fargate resources, and shouldn't be specified.</li>
+<li><code>bid_percentage</code> - (Optional) Integer of maximum percentage that a Spot Instance price can be when compared with the On-Demand price for that instance type before instances are launched. For example, if your bid percentage is 20% (<code>20</code>), then the Spot price must be below 20% of the current On-Demand price for that EC2 instance. If you leave this field empty, the default value is 100% of the On-Demand price. This parameter isn't applicable to jobs running on Fargate resources, and shouldn't be specified.</li>
+<li><code>desired_vcpus</code> - (Optional) The desired number of EC2 vCPUS in the compute environment. This parameter isn't applicable to jobs running on Fargate resources, and shouldn't be specified.</li>
+<li><code>ec2_configuration</code> - (Optional) Provides information used to select Amazon Machine Images (AMIs) for EC2 instances in the compute environment. If Ec2Configuration isn't specified, the default is ECS_AL2. This parameter isn't applicable to jobs that are running on Fargate resources, and shouldn't be specified.</li>
+<li><code>ec2_key_pair</code> - (Optional) The EC2 key pair that is used for instances launched in the compute environment. This parameter isn't applicable to jobs running on Fargate resources, and shouldn't be specified.</li>
+<li><code>image_id</code> - (Optional) The Amazon Machine Image (AMI) ID used for instances launched in the compute environment. This parameter isn't applicable to jobs running on Fargate resources, and shouldn't be specified. (Deprecated, use <a href="#ec2_configuration"><code>ec2_configuration</code></a> <code>image_id_override</code> instead)</li>
+<li><code>instance_role</code> - (Optional) The Amazon ECS instance role applied to Amazon EC2 instances in a compute environment. This parameter isn't applicable to jobs running on Fargate resources, and shouldn't be specified.</li>
+<li><code>instance_type</code> - (Optional) A list of instance types that may be launched. This parameter isn't applicable to jobs running on Fargate resources, and shouldn't be specified.</li>
+<li><code>launch_template</code> - (Optional) The launch template to use for your compute resources. See details below. This parameter isn't applicable to jobs running on Fargate resources, and shouldn't be specified.</li>
+<li><code>max_vcpus</code> - (Required) The maximum number of EC2 vCPUs that an environment can reach.</li>
+<li><code>min_vcpus</code> - (Optional) The minimum number of EC2 vCPUs that an environment should maintain. For <code>EC2</code> or <code>SPOT</code> compute environments, if the parameter is not explicitly defined, a <code>0</code> default value will be set. This parameter isn't applicable to jobs running on Fargate resources, and shouldn't be specified.</li>
+<li><code>placement_group</code> - (Optional) The Amazon EC2 placement group to associate with your compute resources.</li>
+<li><code>security_group_ids</code> - (Optional) A list of EC2 security group that are associated with instances launched in the compute environment. This parameter is required for Fargate compute environments.</li>
+<li><code>spot_iam_fleet_role</code> - (Optional) The Amazon Resource Name (ARN) of the Amazon EC2 Spot Fleet IAM role applied to a SPOT compute environment. This parameter is required for SPOT compute environments. This parameter isn't applicable to jobs running on Fargate resources, and shouldn't be specified.</li>
+<li><code>subnets</code> - (Required) A list of VPC subnets into which the compute resources are launched.</li>
+<li><code>tags</code> - (Optional) Key-value pair tags to be applied to resources that are launched in the compute environment. This parameter isn't applicable to jobs running on Fargate resources, and shouldn't be specified.</li>
+<li><code>type</code> - (Required) The type of compute environment. Valid items are <code>EC2</code>, <code>SPOT</code>, <code>FARGATE</code> or <code>FARGATE_SPOT</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ec2_configuration"></a><h3 id="ec2_configuration">ec2_configuration</h3>
+
+<p><code>ec2_configuration</code> supports the following:</p>
+
+<ul>
+<li><code>image_id_override</code> - (Optional) The AMI ID used for instances launched in the compute environment that match the image type. This setting overrides the <code>image_id</code> argument in the <a href="#compute_resources"><code>compute_resources</code></a> block.</li>
+<li><code>image_type</code> - (Optional) The image type to match with the instance type to select an AMI. If the <code>image_id_override</code> parameter isn't specified, then a recent <a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-optimized_AMI.html#al2ami">Amazon ECS-optimized Amazon Linux 2 AMI</a> (<code>ECS_AL2</code>) is used.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/launch_template"></a><h3 id="launch_template">launch_template</h3>
+
+<p><code>launch_template</code> supports the following:</p>
+
+<ul>
+<li><code>launch_template_id</code> - (Optional) ID of the launch template. You must specify either the launch template ID or launch template name in the request, but not both.</li>
+<li><code>launch_template_name</code> - (Optional) Name of the launch template.</li>
+<li><code>version</code> - (Optional) The version number of the launch template. Default: The default version of the launch template.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/eks_configuration"></a><h3 id="eks_configuration">eks_configuration</h3>
+
+<p><code>eks_configuration</code> supports the following:</p>
+
+<ul>
+<li><code>eks_cluster_arn</code> - (Required) The Amazon Resource Name (ARN) of the Amazon EKS cluster.</li>
+<li><code>kubernetes_namespace</code> - (Required) The namespace of the Amazon EKS cluster. AWS Batch manages pods in this namespace.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/update_policy"></a><h3 id="update_policy">update_policy</h3>
+
+<p><code>update_policy</code> supports the following:</p>
+
+<ul>
+<li><code>job_execution_timeout_minutes</code> - (Required) Specifies the job timeout (in minutes) when the compute environment infrastructure is updated.</li>
+<li><code>terminate_jobs_on_update</code> - (Required) Specifies whether jobs are automatically terminated when the computer environment infrastructure is updated.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>arn</code> - The Amazon Resource Name (ARN) of the compute environment.</li>
+<li><code>ecs_cluster_arn</code> - The Amazon Resource Name (ARN) of the underlying Amazon ECS cluster used by the compute environment.</li>
+<li><code>status</code> - The current status of the compute environment (for example, CREATING or VALID).</li>
+<li><code>status_reason</code> - A short, human-readable string to provide additional details about the current status of the compute environment.</li>
+<li><code>tags_all</code> - A map of tags assigned to the resource, including those inherited from the provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import AWS Batch compute using the <code>compute_environment_name</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_batch_compute_environment.sample</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sample"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import AWS Batch compute using the <code>compute_environment_name</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_batch_compute_environment.sample sample
+</code></pre></div>
+
+            
+        
+    </body></html>

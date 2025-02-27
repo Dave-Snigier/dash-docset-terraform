@@ -1,0 +1,181 @@
+<html><!-- Online page at https://registry.terraform.io/providers/fastly/fastly/latest/docs/resources/tls_subscription_validation --><head>
+                <title>tls_subscription_validation</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="fastly_tls_subscription_validation">fastly_tls_subscription_validation</h1>
+
+<p>This resource represents a successful validation of a Fastly TLS Subscription in concert with other resources.</p>
+
+<p>Most commonly, this resource is used together with a resource for a DNS record and <code>fastly_tls_subscription</code> to request a DNS validated certificate, deploy the required validation records and wait for validation to complete.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Warning</em>
+    <p>This resource implements a part of the validation workflow. It does not represent a real-world entity in Fastly, therefore changing or deleting this resource on its own has no immediate effect.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>DNS Validation with AWS Route53:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"4.55.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">fastly</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"fastly/fastly"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3.1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># NOTE: Creating a hosted zone will automatically create SOA/NS records.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route53_zone"</span><span class="w"> </span><span class="nv">"production"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route53domains_registered_domain"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">domain_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example.com"</span><span class="w"></span>
+
+<span class="w">  </span><span class="err">dynamic</span><span class="w"> </span><span class="s2">"name_server"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route53_zone.production.name_servers</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">content</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">name_server.value</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">subdomains</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"a.example.com"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"b.example.com"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"fastly_service_vcl"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-service"</span><span class="w"></span>
+
+<span class="w">  </span><span class="err">dynamic</span><span class="w"> </span><span class="s2">"domain"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.subdomains</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">content</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">domain.value</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">backend</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">address</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"127.0.0.1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"localhost"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">force_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"fastly_tls_subscription"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">domains</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="err">for</span><span class="w"> </span><span class="err">domain</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">fastly_service_vcl.example.domain</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nv">domain.name</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">certificate_authority</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"lets-encrypt"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route53_record"</span><span class="w"> </span><span class="nv">"domain_validation"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">fastly_tls_subscription.example</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # The following `for` expression (due to the outer {}) will produce an object with key/value pairs.</span>
+<span class="c1">    # The 'key' is the domain name we've configured (e.g. a.example.com, b.example.com)</span>
+<span class="c1">    # The 'value' is a specific 'challenge' object whose record_name matches the domain (e.g. record_name is _acme-challenge.a.example.com).</span>
+<span class="w">    </span><span class="err">for</span><span class="w"> </span><span class="err">domain</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">fastly_tls_subscription.example.domains</span><span class="w"> </span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="na">domain</span><span class="w"> </span><span class="o">=</span><span class="err">&gt;</span><span class="w"> </span><span class="nf">element</span><span class="p">([</span><span class="w"></span>
+<span class="w">      </span><span class="err">for</span><span class="w"> </span><span class="err">obj</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">fastly_tls_subscription.example.managed_dns_challenges</span><span class="w"> </span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="err">obj</span><span class="w"> </span><span class="err">if</span><span class="w"> </span><span class="nv">obj.record_name</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"_acme-challenge.${domain}"</span><span class="c1"> # We use an `if` conditional to filter the list to a single element</span>
+<span class="w">    </span><span class="p">],</span><span class="w"> </span><span class="m">0</span><span class="p">)</span><span class="c1">                                                   # `element()` returns the first object in the list which should be the relevant 'challenge' object we need</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value.record_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value.record_type</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route53_zone.production.zone_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">allow_overwrite</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">records</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">each.value.record_value</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">ttl</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="m">60</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># This is a resource that other resources can depend on if they require the certificate to be issued.</span>
+<span class="c1"># NOTE: Internally the resource keeps retrying `GetTLSSubscription` until no error is returned (or the configured timeout is reached).</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"fastly_tls_subscription_validation"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">subscription_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">fastly_tls_subscription.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_route53_record.domain_validation</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># This data source lists all available configuration objects.</span>
+<span class="c1"># It uses a `default` attribute to narrow down the list to just one configuration object.</span>
+<span class="c1"># If the filtered list has a length that is not exactly one element, you'll see an error returned.</span>
+<span class="c1"># The single TLS configuration is then returned and can be referenced by other resources (see aws_route53_record below).</span>
+<span class="c1">#</span>
+<span class="c1"># IMPORTANT: Not all customers will have a 'default' configuration.</span>
+<span class="c1"># If you have issues filtering with `default = true`, then you may need another attribute.</span>
+<span class="c1"># Refer to the fastly_tls_configuration documentation for available attributes:</span>
+<span class="c1"># https://registry.terraform.io/providers/fastly/fastly/latest/docs/data-sources/tls_configuration#optional</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"fastly_tls_configuration"</span><span class="w"> </span><span class="nv">"default_tls"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">fastly_tls_subscription_validation.example</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Once validation is complete and we've retrieved the TLS configuration data, we can create multiple subdomain records.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route53_record"</span><span class="w"> </span><span class="nv">"subdomain"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">toset</span><span class="p">(</span><span class="nv">local.subdomains</span><span class="p">)</span><span class="c1"> # Because `subdomains` is ultimately a list, the `each` variable produced will contain only a `value` property which will be the subdomain.</span>
+
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="c1"> # e.g. a.example.com, b.example.com</span>
+<span class="w">  </span><span class="na">records</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="err">for</span><span class="w"> </span><span class="err">record</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nv">data.fastly_tls_configuration.default_tls.dns_records</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nv">record.record_value</span><span class="w"> </span><span class="err">if</span><span class="w"> </span><span class="nv">record.record_type</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"CNAME"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">ttl</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">300</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"CNAME"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route53_zone.production.zone_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p><code>fastly_tls_subscription_validation</code> supports the following <a href="https://www.terraform.io/docs/configuration/blocks/resources/syntax.html#operation-timeouts">Timeouts</a> configuration options:</p>
+
+<ul>
+<li><code>create</code> - (Default <code>45m</code>) How long to wait for the subscription to be validated.</li>
+</ul>
+
+<!-- schema generated by tfplugindocs -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Schema"></a><h2 id="schema">Schema</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Required"></a><h3 id="required">Required</h3>
+
+<ul>
+<li><code>subscription_id</code> (String) The ID of the TLS Subscription that should be validated.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Optional"></a><h3 id="optional">Optional</h3>
+
+<ul>
+<li><code>timeouts</code> (Block, Optional) (see <a href="#nestedblock--timeouts">below for nested schema</a>)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Read-Only"></a><h3 id="read-only">Read-Only</h3>
+
+<ul>
+<li><code>id</code> (String) The ID of this resource.</li>
+</ul>
+
+<p><a id="nestedblock--timeouts"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Nested%20Schema%20for%20timeouts"></a><h3 id="nested-schema-for-timeouts">Nested Schema for <code>timeouts</code></h3>
+
+<p>Optional:</p>
+
+<ul>
+<li><code>create</code> (String)</li>
+</ul>
+
+            
+        
+    </body></html>

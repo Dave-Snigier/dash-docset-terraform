@@ -1,0 +1,111 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/hcp/latest/docs/guides/packer-channel-management --><head>
+                <title>Advanced Packer Channel Management</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="advanced-packer-channel-management">Advanced Packer Channel Management</h1>
+
+<p>You can integrate multiple HCP Packer resources and data sources to perform advanced channel management tasks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Setting%20the%20channel%20assignment%20on%20a%20Terraform-managed%20channel"></a><h2 id="setting-the-channel-assignment-on-a-terraform-managed-channel">Setting the channel assignment on a Terraform-managed channel</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_packer_channel"</span><span class="w"> </span><span class="nv">"advanced"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"advanced"</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"alpine"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_packer_channel_assignment"</span><span class="w"> </span><span class="nv">"advanced"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_packer_channel.advanced.bucket_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">channel_name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_packer_channel.advanced.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">version_fingerprint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"01H1ZMW0Q2W6FT4FK27FQJCFG7"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Setting%20the%20channel%20assignment%20to%20the%20latest%20complete%20version"></a><h2 id="setting-the-channel-assignment-to-the-latest-complete-version">Setting the channel assignment to the latest complete version</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"hcp_packer_version"</span><span class="w"> </span><span class="nv">"alpine_latest"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"alpine"</span><span class="w"></span>
+<span class="w">  </span><span class="na">channel_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"latest"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_packer_channel"</span><span class="w"> </span><span class="nv">"alpine_advanced"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"advanced"</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.hcp_packer_version.alpine_latest.bucket_name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_packer_channel_assignment"</span><span class="w"> </span><span class="nv">"alpine_advanced"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_packer_channel.alpine_advanced.bucket_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">channel_name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_packer_channel.alpine_advanced.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">version_fingerprint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.hcp_packer_version.alpine_latest.fingerprint</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Automatically%20creating%20channels%20for%20new%20and%20existing%20buckets"></a><h2 id="automatically-creating-channels-for-new-and-existing-buckets">Automatically creating channels for new and existing buckets</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"hcp_packer_bucket_names"</span><span class="w"> </span><span class="nv">"all"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_packer_channel"</span><span class="w"> </span><span class="nv">"release"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.hcp_packer_bucket_names.all.names</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"release"</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.key</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Optionally, you can use Terraform functions/expressions to filter the list of bucket names before providing it to <code>for_each</code> if channels should only be created for a subset of buckets.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Managing%20channel%20assignment%20for%20automatically%20created%20channels"></a><h3 id="managing-channel-assignment-for-automatically-created-channels">Managing channel assignment for automatically created channels</h3>
+
+<p>Channel assignment for automatically created channels can be managed in many ways. A nonexhaustive example configuration is provided below.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"hcp_packer_version"</span><span class="w"> </span><span class="nv">"all_latest"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.hcp_packer_bucket_names.all.names</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">bucket_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">each.key</span><span class="w"></span>
+<span class="w">  </span><span class="na">channel_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"latest"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"hcp_packer_version"</span><span class="w"> </span><span class="nv">"bucket3_staging"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"bucket3"</span><span class="w"></span>
+<span class="w">  </span><span class="na">channel_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"staging"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_packer_channel_assignment"</span><span class="w"> </span><span class="nv">"release"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="c1"> # Defaulting all channels to be unassigned and Terraform-managed</span>
+<span class="w">      </span><span class="err">for</span><span class="w"> </span><span class="err">bucketName</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nf">keys</span><span class="p">(</span><span class="nv">hcp_packer_channel.release</span><span class="p">)</span><span class="w"> </span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="na">bucketName</span><span class="w"> </span><span class="o">=</span><span class="err">&gt;</span><span class="w"> </span><span class="s2">"none"</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="c1"> # Assigning channels that match a filter to an version fetched from another channel</span>
+<span class="w">      </span><span class="err">for</span><span class="w"> </span><span class="err">bucketName</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="nf">keys</span><span class="p">(</span><span class="nv">hcp_packer_channel.release</span><span class="p">)</span><span class="w"> </span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="na">bucketName</span><span class="w"> </span><span class="o">=</span><span class="err">&gt;</span><span class="w"> </span><span class="nv">data.hcp_packer_version.all_latest[bucketName].fingerprint</span><span class="w"></span>
+<span class="w">      </span><span class="err">if</span><span class="w"> </span><span class="err">endswith</span><span class="p">(</span><span class="err">bucketName</span><span class="p">,</span><span class="w"> </span><span class="s2">"-dev"</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="c1"> # Individual channel assignments</span>
+<span class="w">      </span><span class="s2">"bucket1"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"01H1SF9NWAK8AP25PAWDBGZ1YD"</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"bucket2"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"01H28NJ7WPCZA0FZZ8G3FGGTAF"</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"bucket3"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nv">data.hcp_packer_version.bucket3_staging.fingerprint</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">)</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">bucket_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.key</span><span class="c1"></span>
+<span class="c1">  # Using a reference for `channel_name` allows it to be generated dynamically</span>
+<span class="c1">  # in the `hcp_packer_channel.release` resource if desired.</span>
+<span class="w">  </span><span class="na">channel_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_packer_channel.release[each.key].name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">version_fingerprint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>You are not required to configure an assignment for every channel at the same time as automatic channel creation. Using Terraform builtin functions/expressions, it is possible to limit which channels should have assignments configured by default.</p>
+
+<p>The default value used in the example is <code>"none"</code>, which causes Terraform to set the channel to have no assigned version and continue to ensure that a version is not assigned elsewhere. </p>
+
+<p>If an invalid bucket name is provided in the <code>for_each</code> map, an error will be thrown. This helps to ensure that the configuration doesn't contain orphaned values, but can cause plan failures when buckets are deleted. If this behavior is undesirable, filter out invalid buckets from the result of the <code>merge</code> function.</p>
+
+<p>An <a href="https://github.com/hashicorp/terraform-provider-hcp/tree/main/examples/guides/packer_channel_management/bucket_names/example_module">example module</a> is available that includes options to leave select channels unmanaged, require explicit configurations for select channels, ignore invalid bucket names in the configuration, and automatically assign a version fetched from another channel.</p>
+
+            
+        
+    </body></html>

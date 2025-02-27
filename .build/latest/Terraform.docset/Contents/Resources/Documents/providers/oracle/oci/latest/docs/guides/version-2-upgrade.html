@@ -1,0 +1,135 @@
+<html><!-- Online page at https://registry.terraform.io/providers/oracle/oci/latest/docs/guides/version-2-upgrade --><head>
+                <title>Upgrading to Version 2</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <a class="dashAnchor" name="//apple_ref/cpp/Section/Terraform%20OCI%20Provider%20Version%202"></a><h3 id="terraform-oci-provider-version-2">Terraform OCI Provider Version 2</h3>
+
+<p>All Oracle Bare Metal Cloud (OBMC) technologies and services have been renamed to Oracle Cloud Infrastructure (OCI).</p>
+
+<p>The <a href="https://github.com/oracle/terraform-provider-oci/releases/tag/v2.0.0">V2.0.0 release</a> will require you to make changes to your configuration files and state file.</p>
+
+<p>You can still use previous versions of the provider without modifying the configuration files and state file.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Migration%20tool"></a><h2 id="migration-tool">Migration tool</h2>
+
+<p>As part of the release on September 13th, a migration tool will be supplied that will help you update your terraform plans and state files to work with the new version of the provider. The latest version can be found on the <a href="https://github.com/oracle/terraform-provider-oci/releases/tag/2.0.2">V2.0.2 release page</a> in the oci-tool.zip file. If you would like to review the source and potentially build your own migration tool, the files can be found <a href="https://github.com/oracle/terraform-provider-oci/tree/v2.2.0/tools/oci-tool">here</a>. A readme on using the tool is also in that directory.</p>
+
+<p>The changes in this release affect all our current Terraform Provider users.
+You will be able to run this tool against a plan directory and it will:</p>
+
+<ul>
+<li>Transform all the "baremetal" references in .tf and .tfstate files to the new "oci" provider name.</li>
+<li>Detect and modify provider blocks that do not specify a region to explicitly use "us-phoenix-1".</li>
+</ul>
+
+<p>Alternatively, you can make the changes manually.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Name%20Change"></a><h2 id="provider-name-change">Provider Name Change</h2>
+
+<p>The provider name changes from "baremetal" to "oci". You need to update your Terraform configuration files.</p>
+
+<pre><code>Provider "oci" {
+      region = "us-ashburn-1"
+      tenancy_ocid = "${var.tenancy_ocid}"
+      user_ocid = "${var.user_ocid}"
+      fingerprint = "${var.fingerprint}"
+      private_key_path = "${var.private_key_path}"
+}
+</code></pre>
+
+<p>The provider binary filename also changes, from "terraform-provider-baremetal" to "github.com/oracle/terraform-provider-oci".</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Installing%20the%20Updated%20Provider"></a><h2 id="installing-the-updated-provider">Installing the Updated Provider</h2>
+
+<p>Use the following guidance to install the updated provider on a Linux or Windows computer.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/On%20%2Anix"></a><h3 id="on-nix">On *nix</h3>
+
+<p>Copy the unpacked provider into the following directory:
+<code>~/.terraform.d/plugins/</code></p>
+
+<p>Your ~/.terraformrc file specifies the path to the baremetal provider (only required for v.9.x).
+For example:</p>
+
+<pre><code>providers {
+  baremetal = "~/.terraform.d/plugins/terraform-provider-baremetal"
+}
+</code></pre>
+
+<p>Change the path in your /.terraformrc file to:</p>
+
+<pre><code>providers {
+  oci = "~/.terraform.d/plugins/terraform-provider-oci_v2.0.0"
+}
+</code></pre>
+
+<p>Alternatively you can reference both providers at the same time:</p>
+
+<pre><code>providers {
+  baremetal = "~/.terraform.d/plugins/terraform-provider-baremetal"
+  oci = "~/.terraform.d/plugins/terraform-provider-oci_v2.0.0"
+}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/On%20Windows"></a><h3 id="on-windows">On Windows</h3>
+
+<p>Copy the unpacked provider into the following directory:</p>
+
+<p><code>%APPDATA%/terraform.d/plugins/</code></p>
+
+<p>Your %APPDATA%/terraform.rc file specifies the path to the baremetal provider (only required for v.9.x). For example:</p>
+
+<pre><code>providers {
+  baremetal = "%appdata%/terraform.d/plugins/terraform-provider-baremetal"
+}
+</code></pre>
+
+<p>Change the path in your /.terraformrc file to:</p>
+
+<pre><code>providers {
+  oci = "%appdata%/terraform.d/plugins/terraform-provider-oci"
+}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%20and%20Datasource%20Names"></a><h2 id="resource-and-datasource-names">Resource and Datasource Names</h2>
+
+<p>Resource and datasource names that use a "baremetal" prefix will now use "oci".
+For example, resource "baremetal_core_instance" changes to resource "oci_core_instance".</p>
+
+<p>Code example:</p>
+
+<p><code>image = "${lookup(data.baremetal_core_images.OLImageOCID.images[0], "id")}"</code></p>
+
+<p>changes to</p>
+
+<p><code>image = "${lookup(data.oci_core_images.OLImageOCID.images[0], "id")}"</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Making%20the%20Changes"></a><h2 id="making-the-changes">Making the Changes</h2>
+
+<p>The changes to the provider and the resource names will need to be made to both the configuration files, the state file, and the backup state file.</p>
+
+<p>Once the changes have been made, run terraform plan and verify that there will be no new changes to your infrastructure on the next apply.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Specifying%20a%20Region%20is%20Mandatory"></a><h2 id="specifying-a-region-is-mandatory">Specifying a Region is Mandatory</h2>
+
+<p>In addition to the name change, the region parameter in the provider is a required parameter. In previous releases, the region defaulted to "us-phoenix-1" if no region was specified.
+This region parameter is used to determine service endpoints.</p>
+
+<pre><code>provider “oci" {
+      region = "us-ashburn-1"
+      tenancy_ocid = "${var.tenancy_ocid}"
+      user_ocid = "${var.user_ocid}"
+      fingerprint = "${var.fingerprint}"
+      private_key_path = "${var.private_key_path}"
+}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Building%20the%20Code%20from%20Source"></a><h2 id="building-the-code-from-source">Building the Code from Source</h2>
+
+<p>If you want to build the new code from source you will have to make sure that the root directory of the project is "github.com/oracle/terraform-provider-oci" instead of "terraform-provider-baremetal"</p>
+
+            
+        
+    </body></html>

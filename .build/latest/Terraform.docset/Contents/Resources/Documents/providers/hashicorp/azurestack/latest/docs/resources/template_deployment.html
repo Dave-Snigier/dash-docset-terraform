@@ -1,0 +1,152 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azurestack/latest/docs/resources/template_deployment --><head>
+                <title>azurestack_template_deployment</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="azurestack_template_deployment">azurestack_template_deployment</h1>
+
+<p>Manages a template deployment of resources</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Note on ARM Template Deployments</em>
+    <p>Due to the way the underlying Azure API is designed, Terraform can only manage the deployment of the ARM Template - and not any resources which are created by it. This means that when deleting the <code>azurestack_template_deployment</code> resource, Terraform will only remove the reference to the deployment, whilst leaving any resources created by that ARM Template Deployment. One workaround for this is to use a unique Resource Group for each ARM Template Deployment, which means deleting the Resource Group would contain any resources created within it - however this isn't ideal. <a href="https://docs.microsoft.com/en-us/rest/api/resources/deployments#Deployments_Delete">More information</a>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This example uses <a href="storage_account.html">Storage Accounts</a> and <a href="public_ip.html">Public IP's</a> which are natively supported by Terraform - we'd highly recommend using the Native Resources where possible instead rather than an ARM Template, for the reasons outlined above.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azurestack_resource_group"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"acctestRG-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"West US"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurestack_template_deployment"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"acctesttemplate-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurestack_resource_group.test.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">template_body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="dl">DEPLOY</span><span class="sh"></span>
+<span class="sh">{</span>
+<span class="sh">  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",</span>
+<span class="sh">  "contentVersion": "1.0.0.0",</span>
+<span class="sh">  "parameters": {</span>
+<span class="sh">    "storageAccountType": {</span>
+<span class="sh">      "type": "string",</span>
+<span class="sh">      "defaultValue": "Standard_LRS",</span>
+<span class="sh">      "allowedValues": [</span>
+<span class="sh">        "Standard_LRS",</span>
+<span class="sh">        "Standard_GRS",</span>
+<span class="sh">        "Standard_ZRS"</span>
+<span class="sh">      ],</span>
+<span class="sh">      "metadata": {</span>
+<span class="sh">        "description": "Storage Account type"</span>
+<span class="sh">      }</span>
+<span class="sh">    }</span>
+<span class="sh">  },</span>
+<span class="sh">  "variables": {</span>
+<span class="sh">    "location": "[resourceGroup().location]",</span>
+<span class="sh">    "storageAccountName": "[concat(uniquestring(resourceGroup().id), 'storage')]",</span>
+<span class="sh">    "publicIPAddressName": "[concat('myPublicIp', uniquestring(resourceGroup().id))]",</span>
+<span class="sh">    "publicIPAddressType": "Dynamic",</span>
+<span class="sh">    "apiVersion": "2015-06-15",</span>
+<span class="sh">    "dnsLabelPrefix": "terraform-acctest"</span>
+<span class="sh">  },</span>
+<span class="sh">  "resources": [</span>
+<span class="sh">    {</span>
+<span class="sh">      "type": "Microsoft.Storage/storageAccounts",</span>
+<span class="sh">      "name": "[variables('storageAccountName')]",</span>
+<span class="sh">      "apiVersion": "[variables('apiVersion')]",</span>
+<span class="sh">      "location": "[variables('location')]",</span>
+<span class="sh">      "properties": {</span>
+<span class="sh">        "accountType": "[parameters('storageAccountType')]"</span>
+<span class="sh">      }</span>
+<span class="sh">    },</span>
+<span class="sh">    {</span>
+<span class="sh">      "type": "Microsoft.Network/publicIPAddresses",</span>
+<span class="sh">      "apiVersion": "[variables('apiVersion')]",</span>
+<span class="sh">      "name": "[variables('publicIPAddressName')]",</span>
+<span class="sh">      "location": "[variables('location')]",</span>
+<span class="sh">      "properties": {</span>
+<span class="sh">        "publicIPAllocationMethod": "[variables('publicIPAddressType')]",</span>
+<span class="sh">        "dnsSettings": {</span>
+<span class="sh">          "domainNameLabel": "[variables('dnsLabelPrefix')]"</span>
+<span class="sh">        }</span>
+<span class="sh">      }</span>
+<span class="sh">    }</span>
+<span class="sh">  ],</span>
+<span class="sh">  "outputs": {</span>
+<span class="sh">    "storageAccountName": {</span>
+<span class="sh">      "type": "string",</span>
+<span class="sh">      "value": "[variables('storageAccountName')]"</span>
+<span class="sh">    }</span>
+<span class="sh">  }</span>
+<span class="sh">}</span>
+<span class="dl">DEPLOY</span>
+
+<span class="c1">  # these key-value pairs are passed into the ARM Template's `parameters` block</span>
+<span class="w">  </span><span class="nb">parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"storageAccountType"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Standard_GRS"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">deployment_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Incremental"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"storageAccountName"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${azurestack_template_deployment.test.outputs["storageAccountName"]}"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>name</code> - (Required) Specifies the name of the template deployment. Changing this forces a
+new resource to be created.</li>
+<li><code>resource_group_name</code> - (Required) The name of the resource group in which to
+create the template deployment.</li>
+<li><code>deployment_mode</code> - (Required) Specifies the mode that is used to deploy resources. This value could be either <code>Incremental</code> or <code>Complete</code>.
+Note that you will almost <em>always</em> want this to be set to <code>Incremental</code> otherwise the deployment will destroy all infrastructure not
+specified within the template, and Terraform will not be aware of this.</li>
+<li><code>template_body</code> - (Optional) Specifies the JSON definition for the template.</li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>There's a <a href="https://www.terraform.io/docs/configuration/functions/file.html"><code>file</code> function available</a> which allows you to read this from an external file, which helps makes this more resource more readable.</p>
+</aside>
+
+<ul>
+<li><p><code>parameters</code> - (Optional) Specifies the name and value pairs that define the deployment parameters for the template.</p></li>
+<li><p><code>parameters_body</code> - (Optional) Specifies a valid Azure JSON parameters file that define the deployment parameters. It can contain KeyVault references</p></li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>There's an <a href="https://www.terraform.io/docs/configuration/interpolation.html#file-path-"><code>file</code> interpolation function available</a> which allows you to read this from an external file, which helps makes this more resource more readable.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>The following attributes are exported:</p>
+
+<ul>
+<li><p><code>id</code> - The Template Deployment ID.</p></li>
+<li><p><code>outputs</code> - A map of supported scalar output types returned from the deployment (currently, Azure Template Deployment outputs of type String, Int and Bool are supported, and are converted to strings - others will be ignored) and can be accessed using <code>.outputs["name"]</code>.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Note"></a><h2 id="note">Note</h2>
+
+<p>Terraform does not know about the individual resources created by Azure using a deployment template and therefore cannot delete these resources during a destroy. Destroying a template deployment removes the associated deployment operations, but will not delete the Azure resources created by the deployment. In order to delete these resources, the containing resource group must also be destroyed. <a href="https://docs.microsoft.com/en-us/rest/api/resources/deployments#Deployments_Delete">More information</a>.</p>
+
+            
+        
+    </body></html>

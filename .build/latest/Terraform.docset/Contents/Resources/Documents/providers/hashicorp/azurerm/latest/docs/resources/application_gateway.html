@@ -1,0 +1,903 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/application_gateway --><head>
+                <title>azurerm_application_gateway</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="azurerm_application_gateway">azurerm_application_gateway</h1>
+
+<p>Manages an Application Gateway.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>The <code>backend_address_pool</code>, <code>backend_http_settings</code>, <code>http_listener</code>, <code>private_link_configuration</code>, <code>request_routing_rule</code>, <code>redirect_configuration</code>, <code>probe</code>, <code>ssl_certificate</code>, and <code>frontend_port</code> properties are Sets as the service API returns these lists of objects in a different order from how the provider sends them. As Sets are stored using a hash, if one value is added or removed from the Set, Terraform considers the entire list of objects changed and the plan shows that it is removing every value in the list and re-adding it with the new information. Though Terraform is showing all the values being removed and re-added, we are not actually removing anything unless the user specifies a removal in the configfile.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_resource_group"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-resources"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"West Europe"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_virtual_network"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">address_space</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"10.254.0.0/16"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_subnet"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">virtual_network_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_virtual_network.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">address_prefixes</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"10.254.0.0/24"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_public_ip"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-pip"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">allocation_method</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Static"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># since these variables are re-used - a locals block makes this more maintainable</span>
+<span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend_address_pool_name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"${azurerm_virtual_network.example.name}-beap"</span><span class="w"></span>
+<span class="w">  </span><span class="na">frontend_port_name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"${azurerm_virtual_network.example.name}-feport"</span><span class="w"></span>
+<span class="w">  </span><span class="na">frontend_ip_configuration_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${azurerm_virtual_network.example.name}-feip"</span><span class="w"></span>
+<span class="w">  </span><span class="na">http_setting_name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"${azurerm_virtual_network.example.name}-be-htst"</span><span class="w"></span>
+<span class="w">  </span><span class="na">listener_name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"${azurerm_virtual_network.example.name}-httplstn"</span><span class="w"></span>
+<span class="w">  </span><span class="na">request_routing_rule_name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"${azurerm_virtual_network.example.name}-rqrt"</span><span class="w"></span>
+<span class="w">  </span><span class="na">redirect_configuration_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"${azurerm_virtual_network.example.name}-rdrcfg"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_application_gateway"</span><span class="w"> </span><span class="nv">"network"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-appgateway"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.location</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">sku</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"Standard_v2"</span><span class="w"></span>
+<span class="w">    </span><span class="na">tier</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"Standard_v2"</span><span class="w"></span>
+<span class="w">    </span><span class="na">capacity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">gateway_ip_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-gateway-ip-configuration"</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnet_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_subnet.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">frontend_port</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.frontend_port_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">80</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">frontend_ip_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">local.frontend_ip_configuration_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">public_ip_address_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_public_ip.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">backend_address_pool</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.backend_address_pool_name</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">backend_http_settings</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">local.http_setting_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">cookie_based_affinity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Disabled"</span><span class="w"></span>
+<span class="w">    </span><span class="na">path</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"/path1/"</span><span class="w"></span>
+<span class="w">    </span><span class="na">port</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="m">80</span><span class="w"></span>
+<span class="w">    </span><span class="na">protocol</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"Http"</span><span class="w"></span>
+<span class="w">    </span><span class="na">request_timeout</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="m">60</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">http_listener</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                           </span><span class="o">=</span><span class="w"> </span><span class="nv">local.listener_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">frontend_ip_configuration_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.frontend_ip_configuration_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">frontend_port_name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">local.frontend_port_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">protocol</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="s2">"Http"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">request_routing_rule</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="nv">local.request_routing_rule_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">priority</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="m">9</span><span class="w"></span>
+<span class="w">    </span><span class="na">rule_type</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"Basic"</span><span class="w"></span>
+<span class="w">    </span><span class="na">http_listener_name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">local.listener_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">backend_address_pool_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">local.backend_address_pool_name</span><span class="w"></span>
+<span class="w">    </span><span class="na">backend_http_settings_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.http_setting_name</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The name of the Application Gateway. Changing this forces a new resource to be created.</p></li>
+<li><p><code>resource_group_name</code> - (Required) The name of the resource group in which to the Application Gateway should exist. Changing this forces a new resource to be created.</p></li>
+<li><p><code>location</code> - (Required) The Azure region where the Application Gateway should exist. Changing this forces a new resource to be created.</p></li>
+<li><p><code>backend_address_pool</code> - (Required) One or more <code>backend_address_pool</code> blocks as defined below.</p></li>
+<li><p><code>backend_http_settings</code> - (Required) One or more <code>backend_http_settings</code> blocks as defined below.</p></li>
+<li><p><code>frontend_ip_configuration</code> - (Required) One or more <code>frontend_ip_configuration</code> blocks as defined below.</p></li>
+<li><p><code>frontend_port</code> - (Required) One or more <code>frontend_port</code> blocks as defined below.</p></li>
+<li><p><code>gateway_ip_configuration</code> - (Required) One or more <code>gateway_ip_configuration</code> blocks as defined below.</p></li>
+<li><p><code>http_listener</code> - (Required) One or more <code>http_listener</code> blocks as defined below.</p></li>
+<li><p><code>request_routing_rule</code> - (Required) One or more <code>request_routing_rule</code> blocks as defined below.</p></li>
+<li><p><code>sku</code> - (Required) A <code>sku</code> block as defined below.</p></li>
+</ul>
+
+<hr/>
+
+<ul>
+<li><p><code>fips_enabled</code> - (Optional) Is FIPS enabled on the Application Gateway?</p></li>
+<li><p><code>global</code> - (Optional) A <code>global</code> block as defined below.</p></li>
+<li><p><code>identity</code> - (Optional) An <code>identity</code> block as defined below.</p></li>
+<li><p><code>private_link_configuration</code> - (Optional) One or more <code>private_link_configuration</code> blocks as defined below.</p></li>
+<li><p><code>zones</code> - (Optional) Specifies a list of Availability Zones in which this Application Gateway should be located. Changing this forces a new Application Gateway to be created.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Please Note</em>
+    <p>Availability Zones are not supported in all regions at this time, please check the <a href="https://docs.microsoft.com/azure/availability-zones/az-overview">official documentation</a> for more information. They are also only supported for <a href="https://docs.microsoft.com/azure/application-gateway/application-gateway-autoscaling-zone-redundant">v2 SKUs</a></p>
+</aside>
+
+<ul>
+<li><p><code>trusted_client_certificate</code> - (Optional) One or more <code>trusted_client_certificate</code> blocks as defined below.</p></li>
+<li><p><code>ssl_profile</code> - (Optional) One or more <code>ssl_profile</code> blocks as defined below.</p></li>
+<li><p><code>authentication_certificate</code> - (Optional) One or more <code>authentication_certificate</code> blocks as defined below.</p></li>
+<li><p><code>trusted_root_certificate</code> - (Optional) One or more <code>trusted_root_certificate</code> blocks as defined below.</p></li>
+<li><p><code>ssl_policy</code> - (Optional) a <code>ssl_policy</code> block as defined below.</p></li>
+<li><p><code>enable_http2</code> - (Optional) Is HTTP2 enabled on the application gateway resource? Defaults to <code>false</code>.</p></li>
+<li><p><code>force_firewall_policy_association</code> - (Optional) Is the Firewall Policy associated with the Application Gateway?</p></li>
+<li><p><code>probe</code> - (Optional) One or more <code>probe</code> blocks as defined below.</p></li>
+<li><p><code>ssl_certificate</code> - (Optional) One or more <code>ssl_certificate</code> blocks as defined below.</p></li>
+<li><p><code>tags</code> - (Optional) A mapping of tags to assign to the resource.</p></li>
+<li><p><code>url_path_map</code> - (Optional) One or more <code>url_path_map</code> blocks as defined below.</p></li>
+<li><p><code>waf_configuration</code> - (Optional) A <code>waf_configuration</code> block as defined below.</p></li>
+<li><p><code>custom_error_configuration</code> - (Optional) One or more <code>custom_error_configuration</code> blocks as defined below.</p></li>
+<li><p><code>firewall_policy_id</code> - (Optional) The ID of the Web Application Firewall Policy.</p></li>
+<li><p><code>redirect_configuration</code> - (Optional) One or more <code>redirect_configuration</code> blocks as defined below.</p></li>
+<li><p><code>autoscale_configuration</code> - (Optional) An <code>autoscale_configuration</code> block as defined below.</p></li>
+<li><p><code>rewrite_rule_set</code> - (Optional) One or more <code>rewrite_rule_set</code> blocks as defined below. Only valid for v2 WAF and Standard SKUs.</p></li>
+</ul>
+
+<hr/>
+
+<p>An <code>authentication_certificate</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The Name of the Authentication Certificate to use.</p></li>
+<li><p><code>data</code> - (Required) The contents of the Authentication Certificate which should be used.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>trusted_root_certificate</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The Name of the Trusted Root Certificate to use.</p></li>
+<li><p><code>data</code> - (Optional) The contents of the Trusted Root Certificate which should be used. Required if <code>key_vault_secret_id</code> is not set.</p></li>
+<li><p><code>key_vault_secret_id</code> - (Optional) The Secret ID of the (base-64 encoded unencrypted pfx) <code>Secret</code> or <code>Certificate</code> object stored in Azure KeyVault. You need to enable soft delete for the Key Vault to use this feature. Required if <code>data</code> is not set.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>To implement certificate rotation, <code>versionless_secret_id</code> should be used, although <code>secret_id</code> is also supported.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>TLS termination with Key Vault certificates is limited to the <a href="https://docs.microsoft.com/azure/application-gateway/key-vault-certs">v2 SKUs</a>.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>For TLS termination with Key Vault certificates to work properly, an existing user-assigned managed identity, which Application Gateway uses to retrieve certificates from Key Vault, should be defined via <code>identity</code> block. Additionally, access policies in the Key Vault to allow the identity to be granted <em>get</em> access to the secret should be defined.</p>
+</aside>
+
+<hr/>
+
+<p>A <code>backend_address_pool</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The name of the Backend Address Pool.</p></li>
+<li><p><code>fqdns</code> - (Optional) A list of FQDN's which should be part of the Backend Address Pool.</p></li>
+<li><p><code>ip_addresses</code> - (Optional) A list of IP Addresses which should be part of the Backend Address Pool.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>backend_http_settings</code> block supports the following:</p>
+
+<ul>
+<li><p><code>cookie_based_affinity</code> - (Required) Is Cookie-Based Affinity enabled? Possible values are <code>Enabled</code> and <code>Disabled</code>.</p></li>
+<li><p><code>affinity_cookie_name</code> - (Optional) The name of the affinity cookie.</p></li>
+<li><p><code>name</code> - (Required) The name of the Backend HTTP Settings Collection.</p></li>
+<li><p><code>path</code> - (Optional) The Path which should be used as a prefix for all HTTP requests.</p></li>
+<li><p><code>port</code> - (Required) The port which should be used for this Backend HTTP Settings Collection.</p></li>
+<li><p><code>probe_name</code> - (Optional) The name of an associated HTTP Probe.</p></li>
+<li><p><code>protocol</code> - (Required) The Protocol which should be used. Possible values are <code>Http</code> and <code>Https</code>.</p></li>
+<li><p><code>request_timeout</code> - (Optional) The request timeout in seconds, which must be between 1 and 86400 seconds. Defaults to <code>30</code>.</p></li>
+<li><p><code>host_name</code> - (Optional) Host header to be sent to the backend servers. Cannot be set if <code>pick_host_name_from_backend_address</code> is set to <code>true</code>.</p></li>
+<li><p><code>pick_host_name_from_backend_address</code> - (Optional) Whether host header should be picked from the host name of the backend server. Defaults to <code>false</code>.</p></li>
+<li><p><code>authentication_certificate</code> - (Optional) One or more <code>authentication_certificate_backend</code> blocks as defined below.</p></li>
+<li><p><code>trusted_root_certificate_names</code> - (Optional) A list of <code>trusted_root_certificate</code> names.</p></li>
+<li><p><code>connection_draining</code> - (Optional) A <code>connection_draining</code> block as defined below.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>authentication_certificate_backend</code> block, within the <code>backend_http_settings</code> block supports the following:</p>
+
+<ul>
+<li><code>name</code> - (Required) The name of the Authentication Certificate.</li>
+</ul>
+
+<hr/>
+
+<p>A <code>connection_draining</code> block supports the following:</p>
+
+<ul>
+<li><p><code>enabled</code> - (Required) If connection draining is enabled or not.</p></li>
+<li><p><code>drain_timeout_sec</code> - (Required) The number of seconds connection draining is active. Acceptable values are from <code>1</code> second to <code>3600</code> seconds.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>frontend_ip_configuration</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The name of the Frontend IP Configuration.</p></li>
+<li><p><code>subnet_id</code> - (Optional) The ID of the Subnet.</p></li>
+<li><p><code>private_ip_address</code> - (Optional) The Private IP Address to use for the Application Gateway.</p></li>
+<li><p><code>public_ip_address_id</code> - (Optional) The ID of a Public IP Address which the Application Gateway should use. The allocation method for the Public IP Address depends on the <code>sku</code> of this Application Gateway. Please refer to the <a href="https://docs.microsoft.com/azure/virtual-network/public-ip-addresses#application-gateways">Azure documentation for public IP addresses</a> for details.</p></li>
+<li><p><code>private_ip_address_allocation</code> - (Optional) The Allocation Method for the Private IP Address. Possible values are <code>Dynamic</code> and <code>Static</code>. Defaults to <code>Dynamic</code>.</p></li>
+<li><p><code>private_link_configuration_name</code> - (Optional) The name of the private link configuration to use for this frontend IP configuration.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>frontend_port</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The name of the Frontend Port.</p></li>
+<li><p><code>port</code> - (Required) The port used for this Frontend Port.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>gateway_ip_configuration</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The Name of this Gateway IP Configuration.</p></li>
+<li><p><code>subnet_id</code> - (Required) The ID of the Subnet which the Application Gateway should be connected to.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>http_listener</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The Name of the HTTP Listener.</p></li>
+<li><p><code>frontend_ip_configuration_name</code> - (Required) The Name of the Frontend IP Configuration used for this HTTP Listener.</p></li>
+<li><p><code>frontend_port_name</code> - (Required) The Name of the Frontend Port use for this HTTP Listener.</p></li>
+<li><p><code>host_name</code> - (Optional) The Hostname which should be used for this HTTP Listener. Setting this value changes Listener Type to 'Multi site'.</p></li>
+<li><p><code>host_names</code> - (Optional) A list of Hostname(s) should be used for this HTTP Listener. It allows special wildcard characters.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The <code>host_names</code> and <code>host_name</code> are mutually exclusive and cannot both be set.</p>
+</aside>
+
+<ul>
+<li><p><code>protocol</code> - (Required) The Protocol to use for this HTTP Listener. Possible values are <code>Http</code> and <code>Https</code>.</p></li>
+<li><p><code>require_sni</code> - (Optional) Should Server Name Indication be Required? Defaults to <code>false</code>.</p></li>
+<li><p><code>ssl_certificate_name</code> - (Optional) The name of the associated SSL Certificate which should be used for this HTTP Listener.</p></li>
+<li><p><code>custom_error_configuration</code> - (Optional) One or more <code>custom_error_configuration</code> blocks as defined below.</p></li>
+<li><p><code>firewall_policy_id</code> - (Optional) The ID of the Web Application Firewall Policy which should be used for this HTTP Listener.</p></li>
+<li><p><code>ssl_profile_name</code> - (Optional) The name of the associated SSL Profile which should be used for this HTTP Listener.</p></li>
+</ul>
+
+<hr/>
+
+<p>An <code>identity</code> block supports the following:</p>
+
+<ul>
+<li><p><code>type</code> - (Required) Specifies the type of Managed Service Identity that should be configured on this Application Gateway. Only possible value is <code>UserAssigned</code>.</p></li>
+<li><p><code>identity_ids</code> - (Optional) Specifies a list of User Assigned Managed Identity IDs to be assigned to this Application Gateway.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>private_link_configuration</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The name of the private link configuration.</p></li>
+<li><p><code>ip_configuration</code> - (Required) One or more <code>ip_configuration</code> blocks as defined below.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Please Note</em>
+    <p>The <code>AllowApplicationGatewayPrivateLink</code> feature must be registered on the subscription before enabling private link</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code>az feature register --name AllowApplicationGatewayPrivateLink --namespace Microsoft.Network
+</code></pre></div>
+
+<hr/>
+
+<p>An <code>ip_configuration</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The name of the IP configuration.</p></li>
+<li><p><code>subnet_id</code> - (Required) The ID of the subnet the private link configuration should connect to.</p></li>
+<li><p><code>private_ip_address_allocation</code> - (Required) The allocation method used for the Private IP Address. Possible values are <code>Dynamic</code> and <code>Static</code>.</p></li>
+<li><p><code>primary</code> - (Required) Is this the Primary IP Configuration?</p></li>
+<li><p><code>private_ip_address</code> - (Optional) The Static IP Address which should be used.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>match</code> block supports the following:</p>
+
+<ul>
+<li><p><code>body</code> - (Optional) A snippet from the Response Body which must be present in the Response.</p></li>
+<li><p><code>status_code</code> - (Required) A list of allowed status codes for this Health Probe.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>path_rule</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The Name of the Path Rule.</p></li>
+<li><p><code>paths</code> - (Required) A list of Paths used in this Path Rule.</p></li>
+<li><p><code>backend_address_pool_name</code> - (Optional) The Name of the Backend Address Pool to use for this Path Rule. Cannot be set if <code>redirect_configuration_name</code> is set.</p></li>
+<li><p><code>backend_http_settings_name</code> - (Optional) The Name of the Backend HTTP Settings Collection to use for this Path Rule. Cannot be set if <code>redirect_configuration_name</code> is set.</p></li>
+<li><p><code>redirect_configuration_name</code> - (Optional) The Name of a Redirect Configuration to use for this Path Rule. Cannot be set if <code>backend_address_pool_name</code> or <code>backend_http_settings_name</code> is set.</p></li>
+<li><p><code>rewrite_rule_set_name</code> - (Optional) The Name of the Rewrite Rule Set which should be used for this URL Path Map. Only valid for v2 SKUs.</p></li>
+<li><p><code>firewall_policy_id</code> - (Optional) The ID of the Web Application Firewall Policy which should be used as an HTTP Listener.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>probe</code> block supports the following:</p>
+
+<ul>
+<li><p><code>host</code> - (Optional) The Hostname used for this Probe. If the Application Gateway is configured for a single site, by default the Host name should be specified as <code>127.0.0.1</code>, unless otherwise configured in custom probe. Cannot be set if <code>pick_host_name_from_backend_http_settings</code> is set to <code>true</code>.</p></li>
+<li><p><code>interval</code> - (Required) The Interval between two consecutive probes in seconds. Possible values range from 1 second to a maximum of 86,400 seconds.</p></li>
+<li><p><code>name</code> - (Required) The Name of the Probe.</p></li>
+<li><p><code>protocol</code> - (Required) The Protocol used for this Probe. Possible values are <code>Http</code> and <code>Https</code>.</p></li>
+<li><p><code>path</code> - (Required) The Path used for this Probe.</p></li>
+<li><p><code>timeout</code> - (Required) The Timeout used for this Probe, which indicates when a probe becomes unhealthy. Possible values range from 1 second to a maximum of 86,400 seconds.</p></li>
+<li><p><code>unhealthy_threshold</code> - (Required) The Unhealthy Threshold for this Probe, which indicates the amount of retries which should be attempted before a node is deemed unhealthy. Possible values are from 1 to 20.</p></li>
+<li><p><code>port</code> - (Optional) Custom port which will be used for probing the backend servers. The valid value ranges from 1 to 65535. In case not set, port from HTTP settings will be used. This property is valid for Basic, Standard_v2 and WAF_v2 only.</p></li>
+<li><p><code>pick_host_name_from_backend_http_settings</code> - (Optional) Whether the host header should be picked from the backend HTTP settings. Defaults to <code>false</code>.</p></li>
+<li><p><code>match</code> - (Optional) A <code>match</code> block as defined above.</p></li>
+<li><p><code>minimum_servers</code> - (Optional) The minimum number of servers that are always marked as healthy. Defaults to <code>0</code>.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>request_routing_rule</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The Name of this Request Routing Rule.</p></li>
+<li><p><code>rule_type</code> - (Required) The Type of Routing that should be used for this Rule. Possible values are <code>Basic</code> and <code>PathBasedRouting</code>.</p></li>
+<li><p><code>http_listener_name</code> - (Required) The Name of the HTTP Listener which should be used for this Routing Rule.</p></li>
+<li><p><code>backend_address_pool_name</code> - (Optional) The Name of the Backend Address Pool which should be used for this Routing Rule. Cannot be set if <code>redirect_configuration_name</code> is set.</p></li>
+<li><p><code>backend_http_settings_name</code> - (Optional) The Name of the Backend HTTP Settings Collection which should be used for this Routing Rule. Cannot be set if <code>redirect_configuration_name</code> is set.</p></li>
+<li><p><code>redirect_configuration_name</code> - (Optional) The Name of the Redirect Configuration which should be used for this Routing Rule. Cannot be set if either <code>backend_address_pool_name</code> or <code>backend_http_settings_name</code> is set.</p></li>
+<li><p><code>rewrite_rule_set_name</code> - (Optional) The Name of the Rewrite Rule Set which should be used for this Routing Rule. Only valid for v2 SKUs.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p><code>backend_address_pool_name</code>, <code>backend_http_settings_name</code>, <code>redirect_configuration_name</code>, and <code>rewrite_rule_set_name</code> are applicable only when <code>rule_type</code> is <code>Basic</code>.</p>
+</aside>
+
+<ul>
+<li><p><code>url_path_map_name</code> - (Optional) The Name of the URL Path Map which should be associated with this Routing Rule.</p></li>
+<li><p><code>priority</code> - (Optional) Rule evaluation order can be dictated by specifying an integer value from <code>1</code> to <code>20000</code> with <code>1</code> being the highest priority and <code>20000</code> being the lowest priority.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p><code>priority</code> is required when <code>sku[0].tier</code> is set to <code>*_v2</code>.</p>
+</aside>
+
+<hr/>
+
+<p>A <code>global</code> block supports the following:</p>
+
+<ul>
+<li><p><code>request_buffering_enabled</code> - (Required) Whether Application Gateway's Request buffer is enabled.</p></li>
+<li><p><code>response_buffering_enabled</code> - (Required) Whether Application Gateway's Response buffer is enabled.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>sku</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The Name of the SKU to use for this Application Gateway. Possible values are <code>Basic</code>, <code>Standard_v2</code>, and <code>WAF_v2</code>.</p></li>
+<li><p><code>tier</code> - (Required) The Tier of the SKU to use for this Application Gateway. Possible values are <code>Basic</code>, <code>Standard_v2</code>, and <code>WAF_v2</code>.</p></li>
+<li><p><code>capacity</code> - (Optional) The Capacity of the SKU to use for this Application Gateway. When using a V1 SKU this value must be between <code>1</code> and <code>32</code>, and <code>1</code> to <code>125</code> for a V2 SKU. When using a <code>Basic</code> SKU this property must be between <code>1</code> and <code>2</code>. This property is optional if <code>autoscale_configuration</code> is set.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>ssl_certificate</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The Name of the SSL certificate that is unique within this Application Gateway</p></li>
+<li><p><code>data</code> - (Optional) The base64-encoded PFX certificate data. Required if <code>key_vault_secret_id</code> is not set.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>When specifying a file, use <code>data = filebase64("path/to/file")</code> to encode the contents of that file.</p>
+</aside>
+
+<ul>
+<li><p><code>password</code> - (Optional) Password for the pfx file specified in data. Required if <code>data</code> is set.</p></li>
+<li><p><code>key_vault_secret_id</code> - (Optional) The Secret ID of the (base-64 encoded unencrypted pfx) <code>Secret</code> or <code>Certificate</code> object stored in Azure KeyVault. You need to enable soft delete for Key Vault to use this feature. Required if <code>data</code> is not set.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>To implement certificate rotation, <code>versionless_secret_id</code> should be used, although <code>secret_id</code> is also supported.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>TLS termination with Key Vault certificates is limited to the <a href="https://docs.microsoft.com/azure/application-gateway/key-vault-certs">v2 SKUs</a>.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>For TLS termination with Key Vault certificates to work properly, an existing user-assigned managed identity, which Application Gateway uses to retrieve certificates from Key Vault, should be defined via <code>identity</code> block. Additionally, access policies in the Key Vault to allow the identity to be granted <em>get</em> access to the secret should be defined.</p>
+</aside>
+
+<hr/>
+
+<p>A <code>url_path_map</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The Name of the URL Path Map.</p></li>
+<li><p><code>default_backend_address_pool_name</code> - (Optional) The Name of the Default Backend Address Pool which should be used for this URL Path Map. Cannot be set if <code>default_redirect_configuration_name</code> is set.</p></li>
+<li><p><code>default_backend_http_settings_name</code> - (Optional) The Name of the Default Backend HTTP Settings Collection which should be used for this URL Path Map. Cannot be set if <code>default_redirect_configuration_name</code> is set.</p></li>
+<li><p><code>default_redirect_configuration_name</code> - (Optional) The Name of the Default Redirect Configuration which should be used for this URL Path Map. Cannot be set if either <code>default_backend_address_pool_name</code> or <code>default_backend_http_settings_name</code> is set.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Both <code>default_backend_address_pool_name</code> and <code>default_backend_http_settings_name</code> or <code>default_redirect_configuration_name</code> should be specified.</p>
+</aside>
+
+<ul>
+<li><p><code>default_rewrite_rule_set_name</code> - (Optional) The Name of the Default Rewrite Rule Set which should be used for this URL Path Map. Only valid for v2 SKUs.</p></li>
+<li><p><code>path_rule</code> - (Required) One or more <code>path_rule</code> blocks as defined above.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>trusted_client_certificate</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The name of the Trusted Client Certificate that is unique within this Application Gateway.</p></li>
+<li><p><code>data</code> - (Required) The base-64 encoded certificate.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>ssl_profile</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) The name of the SSL Profile that is unique within this Application Gateway.</p></li>
+<li><p><code>trusted_client_certificate_names</code> - (Optional) The name of the Trusted Client Certificate that will be used to authenticate requests from clients.</p></li>
+<li><p><code>verify_client_cert_issuer_dn</code> - (Optional) Should client certificate issuer DN be verified? Defaults to <code>false</code>.</p></li>
+<li><p><code>verify_client_certificate_revocation</code> - (Optional) Specify the method to check client certificate revocation status. Possible value is <code>OCSP</code>.</p></li>
+<li><p><code>ssl_policy</code> - (Optional) a <code>ssl_policy</code> block as defined below.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>ssl_policy</code> block supports the following:</p>
+
+<ul>
+<li><code>disabled_protocols</code> - (Optional) A list of SSL Protocols which should be disabled on this Application Gateway. Possible values are <code>TLSv1_0</code>, <code>TLSv1_1</code>, <code>TLSv1_2</code> and <code>TLSv1_3</code>.</li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p><code>disabled_protocols</code> cannot be set when <code>policy_name</code> or <code>policy_type</code> are set.</p>
+</aside>
+
+<ul>
+<li><code>policy_type</code> - (Optional) The Type of the Policy. Possible values are <code>Predefined</code>, <code>Custom</code> and <code>CustomV2</code>.</li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p><code>policy_type</code> is Required when <code>policy_name</code> is set - cannot be set if <code>disabled_protocols</code> is set.</p>
+</aside>
+
+<p>When using a <code>policy_type</code> of <code>Predefined</code> the following fields are supported:</p>
+
+<ul>
+<li><code>policy_name</code> - (Optional) The Name of the Policy e.g. AppGwSslPolicy20170401S. Required if <code>policy_type</code> is set to <code>Predefined</code>. Possible values can change over time and are published here <a href="https://docs.microsoft.com/azure/application-gateway/application-gateway-ssl-policy-overview">https://docs.microsoft.com/azure/application-gateway/application-gateway-ssl-policy-overview</a>. Not compatible with <code>disabled_protocols</code>.</li>
+</ul>
+
+<p>When using a <code>policy_type</code> of <code>Custom</code> the following fields are supported:</p>
+
+<ul>
+<li><p><code>cipher_suites</code> - (Optional) A List of accepted cipher suites. Possible values are: <code>TLS_DHE_DSS_WITH_3DES_EDE_CBC_SHA</code>, <code>TLS_DHE_DSS_WITH_AES_128_CBC_SHA</code>, <code>TLS_DHE_DSS_WITH_AES_128_CBC_SHA256</code>, <code>TLS_DHE_DSS_WITH_AES_256_CBC_SHA</code>, <code>TLS_DHE_DSS_WITH_AES_256_CBC_SHA256</code>, <code>TLS_DHE_RSA_WITH_AES_128_CBC_SHA</code>, <code>TLS_DHE_RSA_WITH_AES_128_GCM_SHA256</code>, <code>TLS_DHE_RSA_WITH_AES_256_CBC_SHA</code>, <code>TLS_DHE_RSA_WITH_AES_256_GCM_SHA384</code>, <code>TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA</code>, <code>TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256</code>, <code>TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256</code>, <code>TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA</code>, <code>TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384</code>, <code>TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384</code>, <code>TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA</code>, <code>TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256</code>, <code>TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256</code>, <code>TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA</code>, <code>TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384</code>, <code>TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384</code>, <code>TLS_RSA_WITH_3DES_EDE_CBC_SHA</code>, <code>TLS_RSA_WITH_AES_128_CBC_SHA</code>, <code>TLS_RSA_WITH_AES_128_CBC_SHA256</code>, <code>TLS_RSA_WITH_AES_128_GCM_SHA256</code>, <code>TLS_RSA_WITH_AES_256_CBC_SHA</code>, <code>TLS_RSA_WITH_AES_256_CBC_SHA256</code> and <code>TLS_RSA_WITH_AES_256_GCM_SHA384</code>.</p></li>
+<li><p><code>min_protocol_version</code> - (Optional) The minimal TLS version. Possible values are <code>TLSv1_0</code>, <code>TLSv1_1</code>, <code>TLSv1_2</code> and <code>TLSv1_3</code>.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>waf_configuration</code> block supports the following:</p>
+
+<ul>
+<li><p><code>enabled</code> - (Required) Is the Web Application Firewall enabled?</p></li>
+<li><p><code>firewall_mode</code> - (Required) The Web Application Firewall Mode. Possible values are <code>Detection</code> and <code>Prevention</code>.</p></li>
+<li><p><code>rule_set_type</code> - (Optional) The Type of the Rule Set used for this Web Application Firewall. Possible values are <code>OWASP</code>, <code>Microsoft_BotManagerRuleSet</code> and <code>Microsoft_DefaultRuleSet</code>. Defaults to <code>OWASP</code>.</p></li>
+<li><p><code>rule_set_version</code> - (Required) The Version of the Rule Set used for this Web Application Firewall. Possible values are <code>0.1</code>, <code>1.0</code>, <code>1.1</code>, <code>2.1</code>, <code>2.2.9</code>, <code>3.0</code>, <code>3.1</code> and <code>3.2</code>.</p></li>
+<li><p><code>disabled_rule_group</code> - (Optional) One or more <code>disabled_rule_group</code> blocks as defined below.</p></li>
+<li><p><code>file_upload_limit_mb</code> - (Optional) The File Upload Limit in MB. Accepted values are in the range <code>1</code>MB to <code>750</code>MB for the <code>WAF_v2</code> SKU, and <code>1</code>MB to <code>500</code>MB for all other SKUs. Defaults to <code>100</code>MB.</p></li>
+<li><p><code>request_body_check</code> - (Optional) Is Request Body Inspection enabled? Defaults to <code>true</code>.</p></li>
+<li><p><code>max_request_body_size_kb</code> - (Optional) The Maximum Request Body Size in KB. Accepted values are in the range <code>1</code>KB to <code>128</code>KB. Defaults to <code>128</code>KB.</p></li>
+<li><p><code>exclusion</code> - (Optional) One or more <code>exclusion</code> blocks as defined below.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>disabled_rule_group</code> block supports the following:</p>
+
+<ul>
+<li><p><code>rule_group_name</code> - (Required) The rule group where specific rules should be disabled. Possible values are <code>BadBots</code>, <code>crs_20_protocol_violations</code>, <code>crs_21_protocol_anomalies</code>, <code>crs_23_request_limits</code>, <code>crs_30_http_policy</code>, <code>crs_35_bad_robots</code>, <code>crs_40_generic_attacks</code>, <code>crs_41_sql_injection_attacks</code>, <code>crs_41_xss_attacks</code>, <code>crs_42_tight_security</code>, <code>crs_45_trojans</code>, <code>crs_49_inbound_blocking</code>, <code>General</code>, <code>GoodBots</code>, <code>KnownBadBots</code>, <code>Known-CVEs</code>, <code>REQUEST-911-METHOD-ENFORCEMENT</code>, <code>REQUEST-913-SCANNER-DETECTION</code>, <code>REQUEST-920-PROTOCOL-ENFORCEMENT</code>, <code>REQUEST-921-PROTOCOL-ATTACK</code>, <code>REQUEST-930-APPLICATION-ATTACK-LFI</code>, <code>REQUEST-931-APPLICATION-ATTACK-RFI</code>, <code>REQUEST-932-APPLICATION-ATTACK-RCE</code>, <code>REQUEST-933-APPLICATION-ATTACK-PHP</code>, <code>REQUEST-941-APPLICATION-ATTACK-XSS</code>, <code>REQUEST-942-APPLICATION-ATTACK-SQLI</code>, <code>REQUEST-943-APPLICATION-ATTACK-SESSION-FIXATION</code>, <code>REQUEST-944-APPLICATION-ATTACK-JAVA</code>, <code>UnknownBots</code>, <code>METHOD-ENFORCEMENT</code>, <code>PROTOCOL-ENFORCEMENT</code>, <code>PROTOCOL-ATTACK</code>, <code>LFI</code>, <code>RFI</code>, <code>RCE</code>, <code>PHP</code>, <code>NODEJS</code>, <code>XSS</code>, <code>SQLI</code>, <code>FIX</code>, <code>JAVA</code>, <code>MS-ThreatIntel-WebShells</code>, <code>MS-ThreatIntel-AppSec</code>, <code>MS-ThreatIntel-SQLI</code> and <code>MS-ThreatIntel-CVEs</code>.</p></li>
+<li><p><code>rules</code> - (Optional) A list of rules which should be disabled in that group. Disables all rules in the specified group if <code>rules</code> is not specified.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>exclusion</code> block supports the following:</p>
+
+<ul>
+<li><p><code>match_variable</code> - (Required) Match variable of the exclusion rule to exclude header, cookie or GET arguments. Possible values are <code>RequestArgKeys</code>, <code>RequestArgNames</code>, <code>RequestArgValues</code>, <code>RequestCookieKeys</code>, <code>RequestCookieNames</code>, <code>RequestCookieValues</code>, <code>RequestHeaderKeys</code>, <code>RequestHeaderNames</code> and <code>RequestHeaderValues</code></p></li>
+<li><p><code>selector_match_operator</code> - (Optional) Operator which will be used to search in the variable content. Possible values are <code>Contains</code>, <code>EndsWith</code>, <code>Equals</code>, <code>EqualsAny</code> and <code>StartsWith</code>. If empty will exclude all traffic on this <code>match_variable</code></p></li>
+<li><p><code>selector</code> - (Optional) String value which will be used for the filter operation. If empty will exclude all traffic on this <code>match_variable</code></p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>custom_error_configuration</code> block supports the following:</p>
+
+<ul>
+<li><p><code>status_code</code> - (Required) Status code of the application gateway customer error. Possible values are <code>HttpStatus400</code>, <code>HttpStatus403</code>, <code>HttpStatus404</code>, <code>HttpStatus405</code>, <code>HttpStatus408</code>, <code>HttpStatus500</code>, <code>HttpStatus502</code>, <code>HttpStatus503</code> and <code>HttpStatus504</code></p></li>
+<li><p><code>custom_error_page_url</code> - (Required) Error page URL of the application gateway customer error.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>redirect_configuration</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) Unique name of the redirect configuration block</p></li>
+<li><p><code>redirect_type</code> - (Required) The type of redirect. Possible values are <code>Permanent</code>, <code>Temporary</code>, <code>Found</code> and <code>SeeOther</code></p></li>
+<li><p><code>target_listener_name</code> - (Optional) The name of the listener to redirect to. Cannot be set if <code>target_url</code> is set.</p></li>
+<li><p><code>target_url</code> - (Optional) The URL to redirect the request to. Cannot be set if <code>target_listener_name</code> is set.</p></li>
+<li><p><code>include_path</code> - (Optional) Whether to include the path in the redirected URL. Defaults to <code>false</code></p></li>
+<li><p><code>include_query_string</code> - (Optional) Whether to include the query string in the redirected URL. Default to <code>false</code></p></li>
+</ul>
+
+<hr/>
+
+<p>An <code>autoscale_configuration</code> block supports the following:</p>
+
+<ul>
+<li><p><code>min_capacity</code> - (Required) Minimum capacity for autoscaling. Accepted values are in the range <code>0</code> to <code>100</code>.</p></li>
+<li><p><code>max_capacity</code> - (Optional) Maximum capacity for autoscaling. Accepted values are in the range <code>2</code> to <code>125</code>.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>rewrite_rule_set</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) Unique name of the rewrite rule set block</p></li>
+<li><p><code>rewrite_rule</code> - (Optional) One or more <code>rewrite_rule</code> blocks as defined below.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>rewrite_rule</code> block supports the following:</p>
+
+<ul>
+<li><p><code>name</code> - (Required) Unique name of the rewrite rule block</p></li>
+<li><p><code>rule_sequence</code> - (Required) Rule sequence of the rewrite rule that determines the order of execution in a set.</p></li>
+<li><p><code>condition</code> - (Optional) One or more <code>condition</code> blocks as defined above.</p></li>
+<li><p><code>request_header_configuration</code> - (Optional) One or more <code>request_header_configuration</code> blocks as defined above.</p></li>
+<li><p><code>response_header_configuration</code> - (Optional) One or more <code>response_header_configuration</code> blocks as defined above.</p></li>
+<li><p><code>url</code> - (Optional) One <code>url</code> block as defined below</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>condition</code> block supports the following:</p>
+
+<ul>
+<li><p><code>variable</code> - (Required) The <a href="https://docs.microsoft.com/azure/application-gateway/rewrite-http-headers#server-variables">variable</a> of the condition.</p></li>
+<li><p><code>pattern</code> - (Required) The pattern, either fixed string or regular expression, that evaluates the truthfulness of the condition.</p></li>
+<li><p><code>ignore_case</code> - (Optional) Perform a case in-sensitive comparison. Defaults to <code>false</code></p></li>
+<li><p><code>negate</code> - (Optional) Negate the result of the condition evaluation. Defaults to <code>false</code></p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>request_header_configuration</code> block supports the following:</p>
+
+<ul>
+<li><p><code>header_name</code> - (Required) Header name of the header configuration.</p></li>
+<li><p><code>header_value</code> - (Required) Header value of the header configuration. To delete a request header set this property to an empty string.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>response_header_configuration</code> block supports the following:</p>
+
+<ul>
+<li><p><code>header_name</code> - (Required) Header name of the header configuration.</p></li>
+<li><p><code>header_value</code> - (Required) Header value of the header configuration. To delete a response header set this property to an empty string.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>url</code> block supports the following:</p>
+
+<ul>
+<li><p><code>path</code> - (Optional) The URL path to rewrite.</p></li>
+<li><p><code>query_string</code> - (Optional) The query string to rewrite.</p></li>
+<li><p><code>components</code> - (Optional) The components used to rewrite the URL. Possible values are <code>path_only</code> and <code>query_string_only</code> to limit the rewrite to the URL Path or URL Query String only.</p></li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>One or both of <code>path</code> and <code>query_string</code> must be specified. If one of these is not specified, it means the value will be empty. If you only want to rewrite <code>path</code> or <code>query_string</code>, use <code>components</code>.</p>
+</aside>
+
+<ul>
+<li><code>reroute</code> - (Optional) Whether the URL path map should be reevaluated after this rewrite has been applied. <a href="https://docs.microsoft.com/azure/application-gateway/rewrite-http-headers-url#rewrite-configuration">More info on rewrite configuration</a></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to the Arguments listed above - the following Attributes are exported:</p>
+
+<ul>
+<li><p><code>id</code> - The ID of the Application Gateway.</p></li>
+<li><p><code>authentication_certificate</code> - A list of <code>authentication_certificate</code> blocks as defined below.</p></li>
+<li><p><code>backend_address_pool</code> - A list of <code>backend_address_pool</code> blocks as defined below.</p></li>
+<li><p><code>backend_http_settings</code> - A list of <code>backend_http_settings</code> blocks as defined below.</p></li>
+<li><p><code>frontend_ip_configuration</code> - A list of <code>frontend_ip_configuration</code> blocks as defined below.</p></li>
+<li><p><code>frontend_port</code> - A list of <code>frontend_port</code> blocks as defined below.</p></li>
+<li><p><code>gateway_ip_configuration</code> - A list of <code>gateway_ip_configuration</code> blocks as defined below.</p></li>
+<li><p><code>http_listener</code> - A list of <code>http_listener</code> blocks as defined below.</p></li>
+<li><p><code>private_endpoint_connection</code> - A list of <code>private_endpoint_connection</code> blocks as defined below.</p></li>
+<li><p><code>private_link_configuration</code> - A list of <code>private_link_configuration</code> blocks as defined below.</p></li>
+<li><p><code>probe</code> - A <code>probe</code> block as defined below.</p></li>
+<li><p><code>request_routing_rule</code> - A list of <code>request_routing_rule</code> blocks as defined below.</p></li>
+<li><p><code>ssl_certificate</code> - A list of <code>ssl_certificate</code> blocks as defined below.</p></li>
+<li><p><code>url_path_map</code> - A list of <code>url_path_map</code> blocks as defined below.</p></li>
+<li><p><code>custom_error_configuration</code> - A list of <code>custom_error_configuration</code> blocks as defined below.</p></li>
+<li><p><code>redirect_configuration</code> - A list of <code>redirect_configuration</code> blocks as defined below.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>authentication_certificate</code> block exports the following:</p>
+
+<ul>
+<li><code>id</code> - The ID of the Authentication Certificate.</li>
+</ul>
+
+<hr/>
+
+<p>A <code>authentication_certificate</code> block, within the <code>backend_http_settings</code> block exports the following:</p>
+
+<ul>
+<li><code>id</code> - The ID of the Authentication Certificate.</li>
+</ul>
+
+<hr/>
+
+<p>A <code>backend_address_pool</code> block exports the following:</p>
+
+<ul>
+<li><code>id</code> - The ID of the Backend Address Pool.</li>
+</ul>
+
+<hr/>
+
+<p>A <code>backend_http_settings</code> block exports the following:</p>
+
+<ul>
+<li><p><code>id</code> - The ID of the Backend HTTP Settings Configuration.</p></li>
+<li><p><code>probe_id</code> - The ID of the associated Probe.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>frontend_ip_configuration</code> block exports the following:</p>
+
+<ul>
+<li><p><code>id</code> - The ID of the Frontend IP Configuration.</p></li>
+<li><p><code>private_link_configuration_id</code> - The ID of the associated private link configuration.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>frontend_port</code> block exports the following:</p>
+
+<ul>
+<li><code>id</code> - The ID of the Frontend Port.</li>
+</ul>
+
+<hr/>
+
+<p>A <code>gateway_ip_configuration</code> block exports the following:</p>
+
+<ul>
+<li><code>id</code> - The ID of the Gateway IP Configuration.</li>
+</ul>
+
+<hr/>
+
+<p>A <code>http_listener</code> block exports the following:</p>
+
+<ul>
+<li><p><code>id</code> - The ID of the HTTP Listener.</p></li>
+<li><p><code>frontend_ip_configuration_id</code> - The ID of the associated Frontend Configuration.</p></li>
+<li><p><code>frontend_port_id</code> - The ID of the associated Frontend Port.</p></li>
+<li><p><code>ssl_certificate_id</code> - The ID of the associated SSL Certificate.</p></li>
+<li><p><code>ssl_profile_id</code> - The ID of the associated SSL Profile.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>path_rule</code> block exports the following:</p>
+
+<ul>
+<li><p><code>id</code> - The ID of the Path Rule.</p></li>
+<li><p><code>backend_address_pool_id</code> - The ID of the Backend Address Pool used in this Path Rule.</p></li>
+<li><p><code>backend_http_settings_id</code> - The ID of the Backend HTTP Settings Collection used in this Path Rule.</p></li>
+<li><p><code>redirect_configuration_id</code> - The ID of the Redirect Configuration used in this Path Rule.</p></li>
+<li><p><code>rewrite_rule_set_id</code> - The ID of the Rewrite Rule Set used in this Path Rule.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>private_endpoint_connection</code> block exports the following:</p>
+
+<ul>
+<li><p><code>name</code> - The name of the private endpoint connection.</p></li>
+<li><p><code>id</code> - The ID of the private endpoint connection.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>private_link_configuration</code> block exports the following:</p>
+
+<ul>
+<li><code>id</code> - The ID of the private link configuration.</li>
+</ul>
+
+<hr/>
+
+<p>A <code>probe</code> block exports the following:</p>
+
+<ul>
+<li><code>id</code> - The ID of the Probe.</li>
+</ul>
+
+<hr/>
+
+<p>A <code>request_routing_rule</code> block exports the following:</p>
+
+<ul>
+<li><p><code>id</code> - The ID of the Request Routing Rule.</p></li>
+<li><p><code>http_listener_id</code> - The ID of the associated HTTP Listener.</p></li>
+<li><p><code>backend_address_pool_id</code> - The ID of the associated Backend Address Pool.</p></li>
+<li><p><code>backend_http_settings_id</code> - The ID of the associated Backend HTTP Settings Configuration.</p></li>
+<li><p><code>redirect_configuration_id</code> - The ID of the associated Redirect Configuration.</p></li>
+<li><p><code>rewrite_rule_set_id</code> - The ID of the associated Rewrite Rule Set.</p></li>
+<li><p><code>url_path_map_id</code> - The ID of the associated URL Path Map.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>ssl_certificate</code> block exports the following:</p>
+
+<ul>
+<li><p><code>id</code> - The ID of the SSL Certificate.</p></li>
+<li><p><code>public_cert_data</code> - The Public Certificate Data associated with the SSL Certificate.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>url_path_map</code> block exports the following:</p>
+
+<ul>
+<li><p><code>id</code> - The ID of the URL Path Map.</p></li>
+<li><p><code>default_backend_address_pool_id</code> - The ID of the Default Backend Address Pool.</p></li>
+<li><p><code>default_backend_http_settings_id</code> - The ID of the Default Backend HTTP Settings Collection.</p></li>
+<li><p><code>default_redirect_configuration_id</code> - The ID of the Default Redirect Configuration.</p></li>
+<li><p><code>path_rule</code> - (Required) A list of <code>path_rule</code> blocks as defined above.</p></li>
+</ul>
+
+<hr/>
+
+<p>A <code>custom_error_configuration</code> block exports the following:</p>
+
+<ul>
+<li><code>id</code> - The ID of the Custom Error Configuration.</li>
+</ul>
+
+<hr/>
+
+<p>A <code>redirect_configuration</code> block exports the following:</p>
+
+<ul>
+<li><code>id</code> - The ID of the Redirect Configuration.</li>
+</ul>
+
+<hr/>
+
+<p>A <code>rewrite_rule_set</code> block exports the following:</p>
+
+<ul>
+<li><code>id</code> - The ID of the Rewrite Rule Set</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p>The <code>timeouts</code> block allows you to specify <a href="https://www.terraform.io/language/resources/syntax#operation-timeouts">timeouts</a> for certain actions:</p>
+
+<ul>
+<li><code>create</code> - (Defaults to 90 minutes) Used when creating the Application Gateway.</li>
+<li><code>update</code> - (Defaults to 90 minutes) Used when updating the Application Gateway.</li>
+<li><code>read</code> - (Defaults to 5 minutes) Used when retrieving the Application Gateway.</li>
+<li><code>delete</code> - (Defaults to 90 minutes) Used when deleting the Application Gateway.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Application Gateway's can be imported using the <code>resource id</code>, e.g.</p>
+
+<div class="codehilite"><pre><span></span><code>terraform import azurerm_application_gateway.example /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mygroup1/providers/Microsoft.Network/applicationGateways/myGateway1
+</code></pre></div>
+
+            
+        
+    </body></html>

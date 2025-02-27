@@ -1,0 +1,181 @@
+<html><!-- Online page at https://registry.terraform.io/providers/confluentinc/confluent/latest/docs/guides/version-2-upgrade --><head>
+                <title>Confluent Provider 2.0.0: Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="confluent-provider-200-upgrade-guide">Confluent Provider 2.0.0: Upgrade Guide</h1>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>Warning</em>
+    <p>Version <code>2.0.0</code> of Confluent Provider has been released and this guide describes how to resolve <code>Warning: Deprecated Resource</code> for deprecated <code>confluent_schema_registry_cluster</code> <a href="https://registry.terraform.io/providers/confluentinc/confluent/1.83.0/docs/resources/confluent_schema_registry_cluster">resource</a>  and deprecated <code>confluent_schema_registry_region</code> <a href="https://registry.terraform.io/providers/confluentinc/confluent/1.83.0/docs/data-sources/confluent_schema_registry_region">data source</a> as the warning message references this guide, please resolve these warnings before upgrading to major version <code>2.0.0</code>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Version%20Configuration"></a><h2 id="provider-version-configuration">Provider Version Configuration</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This guide uses the <a href="https://github.com/confluentinc/terraform-provider-confluent/tree/v1.83.0/examples/configurations/basic-kafka-acls">basic-kafka-acls</a> Terraform configuration as an example of a Terraform configuration that has a Kafka cluster and a Schema Registry cluster.</p>
+</aside>
+
+<p>Before reading further, ensure that your environment
+successfully runs <a href="https://www.terraform.io/docs/commands/plan.html"><code>terraform plan</code></a>
+without unexpected changes. Run the following command:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform plan
+</code></pre></div>
+
+<p>Your output should resemble:</p>
+
+<div class="codehilite"><pre><span></span><code>confluent_service_account.test-sa: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>sa-xyz123<span class="o">]</span>
+confluent_environment.test-env: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>env-dge456<span class="o">]</span>
+confluent_kafka_cluster.basic: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>lkc-vrp3op<span class="o">]</span>
+data.confluent_schema_registry_region.essentials: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>sgreg-4<span class="o">]</span>
+...
+
+No changes. Your infrastructure matches the configuration.
+
+Terraform has compared your real infrastructure against your configuration and found no differences, so no changes are needed.
+╷
+│ Warning: Deprecated Resource
+│ 
+│   with data.confluent_schema_registry_region.essentials,
+│   on main.tf line <span class="m">20</span>, <span class="k">in</span> data <span class="s2">"confluent_schema_registry_region"</span> <span class="s2">"essentials"</span>:
+│   <span class="m">20</span>: data <span class="s2">"confluent_schema_registry_region"</span> <span class="s2">"essentials"</span> <span class="o">{</span>
+│ 
+│ The schema_registry_region data <span class="nb">source</span> has been deprecated and will be removed <span class="k">in</span> the next major release <span class="o">(</span><span class="m">2</span>.0.0<span class="o">)</span>. 
+│ Refer to the Upgrade Guide at https://registry.terraform.io/providers/confluentinc/confluent/latest/docs/guides/version-2-upgrade <span class="k">for</span> more details.
+│ 
+│ <span class="o">(</span>and <span class="m">2</span> more similar warnings elsewhere<span class="o">)</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrade%20Terraform%20Configuration"></a><h2 id="upgrade-terraform-configuration">Upgrade Terraform Configuration</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20to%20confluent_schema_registry_cluster%20resource"></a><h3 id="changes-to-confluent_schema_registry_cluster-resource">Changes to <code>confluent_schema_registry_cluster</code> resource</h3>
+
+<p>Deprecated <code>confluent_schema_registry_cluster</code>
+<a href="https://registry.terraform.io/providers/confluentinc/confluent/1.83.0/docs/resources/confluent_schema_registry_cluster">resource</a> has been removed in version <code>2.0.0</code>.</p>
+
+<p>Use the <code>confluent_schema_registry_cluster</code> data source instead to avoid <code>Warning: Deprecated Resource</code> messages.</p>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>Warning</em>
+    <p>Ensure that you <strong>do not</strong> delete / destroy the Schema Registry cluster on Confluent Cloud (<code>confluent_schema_registry_cluster</code> <a href="https://registry.terraform.io/providers/confluentinc/confluent/1.83.0/docs/resources/confluent_schema_registry_cluster">resource</a>) when going through this guide, as opposed to only removing it from the TF state.</p>
+</aside>
+
+<p>The next step is to upgrade your TF configuration:</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Before"></a><h4 id="before">Before</h4>
+
+<pre><code>resource "confluent_schema_registry_cluster" "essentials" {
+  # ...
+  environment {
+    id = confluent_environment.staging.id
+  }
+}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/After"></a><h4 id="after">After</h4>
+
+<pre><code>data "confluent_schema_registry_cluster" "essentials" {
+  environment {
+    id = confluent_environment.staging.id
+  }
+}
+
+# Also, ensure to replace all resource references 
+# (e.g., confluent_schema_registry_cluster.essentials)
+# with data source references 
+# (e.g., data.confluent_schema_registry_cluster.essentials).
+</code></pre>
+
+<p>Next, remove the <code>confluent_schema_registry_cluster</code> <a href="https://registry.terraform.io/providers/confluentinc/confluent/1.83.0/docs/resources/confluent_schema_registry_cluster">resource</a> from TF state (again, just from TF state and not on Confluent Cloud).</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform state list <span class="p">|</span> grep confluent_schema_registry_cluster 
+$ terraform state rm confluent_schema_registry_cluster.essentials
+</code></pre></div>
+
+<p>Your output should resemble:</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform state list <span class="p">|</span> grep confluent_schema_registry_cluster 
+confluent_schema_registry_cluster.essentials
+$ terraform state rm confluent_schema_registry_cluster.essentials
+Removed confluent_schema_registry_cluster.essentials
+Successfully removed <span class="m">1</span> resource instance<span class="o">(</span>s<span class="o">)</span>.
+</code></pre></div>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>After running these commands your Schema Registry cluster still exists on Confluent Cloud, it was removed just from TF state.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20to%20confluent_schema_registry_region%20data%20source"></a><h3 id="changes-to-confluent_schema_registry_region-data-source">Changes to <code>confluent_schema_registry_region</code> data source</h3>
+
+<p>Deprecated <code>confluent_schema_registry_region</code>
+<a href="https://registry.terraform.io/providers/confluentinc/confluent/1.83.0/docs/data-sources/confluent_schema_registry_region">data source</a> has been removed in version <code>2.0.0</code>.</p>
+
+<p>Remove the <code>confluent_schema_registry_region</code>
+<a href="https://registry.terraform.io/providers/confluentinc/confluent/1.83.0/docs/data-sources/confluent_schema_registry_region">data source</a> only from TF configuration (as data sources are not stored in the TF state) instead
+to avoid <code>Warning: Deprecated Resource</code> messages.</p>
+
+<p>To remove <code>confluent_schema_registry_region</code>
+<a href="https://registry.terraform.io/providers/confluentinc/confluent/1.83.0/docs/data-sources/confluent_schema_registry_region">data source</a> from TF configuration, you can just remove its definition:</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Before"></a><h4 id="before-2">Before</h4>
+
+<pre><code>data "confluent_schema_registry_region" "essentials" {
+  # ...
+}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/After"></a><h4 id="after-2">After</h4>
+
+<pre><code># empty
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Sanity%20Check"></a><h5 id="sanity-check">Sanity Check</h5>
+
+<p>Check that the upgrade was successful by ensuring that your environment
+successfully runs <a href="https://www.terraform.io/docs/commands/plan.html"><code>terraform plan</code></a>
+without unexpected changes. Run the following command:</p>
+
+<div class="codehilite"><pre><span></span><code>terraform plan
+</code></pre></div>
+
+<p>Your output should resemble:</p>
+
+<div class="codehilite"><pre><span></span><code>confluent_service_account.test-sa: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>sa-xyz123<span class="o">]</span>
+confluent_environment.test-env: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>env-dge456<span class="o">]</span>
+confluent_kafka_cluster.basic: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>lkc-vrp3op<span class="o">]</span>
+confluent_schema_registry_cluster.essentials: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>lsrc-abc123<span class="o">]</span>
+confluent_kafka_acl.describe-test-basic-cluster: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>lkc-abc123/CLUSTER#kafka-cluster#LITERAL#User:sa-xyz123#*#DESCRIBE#ALLOW<span class="o">]</span>
+confluent_kafka_topic.orders: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>lkc-abc123/orders<span class="o">]</span>
+confluent_kafka_acl.describe-orders: Refreshing state... <span class="o">[</span><span class="nv">id</span><span class="o">=</span>lkc-abc123/TOPIC#orders#LITERAL#User:sa-xyz123#*#DESCRIBE#ALLOW<span class="o">]</span>
+...
+No changes. Infrastructure is up-to-date.
+</code></pre></div>
+
+<p>without any <code>Warning: Deprecated Resource</code> messages.</p>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>Warning</em>
+    <p>Ensure that you <strong>do not</strong> delete / destroy the Schema Registry cluster on Confluent Cloud (<code>confluent_schema_registry_cluster</code> resource) when going through this guide, as opposed to only removing it from the TF state.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20to%20confluent_kafka_cluster%20resource%20and%20confluent_kafka_cluster%20data%20source"></a><h3 id="changes-to-confluent_kafka_cluster-resource-and-confluent_kafka_cluster-data-source">Changes to <code>confluent_kafka_cluster</code> resource and <code>confluent_kafka_cluster</code> data source</h3>
+
+<p>When creating <strong>new</strong> Kafka clusters, you should use <code>byok_key[0].id</code> attribute instead of <code>dedicated[0].encryption_key</code> attribute 
+since the latter is no longer supported in the <a href="https://docs.confluent.io/cloud/current/api.html#tag/Clusters-(cmkv2)">Confluent Cloud API</a>'s <code>POST cmk/v2/clusters</code> request.</p>
+
+<p>However, for existing instances of the <code>confluent_kafka_cluster</code> <a href="https://registry.terraform.io/providers/confluentinc/confluent/1.83.0/docs/resources/confluent_kafka_cluster">resource</a>, <code>dedicated[0].encryption_key</code> is still supported as a read-only attribute.</p>
+
+<p>If you run into any problems, <a href="https://github.com/confluentinc/terraform-provider-confluent/issues">report an issue</a> to Confluent.</p>
+
+            
+        
+    </body></html>

@@ -1,0 +1,117 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/sqs_queue_policy --><head>
+                <title>aws_sqs_queue_policy</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_sqs_queue_policy">Resource: aws_sqs_queue_policy</h1>
+
+<p>Allows you to set a policy of an SQS Queue while referencing the ARN of the queue within the policy.</p>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>danger</em>
+    <p>AWS will hang indefinitely when creating or updating an <a href="../resources/sqs_queue.html"><code>aws_sqs_queue</code></a> with an associated policy if <code>Version = "2012-10-17"</code> is not explicitly set in the policy. <a href="#timeout-problems-creatingupdating">See below</a> for an example of how to avoid this issue.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Basic%20Usage"></a><h3 id="basic-usage">Basic Usage</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_sqs_queue"</span><span class="w"> </span><span class="nv">"q"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"examplequeue"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">sid</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"First"</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"*"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">actions</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"sqs:SendMessage"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">resources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_sqs_queue.q.arn</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">test</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"ArnEquals"</span><span class="w"></span>
+<span class="w">      </span><span class="na">variable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws:SourceArn"</span><span class="w"></span>
+<span class="w">      </span><span class="na">values</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_sns_topic.example.arn</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_sqs_queue_policy"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">queue_url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_sqs_queue.q.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.test.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeout%20Problems%20Creating/Updating"></a><h3 id="timeout-problems-creatingupdating">Timeout Problems Creating/Updating</h3>
+
+<p>If <code>Version = "2012-10-17"</code> is not explicitly set in the policy, AWS may hang, causing the AWS provider to time out. To avoid this, make sure to include <code>Version</code> as shown in the example below.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"brodobaggins"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_sqs_queue"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"be-giant"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_sqs_queue_policy"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">queue_url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_sqs_queue.example.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="na">Version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2012-10-17"</span><span class="c1"> # !! Important !!</span>
+<span class="w">    </span><span class="na">Statement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[{</span><span class="w"></span>
+<span class="w">      </span><span class="na">Sid</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Cejuwdam"</span><span class="w"></span>
+<span class="w">      </span><span class="na">Effect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">Principal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">Service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"s3.amazonaws.com"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="na">Action</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"SQS:SendMessage"</span><span class="w"></span>
+<span class="w">      </span><span class="na">Resource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_sqs_queue.example.arn</span><span class="w"></span>
+<span class="w">      </span><span class="nb">Condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nb">ArnLike</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"aws:SourceArn"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.example.arn</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}]</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>This resource supports the following arguments:</p>
+
+<ul>
+<li><code>policy</code> - (Required) JSON policy for the SQS queue. For more information about building AWS IAM policy documents with Terraform, see the <a href="https://learn.hashicorp.com/terraform/aws/iam-policy">AWS IAM Policy Document Guide</a>. Ensure that <code>Version = "2012-10-17"</code> is set in the policy or AWS may hang in creating the queue.</li>
+<li><code>queue_url</code> - (Required) URL of the SQS Queue to which to attach the policy.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports no additional attributes.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import SQS Queue Policies using the queue URL. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_sqs_queue_policy.test</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://queue.amazonaws.com/123456789012/myqueue"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import SQS Queue Policies using the queue URL. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_sqs_queue_policy.test https://queue.amazonaws.com/123456789012/myqueue
+</code></pre></div>
+
+            
+        
+    </body></html>

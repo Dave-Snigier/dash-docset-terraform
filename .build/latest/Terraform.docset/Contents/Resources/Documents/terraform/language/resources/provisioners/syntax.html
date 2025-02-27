@@ -1,0 +1,380 @@
+<html><!-- Online page at https://www.terraform.io/language/resources/provisioners/syntax --><head>
+                <title>Provisioners</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="provisioners">Provisioners</h1>
+
+<p>You can use provisioners to model specific actions on the local machine or on
+a remote machine in order to prepare servers or other infrastructure objects
+for service.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>We removed the Chef, Habitat, Puppet, and Salt Masterless provisioners in Terraform v0.15.0. Information about these legacy provisioners is still available in the documentation for <a href="../../../terraform/language/v1.1.x/resources/provisioners/syntax.html">Terraform v1.1 (and earlier)</a>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provisioners%20are%20a%20Last%20Resort"></a><h2 id="provisioners-are-a-last-resort">Provisioners are a Last Resort</h2>
+
+<blockquote>
+  <p><strong>Hands-on:</strong> Try the <a href="../../../terraform/tutorials/provision?utm_source=WEBSITE&amp;utm_medium=WEB_IO&amp;utm_offer=ARTICLE_PAGE&amp;utm_content=DOCS.html">Provision Infrastructure Deployed with Terraform</a> tutorials to learn about more declarative ways to handle provisioning actions.</p>
+</blockquote>
+
+<p>Terraform includes the concept of provisioners as a measure of pragmatism,
+knowing that there are always certain behaviors that cannot be directly
+represented in Terraform's declarative model.</p>
+
+<p>However, they also add a considerable amount of complexity and uncertainty to
+Terraform usage. Firstly, Terraform cannot model the actions of provisioners
+as part of a plan because they can in principle take any action. Secondly,
+successful use of provisioners requires coordinating many more details than
+Terraform usage usually requires: direct network access to your servers,
+issuing Terraform credentials to log in, making sure that all of the necessary
+external software is installed, etc.</p>
+
+<p>The following sections describe some situations which can be solved with
+provisioners in principle, but where better solutions are also available. We do
+not recommend using provisioners for any of the use-cases described in the
+following sections.</p>
+
+<p>Even if your specific use-case is not described in the following sections, we
+still recommend attempting to solve it using other techniques first, and use
+provisioners only if there is no other option.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Passing%20data%20into%20virtual%20machines%20and%20other%20compute%20resources"></a><h3 id="passing-data-into-virtual-machines-and-other-compute-resources">Passing data into virtual machines and other compute resources</h3>
+
+<p>When deploying virtual machines or other similar compute resources, we often
+need to pass in data about other related infrastructure that the software on
+that server will need to do its job.</p>
+
+<p>The various provisioners that interact with remote servers over SSH or WinRM
+can potentially be used to pass such data by logging in to the server and
+providing it directly, but most cloud computing platforms provide mechanisms
+to pass data to instances at the time of their creation such that the data
+is immediately available on system boot. For example:</p>
+
+<ul>
+<li>Alibaba Cloud: <code>user_data</code> on
+<a href="https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/instance"><code>alicloud_instance</code></a>
+or <a href="https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/launch_template"><code>alicloud_launch_template</code></a>.</li>
+<li>Amazon EC2: <code>user_data</code> or <code>user_data_base64</code> on
+<a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance"><code>aws_instance</code></a>,
+<a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/launch_template"><code>aws_launch_template</code></a>,
+and <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/launch_configuration"><code>aws_launch_configuration</code></a>.</li>
+<li>Amazon Lightsail: <code>user_data</code> on
+<a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lightsail_instance"><code>aws_lightsail_instance</code></a>.</li>
+<li>Microsoft Azure: <code>custom_data</code> on
+<a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_machine"><code>azurerm_virtual_machine</code></a>
+or <a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_machine_scale_set"><code>azurerm_virtual_machine_scale_set</code></a>.</li>
+<li>Google Cloud Platform: <code>metadata</code> on
+<a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_instance"><code>google_compute_instance</code></a>
+or <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_instance_group"><code>google_compute_instance_group</code></a>.</li>
+<li>Oracle Cloud Infrastructure: <code>metadata</code> or <code>extended_metadata</code> on
+<a href="https://registry.terraform.io/providers/oracle/oci/"><code>oci_core_instance</code></a>
+or <a href="https://registry.terraform.io/providers/oracle/oci/"><code>oci_core_instance_configuration</code></a>.</li>
+<li>VMware vSphere: Attach a virtual CDROM to
+<a href="https://registry.terraform.io/providers/hashicorp/vsphere/latest/docs/resources/virtual_machine"><code>vsphere_virtual_machine</code></a>
+using the <code>cdrom</code> block, containing a file called <code>user-data.txt</code>.</li>
+</ul>
+
+<p>Many official Linux distribution disk images include software called
+<a href="https://cloudinit.readthedocs.io/en/latest/">cloud-init</a> that can automatically
+process in various ways data passed via the means described above, allowing
+you to run arbitrary scripts and do basic system configuration immediately
+during the boot process and without the need to access the machine over SSH.</p>
+
+<blockquote>
+  <p><strong>Hands-on:</strong> Try the <a href="../../../terraform/tutorials/provision/cloud-init?utm_source=WEBSITE&amp;utm_medium=WEB_IO&amp;utm_offer=ARTICLE_PAGE&amp;utm_content=DOCS.html">Provision Infrastructure with Cloud-Init</a> tutorial.</p>
+</blockquote>
+
+<p>If you are building custom machine images, you can make use of the "user data"
+or "metadata" passed by the above means in whatever way makes sense to your
+application, by referring to your vendor's documentation on how to access the
+data at runtime.</p>
+
+<p>This approach is <em>required</em> if you intend to use any mechanism in your cloud
+provider for automatically launching and destroying servers in a group,
+because in that case individual servers will launch unattended while Terraform
+is not around to provision them.</p>
+
+<p>Even if you're deploying individual servers directly with Terraform, passing
+data this way will allow faster boot times and simplify deployment by avoiding
+the need for direct network access from Terraform to the new server and for
+remote access credentials to be provided.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provisioning%20files%20using%20cloud-config"></a><h3 id="provisioning-files-using-cloud-config">Provisioning files using cloud-config</h3>
+
+<p>You can add the <a href="https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs"><code>cloudinit_config</code></a> data source to your Terraform configuration and specify the files you want to provision as <code>text/cloud-config</code> content. The <code>cloudinit_config</code> data source renders multi-part MIME configurations for use with <a href="https://cloudinit.readthedocs.io/en/latest/">cloud-init</a>. Pass the files in the <code>content</code> field as YAML-encoded configurations using the <code>write_files</code> block. </p>
+
+<p>In the following example, the <code>my_cloud_config</code> data source specifies a <code>text/cloud-config</code> MIME part named <code>cloud.conf</code>. The <code>part.content</code> field is set to <a href="../../../terraform/language/functions/yamlencode.html"><code>yamlencode</code></a>, which encodes the <code>write_files</code> JSON object as YAML so that the system can provision the referenced files.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"cloudinit_config"</span><span class="w"> </span><span class="nv">"my_cloud_config"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">gzip</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">base64_encode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">part</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">content_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"text/cloud-config"</span><span class="w"></span>
+<span class="w">    </span><span class="na">filename</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"cloud.conf"</span><span class="w"></span>
+<span class="w">    </span><span class="na">content</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">yamlencode</span><span class="p">(</span><span class="w"></span>
+<span class="w">      </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"write_files"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">          </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"path"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"/etc/foo.conf"</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"content"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"foo contents"</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="p">},</span><span class="w"></span>
+<span class="w">          </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"path"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"/etc/bar.conf"</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"content"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nf">file</span><span class="p">(</span><span class="s2">"bar.conf"</span><span class="p">),</span><span class="w"></span>
+<span class="w">          </span><span class="p">},</span><span class="w"></span>
+<span class="w">          </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"path"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"/etc/baz.conf"</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s2">"content"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nf">templatefile</span><span class="p">(</span><span class="s2">"baz.tpl.conf", { SOME_VAR = "qux"</span><span class="w"> </span><span class="p">}),</span><span class="w"></span>
+<span class="w">          </span><span class="p">},</span><span class="w"></span>
+<span class="w">        </span><span class="p">],</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Running%20configuration%20management%20software"></a><h3 id="running-configuration-management-software">Running configuration management software</h3>
+
+<p>As a convenience to users who are forced to use generic operating system
+distribution images, Terraform includes a number of specialized provisioners
+for launching specific configuration management products.</p>
+
+<p>We strongly recommend not using these, and instead running system configuration
+steps during a custom image build process. For example,
+<a href="https://www.packer.io/">HashiCorp Packer</a> offers a similar complement of
+configuration management provisioners and can run their installation steps
+during a separate build process, before creating a system disk image that you
+can deploy many times.</p>
+
+<blockquote>
+  <p><strong>Hands-on:</strong> Try the <a href="../../../terraform/tutorials/provision/packer?utm_source=WEBSITE&amp;utm_medium=WEB_IO&amp;utm_offer=ARTICLE_PAGE&amp;utm_content=DOCS.html">Provision Infrastructure with Packer</a> tutorial.</p>
+</blockquote>
+
+<p>If you are using configuration management software that has a centralized server
+component, you will need to delay the <em>registration</em> step until the final
+system is booted from your custom image. To achieve that, use one of the
+mechanisms described above to pass the necessary information into each instance
+so that it can register itself with the configuration management server
+immediately on boot, without the need to accept commands from Terraform over
+SSH or WinRM.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/First-class%20Terraform%20provider%20functionality%20may%20be%20available"></a><h3 id="first-class-terraform-provider-functionality-may-be-available">First-class Terraform provider functionality may be available</h3>
+
+<p>It is technically possible to use the <code>local-exec</code> provisioner to run the CLI
+for your target system in order to create, update, or otherwise interact with
+remote objects in that system.</p>
+
+<p>If you are trying to use a new feature of the remote system that isn't yet
+supported in its Terraform provider, that might be the only option. However,
+if there <em>is</em> provider support for the feature you intend to use, prefer to
+use that provider functionality rather than a provisioner so that Terraform
+can be fully aware of the object and properly manage ongoing changes to it.</p>
+
+<p>Even if the functionality you need is not available in a provider today, we
+suggest to consider <code>local-exec</code> usage a temporary workaround and to also
+open an issue in the relevant provider's repository to discuss adding
+first-class provider support. Provider development teams often prioritize
+features based on interest, so opening an issue is a way to record your
+interest in the feature.</p>
+
+<p>Provisioners are used to execute scripts on a local or remote machine
+as part of resource creation or destruction. Provisioners can be used to
+bootstrap a resource, cleanup before destroy, run configuration management, etc.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/How%20to%20use%20Provisioners"></a><h2 id="how-to-use-provisioners">How to use Provisioners</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Provisioners should only be used as a last resort. For most common situations there are better alternatives. For more information, see the sections above.</p>
+</aside>
+
+<p>If you are certain that provisioners are the best way to solve your problem
+after considering the advice in the sections above, you can add a
+<code>provisioner</code> block inside the <code>resource</code> block of a compute instance.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"local-exec"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"echo The server's IP address is ${self.private_ip}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The <code>local-exec</code> provisioner requires no other configuration, but most other
+provisioners must connect to the remote system using SSH or WinRM.
+You must include <a href="../../../terraform/language/resources/provisioners/connection.html">a <code>connection</code> block</a> so that Terraform knows how to communicate with the server.</p>
+
+<p>Terraform includes several built-in provisioners. You can also use third-party provisioners as plugins, by placing them
+in <code>%APPDATA%\terraform.d\plugins</code>, <code>~/.terraform.d/plugins</code>, or the same
+directory where the Terraform binary is installed. However, we do not recommend
+using any provisioners except the built-in <code>file</code>, <code>local-exec</code>, and
+<code>remote-exec</code> provisioners.</p>
+
+<p>All provisioners support the <code>when</code> and <code>on_failure</code> meta-arguments, which
+are described below (see <a href="#destroy-time-provisioners">Destroy-Time Provisioners</a>
+and <a href="#failure-behavior">Failure Behavior</a>).</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/The%20self%20Object"></a><h3 id="the-self-object">The <code>self</code> Object</h3>
+
+<p>Expressions in <code>provisioner</code> blocks cannot refer to their parent resource by
+name. Instead, they can use the special <code>self</code> object.</p>
+
+<p>The <code>self</code> object represents the provisioner's parent resource, and has all of
+that resource's attributes. For example, use <code>self.public_ip</code> to reference an
+<code>aws_instance</code>'s <code>public_ip</code> attribute.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Technical note</em>
+    <p>Resource references are restricted here because references create dependencies. Referring to a resource by name within its own block would create a dependency cycle.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Ephemeral%20values"></a><h3 id="ephemeral-values">Ephemeral values</h3>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>: Ephemeral values are available in Terraform v1.10 and later.</p>
+</aside>
+
+<p>The configuration for a <code>provisioner</code> block may use ephemeral values, such as
+<a href="../../../terraform/language/resources/ephemeral.html"><code>ephemeral</code> resources</a>, <a href="../../../terraform/language/values/locals.html#ephemeral-values"><code>ephemeral</code>
+local values</a>, <a href="../../../terraform/language/values/variables.html#ephemeral"><code>ephemeral</code>
+variables</a>, or <a href="../../../terraform/language/values/outputs.html#ephemeral-avoid-storing-values-in-state-or-plan-files"><code>ephemeral</code>
+output
+values</a>.</p>
+
+<p>Terraform does not store these values in your plan or state, or output them in
+logs.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Sensitive%20values"></a><h3 id="sensitive-values">Sensitive values</h3>
+
+<p>The configuration for a <code>provisioner</code> block may use sensitive values, such as
+<a href="../../../terraform/language/values/variables.html#suppressing-values-in-cli-output"><code>sensitive</code> variables</a>
+or <a href="../../../terraform/language/values/outputs.html#sensitive-suppressing-values-in-cli-output"><code>sensitive</code> output values</a>.
+Terraform suppresses sensitive values in all log output.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creation-Time%20Provisioners"></a><h2 id="creation-time-provisioners">Creation-Time Provisioners</h2>
+
+<p>By default, provisioners run when the resource they are defined within is
+created. Creation-time provisioners are only run during <em>creation</em>, not
+during updating or any other lifecycle. They are meant as a means to perform
+bootstrapping of a system.</p>
+
+<p>If a creation-time provisioner fails, the resource is marked as <strong>tainted</strong>.
+A tainted resource will be planned for destruction and recreation upon the
+next <code>terraform apply</code>. Terraform does this because a failed provisioner
+can leave a resource in a semi-configured state. Because Terraform cannot
+reason about what the provisioner does, the only way to ensure proper creation
+of a resource is to recreate it. This is tainting.</p>
+
+<p>You can change this behavior by setting the <code>on_failure</code> attribute to <code>continue</code>. Refer to <a href="#failure-behavior">Failure Behavior</a> for additional information.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Destroy-Time%20Provisioners"></a><h2 id="destroy-time-provisioners">Destroy-Time Provisioners</h2>
+
+<p>If <code>when = destroy</code> is specified, the provisioner will run when the
+resource it is defined within is <em>destroyed</em>.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"local-exec"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">when</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="err">destroy</span><span class="w"></span>
+<span class="w">    </span><span class="na">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"echo 'Destroy-time provisioner'"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Destroy provisioners are run before the resource is destroyed. If they
+fail, Terraform will error and rerun the provisioners again on the next
+<code>terraform apply</code>. Due to this behavior, care should be taken for destroy
+provisioners to be safe to run multiple times.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>: Destroy provisioners of this resource do not run if <code>create_before_destroy</code> is set to <code>true</code>. This <a href="https://github.com/hashicorp/terraform/issues/13549">GitHub issue</a> contains more details.</p>
+</aside>
+
+<p>Destroy-time provisioners can only run if they remain in the configuration
+at the time a resource is destroyed. If a resource block with a destroy-time
+provisioner is removed entirely from the configuration, its provisioner
+configurations are removed along with it and thus the destroy provisioner
+won't run. To work around this, a multi-step process can be used to safely
+remove a resource with a destroy-time provisioner:</p>
+
+<ul>
+<li>Update the resource configuration to include <code>count = 0</code>.</li>
+<li>Apply the configuration to destroy any existing instances of the resource, including running the destroy provisioner.</li>
+<li>Remove the resource block entirely from configuration, along with its <code>provisioner</code> blocks.</li>
+<li>Apply again, at which point no further action should be taken since the resources were already destroyed.</li>
+</ul>
+
+<p>Because of this limitation, you should use destroy-time provisioners sparingly and with care.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>A destroy-time provisioner within a resource that is tainted <em>will not</em> run. This includes resources that are marked tainted from a failed creation-time provisioner or tainted manually using <code>terraform taint</code>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Multiple%20Provisioners"></a><h2 id="multiple-provisioners">Multiple Provisioners</h2>
+
+<p>Multiple provisioners can be specified within a resource. Multiple provisioners
+are executed in the order they're defined in the configuration file.</p>
+
+<p>You may also mix and match creation and destruction provisioners. Only
+the provisioners that are valid for a given operation will be run. Those
+valid provisioners will be run in the order they're defined in the configuration
+file.</p>
+
+<p>Example of multiple provisioners:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"local-exec"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"echo first"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"local-exec"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"echo second"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Failure%20Behavior"></a><h2 id="failure-behavior">Failure Behavior</h2>
+
+<p>By default, provisioners that fail will also cause the Terraform apply
+itself to fail. The <code>on_failure</code> setting can be used to change this. The
+allowed values are:</p>
+
+<ul>
+<li><p><code>continue</code> - Ignore the error and continue with creation or destruction.</p></li>
+<li><p><code>fail</code> - Raise an error and stop applying (the default behavior). If this is a creation provisioner,
+taint the resource.</p></li>
+</ul>
+
+<p>Example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"local-exec"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">command</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"echo The server's IP address is ${self.private_ip}"</span><span class="w"></span>
+<span class="w">    </span><span class="na">on_failure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">continue</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

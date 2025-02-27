@@ -1,0 +1,567 @@
+<html><!-- Online page at https://registry.terraform.io/providers/gitlabhq/gitlab/latest/docs/development/CreatingANewResource --><head>
+                <title>Creating a New Resource Using the Terraform Plugin Framework</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="creating-a-new-resource-using-the-terraform-plugin-framework">Creating a New Resource Using the Terraform Plugin Framework</h1>
+
+<p>This tutorial is meant to help new contributors out when creating new resource. It will walk through a 
+step-by-step guide of creating a new resource using the 
+<a href="https://developer.hashicorp.com/terraform/plugin/framework">Terraform Provider Framework</a>,
+since that is how all new resources are added to the GitLab terraform provider, as noted in the
+<a href="../CONTRIBUTING.md.html">CONTRIBUTING.md</a>. This guide will assume that a development environment has already
+been set up by following the <code>Developing The Provider</code> section of the CONTRIBUTING.md documentation.</p>
+
+<p><!-- Use "yzhang.markdown-all-in-one" plugin to keep this up to date in vscode --></p>
+
+<ul>
+<li><a href="#creating-a-new-resource-using-the-terraform-plugin-framework">Creating a New Resource Using the Terraform Plugin Framework</a>
+<ul>
+<li><a href="#step-1-understand-the-api-from-gitlab">Step 1: Understand the API from GitLab</a></li>
+<li><a href="#step-2-create-the-resource-struct">Step 2: Create the Resource struct</a></li>
+<li><a href="#step-3-create-the-schema">Step 3: Create the Schema</a></li>
+<li><a href="#step-4-create-the-config-function">Step 4: Create the <code>Config</code> function</a></li>
+<li><a href="#step-5-create-the-crud-operations">Step 5: Create the CRUD operations</a>
+<ul>
+<li><a href="#step-5a-create-the-read-function">Step 5a: Create the <code>Read</code> function</a></li>
+<li><a href="#step-5b-create-the-create-function">Step 5b: Create the <code>Create</code> function</a></li>
+</ul></li>
+<li><a href="#step-6-add-import-support">Step 6: Add import support</a></li>
+<li><a href="#step-7-verify-the-resource-is-properly-structured">Step 7: Verify the resource is properly structured</a></li>
+<li><a href="#step-8-create-documentation">Step 8: Create documentation</a></li>
+<li><a href="#step-8-create-tests">Step 8: Create tests</a></li>
+</ul></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%201%3A%20Understand%20the%20API%20from%20GitLab"></a><h2 id="step-1-understand-the-api-from-gitlab">Step 1: Understand the API from GitLab</h2>
+
+<p>When creating a new resource, the GitLab terraform provider follows the
+<a href="https://developer.hashicorp.com/terraform/plugin/best-practices/hashicorp-provider-design-principles">Terraform Provider Best Practices</a>
+whenever possible. This means that a new resource meets a couple of criteria:</p>
+
+<ol>
+<li>One resource aligns as closely to one set of CRUD APIs as possible.</li>
+<li>The attributes of the resource align to the attributes of the underlying APIs.</li>
+</ol>
+
+<p>For this example, the <a href="../internal/provider/resource_gitlab_application.go"><code>resource_gitlab_application</code></a>
+resource will be used as a step-by-step example. This resource aligns to the 
+<a href="https://docs.gitlab.com/api/applications/">Applications API</a> exposed by GitLab. When creating
+a resource, first ensure that the relevant APIs are present in GitLab. If it's not clear whether an
+api exists for a resource, create an issue on the GitLab Terraform Provider project and ask!</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%202%3A%20Create%20the%20Resource%20struct"></a><h2 id="step-2-create-the-resource-struct">Step 2: Create the Resource struct</h2>
+
+<p>In the Terraform Plugin framework, each resource is represented by a struct that implements one or more
+interfaces. For the sake of keeping this tutorial simple, these interfaces won't be covered in details. However,
+creating the resource struct will be the first step in creating a new resource. Each resource is created
+within its own <code>go</code> file, named <code>resource_&lt;resource_name&gt;.go</code>; in this case, <code>resource_gitlab_application.go</code>. </p>
+
+<div class="codehilite"><pre><span></span><code><span class="kd">type</span><span class="w"> </span><span class="nx">gitlabApplicationResource</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nx">client</span><span class="w"> </span><span class="o">*</span><span class="nx">gitlab</span><span class="p">.</span><span class="nx">Client</span><span class="w"> </span><span class="c1">// This is required for making calls to GitLab later</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%203%3A%20Create%20the%20Schema"></a><h2 id="step-3-create-the-schema">Step 3: Create the Schema</h2>
+
+<p>The schema for the resource handles multiple responsibilities during <code>terraform plan</code> and <code>terraform apply</code>:</p>
+
+<ol>
+<li>It ensures that the input data is the correct type (<code>number</code> vs <code>string</code>).</li>
+<li>It ensures that the input data is properly validated (matches any validation rules).</li>
+<li>It ensures that the input data has all the necessarily required fields.</li>
+</ol>
+
+<p>As a result, the schema is the natural starting point for creating a resource. The best place to start
+for creating a resource is to copy all the required and optional attributes from the GitLab API into the
+schema struct. To define the schema for the resource, first, create a struct representing the attributes
+that a user can use to configure the resource:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kd">type</span><span class="w"> </span><span class="nx">gitlabApplicationResourceModel</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nx">Name</span><span class="w">         </span><span class="nx">types</span><span class="p">.</span><span class="nx">String</span><span class="w"> </span><span class="s">`tfsdk:"name"`</span><span class="w"></span>
+<span class="w">    </span><span class="nx">RedirectURL</span><span class="w">  </span><span class="nx">types</span><span class="p">.</span><span class="nx">String</span><span class="w"> </span><span class="s">`tfsdk:"redirect_url"`</span><span class="w"></span>
+<span class="w">    </span><span class="nx">Scopes</span><span class="w">       </span><span class="nx">types</span><span class="p">.</span><span class="nx">Set</span><span class="w">    </span><span class="s">`tfsdk:"scopes"`</span><span class="w"></span>
+<span class="w">    </span><span class="nx">Confidential</span><span class="w"> </span><span class="nx">types</span><span class="p">.</span><span class="nx">Bool</span><span class="w">   </span><span class="s">`tfsdk:"confidential"`</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">Id</span><span class="w">            </span><span class="nx">types</span><span class="p">.</span><span class="nx">String</span><span class="w"> </span><span class="s">`tfsdk:"id"`</span><span class="w"></span>
+<span class="w">    </span><span class="nx">Secret</span><span class="w">        </span><span class="nx">types</span><span class="p">.</span><span class="nx">String</span><span class="w"> </span><span class="s">`tfsdk:"secret"`</span><span class="w"></span>
+<span class="w">    </span><span class="nx">ApplicationId</span><span class="w"> </span><span class="nx">types</span><span class="p">.</span><span class="nx">String</span><span class="w"> </span><span class="s">`tfsdk:"application_id"`</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>There are a couple of things to notice about this struct:</p>
+
+<ol>
+<li>The types for each attribute use the <code>types</code> package. This is because <code>types.String</code> can have a nil value,
+whereas a primative <code>string</code> cannot.</li>
+<li>The <code>tfsdk</code> tag value maps to the string value in the schema.</li>
+<li>Each new struct like this must have a unique name. The terraform provider uses the naming convention of
+<code>gitlab&lt;resourceName&gt;&lt;resource type, either Resource or Data&gt;Model</code>. That means an application data source 
+would be named <code>gitlabApplicationDataModel</code>.</li>
+</ol>
+
+<p>After the schema struct is created, the next step is to create a second struct representing the resource itself. This
+struct will then implement all the functions that are required for performing terraform CRUD (Create, Read,
+Update, Delete) operations.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kd">type</span><span class="w"> </span><span class="nx">gitlabApplicationResource</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nx">client</span><span class="w"> </span><span class="o">*</span><span class="nx">gitlab</span><span class="p">.</span><span class="nx">Client</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>This struct is very simple, and just accepts a client reference. This client will be used to make REST calls to
+the GitLab instance configured in the provider.</p>
+
+<p>With the schema struct and the resource struct created, it's time to start implementing the resource functions.</p>
+
+<p>The first function to create is the <code>Schema</code> function, which defines a <code>schema.Schema</code> struct representing the schema
+and all the validations required for the resource. The schema block is very large, so the full block will not be copied here. 
+The full schema function can be read 
+<a href="https://gitlab.com/gitlab-org/terraform-provider-gitlab/-/blob/main/internal/provider/resource_gitlab_application.go#L63">in the repository, linked here</a></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">r</span><span class="w"> </span><span class="o">*</span><span class="nx">gitlabApplicationResource</span><span class="p">)</span><span class="w"> </span><span class="nx">Schema</span><span class="p">(</span><span class="nx">ctx</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span><span class="w"> </span><span class="nx">req</span><span class="w"> </span><span class="nx">resource</span><span class="p">.</span><span class="nx">SchemaRequest</span><span class="p">,</span><span class="w"> </span><span class="nx">resp</span><span class="w"> </span><span class="o">*</span><span class="nx">resource</span><span class="p">.</span><span class="nx">SchemaResponse</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nx">resp</span><span class="p">.</span><span class="nx">Schema</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">schema</span><span class="p">.</span><span class="nx">Schema</span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">MarkdownDescription</span><span class="p">:</span><span class="w"> </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Sprintf</span><span class="p">(</span><span class="s">`The `</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s">"`gitlab_application`"</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s">` resource allows to manage the lifecycle of applications in gitlab.</span>
+
+<span class="s">.. warning:: warning</span>
+<span class="s">    In order to use a user for a user to create an application, they must have admin priviledges at the instance level. To create an OIDC application, a scope of "openid".</span>
+
+<span class="s">**Upstream API**: [GitLab REST API docs](https://docs.gitlab.com/api/applications/)`</span><span class="p">),</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">Attributes</span><span class="p">:</span><span class="w"> </span><span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="nx">schema</span><span class="p">.</span><span class="nx">Attribute</span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="s">"id"</span><span class="p">:</span><span class="w"> </span><span class="nx">schema</span><span class="p">.</span><span class="nx">StringAttribute</span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="nx">MarkdownDescription</span><span class="p">:</span><span class="w"> </span><span class="s">"The ID of this Terraform resource. In the format of `&lt;application_id&gt;`."</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="nx">Computed</span><span class="p">:</span><span class="w">            </span><span class="kc">true</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="p">},</span><span class="w"></span>
+<span class="w">            </span><span class="s">"name"</span><span class="p">:</span><span class="w"> </span><span class="nx">schema</span><span class="p">.</span><span class="nx">StringAttribute</span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="nx">MarkdownDescription</span><span class="p">:</span><span class="w"> </span><span class="s">"Name of the application."</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="nx">Required</span><span class="p">:</span><span class="w">            </span><span class="kc">true</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="nx">Validators</span><span class="p">:</span><span class="w">          </span><span class="p">[]</span><span class="nx">validator</span><span class="p">.</span><span class="nx">String</span><span class="p">{</span><span class="nx">stringvalidator</span><span class="p">.</span><span class="nx">LengthAtLeast</span><span class="p">(</span><span class="mi">1</span><span class="p">)},</span><span class="w"></span>
+<span class="w">                </span><span class="nx">PlanModifiers</span><span class="p">:</span><span class="w">       </span><span class="p">[]</span><span class="nx">planmodifier</span><span class="p">.</span><span class="nx">String</span><span class="p">{</span><span class="nx">stringplanmodifier</span><span class="p">.</span><span class="nx">RequiresReplace</span><span class="p">()},</span><span class="w"></span>
+<span class="w">            </span><span class="p">},</span><span class="w"></span>
+<span class="w">            </span><span class="c1">// additional schema resources past this point.</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Similar to the schema struct above, there are a couple things to take note of in the above <code>Schema</code> func.</p>
+
+<ol>
+<li>The <code>Schema</code> func itself is part of the <code>resource.Resource</code> interface. Make sure it has the proper inputs!</li>
+<li>Each <code>Schema</code> must have a <code>MarkdownDescription</code>. This will appear in the terraform documentation on the provider's site.</li>
+<li>Each <code>Schema</code> must have a <code>Attributes</code> map, which contains a minimum of one <code>schema.Attribute</code> in its map. This map
+is where plan-time validation happens. Within each <code>schema.Attribute</code>, several key properties are required:
+<ul>
+<li><code>MarkdownDescription</code> if the documentation that will appear on the terraform documentation site for that attribute.</li>
+<li><code>Required</code> denotes whether the attribute is required for the resource. Resources missing required attribute will fail at plan-time.</li>
+<li><code>Computed</code> denotes whether the resource will compute values for that attribute that may differ from the plan. If <code>Computed</code> is 
+set to <code>true</code>, then storing a value that's different from the terraform config won't result in a diff being identified unless the 
+value is explicitly set in the config. </li>
+<li><code>Validators</code> accepts validator functions that can be used to validate inputs at plan time.</li>
+<li><code>PlanModifiers</code> accepts modifier functions that can change how the resource identifies plan changes.</li>
+</ul></li>
+</ol>
+
+<p>For more information on various properties of the schema attributes, feel free to read the 
+<a href="https://developer.hashicorp.com/terraform/plugin/framework/handling-data/schemas">Terraform Plugin Framework Schema Documentation</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%204%3A%20Create%20the%20Config%20function"></a><h2 id="step-4-create-the-config-function">Step 4: Create the <code>Config</code> function</h2>
+
+<p>After the schema function has been written, the <code>Config</code> function needs to be written. Don't worry, this one is much easier!</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// Configure adds the provider configured client to the resource.</span><span class="w"></span>
+<span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">r</span><span class="w"> </span><span class="o">*</span><span class="nx">gitlabApplicationResource</span><span class="p">)</span><span class="w"> </span><span class="nx">Configure</span><span class="p">(</span><span class="nx">ctx</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span><span class="w"> </span><span class="nx">req</span><span class="w"> </span><span class="nx">resource</span><span class="p">.</span><span class="nx">ConfigureRequest</span><span class="p">,</span><span class="w"> </span><span class="nx">resp</span><span class="w"> </span><span class="o">*</span><span class="nx">resource</span><span class="p">.</span><span class="nx">ConfigureResponse</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="c1">// Prevent panic if the provider has not been configured.</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">req</span><span class="p">.</span><span class="nx">ProviderData</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">r</span><span class="p">.</span><span class="nx">client</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">req</span><span class="p">.</span><span class="nx">ProviderData</span><span class="p">.(</span><span class="o">*</span><span class="nx">gitlab</span><span class="p">.</span><span class="nx">Client</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>This function will be nearly identical on every resource. The logic simply sets the client in the resource struct to be the value 
+configured in the provider. This ensures that when making calls from the <code>r.Client</code> that they're authenticated and configured properly.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%205%3A%20Create%20the%20CRUD%20operations"></a><h2 id="step-5-create-the-crud-operations">Step 5: Create the CRUD operations</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%205a%3A%20Create%20the%20Read%20function"></a><h3 id="step-5a-create-the-read-function">Step 5a: Create the <code>Read</code> function</h3>
+
+<p>Finally, it's time to create the CRUD functions for the resource. The CRUD functions (Create, Read, Update, and Delete) are responsible
+for using the <code>r.Client</code> to make the changes to the GitLab instance. Terraform will automatically call the correct function based on 
+the terraform plan that's generated before the apply:</p>
+
+<ul>
+<li>If a resource is labelled as <code>create</code>, the <code>Create</code> function will be called. </li>
+<li>If a resource is labelled as <code>update</code>, the <code>Update</code> function will be called.</li>
+<li>If a resource is labelled as <code>destroy</code>, the <code>Delete</code> function will be called. </li>
+<li>The <code>Read</code> function is called any time terraform <code>refresh</code> is called, either by a <code>plan</code>, an <code>apply</code>, or an explicit <code>refresh</code>.</li>
+</ul>
+
+<p>Creating a CRUD funcion involves reading the attributes from the terraform configuration, then passing them to the API call necessary
+to manipulate the resource in GitLab. This document will demonstrate a <code>Read</code> and <code>Create</code> function; other functions can be read from
+the <code>gitlab_application_settings.go</code> file.</p>
+
+<p>First, creating the <code>Read</code> function:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">r</span><span class="w"> </span><span class="o">*</span><span class="nx">gitlabApplicationResource</span><span class="p">)</span><span class="w"> </span><span class="nx">Read</span><span class="p">(</span><span class="nx">ctx</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span><span class="w"> </span><span class="nx">req</span><span class="w"> </span><span class="nx">resource</span><span class="p">.</span><span class="nx">ReadRequest</span><span class="p">,</span><span class="w"> </span><span class="nx">resp</span><span class="w"> </span><span class="o">*</span><span class="nx">resource</span><span class="p">.</span><span class="nx">ReadResponse</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kd">var</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="o">*</span><span class="nx">gitlabApplicationResourceModel</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// Read Terraform prior state data into the model</span><span class="w"></span>
+<span class="w">    </span><span class="nx">resp</span><span class="p">.</span><span class="nx">Diagnostics</span><span class="p">.</span><span class="nx">Append</span><span class="p">(</span><span class="nx">req</span><span class="p">.</span><span class="nx">State</span><span class="p">.</span><span class="nx">Get</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">data</span><span class="p">)</span><span class="o">...</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">resp</span><span class="p">.</span><span class="nx">Diagnostics</span><span class="p">.</span><span class="nx">HasError</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">application</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">findGitlabApplication</span><span class="p">(</span><span class="nx">r</span><span class="p">.</span><span class="nx">client</span><span class="p">,</span><span class="w"> </span><span class="nx">data</span><span class="p">.</span><span class="nx">Id</span><span class="p">.</span><span class="nx">ValueString</span><span class="p">())</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">resp</span><span class="p">.</span><span class="nx">Diagnostics</span><span class="p">.</span><span class="nx">AddError</span><span class="p">(</span><span class="s">"GitLab API error occurred"</span><span class="p">,</span><span class="w"> </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Sprintf</span><span class="p">(</span><span class="s">"Unable to create application: %s"</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">.</span><span class="nx">Error</span><span class="p">()))</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">tflog</span><span class="p">.</span><span class="nx">Trace</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="s">"found application"</span><span class="p">,</span><span class="w"> </span><span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kd">interface</span><span class="p">{}{</span><span class="w"></span>
+<span class="w">        </span><span class="s">"application"</span><span class="p">:</span><span class="w"> </span><span class="nx">gitlab</span><span class="p">.</span><span class="nx">Stringify</span><span class="p">(</span><span class="nx">application</span><span class="p">),</span><span class="w"></span>
+<span class="w">    </span><span class="p">})</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">r</span><span class="p">.</span><span class="nx">applicationModelToState</span><span class="p">(</span><span class="nx">application</span><span class="p">,</span><span class="w"> </span><span class="nx">data</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="c1">// Save updated data into Terraform state</span><span class="w"></span>
+<span class="w">    </span><span class="nx">resp</span><span class="p">.</span><span class="nx">Diagnostics</span><span class="p">.</span><span class="nx">Append</span><span class="p">(</span><span class="nx">resp</span><span class="p">.</span><span class="nx">State</span><span class="p">.</span><span class="nx">Set</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">data</span><span class="p">)</span><span class="o">...</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kd">func</span><span class="w"> </span><span class="nx">findGitlabApplication</span><span class="p">(</span><span class="nx">client</span><span class="w"> </span><span class="o">*</span><span class="nx">gitlab</span><span class="p">.</span><span class="nx">Client</span><span class="p">,</span><span class="w"> </span><span class="nx">desiredId</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="nx">gitlab</span><span class="p">.</span><span class="nx">Application</span><span class="p">,</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">options</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">gitlab</span><span class="p">.</span><span class="nx">ListApplicationsOptions</span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">PerPage</span><span class="p">:</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nx">Page</span><span class="p">:</span><span class="w">    </span><span class="mi">1</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="nx">options</span><span class="p">.</span><span class="nx">Page</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">paginatedApplications</span><span class="p">,</span><span class="w"> </span><span class="nx">resp</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">Applications</span><span class="p">.</span><span class="nx">ListApplications</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">options</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="kc">nil</span><span class="p">,</span><span class="w"> </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Errorf</span><span class="p">(</span><span class="s">"unable to list applications. %s"</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="nx">i</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="nx">paginatedApplications</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="nx">strconv</span><span class="p">.</span><span class="nx">Itoa</span><span class="p">(</span><span class="nx">paginatedApplications</span><span class="p">[</span><span class="nx">i</span><span class="p">].</span><span class="nx">ID</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nx">desiredId</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="nx">paginatedApplications</span><span class="p">[</span><span class="nx">i</span><span class="p">],</span><span class="w"> </span><span class="kc">nil</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">options</span><span class="p">.</span><span class="nx">Page</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">resp</span><span class="p">.</span><span class="nx">NextPage</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// if we loop through the pages and haven't found it, we should error</span><span class="w"></span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="kc">nil</span><span class="p">,</span><span class="w"> </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Errorf</span><span class="p">(</span><span class="s">"unable to find application with id: %s"</span><span class="p">,</span><span class="w"> </span><span class="nx">desiredId</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">r</span><span class="w"> </span><span class="o">*</span><span class="nx">gitlabApplicationResource</span><span class="p">)</span><span class="w"> </span><span class="nx">applicationModelToState</span><span class="p">(</span><span class="nx">application</span><span class="w"> </span><span class="o">*</span><span class="nx">gitlab</span><span class="p">.</span><span class="nx">Application</span><span class="p">,</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="o">*</span><span class="nx">gitlabApplicationResourceModel</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="c1">// need to check this</span><span class="w"></span>
+<span class="w">    </span><span class="c1">// For reads, the secret will be empty, in which case we shouldn't set the state</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">application</span><span class="p">.</span><span class="nx">Secret</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="s">""</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">data</span><span class="p">.</span><span class="nx">Secret</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">types</span><span class="p">.</span><span class="nx">StringValue</span><span class="p">(</span><span class="nx">application</span><span class="p">.</span><span class="nx">Secret</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nx">data</span><span class="p">.</span><span class="nx">Id</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">types</span><span class="p">.</span><span class="nx">StringValue</span><span class="p">(</span><span class="nx">strconv</span><span class="p">.</span><span class="nx">Itoa</span><span class="p">(</span><span class="nx">application</span><span class="p">.</span><span class="nx">ID</span><span class="p">))</span><span class="w"></span>
+<span class="w">    </span><span class="nx">data</span><span class="p">.</span><span class="nx">Confidential</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">types</span><span class="p">.</span><span class="nx">BoolValue</span><span class="p">(</span><span class="nx">application</span><span class="p">.</span><span class="nx">Confidential</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="nx">data</span><span class="p">.</span><span class="nx">Name</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">types</span><span class="p">.</span><span class="nx">StringValue</span><span class="p">(</span><span class="nx">application</span><span class="p">.</span><span class="nx">ApplicationName</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="nx">data</span><span class="p">.</span><span class="nx">RedirectURL</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">types</span><span class="p">.</span><span class="nx">StringValue</span><span class="p">(</span><span class="nx">application</span><span class="p">.</span><span class="nx">CallbackURL</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="nx">data</span><span class="p">.</span><span class="nx">ApplicationId</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">types</span><span class="p">.</span><span class="nx">StringValue</span><span class="p">(</span><span class="nx">application</span><span class="p">.</span><span class="nx">ApplicationID</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Like before, there are several things to notice in the <code>Read</code> function:</p>
+
+<ol>
+<li><code>resp.Diagnostics.Append(req.State.Get(ctx, &amp;data)...)</code> will read all the attributes from the request, and store them in <code>data</code>. This
+allows the data object to be used in downstream calls to retrieve data from the config in a typesafe manner.</li>
+<li><code>if resp.Diagnostics.HasError() {return}</code> checks to ensure that reading the config didn't encounter an error, and exits before any changes
+are made if an error was encountered.</li>
+<li><code>findGitlabApplication</code> demonstrates that CRUD functions can invoke helper functions in Go, just like any other Go code. <code>findGitlabApplication</code>
+is used to paginate through listed applications and find the application ID from the config.</li>
+<li>If an application was returned from the API, <code>applicationModelToState</code> is invoked to set all the properties of the <code>data</code> object. Notice the
+<code>types.StringValue</code> calls being made, which take a string primitive and convert it to a <code>types.String</code> object.</li>
+<li>Finally, once the data object has been updated, <code>resp.Diagnostics.Append(resp.State.Set(ctx, &amp;data)...)</code> is called to set the data back into 
+the state file.</li>
+</ol>
+
+<p>This may look complicated, but it's following three steps:</p>
+
+<ol>
+<li>Read the attributes from the configuration, which should contain a unique identifier for the resource</li>
+<li>Use the unique identifier to query the resource from the API</li>
+<li>Store the response from the API back into the state</li>
+</ol>
+
+<p>All <code>Read</code> functions will follow this same pattern.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%205b%3A%20Create%20the%20Create%20function"></a><h3 id="step-5b-create-the-create-function">Step 5b: Create the <code>Create</code> function</h3>
+
+<p>Creating a resource, similarly, involves reading from the configuration, populating an API call, and then storting the created resource
+back into state.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// Create creates a new upstream resources and adds it into the Terraform state.</span><span class="w"></span>
+<span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">r</span><span class="w"> </span><span class="o">*</span><span class="nx">gitlabApplicationResource</span><span class="p">)</span><span class="w"> </span><span class="nx">Create</span><span class="p">(</span><span class="nx">ctx</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span><span class="w"> </span><span class="nx">req</span><span class="w"> </span><span class="nx">resource</span><span class="p">.</span><span class="nx">CreateRequest</span><span class="p">,</span><span class="w"> </span><span class="nx">resp</span><span class="w"> </span><span class="o">*</span><span class="nx">resource</span><span class="p">.</span><span class="nx">CreateResponse</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kd">var</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="o">*</span><span class="nx">gitlabApplicationResourceModel</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// Read Terraform plan data into the model</span><span class="w"></span>
+<span class="w">    </span><span class="nx">resp</span><span class="p">.</span><span class="nx">Diagnostics</span><span class="p">.</span><span class="nx">Append</span><span class="p">(</span><span class="nx">req</span><span class="p">.</span><span class="nx">Plan</span><span class="p">.</span><span class="nx">Get</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">data</span><span class="p">)</span><span class="o">...</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">resp</span><span class="p">.</span><span class="nx">Diagnostics</span><span class="p">.</span><span class="nx">HasError</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">tflog</span><span class="p">.</span><span class="nx">Debug</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="s">"creating application"</span><span class="p">,</span><span class="w"> </span><span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kd">interface</span><span class="p">{}{</span><span class="w"></span>
+<span class="w">        </span><span class="s">"scopes"</span><span class="p">:</span><span class="w"> </span><span class="nx">data</span><span class="p">.</span><span class="nx">Scopes</span><span class="p">.</span><span class="nx">String</span><span class="p">(),</span><span class="w"></span>
+<span class="w">    </span><span class="p">})</span><span class="w"></span>
+<span class="w">    </span><span class="nx">scopes</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">conv</span><span class="p">.</span><span class="nx">StringSetToStrings</span><span class="p">(</span><span class="nx">data</span><span class="p">.</span><span class="nx">Scopes</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">resp</span><span class="p">.</span><span class="nx">Diagnostics</span><span class="p">.</span><span class="nx">HasError</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">formatted_scopes</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">strings</span><span class="p">.</span><span class="nx">Join</span><span class="p">(</span><span class="nx">scopes</span><span class="p">,</span><span class="w"> </span><span class="s">" "</span><span class="p">)</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// configure GitLab API call</span><span class="w"></span>
+<span class="w">    </span><span class="nx">options</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">gitlab</span><span class="p">.</span><span class="nx">CreateApplicationOptions</span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">Name</span><span class="p">:</span><span class="w">        </span><span class="nx">gitlab</span><span class="p">.</span><span class="nx">String</span><span class="p">(</span><span class="nx">data</span><span class="p">.</span><span class="nx">Name</span><span class="p">.</span><span class="nx">ValueString</span><span class="p">()),</span><span class="w"></span>
+<span class="w">        </span><span class="nx">RedirectURI</span><span class="p">:</span><span class="w"> </span><span class="nx">gitlab</span><span class="p">.</span><span class="nx">String</span><span class="p">(</span><span class="nx">data</span><span class="p">.</span><span class="nx">RedirectURL</span><span class="p">.</span><span class="nx">ValueString</span><span class="p">()),</span><span class="w"></span>
+<span class="w">        </span><span class="nx">Scopes</span><span class="p">:</span><span class="w">      </span><span class="nx">gitlab</span><span class="p">.</span><span class="nx">String</span><span class="p">(</span><span class="nx">formatted_scopes</span><span class="p">),</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">!</span><span class="nx">data</span><span class="p">.</span><span class="nx">Confidential</span><span class="p">.</span><span class="nx">IsNull</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">options</span><span class="p">.</span><span class="nx">Confidential</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nx">gitlab</span><span class="p">.</span><span class="nx">Ptr</span><span class="p">(</span><span class="nx">data</span><span class="p">.</span><span class="nx">Confidential</span><span class="p">.</span><span class="nx">ValueBool</span><span class="p">())</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// Create application</span><span class="w"></span>
+<span class="w">    </span><span class="nx">application</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">r</span><span class="p">.</span><span class="nx">client</span><span class="p">.</span><span class="nx">Applications</span><span class="p">.</span><span class="nx">CreateApplication</span><span class="p">(</span><span class="nx">options</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="nx">resp</span><span class="p">.</span><span class="nx">Diagnostics</span><span class="p">.</span><span class="nx">AddError</span><span class="p">(</span><span class="s">"GitLab API error occurred"</span><span class="p">,</span><span class="w"> </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Sprintf</span><span class="p">(</span><span class="s">"Unable to create application: %s"</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">.</span><span class="nx">Error</span><span class="p">()))</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">r</span><span class="p">.</span><span class="nx">applicationModelToState</span><span class="p">(</span><span class="nx">application</span><span class="p">,</span><span class="w"> </span><span class="nx">data</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="c1">// Log the creation of the resource</span><span class="w"></span>
+<span class="w">    </span><span class="nx">tflog</span><span class="p">.</span><span class="nx">Debug</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="s">"created an application"</span><span class="p">,</span><span class="w"> </span><span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kd">interface</span><span class="p">{}{</span><span class="w"></span>
+<span class="w">        </span><span class="s">"name"</span><span class="p">:</span><span class="w"> </span><span class="nx">data</span><span class="p">.</span><span class="nx">Name</span><span class="p">.</span><span class="nx">ValueString</span><span class="p">(),</span><span class="w"> </span><span class="s">"id"</span><span class="p">:</span><span class="w"> </span><span class="nx">data</span><span class="p">.</span><span class="nx">Id</span><span class="p">.</span><span class="nx">ValueString</span><span class="p">(),</span><span class="w"></span>
+<span class="w">    </span><span class="p">})</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// Save data into Terraform state</span><span class="w"></span>
+<span class="w">    </span><span class="nx">resp</span><span class="p">.</span><span class="nx">Diagnostics</span><span class="p">.</span><span class="nx">Append</span><span class="p">(</span><span class="nx">resp</span><span class="p">.</span><span class="nx">State</span><span class="p">.</span><span class="nx">Set</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">data</span><span class="p">)</span><span class="o">...</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Things to notice about this function:</p>
+
+<ol>
+<li>Similar to the <code>Read</code> function, the <code>Create</code> function starts with <code>var data *gitlabApplicationResourceModel</code> to read the config
+into the <code>data</code> struct. This is used through the rest of the function to reference the config.</li>
+<li>the API accepts a list of <code>scopes</code> which is separated by a space. Since the terraform config is going to accept a formatted list
+object, we need to format that []string into a single string separated by spaces. That's what <code>formatted_scopes := strings.Join(scopes, " ")</code>
+is doing. This is an example where the terraform provider may format inputs slightly before passing them to the API to ensure that
+the input follows terraform best practices.</li>
+<li><code>options := &amp;gitlab.CreateApplicationOptions{...}</code> sets all the required values into an options struct. Any values not configured
+will not be passed to the API, and either defaults will be used or the value will not be set by the API.</li>
+<li><code>if !data.Confidential.IsNull() {...}</code> checks to see if an optional value is null. If the value is not null, it's added to the <code>options</code>
+struct to be passed to the API.</li>
+<li><code>application, _, err := r.client.Applications.CreateApplication(options)</code> calls the API with the input options to create the application.</li>
+<li>Just like in the <code>Read</code> func, <code>r.applicationModelToState(application, data)</code> sets the newly created application into the data object</li>
+<li>Finally, like in the <code>Read</code> func, <code>resp.Diagnostics.Append(resp.State.Set(ctx, &amp;data)...)</code> sets the data into state.</li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%206%3A%20Add%20import%20support"></a><h2 id="step-6-add-import-support">Step 6: Add import support</h2>
+
+<p>Most terraform resources should support the ability to use <code>import</code> to load pre-existing resources into the terraform state. To do this,
+a function called <code>ImportState</code> is added to the resource:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">r</span><span class="w"> </span><span class="o">*</span><span class="nx">gitlabApplicationResource</span><span class="p">)</span><span class="w"> </span><span class="nx">ImportState</span><span class="p">(</span><span class="nx">ctx</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span><span class="w"> </span><span class="nx">req</span><span class="w"> </span><span class="nx">resource</span><span class="p">.</span><span class="nx">ImportStateRequest</span><span class="p">,</span><span class="w"> </span><span class="nx">resp</span><span class="w"> </span><span class="o">*</span><span class="nx">resource</span><span class="p">.</span><span class="nx">ImportStateResponse</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nx">resource</span><span class="p">.</span><span class="nx">ImportStatePassthroughID</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">path</span><span class="p">.</span><span class="nx">Root</span><span class="p">(</span><span class="s">"id"</span><span class="p">),</span><span class="w"> </span><span class="nx">req</span><span class="p">,</span><span class="w"> </span><span class="nx">resp</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Most resources will use the <code>ImportStatePassthroughID</code> function to handle import. The critical piece of logic in the above example is 
+the uses of <code>path.Root("id")</code>, which specifies that the <code>id</code> attribute is the primary key for the resource. When a user calls
+<code>terraform import &lt;resource_path&gt; &lt;resource_id&gt;</code>, the value of <code>resource_id</code> will be set into the attribute specified in <code>path.Root()</code>.</p>
+
+<p>Then, the first time <code>terraform refresh</code> is called (either by explicitly calling it, or via a <code>plan</code> or <code>apply</code> operation), terraform
+will execute the <code>Read</code> function, and read the resource specified by that <code>id</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%207%3A%20Verify%20the%20resource%20is%20properly%20structured"></a><h2 id="step-7-verify-the-resource-is-properly-structured">Step 7: Verify the resource is properly structured</h2>
+
+<p>All the functions created in the above tutorial are created because they are required by interfaces. If the resource has been structured
+appropriately, and has the appropriate functions (remember, an <code>Update</code> and <code>Delete</code> function are required in addition to the ones
+created in this toturial) then the resource can be assigned to the interfaces successfully. To verify this, the following assignements
+should be added to the resource implementation:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kd">var</span><span class="w"> </span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="nx">_</span><span class="w"> </span><span class="nx">resource</span><span class="p">.</span><span class="nx">Resource</span><span class="w">                </span><span class="p">=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">gitlabApplicationResource</span><span class="p">{}</span><span class="w"> </span><span class="c1">//requires `Schema` and CRUD functions</span><span class="w"></span>
+<span class="w">    </span><span class="nx">_</span><span class="w"> </span><span class="nx">resource</span><span class="p">.</span><span class="nx">ResourceWithConfigure</span><span class="w">   </span><span class="p">=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">gitlabApplicationResource</span><span class="p">{}</span><span class="w"> </span><span class="c1">//requires the `Config` function</span><span class="w"></span>
+<span class="w">    </span><span class="nx">_</span><span class="w"> </span><span class="nx">resource</span><span class="p">.</span><span class="nx">ResourceWithImportState</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">gitlabApplicationResource</span><span class="p">{}</span><span class="w"> </span><span class="c1">//requires the `ImportState` function</span><span class="w"></span>
+<span class="p">)</span><span class="w"></span>
+</code></pre></div>
+
+<p>If any functions are missing, a compile error will provide details around which functions are missing. There will currently be one
+compilation error with <code>Resource</code>, noting that an <code>init()</code> function is required to register the resource with the provider.  Adding
+the <code>init</code> function is easy, and will require only several lines of code to complete the resource:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kd">func</span><span class="w"> </span><span class="nx">init</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nx">registerResource</span><span class="p">(</span><span class="nx">NewGitLabApplicationResource</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="c1">// NewGitLabApplicationResource is a helper function to simplify the provider implementation.</span><span class="w"></span>
+<span class="kd">func</span><span class="w"> </span><span class="nx">NewGitLabApplicationResource</span><span class="p">()</span><span class="w"> </span><span class="nx">resource</span><span class="p">.</span><span class="nx">Resource</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">gitlabApplicationResource</span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>This will return a new instance of the struct created earlier in the tutorial, and register it to the provider which will allow its 
+use.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%208%3A%20Create%20documentation"></a><h2 id="step-8-create-documentation">Step 8: Create documentation</h2>
+
+<p>Now that the resource has been created and the code has been written, we need to document our resources. Most of the documentation
+will be generated by the <code>make generate</code> command, which will read the documentation from the <code>Schema</code> block created in step 3. However,
+two additional pieces of documentation are required:</p>
+
+<ol>
+<li>An example of the resource in terraform hcl</li>
+<li>An example of how to import the resource</li>
+</ol>
+
+<p>To provide these examples, create a new folder under <code>/examples/resources</code>; the folder should have the same name as the terraform resource.
+In this tutorial, that means <code>gitlab_application</code>.</p>
+
+<p>To provide the <code>import</code> example, create an <code>import.sh</code> file, containing any logic needed to import the resource, and any comments that
+may help an end user.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Gitlab applications can be imported with their id, e.g.</span>
+terraform import gitlab_application.example <span class="s2">"1"</span>
+</code></pre></div>
+
+<p>To provide the resource example, create a <code>resource.tf</code> file, containing an example configuration, and any comments that may help an end user.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"gitlab_application"</span><span class="w"> </span><span class="nv">"oidc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">confidential</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">scopes</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"openid"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"company_oidc"</span><span class="w"></span>
+<span class="w">  </span><span class="na">redirect_url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://mycompany.com"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Finally, run <code>make generate</code> from the root of the repository. This make take about 20-30 seconds to install all go dependencies the first time
+it runs, but it will generate all documents within the <code>/docs</code> folder that are necessary for the resource.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%208%3A%20Create%20tests"></a><h2 id="step-8-create-tests">Step 8: Create tests</h2>
+
+<p>Every resource should have tests associated with it, and test principles can be located in the 
+<a href="https://gitlab.com/gitlab-org/terraform-provider-gitlab/-/blob/main/CONTRIBUTING.md">CONTRIBUTING.md file</a>. Tests are created in a separate
+<code>go</code> file, using a standard naming convention, appending <code>_test</code> to the end of your resource's file name. For example, the <code>gitlab_application</code>
+is in <code>resource_gitlab_application.go</code>, so the tests are located in <code>resource_gitlab_application_test.go</code>. To ensure that test logic is 
+kept separate from the provider, build tags are used for acceptance tests:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">//go:build acceptance</span><span class="w"></span>
+<span class="c1">// +build acceptance</span><span class="w"></span>
+</code></pre></div>
+
+<p>These tags will ensure that logic contained in the test files doesn't get compiled into the provider's binary, and they ensure that the tests
+are run properly when the acceptance test CI jobs are invoked.</p>
+
+<p>Creating a test for a resource involves using the terraform testing framework, and creating a <code>resource.TestCase</code>. This test will run terraform
+commands in the order specified by the test steps, and will execute check methods after each step. At the end of each test case, <code>terraform destroy</code>
+will be run, then a function specified in <code>CheckDestroy</code>. Here is an example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kd">func</span><span class="w"> </span><span class="nx">TestAcc_GitlabApplication_basic</span><span class="p">(</span><span class="nx">t</span><span class="w"> </span><span class="o">*</span><span class="nx">testing</span><span class="p">.</span><span class="nx">T</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nx">name</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">acctest</span><span class="p">.</span><span class="nx">RandString</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="nx">url</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="s">"https://my_website.com"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nx">resource</span><span class="p">.</span><span class="nx">ParallelTest</span><span class="p">(</span><span class="nx">t</span><span class="p">,</span><span class="w"> </span><span class="nx">resource</span><span class="p">.</span><span class="nx">TestCase</span><span class="p">{</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">ProtoV6ProviderFactories</span><span class="p">:</span><span class="w"> </span><span class="nx">testAccProtoV6MuxProviderFactories</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nx">CheckDestroy</span><span class="p">:</span><span class="w">             </span><span class="nx">testAcc_GitlabApplication_CheckDestroy</span><span class="p">(),</span><span class="w"></span>
+
+<span class="w">        </span><span class="nx">Steps</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span><span class="nx">resource</span><span class="p">.</span><span class="nx">TestStep</span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="c1">// Create a basic application.</span><span class="w"></span>
+<span class="w">            </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="nx">Config</span><span class="p">:</span><span class="w"> </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Sprintf</span><span class="p">(</span><span class="s">`</span>
+<span class="s">                resource "gitlab_application" "this" {</span>
+<span class="s">                    name     = %q</span>
+<span class="s">                    redirect_url = %q</span>
+<span class="s">                    scopes = ["openid"]</span>
+<span class="s">                    confidential = true</span>
+<span class="s">                }`</span><span class="p">,</span><span class="w"> </span><span class="nx">name</span><span class="p">,</span><span class="w"> </span><span class="nx">url</span><span class="p">),</span><span class="w"></span>
+<span class="w">                </span><span class="nx">Check</span><span class="p">:</span><span class="w"> </span><span class="nx">resource</span><span class="p">.</span><span class="nx">ComposeTestCheckFunc</span><span class="p">(</span><span class="w"></span>
+<span class="w">                    </span><span class="nx">resource</span><span class="p">.</span><span class="nx">TestCheckResourceAttr</span><span class="p">(</span><span class="s">"gitlab_application.this"</span><span class="p">,</span><span class="w"> </span><span class="s">"redirect_url"</span><span class="p">,</span><span class="w"> </span><span class="nx">url</span><span class="p">),</span><span class="w"></span>
+<span class="w">                    </span><span class="nx">resource</span><span class="p">.</span><span class="nx">TestCheckResourceAttr</span><span class="p">(</span><span class="s">"gitlab_application.this"</span><span class="p">,</span><span class="w"> </span><span class="s">"scopes.0"</span><span class="p">,</span><span class="w"> </span><span class="s">"openid"</span><span class="p">),</span><span class="w"></span>
+<span class="w">                </span><span class="p">),</span><span class="w"></span>
+<span class="w">            </span><span class="p">},</span><span class="w"></span>
+<span class="w">            </span><span class="c1">// Verify upstream attributes with an import.</span><span class="w"></span>
+<span class="w">            </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="nx">ResourceName</span><span class="p">:</span><span class="w">            </span><span class="s">"gitlab_application.this"</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="nx">ImportState</span><span class="p">:</span><span class="w">             </span><span class="kc">true</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="nx">ImportStateVerify</span><span class="p">:</span><span class="w">       </span><span class="kc">true</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="nx">ImportStateVerifyIgnore</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span><span class="kt">string</span><span class="p">{</span><span class="s">"secret"</span><span class="p">,</span><span class="w"> </span><span class="s">"scopes"</span><span class="p">},</span><span class="w"></span>
+<span class="w">            </span><span class="p">},</span><span class="w"></span>
+<span class="w">        </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kd">func</span><span class="w"> </span><span class="nx">testAcc_GitlabApplication_CheckDestroy</span><span class="p">()</span><span class="w"> </span><span class="nx">resource</span><span class="p">.</span><span class="nx">TestCheckFunc</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">s</span><span class="w"> </span><span class="o">*</span><span class="nx">terraform</span><span class="p">.</span><span class="nx">State</span><span class="p">)</span><span class="w"> </span><span class="kt">error</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="nx">_</span><span class="p">,</span><span class="w"> </span><span class="nx">rs</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="nx">s</span><span class="p">.</span><span class="nx">RootModule</span><span class="p">().</span><span class="nx">Resources</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="nx">rs</span><span class="p">.</span><span class="nx">Type</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">"gitlab_application"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="nx">application</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">findGitlabApplication</span><span class="p">(</span><span class="nx">testutil</span><span class="p">.</span><span class="nx">TestGitlabClient</span><span class="p">,</span><span class="w"> </span><span class="nx">rs</span><span class="p">.</span><span class="nx">Primary</span><span class="p">.</span><span class="nx">ID</span><span class="p">)</span><span class="w"></span>
+<span class="w">                </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                    </span><span class="k">return</span><span class="w"> </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Errorf</span><span class="p">(</span><span class="s">"Found GitLab application that should have been deleted: %s"</span><span class="p">,</span><span class="w"> </span><span class="nx">gitlab</span><span class="p">.</span><span class="nx">Stringify</span><span class="p">(</span><span class="nx">application</span><span class="p">))</span><span class="w"></span>
+<span class="w">                </span><span class="p">}</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="kc">nil</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Key items to notice about the above example include:</p>
+
+<ol>
+<li>the <code>Steps</code> attribute of the <code>TestCase</code> include a slice of <code>TestStep</code>. The first step (and any non-import steps) includes a <code>Config</code>
+attribute that specifies what the terraform configuration is. This will run a <code>terraform apply</code> to create that resource.</li>
+<li>The <code>Check</code> attribute includes a set of <code>CheckFunc</code>, and the <code>resource</code> package provides a set of implementations that can be used
+for checking things like values, or to check that an attribute is set without checking its value.</li>
+<li>In the second <code>TestStep</code>, the <code>ImportState</code> attribute is set to true. This will run <code>terraform import</code> and import the resource
+specified in the <code>ResourceName</code> attribute. If any attributes don't match the value returned from the import commany, this <code>TestStep</code> 
+will return an error. Since the <code>secret</code> and <code>scopes</code> values are not returned from the API, those cannot be imported, so those two
+attributes are ignored by including them in the <code>ImportStateVerifyIgnore</code> attribute.</li>
+<li>The <code>CheckDestroy</code> attribute accepts a function. This function loops over the state values until it identified the <code>gitlab_application</code>
+resource. It retrieves the <code>id</code> of the resource (which is the primary key of the application) then attempts to retrieve that application
+using the GitLab API. If the application is still present, it means the application didn't delete properly, and the function returns an
+<code>error</code> object.</li>
+</ol>
+
+<p>If any TestStep check functions fail, any imports fail, or any destroy functions fail, the Test will fail and produce an error.</p>
+
+<p>All new resources are expected to test a minimum of 4 operations:</p>
+
+<ol>
+<li>Create a new resource</li>
+<li>Update an existing resource (usually the one created in step 1)</li>
+<li>Import the resource</li>
+<li>Destroy the resource</li>
+</ol>
+
+<p>These steps are usually covered in a <code>_basic</code> test. In a complicated resource, many tests may be required to fully cover a new resource.
+It's always better to err on the side of creating too many tests than it is to create not enough.</p>
+
+<h1 id="conclusion">Conclusion</h1>
+
+<p>During this tutorial, a new <code>gitlab_application</code> resource has been created, including the schema, CRUD operations, Import operations, and more.
+Hopefully this tutorial has been helpful, but every tutorial has room for improvement. If there are improvements to any examples, or if any steps
+are confusing, please feel free to open an MR are continue to iterate on the documentation.</p>
+
+<p>Thank you for taking the time to read through this tutorial, and the whole community looks forward to working with you on making the gitlab terraform 
+provider excellent!</p>
+
+            
+        
+    </body></html>

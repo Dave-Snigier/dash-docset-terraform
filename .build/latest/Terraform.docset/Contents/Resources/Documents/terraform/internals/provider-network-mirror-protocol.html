@@ -1,0 +1,306 @@
+<html><!-- Online page at https://www.terraform.io/internals/provider-network-mirror-protocol --><head>
+                <title>Provider Network Mirror Protocol Reference</title>
+                <meta charset="utf-8"/>
+                <link href="../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="provider-network-mirror-protocol-reference">Provider Network Mirror Protocol Reference</h1>
+
+<p>This topic provides reference information about the provider network mirror protocol. You can implement an alternative installation source for Terraform providers and make the source available over the provider network mirror protocol, regardless of their origin registries.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Provider network mirrors are supported only in Terraform CLI v0.13.2 and later. Prior versions do not support this protocol.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Introduction"></a><h2 id="introduction">Introduction</h2>
+
+<p>Terraform uses network mirrors only if you activate them explicitly in
+<a href="../terraform/cli/config/config-file.html#provider-installation">the CLI configuration's <code>provider_installation</code> block</a>.
+When enabled, a network mirror can serve providers belonging to any registry
+hostname, which can allow an organization to serve all of the Terraform
+providers they intend to use from an internal server, rather than from each
+provider's origin registry.</p>
+
+<p>This is <em>not</em> the protocol that should be implemented by a host intending to
+serve as an origin registry for Terraform Providers. To provide an origin
+registry (whose hostname would then be included in the source addresses of the
+providers it hosts), implement
+<a href="../terraform/internals/provider-registry-protocol.html">the provider registry protocol</a>
+instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Addresses"></a><h2 id="provider-addresses">Provider Addresses</h2>
+
+<p>Each Terraform provider has an associated address which uniquely identifies it
+within Terraform. A provider address has the syntax <code>hostname/namespace/type</code>,
+which is described in more detail in
+<a href="../terraform/language/providers/requirements.html">the Provider Requirements documentation</a>.</p>
+
+<p>By default, the <code>hostname</code> portion of a provider address serves both as part
+of its unique identifier <em>and</em> as the location of the registry to retrieve it
+from. However, when you configure Terraform to install providers from a network
+mirror, the <code>hostname</code> serves <em>only</em> as an identifier and no longer as
+an installation source. A provider mirror can therefore serve providers
+belonging to a variety of different provider registry hostnames, including
+providers from the public Terraform Registry at <code>registry.terraform.io</code>, from a
+single server.</p>
+
+<p>In the relative URL patterns later in this document, the placeholder <code>:hostname</code>
+refers to the hostname from the address of the provider being requested, not
+the hostname where the provider network mirror is deployed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Protocol%20Base%20URL"></a><h2 id="protocol-base-url">Protocol Base URL</h2>
+
+<p>Most Terraform-native services use
+<a href="../terraform/internals/remote-service-discovery.html">the remote service discovery protocol</a> so
+that the physical location of the endpoints can potentially be separated from
+the hostname used in identifiers. The Provider Network Mirror protocol does
+<em>not</em> use the service discovery indirection, because a network mirror location
+is only a physical location and is never used as part of the identifier of a
+dependency in a Terraform configuration.</p>
+
+<p>Instead, the provider installation section of the CLI configuration accepts
+a base URL directly. The given URL must use the scheme <code>https:</code>, and should
+end with a trailing slash so that the relative URLs of the individual operation
+endpoints will be resolved beneath it.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">provider_installation</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">network_mirror</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://terraform.example.com/providers/"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Terraform uses the base URL only as a stem to resolve the operation endpoint
+URLs against, and so it will never access the base URL directly. You can
+therefore, if desired, publish human-readable usage documentation for your
+network mirror at that URL.</p>
+
+<p>The following sections describe the various operations that a provider
+network mirror server must implement to be compatible with Terraform CLI's
+provider installer. The indicated URLs are all relative to the given base URL,
+as described above.</p>
+
+<p>The URLs are shown with the convention that a path portion with a colon <code>:</code>
+prefix is a placeholder for a dynamically-selected value, while all other
+path portions are literal. For example, in <code>:hostname/:namespace/:type/index.json</code>,
+the first three path portions are placeholders while the third is literally
+the string "index.json".</p>
+
+<p>The example requests in the following sections will assume the example mirror
+base URL from the above CLI configuration example.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Authentication"></a><h3 id="authentication">Authentication</h3>
+
+<p>If the CLI configuration includes
+<a href="../terraform/cli/config/config-file.html#credentials">credentials</a> for the hostname
+given in the network mirror base URL, Terraform will include those credentials
+in its requests for operations described below.</p>
+
+<p>If the given URL uses a non-standard port number (other than 443) then the
+credentials must be associated with a hostname that includes the port number,
+such as <code>terraform.example.com:8443</code>.</p>
+
+<p>Terraform does <em>not</em> send credentials when retrieving the archives whose
+URLs are given in the "List Available Installation Packages" response below.
+If a particular mirror considers the distribution packages themselves to be
+sensitive then it must use cryptographically-secure, user-specific, and
+time-limited URLs in the metadata response. Strategies for doing so are out
+of scope of this protocol documentation.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/List%20Available%20Versions"></a><h2 id="list-available-versions">List Available Versions</h2>
+
+<p>This operation determines which versions are currently available for a
+particular provider.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Method</th>
+  <th>Path</th>
+  <th>Produces</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>GET</code></td>
+  <td><code>:hostname/:namespace/:type/index.json</code></td>
+  <td><code>application/json</code></td>
+</tr>
+</tbody>
+</table>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Parameters"></a><h3 id="parameters">Parameters</h3>
+
+<ul>
+<li><code>hostname</code> (required): the hostname portion of the address of the requested
+provider.</li>
+<li><code>namespace</code> (required): the namespace portion of the address of the requested
+provider.</li>
+<li><code>type</code> (required): the type portion of the address of the requested provider.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Sample%20Request"></a><h3 id="sample-request">Sample Request</h3>
+
+<pre><code>curl 'https://terraform.example.com/providers/registry.terraform.io/hashicorp/random/index.json'
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Sample%20Response"></a><h3 id="sample-response">Sample Response</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"versions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"2.0.0"</span><span class="p">:</span><span class="w"> </span><span class="p">{},</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"2.0.1"</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Response%20Properties"></a><h3 id="response-properties">Response Properties</h3>
+
+<p>A successful result is a JSON object containing a single property <code>versions</code>,
+which must be a JSON object.</p>
+
+<p>Each of the property names of the <code>versions</code> object represents an available
+version number. The property values must be objects, but no properties are defined for those objects. We recommend leaving those objects empty for forward compatibility.</p>
+
+<p>Return <code>404 Not Found</code> to signal that the mirror does not have a provider
+with the given address.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/List%20Available%20Installation%20Packages"></a><h2 id="list-available-installation-packages">List Available Installation Packages</h2>
+
+<p>This operation returns download URLs and associated metadata for the
+distribution packages for a particular version of a provider.</p>
+
+<p>Each distribution package is associated with a particular operating system
+and architecture. A network mirror may host only a subset of the available
+packages for a provider version, if the users of the mirror are known to all
+use only a subset of the target platforms that Terraform supports.</p>
+
+<p>Terraform CLI uses this operation after it has selected the newest available
+version matching the configured version constraints, in order to find a zip
+archive containing the plugin itself.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Method</th>
+  <th>Path</th>
+  <th>Produces</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>GET</code></td>
+  <td><code>:hostname/:namespace/:type/:version.json</code></td>
+  <td><code>application/json</code></td>
+</tr>
+</tbody>
+</table>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Parameters"></a><h3 id="parameters-2">Parameters</h3>
+
+<ul>
+<li><code>hostname</code> (required): the hostname portion of the address of the requested
+provider.</li>
+<li><code>namespace</code> (required): the namespace portion of the address of the requested
+provider.</li>
+<li><code>type</code> (required): the type portion of the address of the requested provider.</li>
+<li><code>version</code> (required): the version selected to download. This will exactly
+match one of the version strings returned from a previous call to
+<a href="#list-available-versions">List Available Versions</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Sample%20Request"></a><h3 id="sample-request-2">Sample Request</h3>
+
+<pre><code>curl 'https://terraform.example.com/providers/registry.terraform.io/hashicorp/random/2.0.0.json'
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Sample%20Response"></a><h3 id="sample-response-2">Sample Response</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nt">"archives"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"darwin_amd64"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"terraform-provider-random_2.0.0_darwin_amd64.zip"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"hashes"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"h1:4A07+ZFc2wgJwo8YNlQpr1rVlgUDlxXHhPJciaPY5gs="</span><span class="w"></span>
+<span class="w">      </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="nt">"linux_amd64"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"terraform-provider-random_2.0.0_linux_amd64.zip"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="nt">"hashes"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"h1:lCJCxf/LIowc2IGS9TPjWDyXY4nOmdGdfcwwDQCOURQ="</span><span class="w"></span>
+<span class="w">      </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Response%20Properties"></a><h3 id="response-properties-2">Response Properties</h3>
+
+<p>A successful result is a JSON object with a property called <code>archives</code>, which
+must be a JSON object.</p>
+
+<p>Each of the property names of the <code>archives</code> object is a target platform
+identifier, which consists of an operating system and architecture concatenated
+with an underscore (<code>_</code>).</p>
+
+<p>Each property value in the <code>archives</code> object is itself a nested object with
+the following properties:</p>
+
+<ul>
+<li><p><code>url</code> (required): a string specifying the URL from which Terraform should
+download the <code>.zip</code> archive containing the requested provider plugin version.</p>
+
+<p>Terraform resolves the URL relative to the URL from which the current
+JSON document was returned, so the examples above containing only a
+filename would cause Terraform to construct a URL like:</p></li>
+</ul>
+
+<pre><code>  https://terraform.example.com/providers/registry.terraform.io/hashicorp/random/terraform-provider-random_2.0.0_darwin_amd64.zip
+</code></pre>
+
+<ul>
+<li><p><code>hashes</code> (optional): a JSON array of strings containing one or more hash
+values for the indicated archive. These hashes use Terraform's provider
+package hashing algorithm. At present, the easiest way to populate these
+is to construct a mirror's JSON indices using the <code>terraform providers mirror</code>
+command, as described in a later section, which will include the calculated
+hashes of each provider.</p>
+
+<p>If the response includes at least one hash, Terraform will select the hash
+whose algorithm it considers to be strongest and verify that the downloaded
+package matches that hash. If the response does not include a <code>hashes</code>
+property then Terraform will install the indicated archive with no
+verification.</p></li>
+</ul>
+
+<p>Terraform CLI will only attempt to download versions that it has previously
+seen in response to <a href="#list-available-versions">List Available Versions</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Mirror%20as%20a%20Static%20Website"></a><h2 id="provider-mirror-as-a-static-website">Provider Mirror as a Static Website</h2>
+
+<p>The provider mirror protocol is designed so that it can potentially be implemented
+by placing files on typical static website hosting services. When using this
+strategy, implement the JSON index responses described above as <code>.json</code> files
+in the appropriate nested subdirectories, and ensure that your system is
+configured to serve <code>.json</code> files with the <code>application/json</code> media type.</p>
+
+<p>As a convenience, Terraform CLI includes
+<a href="../terraform/cli/commands/providers/mirror.html">the <code>terraform providers mirror</code> subcommand</a>,
+which will analyze the current configuration for the providers it requires,
+download the packages for those providers from their origin registries, and
+place them into a local directory suitable for use as a mirror.</p>
+
+<p>The <code>terraform providers mirror</code> subcommand also generates <code>index.json</code> and
+version-specific <code>.json</code> files that can, when placed in a static website hosting
+system, produce responses compatible with the provider mirror protocol.</p>
+
+<p>If you wish to create a mirror with providers for a number of different
+Terraform configurations, run <code>terraform providers mirror</code> in each configuration
+in turn while providing the same output directory each time. Terraform will
+then merge together all of the requirements into a single set of JSON indices.</p>
+
+            
+        
+    </body></html>

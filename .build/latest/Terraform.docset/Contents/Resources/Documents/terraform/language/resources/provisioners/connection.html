@@ -1,0 +1,379 @@
+<html><!-- Online page at https://www.terraform.io/language/resources/provisioners/connection --><head>
+                <title>Provisioner Connection Settings</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="provisioner-connection-settings">Provisioner Connection Settings</h1>
+
+<p>Most provisioners require access to the remote resource via SSH or WinRM and
+expect a nested <code>connection</code> block with details about how to connect.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Important</em>
+    <p>Use provisioners as a last resort. There are better alternatives for most situations. Refer to <a href="../../../terraform/language/resources/provisioners/syntax.html">Declaring Provisioners</a> for more details.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Connection%20Block"></a><h2 id="connection-block">Connection Block</h2>
+
+<p>You can create one or more <code>connection</code> blocks that describe how to access the remote resource. One use case for providing multiple connections is to have an initial provisioner connect as the <code>root</code> user to set up user accounts and then have subsequent provisioners connect as a user with more limited permissions.</p>
+
+<p>Connection blocks don't take a block label and can be nested within either a
+<code>resource</code> or a <code>provisioner</code>.</p>
+
+<ul>
+<li>A <code>connection</code> block nested directly within a <code>resource</code> affects all of
+that resource's provisioners.</li>
+<li>A <code>connection</code> block nested in a <code>provisioner</code> block only affects that
+provisioner and overrides any resource-level connection settings.</li>
+</ul>
+
+<p>Since the SSH connection type is most often used with
+newly-created remote resources, validation of SSH host keys is disabled by
+default. If this is not acceptable, you can establish a separate mechanism for key distribution and explicitly set the <code>host_key</code> argument (details below) to verify against a specific key or signing CA.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>In Terraform 0.11 and earlier, providers could set default values for some connection settings, so that <code>connection</code> blocks could sometimes be omitted. This feature was removed in 0.12 in order to make Terraform's behavior more predictable.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Ephemeral%20values"></a><h3 id="ephemeral-values">Ephemeral values</h3>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>: Ephemeral values are available in Terraform v1.10 and later.</p>
+</aside>
+
+<p>The configuration for a <code>connection</code> block may use ephemeral values, such as
+<a href="../../../terraform/language/resources/ephemeral.html"><code>ephemeral</code> resources</a>, <a href="../../../terraform/language/values/locals.html#ephemeral-values"><code>ephemeral</code>
+local values</a>, <a href="../../../terraform/language/values/variables.html#ephemeral"><code>ephemeral</code>
+variables</a>, or <a href="../../../terraform/language/values/outputs.html#ephemeral-avoid-storing-values-in-state-or-plan-files"><code>ephemeral</code>
+output
+values</a>.</p>
+
+<p>Terraform will not store these values in your plan or state, or output them in
+logs.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20usage"></a><h3 id="example-usage">Example usage</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Copies the file as the root user using SSH</span>
+<span class="kr">provisioner</span><span class="w"> </span><span class="nv">"file"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"conf/myapp.conf"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/etc/myapp.conf"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">connection</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"ssh"</span><span class="w"></span>
+<span class="w">    </span><span class="na">user</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"root"</span><span class="w"></span>
+<span class="w">    </span><span class="na">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.root_password</span><span class="w"></span>
+<span class="w">    </span><span class="na">host</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.host</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Copies the file as the Administrator user using WinRM</span>
+<span class="kr">provisioner</span><span class="w"> </span><span class="nv">"file"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"conf/myapp.conf"</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"C:/App/myapp.conf"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">connection</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"winrm"</span><span class="w"></span>
+<span class="w">    </span><span class="na">user</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"Administrator"</span><span class="w"></span>
+<span class="w">    </span><span class="na">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.admin_password</span><span class="w"></span>
+<span class="w">    </span><span class="na">host</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.host</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/The%20self%20Object"></a><h3 id="the-self-object">The <code>self</code> Object</h3>
+
+<p>Expressions in <code>connection</code> blocks cannot refer to their parent resource by name. References create dependencies, and referring to a resource by name within its own block would create a dependency cycle. Instead, expressions can use the <code>self</code> object, which represents the connection's parent resource and has all of that resource's attributes. For example, use <code>self.public_ip</code> to reference an <code>aws_instance</code>'s <code>public_ip</code> attribute.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h3 id="argument-reference">Argument Reference</h3>
+
+<p>The <code>connection</code> block supports the following arguments. Some arguments are only supported by either the SSH or the WinRM connection type.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Argument</th>
+  <th>Connection Type</th>
+  <th>Description</th>
+  <th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>type</code></td>
+  <td>Both</td>
+  <td>The connection type. Valid values are <code>"ssh"</code> and <code>"winrm"</code>. Provisioners typically assume that the remote system runs Microsoft Windows when using WinRM. Behaviors based on the SSH <code>target_platform</code> will force Windows-specific behavior for WinRM, unless otherwise specified.</td>
+  <td><code>"ssh"</code></td>
+</tr>
+<tr>
+  <td><code>user</code></td>
+  <td>Both</td>
+  <td>The user to use for the connection.</td>
+  <td><code>root</code> for type <code>"ssh"</code><br/><code>Administrator</code> for type <code>"winrm"</code></td>
+</tr>
+<tr>
+  <td><code>password</code></td>
+  <td>Both</td>
+  <td>The password to use for the connection.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>host</code></td>
+  <td>Both</td>
+  <td><strong>Required</strong> - The address of the resource to connect to.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>port</code></td>
+  <td>Both</td>
+  <td>The port to connect to.</td>
+  <td><code>22</code> for type <code>"ssh"</code><br/><code>5985</code> for type <code>"winrm"</code></td>
+</tr>
+<tr>
+  <td><code>timeout</code></td>
+  <td>Both</td>
+  <td>The timeout to wait for the connection to become available. Should be provided as a string (e.g., <code>"30s"</code> or <code>"5m"</code>.)</td>
+  <td><code>"5m"</code></td>
+</tr>
+<tr>
+  <td><code>script_path</code></td>
+  <td>Both</td>
+  <td>The path used to copy scripts meant for remote execution. Refer to <a href="#how-provisioners-execute-remote-scripts">How Provisioners Execute Remote Scripts</a> below for more details.</td>
+  <td>(details below)</td>
+</tr>
+<tr>
+  <td><code>private_key</code></td>
+  <td>SSH</td>
+  <td>The contents of an SSH key to use for the connection. These can be loaded from a file on disk using <a href="../../../terraform/language/functions/file.html">the <code>file</code> function</a>. This takes preference over <code>password</code> if provided.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>certificate</code></td>
+  <td>SSH</td>
+  <td>The contents of a signed CA Certificate. The certificate argument must be used in conjunction with a <code>private_key</code>. These can be loaded from a file on disk using the <a href="../../../terraform/language/functions/file.html">the <code>file</code> function</a>.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>agent</code></td>
+  <td>SSH</td>
+  <td>Set to <code>false</code> to disable using <code>ssh-agent</code> to authenticate. On Windows the only supported SSH authentication agent is <a href="http://the.earth.li/\~sgtatham/putty/0.66/htmldoc/Chapter9.html#pageant">Pageant</a>.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>agent_identity</code></td>
+  <td>SSH</td>
+  <td>The preferred identity from the ssh agent for authentication.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>host_key</code></td>
+  <td>SSH</td>
+  <td>The public key from the remote host or the signing CA, used to verify the connection.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>target_platform</code></td>
+  <td>SSH</td>
+  <td>The target platform to connect to. Valid values are <code>"windows"</code> and <code>"unix"</code>. If the platform is set to <code>windows</code>, the default <code>script_path</code> is <code>c:\windows\temp\terraform_%RAND%.cmd</code>, assuming <a href="https://docs.microsoft.com/en-us/windows-server/administration/openssh/openssh_server_configuration#configuring-the-default-shell-for-openssh-in-windows">the SSH default shell</a> is <code>cmd.exe</code>. If the SSH default shell is PowerShell, set <code>script_path</code> to <code>"c:/windows/temp/terraform_%RAND%.ps1"</code></td>
+  <td><code>"unix"</code></td>
+</tr>
+<tr>
+  <td><code>https</code></td>
+  <td>WinRM</td>
+  <td>Set to <code>true</code> to connect using HTTPS instead of HTTP.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>insecure</code></td>
+  <td>WinRM</td>
+  <td>Set to <code>true</code> to skip validating the HTTPS certificate chain.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>use_ntlm</code></td>
+  <td>WinRM</td>
+  <td>Set to <code>true</code> to use NTLM authentication rather than default (basic authentication), removing the requirement for basic authentication to be enabled within the target guest. Refer to <a href="https://docs.microsoft.com/en-us/windows/win32/winrm/authentication-for-remote-connections">Authentication for Remote Connections</a> in the Windows App Development documentation for more details.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>cacert</code></td>
+  <td>WinRM</td>
+  <td>The CA certificate to validate against.</td>
+  <td></td>
+</tr>
+</tbody>
+</table>
+
+<p><a id="bastion"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Connecting%20through%20a%20Bastion%20Host%20with%20SSH"></a><h2 id="connecting-through-a-bastion-host-with-ssh">Connecting through a Bastion Host with SSH</h2>
+
+<p>The <code>ssh</code> connection also supports the following arguments to connect
+indirectly with a <a href="https://en.wikipedia.org/wiki/Bastion_host">bastion host</a>.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Argument</th>
+  <th>Description</th>
+  <th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>bastion_host</code></td>
+  <td>Setting this enables the bastion Host connection. The provisioner will connect to <code>bastion_host</code> first, and then connect from there to <code>host</code>.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>bastion_host_key</code></td>
+  <td>The public key from the remote host or the signing CA, used to verify the host connection.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>bastion_port</code></td>
+  <td>The port to use connect to the bastion host.</td>
+  <td>The value of the <code>port</code> field.</td>
+</tr>
+<tr>
+  <td><code>bastion_user</code>| The user for the connection to the bastion host.</td>
+  <td>The value of the <code>user</code> field.</td>
+</tr>
+<tr>
+  <td><code>bastion_password</code></td>
+  <td>The password to use for the bastion host.</td>
+  <td>The value of the <code>password</code> field.</td>
+</tr>
+<tr>
+  <td><code>bastion_private_key</code></td>
+  <td>The contents of an SSH key file to use for the bastion host. These can be loaded from a file on disk using <a href="../../../terraform/language/functions/file.html">the <code>file</code> function</a>.</td>
+  <td>The value of the <code>private_key</code> field.</td>
+</tr>
+<tr>
+  <td><code>bastion_certificate</code></td>
+  <td>The contents of a signed CA Certificate. The certificate argument must be used in conjunction with a <code>bastion_private_key</code>. These can be loaded from a file on disk using the <a href="../../../terraform/language/functions/file.html">the <code>file</code> function</a>.</td>
+</tr>
+</tbody>
+</table>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Connection%20through%20HTTP%20and%20SOCKS5%20proxies%20with%20SSH"></a><h2 id="connection-through-http-and-socks5-proxies-with-ssh">Connection through HTTP and SOCKS5 proxies with SSH</h2>
+
+<p>The <code>ssh</code> connection also supports the following fields to facilitate connections by SSH over HTTP or SOCKS5 proxy.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Argument</th>
+  <th>Description</th>
+  <th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>proxy_scheme</code></td>
+  <td>You can specify one of the following values: <code>http</code>, <code>https</code>, <code>socks5</code></td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>proxy_host</code></td>
+  <td>Setting this enables the SSH over HTTP connection. This host will be connected to first, and then the <code>host</code> or <code>bastion_host</code> connection will be made from there.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>proxy_port</code></td>
+  <td>The port to use connect to the proxy host.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>proxy_user_name</code></td>
+  <td>The username to use connect to the private proxy host. This argument should be specified only if authentication is required for the HTTP Proxy server.</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>proxy_user_password</code></td>
+  <td>The password to use connect to the private proxy host. This argument should be specified only if authentication is required for the HTTP Proxy server.</td>
+  <td></td>
+</tr>
+</tbody>
+</table>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/How%20Provisioners%20Execute%20Remote%20Scripts"></a><h2 id="how-provisioners-execute-remote-scripts">How Provisioners Execute Remote Scripts</h2>
+
+<p>Provisioners which execute commands on a remote system via a protocol such as
+SSH typically achieve that by uploading a script file to the remote system
+and then asking the default shell to execute it. Provisioners use this strategy
+because it then allows you to use all of the typical scripting techniques
+supported by that shell, including preserving environment variable values
+and other context between script statements.</p>
+
+<p>However, this approach does have some consequences which can be relevant in
+some unusual situations, even though this is just an implementation detail
+in typical use.</p>
+
+<p>Most importantly, there must be a suitable location in the remote filesystem
+where the provisioner can create the script file. By default, Terraform
+chooses a path containing a random number using the following patterns
+depending on how <code>target_platform</code> is set:</p>
+
+<ul>
+<li><code>"unix"</code>: <code>/tmp/terraform_%RAND%.sh</code></li>
+<li><code>"windows"</code>: <code>C:/windows/temp/terraform_%RAND%.cmd</code></li>
+</ul>
+
+<p>In both cases above, the provisioner replaces the sequence <code>%RAND%</code> with
+some randomly-chosen decimal digits.</p>
+
+<p>Provisioners cannot react directly to remote environment variables such as
+<code>TMPDIR</code> or use functions like <code>mktemp</code> because they run on the system where
+Terraform is running, not on the remote system. Therefore if your remote
+system doesn't use the filesystem layout expected by these default paths
+then you can override it using the <code>script_path</code> option in your <code>connection</code>
+block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">connection</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+<span class="w">  </span><span class="na">script_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"H:/terraform-temp/script_%RAND%.sh"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>As with the default patterns, provisioners will replace the sequence <code>%RAND%</code>
+with randomly-selected decimal digits, to reduce the likelihood of collisions
+between multiple provisioners running concurrently.</p>
+
+<p>If your target system is running Windows, we recommend using forward slashes
+instead of backslashes, despite the typical convention on Windows, because
+the Terraform language uses backslash as the quoted string escape character.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Executing%20Scripts%20using%20SSH/SCP"></a><h3 id="executing-scripts-using-sshscp">Executing Scripts using SSH/SCP</h3>
+
+<p>When using the SSH protocol, provisioners upload their script files using
+the Secure Copy Protocol (SCP), which requires that the remote system have
+the <code>scp</code> service program installed to act as the server for that protocol.</p>
+
+<p>Provisioners will pass the chosen script path (after <code>%RAND%</code>
+expansion) directly to the remote <code>scp</code> process, which is responsible for
+interpreting it. With the default configuration of <code>scp</code> as distributed with
+OpenSSH, you can place temporary scripts in the home directory of the remote
+user by specifying a relative path:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">connection</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ssh"</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+<span class="w">  </span><span class="na">script_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform_provisioner_%RAND%.sh"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>Warning</em>
+    <p>In Terraform v1.0 and earlier, the built-in provisioners incorrectly passed the <code>script_path</code> value to <code>scp</code> through a remote shell and thus allowed it to be subject to arbitrary shell expansion, and thus created an unintended opportunity for remote code execution. Terraform v1.1 and later will now correctly quote and escape the script path to ensure that the remote <code>scp</code> process can always interpret it literally. For modules that will be used with Terraform v1.0 and earlier, avoid using untrusted external values as part of the <code>script_path</code> argument.</p>
+</aside>
+
+            
+        
+    </body></html>

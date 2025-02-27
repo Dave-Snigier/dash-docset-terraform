@@ -1,0 +1,142 @@
+<html><!-- Online page at https://www.terraform.io/cli/commands/console --><head>
+                <title>terraform console command</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-console-command"><code>terraform console</code> command</h1>
+
+<p>The <code>terraform console</code> command opens an interactive console for
+evaluating <a href="../../terraform/language/expressions.html">expressions</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Usage"></a><h2 id="usage">Usage</h2>
+
+<p>Usage: <code>terraform console [options]</code></p>
+
+<p>This command provides an interactive command-line console for evaluating and
+experimenting with <a href="../../terraform/language/expressions.html">expressions</a>.
+You can use it to test interpolations before using them in configurations
+and to interact with any values currently saved in
+<a href="../../terraform/language/state.html">state</a>. If the current state is empty or has not yet been created, you can use the console to experiment with the expression syntax and
+<a href="../../terraform/language/functions.html">built-in functions</a>. The console holds a <a href="../../terraform/language/state/locking.html">lock on the state</a>, and you will not be able to use the console while performing other actions that modify state.</p>
+
+<p>To close the console, enter the <code>exit</code> command or press Control-C
+or Control-D.</p>
+
+<p>For configurations using
+<a href="../../terraform/language/backend/local.html">the <code>local</code> backend</a> only,
+<code>terraform console</code> accepts the legacy command line option
+<a href="../../terraform/language/backend/local.html#command-line-arguments"><code>-state</code></a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Scripting"></a><h2 id="scripting">Scripting</h2>
+
+<p>The <code>terraform console</code> command can be used in non-interactive scripts
+by piping newline-separated commands to it. Only the output from the
+final command is printed unless an error occurs earlier.</p>
+
+<p>For example:</p>
+
+<div class="codehilite"><pre><span></span><code>$ <span class="nb">echo</span> <span class="s1">'split(",", "foo,bar,baz")'</span> <span class="p">|</span> terraform console
+tolist<span class="o">([</span>
+  <span class="s2">"foo"</span>,
+  <span class="s2">"bar"</span>,
+  <span class="s2">"baz"</span>,
+<span class="o">])</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Remote%20State"></a><h2 id="remote-state">Remote State</h2>
+
+<p>If <a href="../../terraform/language/state/remote.html">remote state</a> is used by the current backend,
+Terraform will read the state for the current workspace from the backend
+before evaluating any expressions.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Evaluation%20against%20a%20Plan"></a><h2 id="evaluation-against-a-plan">Evaluation against a Plan</h2>
+
+<p>By default, <code>terraform console</code> evaluates expressions against the current
+Terraform state, and so the results are typically very limited for resource
+instances that haven't yet been created by applying a plan.</p>
+
+<p>You can use the <code>-plan</code> option to instead generate an execution plan first,
+as if running <code>terraform plan</code>, and then evaluate against the <em>planned</em> state
+to describe the values Terraform expects will be correct after the plan is
+applied. This typically causes a longer delay before the console prompt
+appears, but in return there will be a more complete set of values available in
+the expression scope.</p>
+
+<p>For well-behaved configurations the planning phase should not make any
+modifications to real remote objects, but it <em>is</em> possible to write a
+configuration that can take significant actions while planning. For example, a
+configuration which uses the <code>hashicorp/external</code> provider's
+<a href="https://registry.terraform.io/providers/hashicorp/external/latest/docs/data-sources/external"><code>external</code> data source</a>
+is likely to run the configured external command during the plan phase, which
+means it would be run by <code>terraform console -plan</code> too.</p>
+
+<p>We don't recommend that you write configurations that make changes during the
+plan phase. If you do write such a configuration despite that recommendation,
+take care when using the console in plan mode against that configuration.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Examples"></a><h2 id="examples">Examples</h2>
+
+<p>The <code>terraform console</code> command will read the Terraform configuration in the
+current working directory and the Terraform state file from the configured
+backend so that interpolations can be tested against both the values in the
+configuration and the state file.</p>
+
+<p>With the following <code>main.tf</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"apps"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span><span class="err">any</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="nb">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"foo"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"region"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"bar"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"region"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eu-west-1"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"baz"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"region"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ap-south-1"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"random_pet"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.apps</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Executing <code>terraform console</code> will drop you into an interactive shell where you
+can test interpolations to:</p>
+
+<p>Print a value from a map:</p>
+
+<pre><code>&gt; var.apps.foo
+{
+  "region" = "us-east-1"
+}
+</code></pre>
+
+<p>Filter a map based on a specific value:</p>
+
+<pre><code>&gt; { for key, value in var.apps : key =&gt; value if value.region == "us-east-1" }
+{
+  "foo" = {
+    "region" = "us-east-1"
+  }
+}
+</code></pre>
+
+<p>Check if certain values may not be known until apply:</p>
+
+<pre><code>&gt; random_pet.example
+(known after apply)
+</code></pre>
+
+<p>Test various functions:</p>
+
+<pre><code>&gt; cidrnetmask("172.16.0.0/12")
+"255.240.0.0"
+</code></pre>
+
+            
+        
+    </body></html>

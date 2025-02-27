@@ -1,0 +1,110 @@
+<html><!-- Online page at https://registry.terraform.io/providers/heroku/heroku/latest/docs/guides/upgrading --><head>
+                <title>Upgrading v4 to v5</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="upgrading-v4-to-v5">Upgrading v4 to v5</h1>
+
+<p>.. warning:: Major upgrades should be tested with non-critical infrastructure.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Summary%20of%20changes"></a><h2 id="summary-of-changes">Summary of changes</h2>
+
+<p>The <code>heroku_app</code> resource <code>id</code> is automatically migrated to contain the app ID (UUID). This means when you reference <code>heroku_app.example.id</code>, the UUID is returned, whereas previously this <code>id</code> attribute actually contained the app name (surprise!)</p>
+
+<p>All other resources' <code>heroku_app</code> reference attributes are now named <code>app_id</code>. They only accept UUID values, such as from <code>heroku_app.example.id</code>.</p>
+
+<p>All previous <code>app</code> attribute values are automatically migrated to <code>app_id</code>, performing app lookups to replace names with UUIDs.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Required%20configuration%20changes"></a><h2 id="required-configuration-changes">Required configuration changes</h2>
+
+<p>Before running <code>terraform apply</code> using the new provider version, some manual HCL configuration updates are required:</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/1.%20Replace%20resources%27%20app%20attributes%20with%20app_id"></a><h3 id="1-replace-resources-app-attributes-with-app_id">1. Replace resources' <code>app</code> attributes with <code>app_id</code></h3>
+
+<p>Their existing references to <code>heroku_app.example.name</code> must be simultaneously updated to <code>heroku_app.example.id</code>.</p>
+
+<p>Previous v4 config example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"heroku_addon"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">app</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">heroku_app.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">plan</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-plan"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Upgraded v5 config example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"heroku_addon"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">app_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">heroku_app.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">plan</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-plan"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/2.%20Replace%20heroku_app%20data%20source%20result%20references%20with%20id"></a><h3 id="2-replace-heroku_app-data-source-result-references-with-id">2. Replace <code>heroku_app</code> data source result references with <code>id</code></h3>
+
+<p>The app data source <code>id</code> attribute now contains the app UUID, not the app name. As long as <code>id</code> is used for <code>app_id</code> references, then no further configuration changes are required. Setting <code>app_id</code> references from <code>name</code> is no longer allowed, and must be updated to <code>id</code>, like <code>data.heroku_app.example.id</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Verify%20configuration%20changes"></a><h2 id="verify-configuration-changes">Verify configuration changes</h2>
+
+<p>Run <code>terraform apply</code> to verify the migration is complete.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Success%20look%20like%E2%80%A6"></a><h2 id="success-look-like">Success look like…</h2>
+
+<blockquote>
+  <p>No changes. Your infrastructure matches the configuration.</p>
+</blockquote>
+
+<p>Upon the first apply on this new provider version, the state will be automatically updated to contain only UUID-based <code>id</code> for app. You may see some changes detected, but they should not result in infrastructure changes.</p>
+
+<pre><code>heroku_app.example: Refreshing state... [id=c92d7139-ec41-4088-a71d-3a6dfef99f83]
+heroku_addon.example: Refreshing state... [id=41acf474-1b0e-4f53-960f-ca51095b84d7]
+
+Note: Objects have changed outside of Terraform
+
+Terraform detected the following changes made outside of Terraform since the last "terraform apply":
+
+  # heroku_addon.example has been changed
+  ~ resource "heroku_addon" "example" {
+      + app_id            = "c92d7139-ec41-4088-a71d-3a6dfef99f83"
+        id                = "41acf474-1b0e-4f53-960f-ca51095b84d7"
+        # (5 unchanged attributes hidden)
+    }
+
+…
+
+No changes. Your infrastructure matches the configuration.
+</code></pre>
+
+<p>Once this completes, the state will be migrated! ✅😄</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Failure%20looks%20like%E2%80%A6"></a><h2 id="failure-looks-like">Failure looks like…</h2>
+
+<p>Specific errors about <code>app</code> &amp; <code>app_id</code> should describe configuration problems, such as:</p>
+
+<pre><code>│ Error: Missing required argument
+│ 
+│   on main.tf line 19, in resource "heroku_addon" "example":
+│   19: resource "heroku_addon" "example" {
+│ 
+│ The argument "app_id" is required, but no definition was found.
+</code></pre>
+
+<pre><code>│ Error: Unsupported argument
+│ 
+│   on main.tf line 20, in resource "heroku_addon" "example":
+│   20:   app = heroku_app.example.id
+│ 
+│ An argument named "app" is not expected here.
+</code></pre>
+
+<p>If it reflects that other changes are detected, possible explanations are:</p>
+
+<ul>
+<li>missed updating a <code>heroku_app</code> reference from <code>name</code> to <code>id</code></li>
+<li>infrastructure did change somehow during your work (not related to this migration)</li>
+<li>possibly found a bug in the migration strategy, so please create an <a href="https://github.com/heroku/terraform-provider-heroku/issues">issue on GitHub</a>.</li>
+</ul>
+
+            
+        
+    </body></html>

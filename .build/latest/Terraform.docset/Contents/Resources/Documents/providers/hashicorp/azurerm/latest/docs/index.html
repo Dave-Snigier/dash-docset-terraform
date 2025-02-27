@@ -1,0 +1,268 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs --><head>
+                <title>Azure Provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="azure-provider">Azure Provider</h1>
+
+<p>The Azure Provider can be used to configure infrastructure in <a href="https://azure.microsoft.com/en-us/">Microsoft Azure</a> using the Azure Resource Manager API's. Documentation regarding the <a href="./docs/configuration/data-sources.html">Data Sources</a> and <a href="./docs/configuration/resources.html">Resources</a> supported by the Azure Provider can be found in the navigation to the left.</p>
+
+<p>To learn the basics of Terraform using this provider, follow the
+hands-on <a href="https://learn.hashicorp.com/tutorials/terraform/infrastructure-as-code?in=terraform/azure-get-started">get started tutorials</a>.</p>
+
+<p>Interested in the provider's latest features, or want to make sure you're up to date? Check out the <a href="https://github.com/hashicorp/terraform-provider-azurerm/blob/main/CHANGELOG.md">changelog</a> for version information and release notes.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Authenticating%20to%20Azure"></a><h2 id="authenticating-to-azure">Authenticating to Azure</h2>
+
+<p>Terraform supports a number of different methods for authenticating to Azure:</p>
+
+<ul>
+<li><a href="guides/azure_cli.html">Authenticating to Azure using the Azure CLI</a></li>
+<li><a href="guides/managed_service_identity.html">Authenticating to Azure using Managed Service Identity</a></li>
+<li><a href="guides/service_principal_client_certificate.html">Authenticating to Azure using a Service Principal and a Client Certificate</a></li>
+<li><a href="guides/service_principal_client_secret.html">Authenticating to Azure using a Service Principal and a Client Secret</a></li>
+<li><a href="guides/service_principal_oidc.html">Authenticating to Azure using OpenID Connect</a></li>
+</ul>
+
+<hr/>
+
+<p>We recommend using either a Service Principal or Managed Service Identity when running Terraform non-interactively (such as when running Terraform in a CI server) - and authenticating using the Azure CLI when running Terraform locally.</p>
+
+<p>-&gt;<strong>Note on Permissions</strong> The User, Service Principal or Managed Identity running Terraform should have permissions to register <a href="https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-providers-and-types">Azure Resource Providers</a>. If the principal running Terraform has insufficient permissions to register Resource Providers then we recommend setting the property <a href="#resource_provider_registrations"><code>resource_provider_registrations</code></a> to <code>none</code> in the provider block to prevent auto-registration.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># We strongly recommend using the required_providers block to set the</span>
+<span class="c1"># Azure Provider source and version being used</span>
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azurerm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azurerm"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=3.0.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Configure the Microsoft Azure Provider</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_provider_registrations</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"none"</span><span class="c1"> # This is only required when the User, Service Principal, or Identity running Terraform lacks the permissions to register Azure Resource Providers.</span>
+<span class="w">  </span><span class="nb">features</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create a resource group</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_resource_group"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-resources"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"West Europe"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create a virtual network within the resource group</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_virtual_network"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">resource_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_resource_group.example.location</span><span class="w"></span>
+<span class="w">  </span><span class="na">address_space</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"10.0.0.0/16"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Bugs%20and%20Feature%20Requests"></a><h2 id="bugs-and-feature-requests">Bugs and Feature Requests</h2>
+
+<p>The Azure provider's bugs and feature requests can be found in the <a href="https://github.com/hashicorp/terraform-provider-azurerm/issues">GitHub repo issues</a>.
+Please avoid "me too" or "+1" comments. Instead, use a thumbs up <a href="https://blog.github.com/2016-03-10-add-reactions-to-pull-requests-issues-and-comments/">reaction</a>
+on enhancement requests. Provider maintainers will often prioritize work based on the number of thumbs on an issue.</p>
+
+<p>Community input is appreciated on outstanding issues! We love to hear what use
+cases you have for new features, and want to provide the best possible
+experience for you using the Azure provider.</p>
+
+<p>If you have a bug or feature request without an existing issue</p>
+
+<ul>
+<li><p>if an existing resource or field is working in an unexpected way, <a href="https://github.com/hashicorp/terraform-provider-azurerm/issues/new?template=bug.md">file a bug</a>.</p></li>
+<li><p>if you'd like the provider to support a new resource or field, <a href="https://github.com/hashicorp/terraform-provider-azurerm/issues/new?template=enhancement.md">file an enhancement/feature request</a>.</p></li>
+</ul>
+
+<p>The provider maintainers will often use the assignee field on an issue to mark
+who is working on it.</p>
+
+<ul>
+<li><p>An issue assigned to an individual maintainer indicates that the maintainer is working
+on the issue</p></li>
+<li><p>If you're interested in working on an issue please leave a comment on that issue</p></li>
+</ul>
+
+<hr/>
+
+<p>If you have configuration questions, or general questions about using the provider, try checking out:</p>
+
+<ul>
+<li><a href="https://www.terraform.io/docs/extend/community/index.html">Terraform's community resources</a></li>
+<li><a href="https://support.hashicorp.com">HashiCorp support</a> for Terraform Enterprise customers</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>features</code> - (Required) A <code>features</code> block as defined below which can be used to customize the behaviour of certain Azure Provider resources.</p></li>
+<li><p><code>subscription_id</code> - (Required) The Subscription ID which should be used. This can also be sourced from the <code>ARM_SUBSCRIPTION_ID</code> Environment Variable.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The <code>subscription_id</code> property is required when performing a plan or apply operation, but is not required to run <code>terraform validate</code>.</p>
+</aside>
+
+<ul>
+<li><p><code>client_id</code> - (Optional) The Client ID which should be used. This can also be sourced from the <code>ARM_CLIENT_ID</code> Environment Variable.</p></li>
+<li><p><code>client_id_file_path</code> (Optional) The path to a file containing the Client ID which should be used. This can also be sourced from the <code>ARM_CLIENT_ID_FILE_PATH</code> Environment Variable.</p></li>
+<li><p><code>environment</code> - (Optional) The Cloud Environment which should be used. Possible values are <code>public</code>, <code>usgovernment</code>, <code>german</code>, and <code>china</code>. Defaults to <code>public</code>. This can also be sourced from the <code>ARM_ENVIRONMENT</code> Environment Variable. Not used when <code>metadata_host</code> is specified.</p></li>
+<li><p><code>tenant_id</code> - (Optional) The Tenant ID which should be used. This can also be sourced from the <code>ARM_TENANT_ID</code> Environment Variable.</p></li>
+<li><p><code>auxiliary_tenant_ids</code> - (Optional) List of auxiliary Tenant IDs required for multi-tenancy and cross-tenant scenarios. This can also be sourced from the <code>ARM_AUXILIARY_TENANT_IDS</code> Environment Variable.</p></li>
+</ul>
+
+<hr/>
+
+<p>When authenticating as a Service Principal using a Client Certificate, the following fields can be set:</p>
+
+<ul>
+<li><p><code>client_certificate</code> - (Optional) A base64-encoded PKCS#12 bundle to be used as the client certificate for authentication. This can also be sourced from the <code>ARM_CLIENT_CERTIFICATE</code> environment variable.</p></li>
+<li><p><code>client_certificate_password</code> - (Optional) The password associated with the Client Certificate. This can also be sourced from the <code>ARM_CLIENT_CERTIFICATE_PASSWORD</code> Environment Variable.</p></li>
+<li><p><code>client_certificate_path</code> - (Optional) The path to the Client Certificate associated with the Service Principal which should be used. This can also be sourced from the <code>ARM_CLIENT_CERTIFICATE_PATH</code> Environment Variable.</p></li>
+</ul>
+
+<p>More information on <a href="guides/service_principal_client_certificate.html">how to configure a Service Principal using a Client Certificate can be found in this guide</a>.</p>
+
+<hr/>
+
+<p>When authenticating as a Service Principal using a Client Secret, the following fields can be set:</p>
+
+<ul>
+<li><p><code>client_secret</code> - (Optional) The Client Secret which should be used. This can also be sourced from the <code>ARM_CLIENT_SECRET</code> Environment Variable.</p></li>
+<li><p><code>client_secret_file_path</code> - (Optional) The path to a file containing the Client Secret which should be used. This can also be sourced from the <code>ARM_CLIENT_SECRET_FILE_PATH</code> Environment Variable.</p></li>
+</ul>
+
+<p>More information on <a href="guides/service_principal_client_secret.html">how to configure a Service Principal using a Client Secret can be found in this guide</a>.</p>
+
+<hr/>
+
+<p>When authenticating as a Service Principal using Open ID Connect, the following fields can be set:</p>
+
+<ul>
+<li><p><code>oidc_request_token</code> - (Optional) The bearer token for the request to the OIDC provider. This can also be sourced from the <code>ARM_OIDC_REQUEST_TOKEN</code>, <code>ACTIONS_ID_TOKEN_REQUEST_TOKEN</code> or <code>SYSTEM_ACCESSTOKEN</code> Environment Variables. The provider will look for values in this order and use the first it finds configured.</p></li>
+<li><p><code>oidc_request_url</code> - (Optional) The URL for the OIDC provider from which to request an ID token. This can also be sourced from the <code>ARM_OIDC_REQUEST_URL</code>, <code>ACTIONS_ID_TOKEN_REQUEST_URL</code> or <code>SYSTEM_OIDCREQUESTURI</code> Environment Variables. The provider will look for values in this order and use the first it finds configured.</p></li>
+<li><p><code>ado_pipeline_service_connection_id</code> - (Optional) The Azure DevOps Pipeline Service Connection ID. This can also be sourced from the <code>ARM_ADO_PIPELINE_SERVICE_CONNECTION_ID</code> or <code>ARM_OIDC_AZURE_SERVICE_CONNECTION_ID</code> Environment Variables. The provider will look for values in this order and use the first it finds configured.</p></li>
+<li><p><code>oidc_token</code> - (Optional) The ID token when authenticating using OpenID Connect (OIDC). This can also be sourced from the <code>ARM_OIDC_TOKEN</code> environment Variable.</p></li>
+<li><p><code>oidc_token_file_path</code> - (Optional) The path to a file containing an ID token when authenticating using OpenID Connect (OIDC). This can also be sourced from the <code>ARM_OIDC_TOKEN_FILE_PATH</code> Environment Variable.</p></li>
+<li><p><code>use_oidc</code> - (Optional) Should OIDC be used for Authentication? This can also be sourced from the <code>ARM_USE_OIDC</code> Environment Variable. Defaults to <code>false</code>.</p></li>
+</ul>
+
+<p>More information on <a href="guides/service_principal_oidc.html">how to configure a Service Principal using OpenID Connect can be found in this guide</a>.</p>
+
+<hr/>
+
+<p>When authenticating using Managed Identity, the following fields can be set:</p>
+
+<ul>
+<li><p><code>msi_endpoint</code> - (Optional) The path to a custom endpoint for Managed Identity - in most circumstances, this should be detected automatically. This can also be sourced from the <code>ARM_MSI_ENDPOINT</code> Environment Variable.</p></li>
+<li><p><code>use_msi</code> - (Optional) Should Managed Identity be used for Authentication? This can also be sourced from the <code>ARM_USE_MSI</code> Environment Variable. Defaults to <code>false</code>.</p></li>
+</ul>
+
+<p>More information on <a href="guides/managed_service_identity.html">how to configure a Service Principal using Managed Identity can be found in this guide</a>.</p>
+
+<hr/>
+
+<p>When authenticating using AKS Workload Identity, the following fields can be set:</p>
+
+<ul>
+<li><code>use_aks_workload_identity</code> - (Optional) Should AKS Workload Identity be used for Authentication? This can also be sourced from the <code>ARM_USE_AKS_WORKLOAD_IDENTITY</code> Environment Variable. Defaults to <code>false</code>. When set, <code>client_id</code>, <code>tenant_id</code> and <code>oidc_token_file_path</code> will be detected from the environment and do not need to be specified.</li>
+</ul>
+
+<p>More information on <a href="guides/aks_workload_identity.html">how to configure AKS Workload Identity can be found in this guide</a>.</p>
+
+<hr/>
+
+<p>For Azure CLI authentication, the following fields can be set:</p>
+
+<ul>
+<li><code>use_cli</code> - (Optional) Should Azure CLI be used for authentication? This can also be sourced from the <code>ARM_USE_CLI</code> environment variable. Defaults to <code>true</code>.</li>
+</ul>
+
+<hr/>
+
+<p>For some advanced scenarios, such as where more granular permissions are necessary - the following properties can be set:</p>
+
+<ul>
+<li><p><code>disable_terraform_partner_id</code> - (Optional) Disable sending the Terraform Partner ID if a custom <code>partner_id</code> isn't specified, which allows Microsoft to better understand the usage of Terraform. The Partner ID does not give HashiCorp any direct access to usage information. This can also be sourced from the <code>ARM_DISABLE_TERRAFORM_PARTNER_ID</code> environment variable. Defaults to <code>false</code>.</p></li>
+<li><p><code>metadata_host</code> - (Optional) The Hostname of the Azure Metadata Service (for example <code>management.azure.com</code>), used to obtain the Cloud Environment when using a Custom Azure Environment. This can also be sourced from the <code>ARM_METADATA_HOSTNAME</code> Environment Variable.</p></li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p><code>environment</code> must be set to the requested environment name in the list of available environments held in the <code>metadata_host</code>.</p>
+</aside>
+
+<ul>
+<li><p><code>partner_id</code> - (Optional) A GUID/UUID registered with Microsoft to facilitate partner resource <a href="https://docs.microsoft.com/azure/marketplace/azure-partner-customer-usage-attribution">usage attribution</a>. This can also be sourced from the <code>ARM_PARTNER_ID</code> Environment Variable. Supported formats are <code>&lt;guid&gt;</code> / <code>pid-&lt;guid&gt;</code> (GUIDs <a href="https://docs.microsoft.com/azure/marketplace/azure-partner-customer-usage-attribution#other-use-cases">registered</a> in Partner Center) and <code>pid-&lt;guid&gt;-partnercenter</code> (for published <a href="https://docs.microsoft.com/azure/marketplace/azure-partner-customer-usage-attribution#commercial-marketplace-azure-apps">commercial marketplace Azure apps</a>).</p></li>
+<li><p><code>auxiliary_tenant_ids</code> - (Optional) Contains a list of (up to 3) other Tenant IDs used for cross-tenant and multi-tenancy scenarios with multiple AzureRM provider definitions. The list of <code>auxiliary_tenant_ids</code> in a given AzureRM provider definition contains the other, remote Tenants and should not include its own <code>subscription_id</code> (or <code>ARM_SUBSCRIPTION_ID</code> Environment Variable).</p></li>
+<li><p><code>resource_provider_registrations</code> - (Optional) Specifies a pre-determined set of <a href="https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-providers-and-types">Azure Resource Providers</a> to automatically register when initializing the AzureRM Provider. Allowed values for this property are <code>core</code>, <code>extended</code>, <code>all</code>, or <code>none</code>. This can also be sourced from the <code>ARM_RESOURCE_PROVIDER_REGISTRATIONS</code> environment variable. For more information about which resource providers each set contains, see the <a href="#resource-provider-registrations">Resource Provider Registrations</a> section below.</p></li>
+<li><p><code>resource_providers_to_register</code> - (Optional) A list of arbitrary <a href="https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-providers-and-types">Azure Resource Providers</a> to automatically register when initializing the AzureRM Provider. Can be used in combination with the <code>resource_provider_registrations</code> property. For more information, see the <a href="#resource-provider-registrations">Resource Provider Registrations</a> section below.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>By default, Terraform will attempt to register any Resource Providers that it supports, even if they're not used in your configurations, to be able to display more helpful error messages. If you're running in an environment with restricted permissions, or wish to manage Resource Provider Registration outside of Terraform you may wish to disable this by setting <code>resource_provider_registrations</code> to <code>none</code>; however, please note that the error messages returned from Azure may be confusing as a result.</p>
+</aside>
+
+<ul>
+<li><code>storage_use_azuread</code> - (Optional) Should the AzureRM Provider use AzureAD to connect to the Storage Blob &amp; Queue APIs, rather than the SharedKey from the Storage Account? This can also be sourced from the <code>ARM_STORAGE_USE_AZUREAD</code> Environment Variable. Defaults to <code>false</code>.</li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This requires that the User/Service Principal being used has the associated <code>Storage</code> roles - which are added to new Contributor/Owner role-assignments, but <strong>have not</strong> been backported by Azure to existing role-assignments.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>The Files Storage API does not support authenticating via AzureAD and will continue to use a SharedKey when AAD authentication is enabled.</p>
+</aside>
+
+<p>It's also possible to use multiple Provider blocks within a single Terraform configuration, for example, to work with resources across multiple Subscriptions - more information can be found <a href="https://www.terraform.io/docs/configuration/providers.html#multiple-provider-instances">in the documentation for Providers</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Features"></a><h2 id="features">Features</h2>
+
+<p>The <code>features</code> block allows configuring the behaviour of the Azure Provider, more information can be found on <a href="guides/features-block.html">the dedicated page for the <code>features</code> block</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%20Provider%20Registrations"></a><h2 id="resource-provider-registrations">Resource Provider Registrations</h2>
+
+<p>Before each plan or apply operation, the AzureRM Provider attempts to ensure that necessary Azure Resource Providers are registered. This process enables the necessary APIs and services for the provider to work with Azure. By default, the provider will attempt to register a small set of resource providers, which provides coverage for the most common resource types that are supported by the provider.</p>
+
+<p>You can customise this behavior as needed by setting the <code>resource_provider_registrations</code> provider property, or the <code>resource_providers_to_register</code> provider property, or both of these. The <code>resource_provider_registrations</code> property indicates a pre-determined set of resource providers to automatically register, and are:</p>
+
+<ul>
+<li><code>core</code> - a small set of resource providers for essential services including Compute, Networking and Storage.</li>
+<li><code>extended</code> - a larger set that provides coverage for the most common supported resources.</li>
+<li><code>all</code> - a set of resource providers that enables every resource in the provider to be used.</li>
+<li><code>none</code> - with this setting, the provider will not attempt to register any resource providers.</li>
+</ul>
+
+<p>To view the latest specific Azure Resource Providers included in each set, please refer to <a href="https://github.com/hashicorp/terraform-provider-azurerm/blob/main/internal/resourceproviders/required.go">this page</a> on GitHub.</p>
+
+<p>In addition to, or in place of, the sets described above, you can also configure the AzureRM Provider to register specific Azure Resource Providers, by setting the <code>resource_providers_to_register</code> provider property. This should be a list of strings, containing the exact names of Azure Resource Providers to register. For a list of all resource providers, please refer to <a href="https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-providers-and-types">official Azure documentation</a>.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Note on Permissions</em>
+    <p>The User, Service Principal or Managed Identity running Terraform should have permissions to register <a href="https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-providers-and-types">Azure Resource Providers</a>. If the principal running Terraform has insufficient permissions to register Resource Providers then we recommend setting the property <a href="#resource_provider_registrations"><code>resource_provider_registrations</code></a> to <code>none</code> in the provider block to prevent auto-registration.</p>
+</aside>
+
+            
+        
+    </body></html>

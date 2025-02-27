@@ -1,0 +1,687 @@
+<html><!-- Online page at https://www.terraform.io/language/backend/azurerm --><head>
+                <title>azurerm</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="azurerm">azurerm</h1>
+
+<p>Stores the state as a Blob with the given Key within the Blob Container within <a href="https://docs.microsoft.com/en-us/azure/storage/common/storage-introduction">the Blob Storage Account</a>.</p>
+
+<p>This backend supports state locking and consistency checking with Azure Blob Storage native capabilities.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Terraform 1.1 and 1.2 supported a feature-flag to allow enabling/disabling the use of Microsoft Graph (and MSAL) rather than Azure Active Directory Graph (and ADAL) - however this flag has since been removed in Terraform 1.3. Microsoft Graph (and MSAL) are now enabled by default and Azure Active Directory Graph (and ADAL) can no longer be used.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Authentication"></a><h2 id="authentication">Authentication</h2>
+
+<p>The <code>azurerm</code> backend supports 3 methods of authenticating to the storage account:</p>
+
+<ul>
+<li>Access Key (default)</li>
+<li>Azure Active Directory</li>
+<li>SAS Token</li>
+</ul>
+
+<p>The <em>Access Key</em> method can be used directly, by specifying the access key, or in combination with an Azure AD principal (e.g. user, service principal or managed identity). To use an Access Key directly you must generate one for your state file blob and specify it in the backend configuration. If neither an access key or client ID is specified, Terraform will attempt to use Azure CLI. In both cases where no access key is given, Terraform will attempt to retrieve the access key for the storage account, using the authenticated Azure AD principal.</p>
+
+<p>The <em>Azure Active Directory</em> method can only be used in combination with an Azure AD principal. To use the Azure Active Directory method you must set the <code>use_azuread_auth</code> variable to <code>true</code> in your backend configuration. This will cause the backend to use the Access Token of the Azure AD principal to authenticate to the state file blob, instead of authenticating using a shared access key.</p>
+
+<p>The <em>SAS Token</em> method can only be used directly. You must generate a SAS Token for your state file blob and pass it to the backend config.</p>
+
+<p>The <code>azurerm</code> backend supports the following authentication scenarios to connect to the storage account, based on the configuration variables provided:</p>
+
+<table>
+<thead>
+<tr>
+  <th>Authentication Method</th>
+  <th>Storage Account Authentication Type</th>
+  <th>Minimum Required Configuration†</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>User Principal via Azure CLI</td>
+  <td>Access Key</td>
+  <td>N/A</td>
+</tr>
+<tr>
+  <td>User Principal via Azure CLI</td>
+  <td>Azure AD</td>
+  <td><code>use_azuread_auth = true</code></td>
+</tr>
+<tr>
+  <td>Service Principal or User Assigned Managed Identity via OIDC (Workload identity federation)</td>
+  <td>Access Key</td>
+  <td><code>use_oidc = true</code></td>
+</tr>
+<tr>
+  <td>Service Principal or User Assigned Managed Identity via OIDC (Workload identity federation)</td>
+  <td>Azure AD</td>
+  <td><code>use_azuread_auth = true</code>, <code>use_oidc = true</code></td>
+</tr>
+<tr>
+  <td>Managed Identity Principal</td>
+  <td>Access Key</td>
+  <td><code>use_msi = true</code></td>
+</tr>
+<tr>
+  <td>Managed Identity Principal</td>
+  <td>Azure AD</td>
+  <td><code>use_azuread_auth = true</code>, <code>use_msi = true</code></td>
+</tr>
+<tr>
+  <td>Service Principal via Client Secret</td>
+  <td>Access Key</td>
+  <td><code>client_secret = "..."</code></td>
+</tr>
+<tr>
+  <td>Service Principal via Client Secret</td>
+  <td>Azure AD</td>
+  <td><code>use_azuread_auth = true</code>, <code>client_secret = "..."</code></td>
+</tr>
+<tr>
+  <td>Service Principal via Client Certificate</td>
+  <td>Access Key</td>
+  <td><code>client_certificate_path = "..."</code></td>
+</tr>
+<tr>
+  <td>Service Principal via Client Certificate</td>
+  <td>Azure AD</td>
+  <td><code>client_certificate_path = "...</code>, <code>use_azuread_auth = true</code></td>
+</tr>
+<tr>
+  <td>Access Key direct</td>
+  <td>Access Key</td>
+  <td><code>access_key = "..."</code></td>
+</tr>
+<tr>
+  <td>SAS Token direct</td>
+  <td>SAS Token</td>
+  <td><code>sas_token = "..."</code></td>
+</tr>
+</tbody>
+</table>
+
+<p>† There are sometimes more options needed for successful authentication. The variable shown is the one that triggers the backend to use a given authentication scenario. You can see examples of each option below.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Sensitive values should not be hardcoded into your configuration, and should instead be specified using environment variables or partial configuration flags in the <code>init</code> command of Terraform CLI.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Backend%20Configurations"></a><h2 id="example-backend-configurations">Example Backend Configurations</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Backend%3A%20Azure%20AD%20User%20via%20Azure%20CLI"></a><h3 id="backend-azure-ad-user-via-azure-cli">Backend: Azure AD User via Azure CLI</h3>
+
+<p>This method is not suitable for automation since it only supports a User Principal. To check which tenant and subscription you are pointed to, run <code>az account show</code>.</p>
+
+<p><em>Connect to Storage Account with Access Key</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"  # Can be passed via `-backend-config=`"resource_group_name=&lt;resource group name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcd1234"                      # Can be passed via `-backend-config=`"storage_account_name=&lt;storage account name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"                       # Can be passed via `-backend-config=`"container_name=&lt;container name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"        # Can be passed via `-backend-config=`"key=&lt;blob key name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><em>Connect to Storage Account with Azure Active Directory authentication</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"  # Can be passed via `-backend-config=`"resource_group_name=&lt;resource group name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcd1234"                      # Can be passed via `-backend-config=`"storage_account_name=&lt;storage account name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"                       # Can be passed via `-backend-config=`"container_name=&lt;container name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"        # Can be passed via `-backend-config=`"key=&lt;blob key name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">use_azuread_auth</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                            # Can also be set via `ARM_USE_AZUREAD` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Backend%3A%20Azure%20AD%20Service%20Principal%20or%20User%20Assigned%20Managed%20Identity%20via%20OIDC%20%28Workload%20Identity%20Federation%29"></a><h3 id="backend-azure-ad-service-principal-or-user-assigned-managed-identity-via-oidc-workload-identity-federation">Backend: Azure AD Service Principal or User Assigned Managed Identity via OIDC (Workload Identity Federation)</h3>
+
+<p>You can use an App Registration (Service Principal) or a User Assigned Managed Identity to configure federated credentials. You must supply the Client ID of the principal.</p>
+
+<p><em>Connect to Storage Account with Access Key</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"          # Can be passed via `-backend-config=`"resource_group_name=&lt;resource group name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcd1234"                              # Can be passed via `-backend-config=`"storage_account_name=&lt;storage account name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"                               # Can be passed via `-backend-config=`"container_name=&lt;container name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"                # Can be passed via `-backend-config=`"key=&lt;blob key name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">use_oidc</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_OIDC` environment variable.</span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_CLIENT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><em>Connect to Storage Account with Azure Active Directory authentication</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"          # Can be passed via `-backend-config=`"resource_group_name=&lt;resource group name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcd1234"                              # Can be passed via `-backend-config=`"storage_account_name=&lt;storage account name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"                               # Can be passed via `-backend-config=`"container_name=&lt;container name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"                # Can be passed via `-backend-config=`"key=&lt;blob key name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">use_oidc</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_OIDC` environment variable.</span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_CLIENT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">use_azuread_auth</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_AZUREAD` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Backend%3A%20Azure%20AD%20Managed%20Identity%20Principal"></a><h3 id="backend-azure-ad-managed-identity-principal">Backend: Azure AD Managed Identity Principal</h3>
+
+<p>You can use a User Assigned Managed Identity as well as a System Assigned Managed Identity on your agent / runner compute environment. However the backend does not currently support specifying the Client ID of the User Assigned Managed Identity, so you can only supply one per compute instance.</p>
+
+<p><em>Connect to Storage Account with Access Key</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"          # Can be passed via `-backend-config=`"resource_group_name=&lt;resource group name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcd1234"                              # Can be passed via `-backend-config=`"storage_account_name=&lt;storage account name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"                               # Can be passed via `-backend-config=`"container_name=&lt;container name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"                # Can be passed via `-backend-config=`"key=&lt;blob key name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">use_msi</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_MSI` environment variable.</span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_CLIENT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><em>Connect to Storage Account with Azure Active Directory authentication</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"          # Can be passed via `-backend-config=`"resource_group_name=&lt;resource group name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcd1234"                              # Can be passed via `-backend-config=`"storage_account_name=&lt;storage account name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"                               # Can be passed via `-backend-config=`"container_name=&lt;container name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"                # Can be passed via `-backend-config=`"key=&lt;blob key name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">use_msi</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_MSI` environment variable.</span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_CLIENT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">use_azuread_auth</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_AZUREAD` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Backend%3A%20Azure%20AD%20Service%20Principal%20via%20Client%20Secret"></a><h3 id="backend-azure-ad-service-principal-via-client-secret">Backend: Azure AD Service Principal via Client Secret</h3>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Warning!</em>
+    <p>This method requires you to manage and rotate a secret. Consider using OIDC as a more secure approach.</p>
+</aside>
+
+<p><em>Connect to Storage Account with Access Key</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"          # Can be passed via `-backend-config=`"resource_group_name=&lt;resource group name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcd1234"                              # Can be passed via `-backend-config=`"storage_account_name=&lt;storage account name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"                               # Can be passed via `-backend-config=`"container_name=&lt;container name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"                # Can be passed via `-backend-config=`"key=&lt;blob key name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_CLIENT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">client_secret</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"************************************"</span><span class="c1">  # Can also be set via `ARM_CLIENT_SECRET` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><em>Connect to Storage Account with Azure Active Directory authentication</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"          # Can be passed via `-backend-config=`"resource_group_name=&lt;resource group name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcd1234"                              # Can be passed via `-backend-config=`"storage_account_name=&lt;storage account name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"                               # Can be passed via `-backend-config=`"container_name=&lt;container name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"                # Can be passed via `-backend-config=`"key=&lt;blob key name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_CLIENT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">client_secret</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"************************************"</span><span class="c1">  # Can also be set via `ARM_CLIENT_SECRET` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">use_azuread_auth</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_AZUREAD` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Backend%3A%20Azure%20AD%20Service%20Principal%20via%20Client%20Certificate"></a><h3 id="backend-azure-ad-service-principal-via-client-certificate">Backend: Azure AD Service Principal via Client Certificate</h3>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Warning!</em>
+    <p>This method requires you to manage and rotate a secret. Consider using OIDC as a more secure approach.</p>
+</aside>
+
+<p><em>Connect to Storage Account with Access Key</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"          # Can be passed via `-backend-config=`"resource_group_name=&lt;resource group name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcd1234"                              # Can be passed via `-backend-config=`"storage_account_name=&lt;storage account name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"                               # Can be passed via `-backend-config=`"container_name=&lt;container name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                         </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"                # Can be passed via `-backend-config=`"key=&lt;blob key name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_CLIENT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">client_certificate_path</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"/path/to/bundle.pfx"</span><span class="c1">                   # Can also be set via `ARM_CLIENT_CERTIFICATE_PATH` environment variable.</span>
+<span class="w">    </span><span class="na">client_certificate_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"************************************"</span><span class="c1">  # Can also be set via `ARM_CLIENT_CERTIFICATE_PASSWORD` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><em>Connect to Storage Account with Azure Active Directory authentication</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"          # Can be passed via `-backend-config=`"resource_group_name=&lt;resource group name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcd1234"                              # Can be passed via `-backend-config=`"storage_account_name=&lt;storage account name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"                               # Can be passed via `-backend-config=`"container_name=&lt;container name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                         </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"                # Can be passed via `-backend-config=`"key=&lt;blob key name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_CLIENT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">client_certificate_path</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"/path/to/bundle.pfx"</span><span class="c1">                   # Can also be set via `ARM_CLIENT_CERTIFICATE_PATH` environment variable.</span>
+<span class="w">    </span><span class="na">client_certificate_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"************************************"</span><span class="c1">  # Can also be set via `ARM_CLIENT_CERTIFICATE_PASSWORD` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">use_azuread_auth</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_AZUREAD` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Backend%3A%20Access%20Key%20Direct"></a><h3 id="backend-access-key-direct">Backend: Access Key Direct</h3>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Warning!</em>
+    <p>This method requires you to manage and rotate a secret. Consider using OIDC as a more secure approach.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"             # Can be passed via `-backend-config=`"resource_group_name=&lt;resource group name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcd1234"                                 # Can be passed via `-backend-config=`"storage_account_name=&lt;storage account name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"                                  # Can be passed via `-backend-config=`"container_name=&lt;container name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"                   # Can be passed via `-backend-config=`"key=&lt;blob key name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">access_key</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcdefghijklmnopqrstuvwxyz0123456789..."</span><span class="c1">  # Can also be set via `ARM_ACCESS_KEY` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Backend%3A%20SAS%20Token"></a><h3 id="backend-sas-token">Backend: SAS Token</h3>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Warning!</em>
+    <p>This method requires you to manage and rotate a secret. Consider using OIDC as a more secure approach.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kr">backend</span><span class="w"> </span><span class="nv">"azurerm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"             # Can be passed via `-backend-config=`"resource_group_name=&lt;resource group name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcd1234"                                 # Can be passed via `-backend-config=`"storage_account_name=&lt;storage account name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"                                  # Can be passed via `-backend-config=`"container_name=&lt;container name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"                   # Can be passed via `-backend-config=`"key=&lt;blob key name&gt;"</span><span class="err">`</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">the</span><span class="w"> </span><span class="err">`init`</span><span class="w"> </span><span class="err">command</span><span class="p">.</span><span class="w"></span>
+<span class="w">    </span><span class="na">sas_token</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcdefghijklmnopqrstuvwxyz0123456789..."</span><span class="c1">  # Can also be set via `ARM_SAS_TOKEN` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Data%20Source%20Configurations"></a><h2 id="example-data-source-configurations">Example Data Source Configurations</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20Azure%20AD%20User%20Principal%20via%20Azure%20CLI"></a><h3 id="data-source-azure-ad-user-principal-via-azure-cli">Data Source: Azure AD User Principal via Azure CLI</h3>
+
+<p>This method is not suitable for automation since it only supports a User Principal. To check which tenant and subscription you are pointed to, run <code>az account show</code>.</p>
+
+<p><em>Connect to Storage Account with Access Key</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"terraform_remote_state"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azurerm"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform123abc"</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><em>Connect to Storage Account with Azure Active Directory authentication</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"terraform_remote_state"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azurerm"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform123abc"</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">use_azuread_auth</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                            # Can also be set via `ARM_USE_AZUREAD` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20Azure%20AD%20Service%20Principal%20or%20User%20Assigned%20Managed%20Identity%20via%20OIDC%20%28Workload%20Identity%20Federation%29"></a><h3 id="data-source-azure-ad-service-principal-or-user-assigned-managed-identity-via-oidc-workload-identity-federation">Data Source: Azure AD Service Principal or User Assigned Managed Identity via OIDC (Workload Identity Federation)</h3>
+
+<p>You can use an App Registration (Service Principal) or a User Assigned Managed Identity to configure federated credentials. You must supply the Client ID of the principal.</p>
+
+<p><em>Connect to Storage Account with Access Key</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"terraform_remote_state"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azurerm"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform123abc"</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">use_oidc</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_OIDC` environment variable.</span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_CLIENT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><em>Connect to Storage Account with Azure Active Directory authentication</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"terraform_remote_state"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azurerm"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform123abc"</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">use_oidc</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_OIDC` environment variable.</span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_CLIENT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">use_azuread_auth</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_AZUREAD` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20Azure%20AD%20Managed%20Identity%20Principal"></a><h3 id="data-source-azure-ad-managed-identity-principal">Data Source: Azure AD Managed Identity Principal</h3>
+
+<p>You can use a User Assigned Managed Identity as well as a System Assigned Managed Identity on your agent / runner compute environment. However the backend does not currently support specifying the Client ID of the User Assigned Managed Identity, so you can only supply one per compute instance.</p>
+
+<p><em>Connect to Storage Account with Access Key</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"terraform_remote_state"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azurerm"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform123abc"</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">use_msi</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_MSI` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><em>Connect to Storage Account with Azure Active Directory authentication</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"terraform_remote_state"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azurerm"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform123abc"</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">use_msi</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_MSI` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">use_azuread_auth</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_AZUREAD` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20Azure%20AD%20Service%20Principal%20via%20Client%20Secret"></a><h3 id="data-source-azure-ad-service-principal-via-client-secret">Data Source: Azure AD Service Principal via Client Secret</h3>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Warning!</em>
+    <p>This method requires you to manage and rotate a secret. Consider using OIDC as a more secure approach.</p>
+</aside>
+
+<p><em>Connect to Storage Account with Access Key</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"terraform_remote_state"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azurerm"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform123abc"</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_CLIENT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">client_secret</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"************************************"</span><span class="c1">  # Can also be set via `ARM_CLIENT_SECRET` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><em>Connect to Storage Account with Azure Active Directory authentication</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"terraform_remote_state"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azurerm"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform123abc"</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_CLIENT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">client_secret</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"************************************"</span><span class="c1">  # Can also be set via `ARM_CLIENT_SECRET` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">use_azuread_auth</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_AZUREAD` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20Azure%20AD%20Service%20Principal%20via%20Client%20Certificate"></a><h3 id="data-source-azure-ad-service-principal-via-client-certificate">Data Source: Azure AD Service Principal via Client Certificate</h3>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Warning!</em>
+    <p>This method requires you to manage and rotate a secret. Consider using OIDC as a more secure approach.</p>
+</aside>
+
+<p><em>Connect to Storage Account with Access Key</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"terraform_remote_state"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azurerm"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform123abc"</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                         </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_CLIENT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">client_certificate_path</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"/path/to/bundle.pfx"</span><span class="c1">                   # Can also be set via `ARM_CLIENT_CERTIFICATE_PATH` environment variable.</span>
+<span class="w">    </span><span class="na">client_certificate_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"************************************"</span><span class="c1">  # Can also be set via `ARM_CLIENT_CERTIFICATE_PASSWORD` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><em>Connect to Storage Account with Azure Active Directory authentication</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"terraform_remote_state"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azurerm"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform123abc"</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                         </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">client_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_CLIENT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">client_certificate_path</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"/path/to/bundle.pfx"</span><span class="c1">                   # Can also be set via `ARM_CLIENT_CERTIFICATE_PATH` environment variable.</span>
+<span class="w">    </span><span class="na">client_certificate_password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"************************************"</span><span class="c1">  # Can also be set via `ARM_CLIENT_CERTIFICATE_PASSWORD` environment variable.</span>
+<span class="w">    </span><span class="na">subscription_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_SUBSCRIPTION_ID` environment variable.</span>
+<span class="w">    </span><span class="na">tenant_id</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="c1">  # Can also be set via `ARM_TENANT_ID` environment variable.</span>
+<span class="w">    </span><span class="na">use_azuread_auth</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="c1">                                    # Can also be set via `ARM_USE_AZUREAD` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20Access%20Key%20Direct"></a><h3 id="data-source-access-key-direct">Data Source: Access Key Direct</h3>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Warning!</em>
+    <p>This method requires you to manage and rotate a secret. Consider using OIDC as a more secure approach.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"terraform_remote_state"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azurerm"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform123abc"</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">access_key</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcdefghijklmnopqrstuvwxyz0123456789..."</span><span class="c1">  # Can also be set via `ARM_ACCESS_KEY` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20SAS%20Token"></a><h3 id="data-source-sas-token">Data Source: SAS Token</h3>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Warning!</em>
+    <p>This method requires you to manage and rotate a secret. Consider using OIDC as a more secure approach.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"terraform_remote_state"</span><span class="w"> </span><span class="nv">"foo"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"azurerm"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">resource_group_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"StorageAccount-ResourceGroup"</span><span class="w"></span>
+<span class="w">    </span><span class="na">storage_account_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform123abc"</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">key</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod.terraform.tfstate"</span><span class="w"></span>
+<span class="w">    </span><span class="na">sas_token</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"abcdefghijklmnopqrstuvwxyz0123456789..."</span><span class="c1">  # Can also be set via `ARM_SAS_TOKEN` environment variable.</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuration%20Variables"></a><h2 id="configuration-variables">Configuration Variables</h2>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>Warning</em>
+    <p>We recommend using environment variables to supply credentials and other sensitive data. If you use <code>-backend-config</code> or hardcode these values directly in your configuration, Terraform will include these values in both the <code>.terraform</code> subdirectory and in plan files. Refer to <a href="../../terraform/language/backend.html#credentials-and-sensitive-data">Credentials and Sensitive Data</a> for details.</p>
+</aside>
+
+<p>The following configuration options are supported:</p>
+
+<ul>
+<li><p><code>storage_account_name</code> - (Required) The Name of <a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_account">the Storage Account</a>.</p></li>
+<li><p><code>container_name</code> - (Required) The Name of <a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_container">the Storage Container</a> within the Storage Account.</p></li>
+<li><p><code>key</code> - (Required) The name of the Blob used to retrieve/store Terraform's State file inside the Storage Container.</p></li>
+<li><p><code>environment</code> - (Optional) The Azure Environment which should be used. This can also be sourced from the <code>ARM_ENVIRONMENT</code> environment variable. Possible values are <code>public</code>, <code>china</code>  and <code>usgovernment</code>. Defaults to <code>public</code>.</p></li>
+<li><p><code>metadata_host</code> - (Optional) The Hostname of the Azure Metadata Service (for example <code>management.azure.com</code>), used to obtain the Cloud Environment when using a Custom Azure Environment. This can also be sourced from the <code>ARM_METADATA_HOSTNAME</code> Environment Variable.</p></li>
+<li><p><code>snapshot</code> - (Optional) Should the Blob used to store the Terraform Statefile be snapshotted before use? Defaults to <code>false</code>. This value can also be sourced from the <code>ARM_SNAPSHOT</code> environment variable.</p></li>
+<li><p><code>use_cli</code> - (Optional) Should Azure CLI be used for authentication? Defaults to <code>false</code>. This value can also be sourced from the <code>ARM_USE_CLI</code> environment variable.</p></li>
+</ul>
+
+<hr/>
+
+<p>When authenticating using a Managed Identity (MSI) - the following fields are also supported:</p>
+
+<ul>
+<li><p><code>resource_group_name</code> - (Required) The Name of the Resource Group in which the Storage Account exists.</p></li>
+<li><p><code>msi_endpoint</code> - (Optional) The path to a custom Managed Service Identity endpoint which is automatically determined if not specified. This can also be sourced from the <code>ARM_MSI_ENDPOINT</code> environment variable.</p></li>
+<li><p><code>subscription_id</code> - (Optional) The Subscription ID in which the Storage Account exists. This can also be sourced from the <code>ARM_SUBSCRIPTION_ID</code> environment variable.</p></li>
+<li><p><code>tenant_id</code> - (Optional) The Tenant ID in which the Subscription exists. This can also be sourced from the <code>ARM_TENANT_ID</code> environment variable.</p></li>
+<li><p><code>use_msi</code> - (Optional) Should Managed Service Identity authentication be used? This can also be sourced from the <code>ARM_USE_MSI</code> environment variable.</p></li>
+</ul>
+
+<hr/>
+
+<p>When authenticating using a Service Principal with OpenID Connect (OIDC / Workload Identity Federation) - the following fields are also supported:</p>
+
+<ul>
+<li><p><code>oidc_request_url</code> - (Optional) The URL for the OIDC provider from which to request an ID token. This can also be sourced from the <code>ARM_OIDC_REQUEST_URL</code> or <code>ACTIONS_ID_TOKEN_REQUEST_URL</code> environment variables.</p></li>
+<li><p><code>oidc_request_token</code> - (Optional) The bearer token for the request to the OIDC provider. This can also be sourced from the <code>ARM_OIDC_REQUEST_TOKEN</code> or <code>ACTIONS_ID_TOKEN_REQUEST_TOKEN</code> environment variables.</p></li>
+<li><p><code>oidc_token</code> - (Optional) The ID token when authenticating using OpenID Connect (OIDC). This can also be sourced from the <code>ARM_OIDC_TOKEN</code> environment variable.</p></li>
+<li><p><code>oidc_token_file_path</code> - (Optional) The path to a file containing an ID token when authenticating using OpenID Connect (OIDC). This can also be sourced from the <code>ARM_OIDC_TOKEN_FILE_PATH</code> environment variable.</p></li>
+<li><p><code>use_oidc</code> - (Optional) Should OIDC authentication be used? This can also be sourced from the <code>ARM_USE_OIDC</code> environment variable.</p></li>
+<li><p><code>use_aks_workload_identity</code> (Optional) Should Azure AKS Workload Identity be used for Authentication? This can also be sourced from the <code>ARM_USE_AKS_WORKLOAD_IDENTITY</code> environment variable.</p></li>
+</ul>
+
+<hr/>
+
+<p>When authenticating using a SAS Token associated with the Storage Account - the following fields are also supported:</p>
+
+<ul>
+<li><code>sas_token</code> - (Optional) The SAS Token used to access the Blob Storage Account. This can also be sourced from the <code>ARM_SAS_TOKEN</code> environment variable.</li>
+</ul>
+
+<hr/>
+
+<p>When authenticating using the Storage Account's Access Key - the following fields are also supported:</p>
+
+<ul>
+<li><code>access_key</code> - (Optional) The Access Key used to access the Blob Storage Account. This can also be sourced from the <code>ARM_ACCESS_KEY</code> environment variable.</li>
+</ul>
+
+<hr/>
+
+<p>When authenticating using an Azure AD Service Principal, you have the option to use Azure Active Directory authentication for the storage account (rather than by an Access Key or SAS Token) - the following fields are also supported:</p>
+
+<ul>
+<li><code>use_azuread_auth</code> - (Optional) Whether Azure Active Directory Authentication should be used to access the Blob Storage Account. This can also be sourced from the <code>ARM_USE_AZUREAD</code> environment variable.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>When using Azure Active Directory Authentication, you must ensure the <code>Storage Blob Data Owner</code> or <code>Container Blob Data Owner</code> roles are assigned to your Storage Account.</p>
+</aside>
+
+<hr/>
+
+<p>When authenticating using a Service Principal with a Client Certificate - the following fields are also supported:</p>
+
+<ul>
+<li><p><code>resource_group_name</code> - (Required) The Name of the Resource Group in which the Storage Account exists.</p></li>
+<li><p><code>client_id</code> - (Optional) The Client ID of the Service Principal. This can also be sourced from the <code>ARM_CLIENT_ID</code> environment variable.</p></li>
+<li><p><code>client_id_file_path</code> (Optional) The path to a file containing the Client ID which should be used. This can also be sourced from the <code>ARM_CLIENT_ID_FILE_PATH</code> Environment Variable.</p></li>
+<li><p><code>client_certificate_password</code> - (Optional) The password associated with the Client Certificate specified in <code>client_certificate_path</code>. This can also be sourced from the <code>ARM_CLIENT_CERTIFICATE_PASSWORD</code> environment variable.</p></li>
+<li><p><code>client_certificate_path</code> - (Optional) The path to the PFX file used as the Client Certificate when authenticating as a Service Principal. This can also be sourced from the <code>ARM_CLIENT_CERTIFICATE_PATH</code> environment variable.</p></li>
+<li><p><code>client_certificate</code> - (Optional) Base64 encoded PKCS#12 certificate bundle to use when authenticating as a Service Principal using a Client Certificate. This can also be sourced from the <code>ARM_CLIENT_CERTIFICATE</code> environment variable.</p></li>
+<li><p><code>subscription_id</code> - (Optional) The Subscription ID in which the Storage Account exists. This can also be sourced from the <code>ARM_SUBSCRIPTION_ID</code> environment variable.</p></li>
+<li><p><code>tenant_id</code> - (Optional) The Tenant ID in which the Subscription exists. This can also be sourced from the <code>ARM_TENANT_ID</code> environment variable.</p></li>
+</ul>
+
+<hr/>
+
+<p>When authenticating using a Service Principal with a Client Secret - the following fields are also supported:</p>
+
+<ul>
+<li><p><code>resource_group_name</code> - (Required) The Name of the Resource Group in which the Storage Account exists.</p></li>
+<li><p><code>client_id</code> - (Optional) The Client ID of the Service Principal. This can also be sourced from the <code>ARM_CLIENT_ID</code> environment variable.</p></li>
+<li><p><code>client_id_file_path</code> (Optional) The path to a file containing the Client ID which should be used. This can also be sourced from the <code>ARM_CLIENT_ID_FILE_PATH</code> Environment Variable.</p></li>
+<li><p><code>client_secret</code> - (Optional) The Client Secret of the Service Principal. This can also be sourced from the <code>ARM_CLIENT_SECRET</code> environment variable.</p></li>
+<li><p><code>client_secret_file_path</code> - (Optional) The path to a file containing the Client Secret which should be used. This can also be sourced from the <code>ARM_CLIENT_SECRET_FILE_PATH</code> Environment Variable.</p></li>
+<li><p><code>subscription_id</code> - (Optional) The Subscription ID in which the Storage Account exists. This can also be sourced from the <code>ARM_SUBSCRIPTION_ID</code> environment variable.</p></li>
+<li><p><code>tenant_id</code> - (Optional) The Tenant ID in which the Subscription exists. This can also be sourced from the <code>ARM_TENANT_ID</code> environment variable.</p></li>
+</ul>
+
+            
+        
+    </body></html>

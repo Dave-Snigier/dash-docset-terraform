@@ -1,0 +1,102 @@
+<html><!-- Online page at https://registry.terraform.io/providers/heroku/heroku/latest/docs/resources/app_config_association --><head>
+                <title>heroku_app_config_association</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="heroku_app_config_association">heroku_app_config_association</h1>
+
+<p>Provides a Heroku App Config Association resource, making it possible to set/update/remove heroku app config vars independently from
+the <code>heroku_app</code> resource. An example usage scenario could be:</p>
+
+<ul>
+<li>User has separate git repositories for various micro-services. Multiple micro-services use Kafka.</li>
+<li>User has a separate repository for kafka terraform files with blue/green support.</li>
+<li>User builds out new clusters.</li>
+<li>Prior to this resource's introduction, user would need one <code>terraform apply</code> to update state and X number of <code>terraform apply</code>
+for each micro-service to pick up the new kafka clusters. However with this resource, user can do one <code>terraform apply</code>
+and let Heroku handle the rolling restarts to pick up the new config vars.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/%22Sensitive%22%20is%20not%20secret"></a><h3 id="sensitive-is-not-secret">"Sensitive" is not secret</h3>
+
+<p>Heroku does not have a 'sensitivity' distinction for its config variables.
+This distinction is only made during terraform <code>plan</code> and <code>apply</code> to avoid leaking sensitive data in the console output.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Beware%20of%20conflicting%20vars"></a><h3 id="beware-of-conflicting-vars">Beware of conflicting vars</h3>
+
+<p>Be careful when having config variables defined in both <code>heroku_app</code> and <code>heroku_app_config_association</code> resources. As the latter resource
+has a dependency on the former, any overlapping config variables in <code>heroku_app</code> will be overwritten in <code>heroku_app_config_association</code>
+during a <code>terraform apply</code>. Furthermore, this overlap will cause an infinite dirty terraform plan if config variables have
+different values on both resources at the same time. It is recommended to use one or the other resource, not both, to manage your app(s) config vars.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20HCL"></a><h2 id="example-hcl">Example HCL</h2>
+
+<pre><code>resource "heroku_config" "common" {
+    vars = {
+        LOG_LEVEL = "info"
+    }
+
+    sensitive_vars = {
+        PRIVATE_KEY = "some_private_key"
+    }
+}
+
+resource "heroku_app" "foobar" {
+  name   = "my-cool-app"
+  region = "us"
+}
+
+resource "heroku_app" "foobar2" {
+  name   = "my-cool-app2"
+  region = "us"
+}
+
+resource "heroku_app_config_association" "foobar" {
+  app_id = heroku_app.foobar.id
+
+  vars = heroku_config.common.vars
+  sensitive_vars = heroku_config.common.sensitive_vars
+}
+
+resource "heroku_app_config_association" "foobar2" {
+  app_id = heroku_app.foobar2.id
+
+  vars = heroku_config.common.vars
+  sensitive_vars = {
+    DATABASE_URL = "some_db_url_that_has_auth_info"
+  }
+}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<ul>
+<li><code>app_id</code> - (Required) Heroku app ID (do not use app name)</li>
+<li><code>vars</code> - Map of config vars that can be output in plaintext.</li>
+<li><code>sensitive_vars</code> - This is the same as <code>vars</code>. The main difference between the two
+attributes is <code>sensitive_vars</code> outputs are redacted on-screen and replaced by a <sensitive> placeholder, following a terraform
+plan or apply. It is recommended to put private keys, passwords, etc in this argument.</sensitive></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>The following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - The ID of the app config association.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>This resource defines two config var attributes with one of them used for masking any sensitive/secret variables
+during a <code>terraform plan|apply</code> in a CI build, terminal, etc. This 'sensitive' distinction for config vars is unique to
+this provider and not a built-in feature of the Heroku Platform API. Therefore, it will not be possible to import
+this resource.</p>
+
+<p>However, it is safe to define the resource in your configuration file and execute a <code>terraform apply</code>
+as the end result is <code>noop</code> when the config vars already exist on the remote resource.</p>
+
+            
+        
+    </body></html>

@@ -1,0 +1,1646 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/version_3_upgrade --><head>
+                <title>Terraform provider for Google Cloud 3.0.0 Upgrade Guide</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-provider-for-google-cloud-300-upgrade-guide">Terraform provider for Google Cloud 3.0.0 Upgrade Guide</h1>
+
+<p>The <code>3.0.0</code> release of the Terraform provider for Google Cloud is a major version and
+includes some changes that you will need to consider when upgrading. This guide
+is intended to help with that process and focuses only on the changes necessary
+to upgrade from the final <code>2.X</code> series release to <code>3.0.0</code>.</p>
+
+<p>Most of the changes outlined in this guide have been previously marked as
+deprecated in the Terraform <code>plan</code>/<code>apply</code> output throughout previous provider
+releases, up to and including the final <code>2.X</code> series release. These changes,
+such as deprecation notices, can always be found in the CHANGELOG of the
+affected providers. <a href="https://github.com/hashicorp/terraform-provider-google/blob/main/CHANGELOG.md">google</a>
+<a href="https://github.com/hashicorp/terraform-provider-google-beta/blob/main/CHANGELOG.md">google-beta</a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/What%20is%203.0.0-beta.1%3F"></a><h2 id="what-is-300-beta1">What is <code>3.0.0-beta.1</code>?</h2>
+
+<p>With <code>3.0.0</code>, we introduced a prerelease window for our major provider releases.
+<code>3.0.0-beta.1</code> contains all of the changes in <code>3.0.0</code>, and allows you to test it
+prior to the full upgrade. Currently <code>3.0.0</code> is not expected to contain new
+features not available in <code>3.0.0-beta.1</code>, only bugfixes for issues we're made
+aware of before <code>3.0.0</code>'s release. Using <code>3.0.0-beta.1</code> in production is not
+recommended.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 3.0.0-beta.1"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/I%20accidentally%20upgraded%20to%203.0.0%2C%20how%20do%20I%20downgrade%20to%202.X%3F"></a><h2 id="i-accidentally-upgraded-to-300-how-do-i-downgrade-to-2x">I accidentally upgraded to 3.0.0, how do I downgrade to <code>2.X</code>?</h2>
+
+<p>If you've inadvertently upgraded to <code>3.0.0</code>, first see the
+<a href="#provider-version-configuration">Provider Version Configuration Guide</a> to lock
+your provider version; if you've constrained the provider to a lower version
+such as shown in the previous version example in that guide, Terraform will pull
+in a <code>2.X</code> series release on <code>terraform init</code>.</p>
+
+<p>If you've only ran <code>terraform init</code> or <code>terraform plan</code>, your state will not
+have been modified and downgrading your provider is sufficient.</p>
+
+<p>If you've ran <code>terraform refresh</code> or <code>terraform apply</code>, Terraform may have made
+state changes in the meantime.</p>
+
+<ul>
+<li><p>If you're using a local state, or a remote state backend that does not support
+versioning, <code>terraform refresh</code> with a downgraded provider is likely sufficient
+to revert your state. The Google provider generally refreshes most state
+information from the API, and the properties necessary to do so have been left
+unchanged.</p></li>
+<li><p>If you're using a remote state backend that supports versioning such as
+<a href="https://www.terraform.io/docs/backends/types/gcs.html">Google Cloud Storage</a>,
+you can revert the Terraform state file to a previous version. If you do
+so and Terraform had created resources as part of a <code>terraform apply</code> in the
+meantime, you'll need to either delete them by hand or <code>terraform import</code> them
+so Terraform knows to manage them.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrade%20Topics"></a><h2 id="upgrade-topics">Upgrade Topics</h2>
+
+<!-- TOC depthFrom:2 depthTo:2 -->
+
+<ul>
+<li><a href="#provider-version-configuration">Provider Version Configuration</a></li>
+<li><a href="#provider">Provider</a></li>
+<li><a href="#id-format-changes">ID Format Changes</a></li>
+<li><a href="#data-source-google_container_engine_versions">Data Source: <code>google_container_engine_versions</code></a></li>
+<li><a href="#resource-google_access_context_manager_access_level">Resource: <code>google_access_context_manager_access_level</code></a></li>
+<li><a href="#resource-google_access_context_manager_service_perimeter">Resource: <code>google_access_context_manager_service_perimeter</code></a></li>
+<li><a href="#resource-google_app_engine_application">Resource: <code>google_app_engine_application</code></a></li>
+<li><a href="#resource-google_app_engine_domain_mapping">Resource: <code>google_app_engine_domain_mapping</code></a></li>
+<li><a href="#resource-google_app_engine_standard_app_version">Resource: <code>google_app_engine_standard_app_version</code></a></li>
+<li><a href="#resource-google_bigquery_table">Resource: <code>google_bigquery_table</code></a></li>
+<li><a href="#resource-google_bigtable_app_profile">Resource: <code>google_bigtable_app_profile</code></a></li>
+<li><a href="#resource-google_binary_authorization_policy">Resource: <code>google_binary_authorization_policy</code></a></li>
+<li><a href="#resource-google_cloudbuild_trigger">Resource: <code>google_cloudbuild_trigger</code></a></li>
+<li><a href="#resource-google_cloudfunctions_function">Resource: <code>google_cloudfunctions_function</code></a></li>
+<li><a href="#resource-google_cloudiot_registry">Resource: <code>google_cloudiot_registry</code></a></li>
+<li><a href="#resource-google_cloudscheduler_job">Resource: <code>google_cloudscheduler_job</code></a></li>
+<li><a href="#resource-google_cloud_run_service">Resource: <code>google_cloud_run_service</code></a></li>
+<li><a href="#resource-google_composer_environment">Resource: <code>google_composer_environment</code></a></li>
+<li><a href="#resource-google_compute_backend_bucket">Resource: <code>google_compute_backend_bucket</code></a></li>
+<li><a href="#resource-google_compute_backend_service">Resource: <code>google_compute_backend_service</code></a></li>
+<li><a href="#resource-google_compute_firewall">Resource: <code>google_compute_firewall</code></a></li>
+<li><a href="#resource-google_compute_forwarding_rule">Resource: <code>google_compute_forwarding_rule</code></a></li>
+<li><a href="#resource-google_compute_global_forwarding_rule">Resource: <code>google_compute_global_forwarding_rule</code></a></li>
+<li><a href="#resource-google_compute_health_check">Resource: <code>google_compute_health_check</code></a></li>
+<li><a href="#resource-google_compute_image">Resource: <code>google_compute_image</code></a></li>
+<li><a href="#resource-google_compute_instance">Resource: <code>google_compute_instance</code></a></li>
+<li><a href="#resource-google_compute_instance_group_manager">Resource: <code>google_compute_instance_group_manager</code></a></li>
+<li><a href="#resource-google_compute_instance_template">Resource: <code>google_compute_instance_template</code></a></li>
+<li><a href="#resource-google_compute_network">Resource: <code>google_compute_network</code></a></li>
+<li><a href="#resource-google_compute_network_peering">Resource: <code>google_compute_network_peering</code></a></li>
+<li><a href="#resource-google_compute_node_template">Resource: <code>google_compute_node_template</code></a></li>
+<li><a href="#resource-google_compute_region_backend_service">Resource: <code>google_compute_region_backend_service</code></a></li>
+<li><a href="#resource-google_compute_region_health_check">Resource: <code>google_compute_region_health_check</code></a></li>
+<li><a href="#resource-google_compute_instance_group_manager">Resource: <code>google_compute_region_instance_group_manager</code></a></li>
+<li><a href="#resource-google_compute_resource_policy">Resource: <code>google_compute_resource_policy</code></a></li>
+<li><a href="#resource-google_compute_route">Resource: <code>google_compute_route</code></a></li>
+<li><a href="#resource-google_compute_router">Resource: <code>google_compute_router</code></a></li>
+<li><a href="#resource-google_compute_router_peer">Resource: <code>google_compute_router_peer</code></a></li>
+<li><a href="#resource-google_compute_snapshot">Resource: <code>google_compute_snapshot</code></a></li>
+<li><a href="#resource-google_compute_subnetwork">Resource: <code>google_compute_subnetwork</code></a></li>
+<li><a href="#resource-google_container_cluster">Resource: <code>google_container_cluster</code></a></li>
+<li><a href="#resource-google_container_node_pool">Resource: <code>google_container_node_pool</code></a></li>
+<li><a href="#resource-google_dataproc_autoscaling_policy">Resource: <code>google_dataproc_autoscaling_policy</code></a></li>
+<li><a href="#resource-google_dataproc_cluster">Resource: <code>google_dataproc_cluster</code></a></li>
+<li><a href="#resource-google_dataproc_job">Resource: <code>google_dataproc_job</code></a></li>
+<li><a href="#resource-google_dns_managed_zone">Resource: <code>google_dns_managed_zone</code></a></li>
+<li><a href="#resource-google_dns_policy">Resource: <code>google_dns_policy</code></a></li>
+<li><a href="#resource-google_folder_organization_policy">Resource: <code>google_folder_organization_policy</code></a></li>
+<li><a href="#resource-google_healthcare_hl7_v2_store">Resource: <code>google_healthcare_hl7_v2_store</code></a></li>
+<li><a href="#resource-google_logging_metric">Resource: <code>google_logging_metric</code></a></li>
+<li><a href="#resource-google_mlengine_model">Resource: <code>google_mlengine_model</code></a></li>
+<li><a href="#resource-google_monitoring_alert_policy">Resource: <code>google_monitoring_alert_policy</code></a></li>
+<li><a href="#resource-google_monitoring_uptime_check_config">Resource: <code>google_monitoring_uptime_check_config</code></a></li>
+<li><a href="#resource-google_organization_policy">Resource: <code>google_organization_policy</code></a></li>
+<li><a href="#resource-google_project_iam_audit_config">Resource: <code>google_project_iam_audit_config</code></a></li>
+<li><a href="#resource-google_project_organization_policy">Resource: <code>google_project_organization_policy</code></a></li>
+<li><a href="#resource-google_project_service">Resource: <code>google_project_service</code></a></li>
+<li><a href="#resource-google_project_services">Resource: <code>google_project_services</code></a></li>
+<li><a href="#resource-google_pubsub_subscription">Resource: <code>google_pubsub_subscription</code></a></li>
+<li><a href="#resource-google_security_scanner_scan_config">Resource: <code>google_security_scanner_scan_config</code></a></li>
+<li><a href="#resource-google_service_account_key">Resource: <code>google_service_account_key</code></a></li>
+<li><a href="#resource-google_sql_database_instance">Resource: <code>google_sql_database_instance</code></a></li>
+<li><a href="#resource-google_storage_bucket">Resource: <code>google_storage_bucket</code></a></li>
+<li><a href="#resource-google_storage_transfer_job">Resource: <code>google_storage_transfer_job</code></a></li>
+<li><a href="#resource-google_tpu_node">Resource: <code>google_tpu_node</code></a></li>
+</ul>
+
+<!-- /TOC -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Version%20Configuration"></a><h2 id="provider-version-configuration">Provider Version Configuration</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Before upgrading to version 3.0.0, it is recommended to upgrade to the most recent <code>2.X</code> series release of the provider, make the changes noted in this guide, and ensure that your environment successfully runs <a href="https://www.terraform.io/docs/commands/plan.html"><code>terraform plan</code></a> without unexpected changes or deprecation notices.</p>
+</aside>
+
+<p>It is recommended to use <a href="https://www.terraform.io/docs/configuration/providers.html#provider-versions">version constraints</a>
+when configuring Terraform providers. If you are following that recommendation,
+update the version constraints in your Terraform configuration and run
+<a href="https://www.terraform.io/docs/commands/init.html"><code>terraform init</code></a> to download
+the new version.</p>
+
+<p>If you aren't using version constraints, you can use <code>terraform init -upgrade</code>
+in order to upgrade your provider to the latest released version.</p>
+
+<p>For example, given this previous configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 2.17.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An updated configuration:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configuration ...</span>
+
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 3.0.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider"></a><h2 id="provider">Provider</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Terraform%200.11%20no%20longer%20supported"></a><h3 id="terraform-011-no-longer-supported">Terraform 0.11 no longer supported</h3>
+
+<p>Support for Terraform 0.11 has been deprecated, and Terraform 0.12 or higher is
+required to <code>terraform init</code> the provider. See <a href="https://www.hashicorp.com/blog/deprecating-terraform-0-11-support-in-terraform-providers/">the blog post</a>
+for more information. It is recommended that you upgrade to Terraform 0.12 before
+upgrading to version 3.0.0 of the provider.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/userinfo.email%20added%20to%20default%20scopes"></a><h3 id="userinfoemail-added-to-default-scopes"><code>userinfo.email</code> added to default scopes</h3>
+
+<p><code>userinfo.email</code> has been added to the default set of OAuth scopes in the
+provider. This provides the Terraform user specified by <code>credentials</code>' (generally
+a service account) email address to GCP APIs in addition to an obfuscated user
+id; particularly, it makes the email of the Terraform user available for some
+Kubernetes and IAP use cases.</p>
+
+<p>If this was previously defined explicitly, the definition can now be removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Old%20Config"></a><h4 id="old-config">Old Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">scopes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"https://www.googleapis.com/auth/compute"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"https://www.googleapis.com/auth/cloud-platform"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"https://www.googleapis.com/auth/ndev.clouddns.readwrite"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"https://www.googleapis.com/auth/devstorage.full_control"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"https://www.googleapis.com/auth/userinfo.email"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Config"></a><h4 id="new-config">New Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"google"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ID%20Format%20Changes"></a><h2 id="id-format-changes">ID Format Changes</h2>
+
+<p>ID formats on many resources have changed. ID formats have standardized on being similar to the <code>self_link</code> of
+a resource. Users who depended on particular ID formats in previous versions may be impacted.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%3A%20google_container_engine_versions"></a><h2 id="data-source-google_container_engine_versions">Data Source: <code>google_container_engine_versions</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/region%20and%20zone%20are%20now%20removed"></a><h3 id="region-and-zone-are-now-removed"><code>region</code> and <code>zone</code> are now removed</h3>
+
+<p>Use <code>location</code> instead.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_access_context_manager_access_level"></a><h2 id="resource-google_access_context_manager_access_level">Resource: <code>google_access_context_manager_access_level</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/os_type%20is%20now%20required%20on%20block%20google_access_context_manager_access_level.basic.conditions.device_policy.os_constraints"></a><h3 id="os_type-is-now-required-on-block-google_access_context_manager_access_levelbasicconditionsdevice_policyos_constraints"><code>os_type</code> is now required on block <code>google_access_context_manager_access_level.basic.conditions.device_policy.os_constraints</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>os_type</code> is now
+required on the <code>basic.conditions.device_policy.os_constraints</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_access_context_manager_service_perimeter"></a><h2 id="resource-google_access_context_manager_service_perimeter">Resource: <code>google_access_context_manager_service_perimeter</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20resources%2C%20access_levels%2C%20or%20restricted_services%20is%20now%20required%20on%20google_accesscontextmanager_service_perimeter.status"></a><h3 id="at-least-one-of-resources-access_levels-or-restricted_services-is-now-required-on-google_accesscontextmanager_service_perimeterstatus">At least one of <code>resources</code>, <code>access_levels</code>, or <code>restricted_services</code> is now required on <code>google_accesscontextmanager_service_perimeter.status</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>resources</code>, <code>access_levels</code>,
+or <code>restricted_services</code> is now required on the <code>status</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_app_engine_application"></a><h2 id="resource-google_app_engine_application">Resource: <code>google_app_engine_application</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/split_health_checks%20is%20now%20required%20on%20block%20google_app_engine_application.feature_settings"></a><h3 id="split_health_checks-is-now-required-on-block-google_app_engine_applicationfeature_settings"><code>split_health_checks</code> is now required on block <code>google_app_engine_application.feature_settings</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>split_health_checks</code> is now
+required on the <code>feature_settings</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_app_engine_domain_mapping"></a><h2 id="resource-google_app_engine_domain_mapping">Resource: <code>google_app_engine_domain_mapping</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ssl_management_type%20is%20now%20required%20on%20google_app_engine_domain_mapping.ssl_settings"></a><h3 id="ssl_management_type-is-now-required-on-google_app_engine_domain_mappingssl_settings"><code>ssl_management_type</code> is now required on <code>google_app_engine_domain_mapping.ssl_settings</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>ssl_management_type</code> is now
+required on the <code>ssl_settings</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_app_engine_standard_app_version"></a><h2 id="resource-google_app_engine_standard_app_version">Resource: <code>google_app_engine_standard_app_version</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20zip%20or%20files%20is%20now%20required%20on%20google_app_engine_standard_app_version.deployment"></a><h3 id="at-least-one-of-zip-or-files-is-now-required-on-google_app_engine_standard_app_versiondeployment">At least one of <code>zip</code> or <code>files</code> is now required on <code>google_app_engine_standard_app_version.deployment</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>zip</code> or <code>files</code>
+is now required on the <code>deployment</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/shell%20is%20now%20required%20on%20google_app_engine_standard_app_version.entrypoint"></a><h3 id="shell-is-now-required-on-google_app_engine_standard_app_versionentrypoint"><code>shell</code> is now required on <code>google_app_engine_standard_app_version.entrypoint</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>shell</code> is now
+required on the <code>entrypoint</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/script_path%20is%20now%20required%20on%20google_app_engine_standard_app_version.handlers.script"></a><h3 id="script_path-is-now-required-on-google_app_engine_standard_app_versionhandlersscript"><code>script_path</code> is now required on <code>google_app_engine_standard_app_version.handlers.script</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>script_path</code> is now
+required on the <code>handlers.script</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/source_url%20is%20now%20required%20on%20google_app_engine_standard_app_version.deployment.files%20and%20google_app_engine_standard_app_version.deployment.zip"></a><h3 id="source_url-is-now-required-on-google_app_engine_standard_app_versiondeploymentfiles-and-google_app_engine_standard_app_versiondeploymentzip"><code>source_url</code> is now required on <code>google_app_engine_standard_app_version.deployment.files</code> and <code>google_app_engine_standard_app_version.deployment.zip</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>shell</code> is now
+required on the <code>deployment.files</code> and <code>deployment.zip</code> blocks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_bigquery_table"></a><h2 id="resource-google_bigquery_table">Resource: <code>google_bigquery_table</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20range%20or%20skip_leading_rows%20is%20now%20required%20on%20external_data_configuration.google_sheets_options"></a><h3 id="at-least-one-of-range-or-skip_leading_rows-is-now-required-on-external_data_configurationgoogle_sheets_options">At least one of <code>range</code> or <code>skip_leading_rows</code> is now required on <code>external_data_configuration.google_sheets_options</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one
+of <code>range</code> or <code>skip_leading_rows</code> is now required on the
+<code>external_data_configuration.google_sheets_options</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_bigtable_app_profile"></a><h2 id="resource-google_bigtable_app_profile">Resource: <code>google_bigtable_app_profile</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20single_cluster_routing%20or%20multi_cluster_routing_use_any%20is%20now%20required%20on%20google_bigtable_app_profile"></a><h3 id="exactly-one-of-single_cluster_routing-or-multi_cluster_routing_use_any-is-now-required-on-google_bigtable_app_profile">Exactly one of <code>single_cluster_routing</code> or <code>multi_cluster_routing_use_any</code> is now required on <code>google_bigtable_app_profile</code></h3>
+
+<p>In attempt to be more consistent with the API, exactly one of <code>single_cluster_routing</code> or
+<code>multi_cluster_routing_use_any</code> is now required on <code>google_bigtable_app_profile</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/cluster_id%20is%20now%20required%20on%20google_bigtable_app_profile.single_cluster_routing"></a><h3 id="cluster_id-is-now-required-on-google_bigtable_app_profilesingle_cluster_routing"><code>cluster_id</code> is now required on <code>google_bigtable_app_profile.single_cluster_routing</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>cluster_id</code> is now
+required on the <code>single_cluster_routing</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_binary_authorization_policy"></a><h2 id="resource-google_binary_authorization_policy">Resource: <code>google_binary_authorization_policy</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/name_pattern%20is%20now%20required%20on%20google_binary_authorization_policy.admission_whitelist_patterns"></a><h3 id="name_pattern-is-now-required-on-google_binary_authorization_policyadmission_whitelist_patterns"><code>name_pattern</code> is now required on <code>google_binary_authorization_policy.admission_whitelist_patterns</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>name_pattern</code> is now
+required on the <code>admission_whitelist_patterns</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/evaluation_mode%20and%20enforcement_mode%20are%20now%20required%20on%20google_binary_authorization_policy.cluster_admission_rules"></a><h3 id="evaluation_mode-and-enforcement_mode-are-now-required-on-google_binary_authorization_policycluster_admission_rules"><code>evaluation_mode</code> and <code>enforcement_mode</code> are now required on <code>google_binary_authorization_policy.cluster_admission_rules</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>evaluation_mode</code> and <code>enforcement_mode</code> are now
+required on the <code>cluster_admission_rules</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_cloudbuild_trigger"></a><h2 id="resource-google_cloudbuild_trigger">Resource: <code>google_cloudbuild_trigger</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20filename%20or%20build%20is%20now%20required%20on%20google_cloudbuild_trigger"></a><h3 id="exactly-one-of-filename-or-build-is-now-required-on-google_cloudbuild_trigger">Exactly one of <code>filename</code> or <code>build</code> is now required on <code>google_cloudbuild_trigger</code></h3>
+
+<p>In attempt to be more consistent with the API, exactly one of <code>filename</code> or <code>build</code> is now
+required on <code>google_cloudbuild_trigger</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20branch_name%2C%20tag_name%20or%20commit_sha%20is%20now%20required%20on%20google_cloudbuild_trigger.trigger_template"></a><h3 id="exactly-one-of-branch_name-tag_name-or-commit_sha-is-now-required-on-google_cloudbuild_triggertrigger_template">Exactly one of <code>branch_name</code>, <code>tag_name</code> or <code>commit_sha</code> is now required on <code>google_cloudbuild_trigger.trigger_template</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, exactly one
+of <code>branch_name</code>, <code>tag_name</code> or <code>commit_sha</code> is now required on the
+<code>trigger_template</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20pull_request%20or%20push%20is%20now%20required%20on%20google_cloudbuild_trigger.github"></a><h3 id="exactly-one-of-pull_request-or-push-is-now-required-on-google_cloudbuild_triggergithub">Exactly one of <code>pull_request</code> or <code>push</code> is now required on <code>google_cloudbuild_trigger.github</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, exactly one
+of <code>pull_request</code> or <code>push</code> is now required on the <code>github</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20branch%20or%20tag_name%20is%20now%20required%20on%20google_cloudbuild_trigger.github.push"></a><h3 id="exactly-one-of-branch-or-tag_name-is-now-required-on-google_cloudbuild_triggergithubpush">Exactly one of <code>branch</code> or <code>tag_name</code> is now required on <code>google_cloudbuild_trigger.github.push</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, exactly one
+of <code>branch</code> or <code>tag_name</code> is now required on the <code>github.push</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/steps%20is%20now%20required%20on%20google_cloudbuild_trigger.build."></a><h3 id="steps-is-now-required-on-google_cloudbuild_triggerbuild"><code>steps</code> is now required on <code>google_cloudbuild_trigger.build</code>.</h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>steps</code> is now
+required on the <code>build</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/name%20is%20now%20required%20on%20google_cloudbuild_trigger.build.steps"></a><h3 id="name-is-now-required-on-google_cloudbuild_triggerbuildsteps"><code>name</code> is now required on <code>google_cloudbuild_trigger.build.steps</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>name</code> is now
+required on the <code>build.steps</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/name%20and%20path%20are%20now%20required%20on%20google_cloudbuild_trigger.build.steps.volumes"></a><h3 id="name-and-path-are-now-required-on-google_cloudbuild_triggerbuildstepsvolumes"><code>name</code> and <code>path</code> are now required on <code>google_cloudbuild_trigger.build.steps.volumes</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>name</code> and <code>path</code> are now
+required on the <code>build.volumes</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_cloudfunctions_function"></a><h2 id="resource-google_cloudfunctions_function">Resource: <code>google_cloudfunctions_function</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/The%20runtime%20option%20nodejs6%20has%20been%20deprecated"></a><h3 id="the-runtime-option-nodejs6-has-been-deprecated">The <code>runtime</code> option <code>nodejs6</code> has been deprecated</h3>
+
+<p><code>nodejs6</code> has been deprecated and is no longer the default value for <code>runtime</code>.
+<code>runtime</code> is now required.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_cloudiot_registry"></a><h2 id="resource-google_cloudiot_registry">Resource: <code>google_cloudiot_registry</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Replace%20singular%20event%20notification%20config%20field%20with%20plural%20event_notification_configs"></a><h3 id="replace-singular-event-notification-config-field-with-plural-event_notification_configs">Replace singular event notification config field with plural <code>event_notification_configs</code></h3>
+
+<p>Use the plural field <code>event_notification_configs</code> instead of
+<code>event_notification_config</code>, which has now been removed.
+Since the Cloud IoT API now accept multiple event notification configs for a
+registry, the singular field no longer exists on the API resource and has been
+removed from Terraform to prevent conflicts.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Old%20Config"></a><h4 id="old-config-2">Old Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_cloudiot_registry"</span><span class="w"> </span><span class="nv">"myregistry"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"%s"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">event_notification_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">pubsub_topic_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_pubsub_topic.event-topic.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Config"></a><h4 id="new-config-2">New Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_cloudiot_registry"</span><span class="w"> </span><span class="nv">"myregistry"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"%s"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">event_notification_configs</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">pubsub_topic_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_pubsub_topic.event-topic.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/public_key_certificate%20is%20now%20required%20on%20block%20google_cloudiot_registry.credentials"></a><h3 id="public_key_certificate-is-now-required-on-block-google_cloudiot_registrycredentials"><code>public_key_certificate</code> is now required on block <code>google_cloudiot_registry.credentials</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>public_key_certificate</code> is now
+required on the <code>credentials</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_cloud_run_service"></a><h2 id="resource-google_cloud_run_service">Resource: <code>google_cloud_run_service</code></h2>
+
+<p>Google Cloud Run Service is being released at v1 and there are breaking schema changes that have arisen from changing the underlying API. These breaking changes only affect the Beta version of the resource as it was not previously available in the GA provider.</p>
+
+<p>To support partial rollouts of different revisions, the <code>spec</code> block is now nested under <code>template</code> and a second <code>metadata</code> block has been added alongside <code>spec</code>. Now users can make a change and, using a named revision, they can control the rollout of that revision with a higher granularity.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Old%20Config"></a><h4 id="old-config-3">Old Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_cloud_run_service"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">spec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">containers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gcr.io/cloudrun/hello"</span><span class="w"></span>
+<span class="w">      </span><span class="na">args</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"arrg2", "pirate"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_concurrency</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Config"></a><h4 id="new-config-3">New Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_cloud_run_service"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">template</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">spec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">containers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"gcr.io/cloudrun/hello"</span><span class="w"></span>
+<span class="w">        </span><span class="na">args</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"arrg2", "pirate"</span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="na">container_concurrency</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">10</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">metadata</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">annotations</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"autoscaling.knative.dev/maxScale"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1000"</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"run.googleapis.com/client-name"</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"revision-name"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_cloudscheduler_job"></a><h2 id="resource-google_cloudscheduler_job">Resource: <code>google_cloudscheduler_job</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20pubsub_target%2C%20http_target%20or%20app_engine_http_target%20is%20required%20on%20google_cloudscheduler_job"></a><h3 id="exactly-one-of-pubsub_target-http_target-or-app_engine_http_target-is-required-on-google_cloudscheduler_job">Exactly one of <code>pubsub_target</code>, <code>http_target</code> or <code>app_engine_http_target</code> is required on <code>google_cloudscheduler_job</code></h3>
+
+<p>In attempt to be more consistent with the API, exactly one of <code>pubsub_target</code>, <code>http_target</code>
+or <code>app_engine_http_target</code> is now required on <code>google_cloudscheduler_job</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/service_account_email%20is%20now%20required%20on%20google_cloudscheduler_job.http_target.oauth_token%20and%20google_cloudscheduler_job.http_target.oidc_token."></a><h3 id="service_account_email-is-now-required-on-google_cloudscheduler_jobhttp_targetoauth_token-and-google_cloudscheduler_jobhttp_targetoidc_token"><code>service_account_email</code> is now required on <code>google_cloudscheduler_job.http_target.oauth_token</code> and <code>google_cloudscheduler_job.http_target.oidc_token</code>.</h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>service_account_email</code> is now
+required on the <code>http_target.oauth_token</code> and <code>http_target.oidc_token</code> blocks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20retry_count%2C%20max_retry_duration%2C%20min_backoff_duration%2C%20max_backoff_duration%2C%20or%20max_doublings%20is%20now%20required%20on%20google_cloud_scheduler_job.retry_config"></a><h3 id="at-least-one-of-retry_count-max_retry_duration-min_backoff_duration-max_backoff_duration-or-max_doublings-is-now-required-on-google_cloud_scheduler_jobretry_config">At least one of <code>retry_count</code>, <code>max_retry_duration</code>, <code>min_backoff_duration</code>, <code>max_backoff_duration</code>, or <code>max_doublings</code> is now required on <code>google_cloud_scheduler_job.retry_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>retry_count</code>,
+<code>max_retry_duration</code>, <code>min_backoff_duration</code>, <code>max_backoff_duration</code>, or <code>max_doublings</code> is
+now required on the <code>retry_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20service%2C%20version%2C%20or%20instance%20is%20now%20required%20on%20google_cloud_scheduler_job.app_engine_http_target.app_engine_routing"></a><h3 id="at-least-one-of-service-version-or-instance-is-now-required-on-google_cloud_scheduler_jobapp_engine_http_targetapp_engine_routing">At least one of <code>service</code>, <code>version</code>, or <code>instance</code> is now required on <code>google_cloud_scheduler_job.app_engine_http_target.app_engine_routing</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>service</code>,
+<code>version</code>, or <code>instance</code> is now required on the <code>app_engine_http_target.app_engine_routing</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_composer_environment"></a><h2 id="resource-google_composer_environment">Resource: <code>google_composer_environment</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20airflow_config_overrides%2C%20pypi_packages%2C%20env_variables%2C%20image_version%2C%20python_version%20or%20scheduler_count%20is%20now%20required%20on%20google_composer_environment.config.software_config"></a><h3 id="at-least-one-of-airflow_config_overrides-pypi_packages-env_variables-image_version-python_version-or-scheduler_count-is-now-required-on-google_composer_environmentconfigsoftware_config">At least one of <code>airflow_config_overrides</code>, <code>pypi_packages</code>, <code>env_variables</code>, <code>image_version</code>, <code>python_version</code> or <code>scheduler_count</code> is now required on <code>google_composer_environment.config.software_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>airflow_config_overrides</code>,
+<code>pypi_packages</code>, <code>env_variables</code>, <code>image_version</code>, <code>python_version</code> or <code>scheduler_count</code> is now required on the
+<code>config.software_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/use_ip_aliases%20is%20now%20required%20on%20block%20google_composer_environment.ip_allocation_policy"></a><h3 id="use_ip_aliases-is-now-required-on-block-google_composer_environmentip_allocation_policy"><code>use_ip_aliases</code> is now required on block <code>google_composer_environment.ip_allocation_policy</code></h3>
+
+<p>Previously the default value of <code>use_ip_aliases</code> was <code>true</code>. In an attempt to avoid allowing empty blocks
+in config files, <code>use_ip_aliases</code> is now required on the <code>ip_allocation_policy</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20enable_private_endpoint%20or%20master_ipv4_cidr_block%20is%20now%20required%20on%20google_composer_environment.config.private_environment_config"></a><h3 id="at-least-one-of-enable_private_endpoint-or-master_ipv4_cidr_block-is-now-required-on-google_composer_environmentconfigprivate_environment_config">At least one of <code>enable_private_endpoint</code> or <code>master_ipv4_cidr_block</code> is now required on <code>google_composer_environment.config.private_environment_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>enable_private_endpoint</code> or <code>master_ipv4_cidr_block</code> is now required on the
+<code>config.private_environment_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20node_count%2C%20node_config%2C%20software_config%20or%20private_environment_config%20required%20on%20google_composer_environment.config"></a><h3 id="at-least-one-of-node_count-node_config-software_config-or-private_environment_config-required-on-google_composer_environmentconfig">At least one of <code>node_count</code>, <code>node_config</code>, <code>software_config</code> or <code>private_environment_config</code> required on <code>google_composer_environment.config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>node_count</code>, <code>node_config</code>, <code>software_config</code> or <code>private_environment_config</code> is now required on the <code>config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_backend_bucket"></a><h2 id="resource-google_compute_backend_bucket">Resource: <code>google_compute_backend_bucket</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/signed_url_cache_max_age_sec%20is%20now%20required%20on%20google_compute_backend_bucket.autoscaling_policy.cdn_policy"></a><h3 id="signed_url_cache_max_age_sec-is-now-required-on-google_compute_backend_bucketautoscaling_policycdn_policy"><code>signed_url_cache_max_age_sec</code> is now required on <code>google_compute_backend_bucket.autoscaling_policy.cdn_policy</code></h3>
+
+<p>Previously the default value of <code>signed_url_cache_max_age_sec</code> was <code>3600</code>. In an attempt to avoid allowing empty
+blocks in config files, <code>signed_url_cache_max_age_sec</code> is now required on the
+<code>autoscaling_policy.cdn_policy</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_backend_service"></a><h2 id="resource-google_compute_backend_service">Resource: <code>google_compute_backend_service</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20connect_timeout%2C%20max_requests_per_connection%2C%20max_connections%2C%20max_pending_requests%2C%20max_requests%2C%20%20or%20max_retries%20is%20now%20required%20on%20google_compute_backend_service.circuit_breakers"></a><h3 id="at-least-one-of-connect_timeout-max_requests_per_connection-max_connections-max_pending_requests-max_requests-or-max_retries-is-now-required-on-google_compute_backend_servicecircuit_breakers">At least one of <code>connect_timeout</code>, <code>max_requests_per_connection</code>, <code>max_connections</code>, <code>max_pending_requests</code>, <code>max_requests</code>,  or <code>max_retries</code> is now required on <code>google_compute_backend_service.circuit_breakers</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>connect_timeout</code>,
+<code>max_requests_per_connection</code>, <code>max_connections</code>, <code>max_pending_requests</code>, <code>max_requests</code>,
+or <code>max_retries</code> is now required on the <code>circuit_breakers</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20ttl%2C%20name%2C%20or%20path%20is%20now%20required%20on%20google_compute_backend_service.consistent_hash.http_cookie"></a><h3 id="at-least-one-of-ttl-name-or-path-is-now-required-on-google_compute_backend_serviceconsistent_hashhttp_cookie">At least one of <code>ttl</code>, <code>name</code>, or <code>path</code> is now required on <code>google_compute_backend_service.consistent_hash.http_cookie</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>ttl</code>, <code>name</code>, or <code>path</code>
+is now required on the <code>consistent_hash.http_cookie</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20http_cookie%2C%20http_header_name%2C%20or%20minimum_ring_size%20is%20now%20required%20on%20google_compute_backend_service.consistent_hash"></a><h3 id="at-least-one-of-http_cookie-http_header_name-or-minimum_ring_size-is-now-required-on-google_compute_backend_serviceconsistent_hash">At least one of <code>http_cookie</code>, <code>http_header_name</code>, or <code>minimum_ring_size</code> is now required on <code>google_compute_backend_service.consistent_hash</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>http_cookie</code>,
+<code>http_header_name</code>, or <code>minimum_ring_size</code> is now required on the <code>consistent_hash</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20cache_key_policy%20or%20signed_url_cache_max_age_sec%20is%20now%20required%20on%20google_compute_backend_service.cdn_policy"></a><h3 id="at-least-one-of-cache_key_policy-or-signed_url_cache_max_age_sec-is-now-required-on-google_compute_backend_servicecdn_policy">At least one of <code>cache_key_policy</code> or <code>signed_url_cache_max_age_sec</code> is now required on <code>google_compute_backend_service.cdn_policy</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>cache_key_policy</code> or
+<code>signed_url_cache_max_age_sec</code> is now required on the <code>cdn_policy</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20include_host%2C%20include_protocol%2C%20include_query_string%2C%20query_string_blacklist%2C%20or%20query_string_whitelist%20is%20now%20required%20on%20google_compute_backend_service.cdn_policy.cache_key_policy"></a><h3 id="at-least-one-of-include_host-include_protocol-include_query_string-query_string_blacklist-or-query_string_whitelist-is-now-required-on-google_compute_backend_servicecdn_policycache_key_policy">At least one of <code>include_host</code>, <code>include_protocol</code>, <code>include_query_string</code>, <code>query_string_blacklist</code>, or <code>query_string_whitelist</code> is now required on <code>google_compute_backend_service.cdn_policy.cache_key_policy</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>include_host</code>,
+<code>include_protocol</code>, <code>include_query_string</code>, <code>query_string_blacklist</code>, or <code>query_string_whitelist</code>
+is now required on the <code>cdn_policy.cache_key_policy</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20base_ejection_time%2C%20consecutive_errors%2C%20consecutive_gateway_failure%2C%20enforcing_consecutive_errors%2C%20enforcing_consecutive_gateway_failure%2C%20enforcing_success_rate%2C%20interval%2C%20max_ejection_percent%2C%20success_rate_minimum_hosts%2C%20success_rate_request_volume%2C%20or%20success_rate_stdev_factor%20is%20now%20required%20on%20google_compute_backend_service.outlier_detection"></a><h3 id="at-least-one-of-base_ejection_time-consecutive_errors-consecutive_gateway_failure-enforcing_consecutive_errors-enforcing_consecutive_gateway_failure-enforcing_success_rate-interval-max_ejection_percent-success_rate_minimum_hosts-success_rate_request_volume-or-success_rate_stdev_factor-is-now-required-on-google_compute_backend_serviceoutlier_detection">At least one of <code>base_ejection_time</code>, <code>consecutive_errors</code>, <code>consecutive_gateway_failure</code>, <code>enforcing_consecutive_errors</code>, <code>enforcing_consecutive_gateway_failure</code>, <code>enforcing_success_rate</code>, <code>interval</code>, <code>max_ejection_percent</code>, <code>success_rate_minimum_hosts</code>, <code>success_rate_request_volume</code>, or <code>success_rate_stdev_factor</code> is now required on <code>google_compute_backend_service.outlier_detection</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>base_ejection_time</code>,
+<code>consecutive_errors</code>, <code>consecutive_gateway_failure</code>, <code>enforcing_consecutive_errors</code>,
+<code>enforcing_consecutive_gateway_failure</code>, <code>enforcing_success_rate</code>, <code>interval</code>, <code>max_ejection_percent</code>,
+<code>success_rate_minimum_hosts</code>, <code>success_rate_request_volume</code>, or <code>success_rate_stdev_factor</code>
+is now required on the <code>outlier_detection</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20enable%20or%20sample_rate%20is%20now%20required%20on%20google_compute_backend_service.log_config"></a><h3 id="at-least-one-of-enable-or-sample_rate-is-now-required-on-google_compute_backend_servicelog_config">At least one of <code>enable</code> or <code>sample_rate</code> is now required on <code>google_compute_backend_service.log_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>enable</code> or <code>sample_rate</code>
+is now required on the <code>log_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_firewall"></a><h2 id="resource-google_compute_firewall">Resource: <code>google_compute_firewall</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20allow%20or%20deny%20is%20required%20on%20google_compute_firewall"></a><h3 id="exactly-one-of-allow-or-deny-is-required-on-google_compute_firewall">Exactly one of <code>allow</code> or <code>deny</code> is required on <code>google_compute_firewall</code></h3>
+
+<p>In attempt to be more consistent with the API, exactly one of <code>allowed</code> or <code>denied</code>
+is now required on <code>google_compute_firewall</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_forwarding_rule"></a><h2 id="resource-google_compute_forwarding_rule">Resource: <code>google_compute_forwarding_rule</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ip_version%20is%20now%20removed"></a><h3 id="ip_version-is-now-removed"><code>ip_version</code> is now removed</h3>
+
+<p><code>ip_version</code> is not used for regional forwarding rules.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ip_address%20is%20now%20strictly%20validated%20to%20enforce%20literal%20IP%20address%20format"></a><h3 id="ip_address-is-now-strictly-validated-to-enforce-literal-ip-address-format"><code>ip_address</code> is now strictly validated to enforce literal IP address format</h3>
+
+<p>Previously documentation suggested Terraform could use the same range of valid
+IP Address formats for <code>ip_address</code> as accepted by the API (e.g. named addresses
+or URLs to GCP Address resources). However, the server returns only literal IP
+addresses and thus caused diffs on re-apply (i.e. a permadiff). We amended
+documentation to say Terraform only accepts literal IP addresses.</p>
+
+<p>This is now strictly validated. While this shouldn't have a large breaking
+impact as users would have already run into permadiff issues on re-apply,
+there might be validation errors for existing configs. The solution is be to
+replace other address formats with the IP address, either manually or by
+interpolating values from a <code>google_compute_address</code> resource.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Old%20Config%20%28that%20would%20have%20permadiff%29"></a><h4 id="old-config-that-would-have-permadiff">Old Config (that would have permadiff)</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_address"</span><span class="w"> </span><span class="nv">"my-addr"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-addr"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_forwarding_rule"</span><span class="w"> </span><span class="nv">"frule"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-forwarding-rule"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">address</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_address.my-addr.self_link</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Config"></a><h4 id="new-config-4">New Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_address"</span><span class="w"> </span><span class="nv">"my-addr"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-addr"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_forwarding_rule"</span><span class="w"> </span><span class="nv">"frule"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-forwarding-rule"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">address</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_address.my-addr.address</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_global_forwarding_rule"></a><h2 id="resource-google_compute_global_forwarding_rule">Resource: <code>google_compute_global_forwarding_rule</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ip_address%20is%20now%20validated%20to%20enforce%20literal%20IP%20address%20format"></a><h3 id="ip_address-is-now-validated-to-enforce-literal-ip-address-format"><code>ip_address</code> is now validated to enforce literal IP address format</h3>
+
+<p>See <a href="#resource-google_compute_forwarding_rule"><code>google_compute_forwarding_rule</code></a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_health_check"></a><h2 id="resource-google_compute_health_check">Resource: <code>google_compute_health_check</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20http_health_check%2C%20https_health_check%2C%20http2_health_check%2C%20tcp_health_check%20or%20ssl_health_check%20is%20required%20on%20google_compute_health_check"></a><h3 id="exactly-one-of-http_health_check-https_health_check-http2_health_check-tcp_health_check-or-ssl_health_check-is-required-on-google_compute_health_check">Exactly one of <code>http_health_check</code>, <code>https_health_check</code>, <code>http2_health_check</code>, <code>tcp_health_check</code> or <code>ssl_health_check</code> is required on <code>google_compute_health_check</code></h3>
+
+<p>In attempt to be more consistent with the API, exactly one of <code>http_health_check</code>, <code>https_health_check</code>,
+<code>http2_health_check</code>, <code>tcp_health_check</code> or <code>ssl_health_check</code> is now required on
+<code>google_compute_health_check</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20host%2C%20request_path%2C%20response%2C%20port%2C%20port_name%2C%20proxy_header%2C%20or%20port_specification%20is%20now%20required%20on%20google_compute_health_check.http_health_check%2C%20google_compute_health_check.https_health_check%20and%20google_compute_health_check.http2_health_check"></a><h3 id="at-least-one-of-host-request_path-response-port-port_name-proxy_header-or-port_specification-is-now-required-on-google_compute_health_checkhttp_health_check-google_compute_health_checkhttps_health_check-and-google_compute_health_checkhttp2_health_check">At least one of <code>host</code>, <code>request_path</code>, <code>response</code>, <code>port</code>, <code>port_name</code>, <code>proxy_header</code>, or <code>port_specification</code> is now required on <code>google_compute_health_check.http_health_check</code>, <code>google_compute_health_check.https_health_check</code> and <code>google_compute_health_check.http2_health_check</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>host</code>, <code>request_path</code>, <code>response</code>,
+<code>port</code>, <code>port_name</code>, <code>proxy_header</code>, or <code>port_specification</code> is now required on the
+<code>http_health_check</code>, <code>https_health_check</code> and <code>http2_health_check</code> blocks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20request%2C%20response%2C%20port%2C%20port_name%2C%20proxy_header%2C%20or%20port_specification%20is%20now%20required%20on%20google_compute_health_check.ssl_health_check%20and%20google_compute_health_check.tcp_health_check"></a><h3 id="at-least-one-of-request-response-port-port_name-proxy_header-or-port_specification-is-now-required-on-google_compute_health_checkssl_health_check-and-google_compute_health_checktcp_health_check">At least one of <code>request</code>, <code>response</code>, <code>port</code>, <code>port_name</code>, <code>proxy_header</code>, or <code>port_specification</code> is now required on <code>google_compute_health_check.ssl_health_check</code> and <code>google_compute_health_check.tcp_health_check</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>request</code>, <code>response</code>, <code>port</code>, <code>port_name</code>,
+<code>proxy_header</code>, or <code>port_specification</code> is now required on the <code>ssl_health_check</code> and <code>tcp_health_check</code> blocks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_image"></a><h2 id="resource-google_compute_image">Resource: <code>google_compute_image</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/type%20is%20now%20required%20on%20google_compute_image.guest_os_features"></a><h3 id="type-is-now-required-on-google_compute_imageguest_os_features"><code>type</code> is now required on <code>google_compute_image.guest_os_features</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>type</code> is now required on the
+<code>guest_os_features</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_instance"></a><h2 id="resource-google_compute_instance">Resource: <code>google_compute_instance</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/interface%20is%20now%20required%20on%20block%20google_compute_instance.scratch_disk"></a><h3 id="interface-is-now-required-on-block-google_compute_instancescratch_disk"><code>interface</code> is now required on block <code>google_compute_instance.scratch_disk</code></h3>
+
+<p>Previously the default value of <code>interface</code> was <code>SCSI</code>. In an attempt to avoid allowing empty blocks
+in config files, <code>interface</code> is now required on the <code>scratch_disk</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20auto_delete%2C%20device_name%2C%20disk_encryption_key_raw%2C%20kms_key_self_link%2C%20initialize_params%2C%20mode%20or%20source%20is%20now%20required%20on%20google_compute_instance.boot_disk"></a><h3 id="at-least-one-of-auto_delete-device_name-disk_encryption_key_raw-kms_key_self_link-initialize_params-mode-or-source-is-now-required-on-google_compute_instanceboot_disk">At least one of <code>auto_delete</code>, <code>device_name</code>, <code>disk_encryption_key_raw</code>, <code>kms_key_self_link</code>, <code>initialize_params</code>, <code>mode</code> or <code>source</code> is now required on <code>google_compute_instance.boot_disk</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>auto_delete</code>, <code>device_name</code>,
+<code>disk_encryption_key_raw</code>, <code>kms_key_self_link</code>, <code>initialize_params</code>, <code>mode</code> or <code>source</code> is now required on the
+<code>boot_disk</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20size%2C%20type%2C%20image%2C%20or%20labels%20is%20now%20required%20on%20google_compute_instance.boot_disk.initialize_params"></a><h3 id="at-least-one-of-size-type-image-or-labels-is-now-required-on-google_compute_instanceboot_diskinitialize_params">At least one of <code>size</code>, <code>type</code>, <code>image</code>, or <code>labels</code> is now required on <code>google_compute_instance.boot_disk.initialize_params</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>size</code>, <code>type</code>, <code>image</code>, or <code>labels</code>
+is now required on the <code>initialize_params</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20enable_secure_boot%2C%20enable_vtpm%2C%20or%20enable_integrity_monitoring%20is%20now%20required%20on%20google_compute_instance.shielded_instance_config"></a><h3 id="at-least-one-of-enable_secure_boot-enable_vtpm-or-enable_integrity_monitoring-is-now-required-on-google_compute_instanceshielded_instance_config">At least one of <code>enable_secure_boot</code>, <code>enable_vtpm</code>, or <code>enable_integrity_monitoring</code> is now required on <code>google_compute_instance.shielded_instance_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>enable_secure_boot</code>, <code>enable_vtpm</code>,
+or <code>enable_integrity_monitoring</code> is now required on the <code>shielded_instance_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20on_host_maintenance%2C%20automatic_restart%2C%20preemptible%2C%20or%20node_affinities%20is%20now%20required%20on%20google_compute_instance.scheduling"></a><h3 id="at-least-one-of-on_host_maintenance-automatic_restart-preemptible-or-node_affinities-is-now-required-on-google_compute_instancescheduling">At least one of <code>on_host_maintenance</code>, <code>automatic_restart</code>, <code>preemptible</code>, or <code>node_affinities</code> is now required on <code>google_compute_instance.scheduling</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>on_host_maintenance</code>, <code>automatic_restart</code>,
+<code>preemptible</code>, or <code>node_affinities</code> is now required on the <code>scheduling</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_instance_group_manager"></a><h2 id="resource-google_compute_instance_group_manager">Resource: <code>google_compute_instance_group_manager</code></h2>
+
+<p>The following changes apply to both <code>google_compute_instance_group_manager</code> and <code>google_compute_region_instance_group_manager</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/instance_template%20has%20been%20replaced%20by%20version.instance_template"></a><h3 id="instance_template-has-been-replaced-by-versioninstance_template"><code>instance_template</code> has been replaced by <code>version.instance_template</code></h3>
+
+<p>Instance group managers should be using <code>version</code> blocks to reference which
+instance template to use for provisioning. To upgrade use a single <code>version</code>
+block with <code>instance_template</code> in your config and by default all traffic will be
+directed to that version.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Old%20Config"></a><h3 id="old-config-4">Old Config</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_group_manager"</span><span class="w"> </span><span class="nv">"my_igm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-igm"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-c"</span><span class="w"></span>
+<span class="w">  </span><span class="na">base_instance_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"igm"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">instance_template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance_template.my_tmpl.self_link</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Config"></a><h3 id="new-config-5">New Config</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_group_manager"</span><span class="w"> </span><span class="nv">"my_igm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-igm"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-c"</span><span class="w"></span>
+<span class="w">  </span><span class="na">base_instance_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"igm"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">version</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod"</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_instance_template.my_tmpl.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/update_strategy%20has%20been%20replaced%20by%20update_policy"></a><h3 id="update_strategy-has-been-replaced-by-update_policy"><code>update_strategy</code> has been replaced by <code>update_policy</code></h3>
+
+<p>To allow much greater control over the updates happening to instance groups
+<code>update_strategy</code> has been replaced by <code>update_policy</code>. The functionality controlled by <code>update_strategy</code> is now controlled by a combination of <code>update_policy.type</code> and <code>update_policy.minimal_action</code>. <code>update_strategy = NONE</code> can be achieved with <code>type = OPPORTUNISTIC</code>. The previous values of <code>RESTART</code> and <code>REPLACE</code> were both <code>PROACTIVE</code> types implicitly previously but can now be controlled explicitly.</p>
+
+<p>For more details see the
+<a href="https://cloud.google.com/compute/docs/instance-groups/rolling-out-updates-to-managed-instance-groups">official guide</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Old%20Config"></a><h3 id="old-config-5">Old Config</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_group_manager"</span><span class="w"> </span><span class="nv">"my_igm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-igm"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-c"</span><span class="w"></span>
+<span class="w">  </span><span class="na">base_instance_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"igm"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">instance_template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${google_compute_instance_template.my_tmpl.self_link}"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">update_strategy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"NONE"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Config"></a><h3 id="new-config-6">New Config</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_instance_group_manager"</span><span class="w"> </span><span class="nv">"my_igm"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-igm"</span><span class="w"></span>
+<span class="w">  </span><span class="na">zone</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1-c"</span><span class="w"></span>
+<span class="w">  </span><span class="na">base_instance_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"igm"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">version</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod"</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_template</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${google_compute_instance_template.my_tmpl.self_link}"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">update_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">minimal_action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"RESTART"</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"OPPORTUNISTIC"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_instance_template"></a><h2 id="resource-google_compute_instance_template">Resource: <code>google_compute_instance_template</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20enable_secure_boot%2C%20enable_vtpm%2C%20or%20enable_integrity_monitoring%20is%20now%20required%20on%20google_compute_instance_template.shielded_instance_config"></a><h3 id="at-least-one-of-enable_secure_boot-enable_vtpm-or-enable_integrity_monitoring-is-now-required-on-google_compute_instance_templateshielded_instance_config">At least one of <code>enable_secure_boot</code>, <code>enable_vtpm</code>, or <code>enable_integrity_monitoring</code> is now required on <code>google_compute_instance_template.shielded_instance_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>enable_secure_boot</code>, <code>enable_vtpm</code>, or
+<code>enable_integrity_monitoring</code> is now required on the <code>shielded_instance_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20on_host_maintenance%2C%20automatic_restart%2C%20preemptible%2C%20or%20node_affinities%20is%20now%20required%20on%20google_compute_instance_template.scheduling"></a><h3 id="at-least-one-of-on_host_maintenance-automatic_restart-preemptible-or-node_affinities-is-now-required-on-google_compute_instance_templatescheduling">At least one of <code>on_host_maintenance</code>, <code>automatic_restart</code>, <code>preemptible</code>, or <code>node_affinities</code> is now required on <code>google_compute_instance_template.scheduling</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>on_host_maintenance</code>, <code>automatic_restart</code>,
+<code>preemptible</code>, or <code>node_affinities</code> is now required on the <code>scheduling</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Disks%20with%20invalid%20scratch%20disk%20configurations%20are%20now%20rejected"></a><h3 id="disks-with-invalid-scratch-disk-configurations-are-now-rejected">Disks with invalid scratch disk configurations are now rejected</h3>
+
+<p>The instance template API allows specifying invalid configurations in some cases,
+and an error is only returned when attempting to provision them. Terraform will
+now report that some configs that previously appeared valid at plan time are
+now invalid.</p>
+
+<p>A disk with <code>type</code> <code>"SCRATCH"</code> must have <code>disk_type</code> <code>"local-ssd"</code> and a size of 375GB. For example,
+the following is valid:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_delete</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"SCRATCH"</span><span class="w"></span>
+<span class="w">  </span><span class="na">disk_type</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"local-ssd"</span><span class="w"></span>
+<span class="w">  </span><span class="na">disk_size_gb</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">375</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>These configs would have been accepted by Terraform previously, but will now
+fail:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://www.googleapis.com/compute/v1/projects/centos-cloud/global/images/centos-7-v20210217"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_delete</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"SCRATCH"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_image</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://www.googleapis.com/compute/v1/projects/centos-cloud/global/images/centos-7-v20210217"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_delete</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">disk_type</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"local-ssd"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">disk</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_delete</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">"SCRATCH"</span><span class="w"></span>
+<span class="w">  </span><span class="na">disk_type</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"local-ssd"</span><span class="w"></span>
+<span class="w">  </span><span class="na">disk_size_gb</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">300</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/kms_key_self_link%20is%20now%20required%20on%20block%20google_compute_instance_template.disk_encryption_key"></a><h3 id="kms_key_self_link-is-now-required-on-block-google_compute_instance_templatedisk_encryption_key"><code>kms_key_self_link</code> is now required on block <code>google_compute_instance_template.disk_encryption_key</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>kms_key_self_link</code> is now
+required on the <code>disk_encryption_key</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_network"></a><h2 id="resource-google_compute_network">Resource: <code>google_compute_network</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ipv4_range%20is%20now%20removed"></a><h3 id="ipv4_range-is-now-removed"><code>ipv4_range</code> is now removed</h3>
+
+<p>Legacy Networks are removed and you will no longer be able to create them
+using this field from Feb 1, 2020 onwards.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_network_peering"></a><h2 id="resource-google_compute_network_peering">Resource: <code>google_compute_network_peering</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/auto_create_routes%20is%20now%20removed"></a><h3 id="auto_create_routes-is-now-removed"><code>auto_create_routes</code> is now removed</h3>
+
+<p><code>auto_create_routes</code> has been removed because it's redundant and not
+user-configurable.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_node_template"></a><h2 id="resource-google_compute_node_template">Resource: <code>google_compute_node_template</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20cpus%20or%20memory%20is%20now%20required%20on%20google_compute_node_template.node_type_flexibility"></a><h3 id="at-least-one-of-cpus-or-memory-is-now-required-on-google_compute_node_templatenode_type_flexibility">At least one of <code>cpus</code> or <code>memory</code> is now required on <code>google_compute_node_template.node_type_flexibility</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>cpus</code> or <code>memory</code>
+is now required on the <code>node_type_flexibility</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_region_backend_service"></a><h2 id="resource-google_compute_region_backend_service">Resource: <code>google_compute_region_backend_service</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20connect_timeout%2C%20max_requests_per_connection%2C%20max_connections%2C%20max_pending_requests%2C%20max_requests%2C%20%20or%20max_retries%20is%20now%20required%20on%20google_compute_region_backend_service.circuit_breakers"></a><h3 id="at-least-one-of-connect_timeout-max_requests_per_connection-max_connections-max_pending_requests-max_requests-or-max_retries-is-now-required-on-google_compute_region_backend_servicecircuit_breakers">At least one of <code>connect_timeout</code>, <code>max_requests_per_connection</code>, <code>max_connections</code>, <code>max_pending_requests</code>, <code>max_requests</code>,  or <code>max_retries</code> is now required on <code>google_compute_region_backend_service.circuit_breakers</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>connect_timeout</code>,
+<code>max_requests_per_connection</code>, <code>max_connections</code>, <code>max_pending_requests</code>, <code>max_requests</code>,
+or <code>max_retries</code> is now required on the <code>circuit_breakers</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20ttl%2C%20name%2C%20or%20path%20is%20now%20required%20on%20google_compute_region_backend_service.consistent_hash.http_cookie"></a><h3 id="at-least-one-of-ttl-name-or-path-is-now-required-on-google_compute_region_backend_serviceconsistent_hashhttp_cookie">At least one of <code>ttl</code>, <code>name</code>, or <code>path</code> is now required on <code>google_compute_region_backend_service.consistent_hash.http_cookie</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>ttl</code>, <code>name</code>, or <code>path</code>
+is now required on the <code>consistent_hash.http_cookie</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20http_cookie%2C%20http_header_name%2C%20or%20minimum_ring_size%20is%20now%20required%20on%20google_compute_region_backend_service.consistent_hash"></a><h3 id="at-least-one-of-http_cookie-http_header_name-or-minimum_ring_size-is-now-required-on-google_compute_region_backend_serviceconsistent_hash">At least one of <code>http_cookie</code>, <code>http_header_name</code>, or <code>minimum_ring_size</code> is now required on <code>google_compute_region_backend_service.consistent_hash</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>http_cookie</code>,
+<code>http_header_name</code>, or <code>minimum_ring_size</code> is now required on the <code>consistent_hash</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20disable_connection_drain_on_failover%2C%20drop_traffic_if_unhealthy%2C%20or%20failover_ratio%20is%20now%20required%20on%20google_compute_region_backend_service.failover_policy"></a><h3 id="at-least-one-of-disable_connection_drain_on_failover-drop_traffic_if_unhealthy-or-failover_ratio-is-now-required-on-google_compute_region_backend_servicefailover_policy">At least one of <code>disable_connection_drain_on_failover</code>, <code>drop_traffic_if_unhealthy</code>, or <code>failover_ratio</code> is now required on <code>google_compute_region_backend_service.failover_policy</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>disable_connection_drain_on_failover</code>,
+<code>drop_traffic_if_unhealthy</code>, or <code>failover_ratio</code> is now required on the <code>failover_policy</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20base_ejection_time%2C%20consecutive_errors%2C%20consecutive_gateway_failure%2C%20enforcing_consecutive_errors%2C%20enforcing_consecutive_gateway_failure%2C%20enforcing_success_rate%2C%20interval%2C%20max_ejection_percent%2C%20success_rate_minimum_hosts%2C%20success_rate_request_volume%2C%20or%20success_rate_stdev_factor%20is%20now%20required%20on%20google_compute_region_backend_service.outlier_detection"></a><h3 id="at-least-one-of-base_ejection_time-consecutive_errors-consecutive_gateway_failure-enforcing_consecutive_errors-enforcing_consecutive_gateway_failure-enforcing_success_rate-interval-max_ejection_percent-success_rate_minimum_hosts-success_rate_request_volume-or-success_rate_stdev_factor-is-now-required-on-google_compute_region_backend_serviceoutlier_detection">At least one of <code>base_ejection_time</code>, <code>consecutive_errors</code>, <code>consecutive_gateway_failure</code>, <code>enforcing_consecutive_errors</code>, <code>enforcing_consecutive_gateway_failure</code>, <code>enforcing_success_rate</code>, <code>interval</code>, <code>max_ejection_percent</code>, <code>success_rate_minimum_hosts</code>, <code>success_rate_request_volume</code>, or <code>success_rate_stdev_factor</code> is now required on <code>google_compute_region_backend_service.outlier_detection</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>base_ejection_time</code>,
+<code>consecutive_errors</code>, <code>consecutive_gateway_failure</code>, <code>enforcing_consecutive_errors</code>,
+<code>enforcing_consecutive_gateway_failure</code>, <code>enforcing_success_rate</code>, <code>interval</code>, <code>max_ejection_percent</code>,
+<code>success_rate_minimum_hosts</code>, <code>success_rate_request_volume</code>, or <code>success_rate_stdev_factor</code>
+is now required on the <code>outlier_detection</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20enable%20or%20sample_rate%20is%20now%20required%20on%20google_compute_region_backend_service.log_config"></a><h3 id="at-least-one-of-enable-or-sample_rate-is-now-required-on-google_compute_region_backend_servicelog_config">At least one of <code>enable</code> or <code>sample_rate</code> is now required on <code>google_compute_region_backend_service.log_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>enable</code> or <code>sample_rate</code>
+is now required on the <code>log_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_region_health_check"></a><h2 id="resource-google_compute_region_health_check">Resource: <code>google_compute_region_health_check</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20http_health_check%2C%20https_health_check%2C%20http2_health_check%2C%20tcp_health_check%20or%20ssl_health_check%20is%20required%20on%20google_compute_health_check"></a><h3 id="exactly-one-of-http_health_check-https_health_check-http2_health_check-tcp_health_check-or-ssl_health_check-is-required-on-google_compute_health_check-2">Exactly one of <code>http_health_check</code>, <code>https_health_check</code>, <code>http2_health_check</code>, <code>tcp_health_check</code> or <code>ssl_health_check</code> is required on <code>google_compute_health_check</code></h3>
+
+<p>In attempt to be more consistent with the API, exactly one of <code>http_health_check</code>, <code>https_health_check</code>,
+<code>http2_health_check</code>, <code>tcp_health_check</code> or <code>ssl_health_check</code> is now required on the
+<code>google_compute_region_health_check</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20host%2C%20request_path%2C%20response%2C%20port%2C%20port_name%2C%20proxy_header%2C%20or%20port_specification%20is%20now%20required%20on%20google_compute_region_health_check.http_health_check%2C%20google_compute_region_health_check.https_health_check%20and%20google_compute_region_health_check.http2_health_check"></a><h3 id="at-least-one-of-host-request_path-response-port-port_name-proxy_header-or-port_specification-is-now-required-on-google_compute_region_health_checkhttp_health_check-google_compute_region_health_checkhttps_health_check-and-google_compute_region_health_checkhttp2_health_check">At least one of <code>host</code>, <code>request_path</code>, <code>response</code>, <code>port</code>, <code>port_name</code>, <code>proxy_header</code>, or <code>port_specification</code> is now required on <code>google_compute_region_health_check.http_health_check</code>, <code>google_compute_region_health_check.https_health_check</code> and <code>google_compute_region_health_check.http2_health_check</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>host</code>, <code>request_path</code>, <code>response</code>,
+<code>port</code>, <code>port_name</code>, <code>proxy_header</code>, or <code>port_specification</code> is now required on the
+<code>http_health_check</code>, <code>https_health_check</code> and <code>http2_health_check</code> blocks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20request%2C%20response%2C%20port%2C%20port_name%2C%20proxy_header%2C%20or%20port_specification%20is%20now%20required%20on%20google_compute_region_health_check.ssl_health_check%20and%20google_compute_region_health_check.tcp_health_check"></a><h3 id="at-least-one-of-request-response-port-port_name-proxy_header-or-port_specification-is-now-required-on-google_compute_region_health_checkssl_health_check-and-google_compute_region_health_checktcp_health_check">At least one of <code>request</code>, <code>response</code>, <code>port</code>, <code>port_name</code>, <code>proxy_header</code>, or <code>port_specification</code> is now required on <code>google_compute_region_health_check.ssl_health_check</code> and <code>google_compute_region_health_check.tcp_health_check</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>request</code>, <code>response</code>, <code>port</code>, <code>port_name</code>,
+<code>proxy_header</code>, or <code>port_specification</code> is now required on the <code>ssl_health_check</code> and <code>tcp_health_check</code> blocks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_resource_policy"></a><h2 id="resource-google_compute_resource_policy">Resource: <code>google_compute_resource_policy</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20hourly_schedule%2C%20daily_schedule%20or%20weekly_schedule%20is%20now%20required%20on%20google_compute_resource_policy.snapshot_schedule_policy.schedule"></a><h3 id="exactly-one-of-hourly_schedule-daily_schedule-or-weekly_schedule-is-now-required-on-google_compute_resource_policysnapshot_schedule_policyschedule">Exactly one of <code>hourly_schedule</code>, <code>daily_schedule</code> or <code>weekly_schedule</code> is now required on <code>google_compute_resource_policy.snapshot_schedule_policy.schedule</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, exactly one
+of <code>hourly_schedule</code>, <code>daily_schedule</code> or <code>weekly_schedule</code> is now required
+on the <code>snapshot_schedule_policy.schedule</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20labels%2C%20storage_locations%2C%20or%20guest_flush%20is%20now%20required%20on%20google_compute_resource_policy.snapshot_schedule_policy.snapshot_properties"></a><h3 id="at-least-one-of-labels-storage_locations-or-guest_flush-is-now-required-on-google_compute_resource_policysnapshot_schedule_policysnapshot_properties">At least one of <code>labels</code>, <code>storage_locations</code>, or <code>guest_flush</code> is now required on <code>google_compute_resource_policy.snapshot_schedule_policy.snapshot_properties</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of
+<code>labels</code>, <code>storage_locations</code>, or <code>guest_flush</code> is now required on the
+<code>snapshot_schedule_policy.snapshot_properties</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_route"></a><h2 id="resource-google_compute_route">Resource: <code>google_compute_route</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20next_hop_gateway%2C%20next_hop_instance%2C%20next_hop_ip%2C%20next_hop_vpn_tunnel%20or%20next_hop_ilb%20is%20required%20on%20google_compute_route"></a><h3 id="exactly-one-of-next_hop_gateway-next_hop_instance-next_hop_ip-next_hop_vpn_tunnel-or-next_hop_ilb-is-required-on-google_compute_route">Exactly one of <code>next_hop_gateway</code>, <code>next_hop_instance</code>, <code>next_hop_ip</code>, <code>next_hop_vpn_tunnel</code> or <code>next_hop_ilb</code> is required on <code>google_compute_route</code></h3>
+
+<p>In attempt to be more consistent with the API, exactly one of <code>next_hop_gateway</code>, <code>next_hop_instance</code>,
+<code>next_hop_ip</code>, <code>next_hop_vpn_tunnel</code> or <code>next_hop_ilb</code> is now required on the
+<code>google_compute_route</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_router"></a><h2 id="resource-google_compute_router">Resource: <code>google_compute_router</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/range%20is%20now%20required%20on%20google_compute_router.bgp.advertised_ip_ranges"></a><h3 id="range-is-now-required-on-google_compute_routerbgpadvertised_ip_ranges"><code>range</code> is now required on <code>google_compute_router.bgp.advertised_ip_ranges</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>range</code> is now
+required on the <code>bgp.advertised_ip_ranges</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_router_peer"></a><h2 id="resource-google_compute_router_peer">Resource: <code>google_compute_router_peer</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/range%20is%20now%20required%20on%20block%20google_compute_router_peer.advertised_ip_ranges"></a><h3 id="range-is-now-required-on-block-google_compute_router_peeradvertised_ip_ranges"><code>range</code> is now required on block <code>google_compute_router_peer.advertised_ip_ranges</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>range</code> is now
+required on the <code>advertised_ip_ranges</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_snapshot"></a><h2 id="resource-google_compute_snapshot">Resource: <code>google_compute_snapshot</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/raw_key%20is%20now%20required%20on%20block%20google_compute_snapshot.source_disk_encryption_key"></a><h3 id="raw_key-is-now-required-on-block-google_compute_snapshotsource_disk_encryption_key"><code>raw_key</code> is now required on block <code>google_compute_snapshot.source_disk_encryption_key</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>raw_key</code> is now
+required on the <code>source_disk_encryption_key</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_compute_subnetwork"></a><h2 id="resource-google_compute_subnetwork">Resource: <code>google_compute_subnetwork</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/enable_flow_logs%20is%20now%20removed"></a><h3 id="enable_flow_logs-is-now-removed"><code>enable_flow_logs</code> is now removed</h3>
+
+<p><code>enable_flow_logs</code> has been removed and should be replaced by the <code>log_config</code> block with configurations
+for flow logging. Enablement of flow logs is now controlled by whether <code>log_config</code> is defined or not instead
+of by the <code>enable_flow_logs</code> variable. Users with <code>enable_flow_logs = false</code> only need to remove the field.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20aggregation_interval%2C%20flow_sampling%2C%20or%20metadata%20is%20now%20required%20on%20google_compute_subnetwork.log_config"></a><h3 id="at-least-one-of-aggregation_interval-flow_sampling-or-metadata-is-now-required-on-google_compute_subnetworklog_config">At least one of <code>aggregation_interval</code>, <code>flow_sampling</code>, or <code>metadata</code> is now required on <code>google_compute_subnetwork.log_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of
+<code>aggregation_interval</code>, <code>flow_sampling</code>, or <code>metadata</code> is now required on the
+<code>log_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Old%20Config"></a><h3 id="old-config-6">Old Config</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"subnet-with-logging"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"log-test-subnetwork"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.2.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.custom-test.self_link</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">enable_flow_logs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Config"></a><h3 id="new-config-7">New Config</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"subnet-with-logging"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"log-test-subnetwork"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.2.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.custom-test.self_link</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">log_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">aggregation_interval</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"INTERVAL_10_MIN"</span><span class="w"></span>
+<span class="w">    </span><span class="na">flow_sampling</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">0.5</span><span class="w"></span>
+<span class="w">    </span><span class="na">metadata</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"INCLUDE_ALL_METADATA"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_container_cluster"></a><h2 id="resource-google_container_cluster">Resource: <code>google_container_cluster</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ip_allocation_policy%20will%20catch%20out-of-band%20changes%2C%20use_ip_aliases%20removed"></a><h3 id="ip_allocation_policy-will-catch-out-of-band-changes-use_ip_aliases-removed"><code>ip_allocation_policy</code> will catch out-of-band changes, <code>use_ip_aliases</code> removed</h3>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This change and "Automatic subnetwork creation for VPC-native clusters removed" are related; see the other entry for more details.</p>
+</aside>
+
+<p>In <code>2.X</code>, <code>ip_allocation_policy</code> wouldn't cause a diff if it was undefined in
+config but was set on the cluster itself. Additionally, it could be defined with
+<code>use_ip_aliases</code> set to <code>false</code>. However, this made it difficult to reason about
+whether a cluster was routes-based or VPC-native.</p>
+
+<p>With <code>3.0.0</code>, Terraform will detect drift on the block. The configuration has also
+been simplified. Terraform creates a VPC-native cluster when
+<code>ip_allocation_policy</code> is defined (<code>use_ip_aliases</code> is implicitly set to true
+and is no longer configurable). When the block is undefined, Terraform creates a
+routes-based cluster.</p>
+
+<p>Other than removing the <code>use_ip_aliases</code> field, most users of VPC-native clusters
+won't be affected. <code>terraform plan</code> will show a diff if a config doesn't contain
+<code>ip_allocation_policy</code> but the underlying cluster does. Routes-based cluster
+users may need to remove <code>ip_allocation_policy</code> if <code>use_ip_aliases</code> had been set
+to <code>false</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Old%20Config"></a><h4 id="old-config-7">Old Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"primary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">initial_node_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">ip_allocation_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">use_ip_aliases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Config"></a><h4 id="new-config-8">New Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"primary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">initial_node_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Automatic%20subnetwork%20creation%20for%20VPC-native%20clusters%20removed"></a><h3 id="automatic-subnetwork-creation-for-vpc-native-clusters-removed">Automatic subnetwork creation for VPC-native clusters removed</h3>
+
+<p>Automatic creation of subnetworks in GKE has been removed. Now, users of
+VPC-native clusters will always need to provide a <code>google_compute_subnetwork</code>
+resource to use <code>ip_allocation_policy</code>. Routes-based clusters are unaffected.</p>
+
+<p>Representing resources managed by another source in Terraform is painful, and
+leads to confusing patterns that often involve unnecessarily recreating user
+resources. A number of fields in GKE are dedicated to a feature that allows
+users to create a GKE-managed subnetwork.</p>
+
+<p>This is a great fit for an imperative tool like <code>gcloud</code>, but it's not required
+for Terraform. With Terraform, it's relatively easy to specify a subnetwork in
+config alongside the cluster. Not only does that allow configuring subnetwork
+features like flow logging, it's more explicit, allows the subnetwork to be used
+by other resources, and the subnetwork persists through cluster deletion.</p>
+
+<p>Particularly, Shared VPC was incompatible with <code>create_subnetwork</code>, and
+<code>node_ipv4_cidr</code> was easy to confuse with
+<code>ip_allocation_policy.node_ipv4_cidr_block</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Detailed%20changes%3A"></a><h4 id="detailed-changes">Detailed changes:</h4>
+
+<ul>
+<li><code>ip_allocation_policy.node_ipv4_cidr_block</code> removed (This controls the primary range of the created subnetwork)</li>
+<li><code>ip_allocation_policy.create_subnetwork</code>, <code>ip_allocation_policy.subnetwork_name</code> removed</li>
+<li><code>ip_allocation_policy</code> will catch drift when not in config</li>
+<li><code>ip_allocation_policy.use_ip_aliases</code> removed
+<ul>
+<li>Enablement is now based on <code>ip_allocation_policy</code> being defined instead</li>
+</ul></li>
+<li>Conflict added between <code>node_ipv4_cidr</code>, <code>ip_allocation_policy</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Upgrade%20instructions"></a><h4 id="upgrade-instructions">Upgrade instructions</h4>
+
+<ol>
+<li>Remove the removed fields from <code>google_container_cluster</code></li>
+<li>Add a <code>google_compute_subnetwork</code> to your config, import it using <code>terraform import</code></li>
+<li>Reference the subnetwork using the <code>subnetwork</code> field on your <code>google_container_cluster</code></li>
+</ol>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Subnetworks originally created as part of <code>create_subnetwork</code> will be deleted alongside the cluster. If there are other users of the subnetwork, deletion of the cluster will fail. After the original resources are deleted, <code>terraform apply</code> will recreate the same subnetwork except that it won't be managed by a GKE cluster and other resources can use it safely.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Old%20Config"></a><h4 id="old-config-8">Old Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"container_network"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"container-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"primary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.container_network.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">initial_node_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">ip_allocation_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">use_ip_aliases</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">create_subnetwork</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">    </span><span class="na">cluster_ipv4_cidr_block</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.0/16"</span><span class="w"></span>
+<span class="w">    </span><span class="na">services_ipv4_cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.0.0/16"</span><span class="w"></span>
+<span class="w">    </span><span class="na">node_ipv4_cidr_block</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.2.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Config"></a><h4 id="new-config-9">New Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"container_network"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"container-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"container_subnetwork"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"container-subnetwork"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"auto-created subnetwork for cluster \"my-cluster\""</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.2.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.container_network.self_link</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_container_cluster"</span><span class="w"> </span><span class="nv">"primary"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-cluster"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.container_network.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnetwork</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.container_subnetwork.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">initial_node_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">ip_allocation_policy</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">cluster_ipv4_cidr_block</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.0/16"</span><span class="w"></span>
+<span class="w">    </span><span class="na">services_ipv4_cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/taint%20field%20is%20now%20authoritative%20when%20set"></a><h3 id="taint-field-is-now-authoritative-when-set"><code>taint</code> field is now authoritative when set</h3>
+
+<p>The <code>taint</code> field inside of <code>node_config</code> blocks on <code>google_container_cluster</code>
+and <code>google_container_node_pool</code> will no longer ignore GPU-related values when
+set.</p>
+
+<p>Previously, the field ignored upstream taints when unset and ignored unset GPU
+taints when other taints were set. Now it will ignore upstream taints when set
+and act authoritatively when set, requiring all taints (including Kubernetes and
+GKE-managed ones) to be defined in config.</p>
+
+<p>Additionally, an empty taint can now be specified with <code>taint = []</code>. As a result
+of this change, the JSON/state representation of the field has changed,
+introducing an incompatibility for users who specify config in JSON instead of
+HCL or who use <code>dynamic</code> blocks. See more details in the <a href="https://www.terraform.io/docs/configuration/attr-as-blocks.html">Attributes as Blocks</a>
+documentation.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/addons_config.kubernetes_dashboard%20is%20now%20removed"></a><h3 id="addons_configkubernetes_dashboard-is-now-removed"><code>addons_config.kubernetes_dashboard</code> is now removed</h3>
+
+<p>The <code>kubernetes_dashboard</code> addon is deprecated for clusters on GKE and
+will soon be removed. It is recommended to use alternative GCP Console
+dashboards.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/channel%20is%20now%20required%20on%20google_container_cluster.release_channel"></a><h3 id="channel-is-now-required-on-google_container_clusterrelease_channel"><code>channel</code> is now required on <code>google_container_cluster.release_channel</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>channel</code> is now
+required on the <code>release_channel</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/The%20disabled%20field%20is%20now%20required%20on%20the%20addons_config%20blocks%20for%20http_load_balancing%2C%20horizontal_pod_autoscaling%2C%20istio_config%2C%20cloudrun_config%20and%20network_policy_config."></a><h3 id="the-disabled-field-is-now-required-on-the-addons_config-blocks-for-http_load_balancing-horizontal_pod_autoscaling-istio_config-cloudrun_config-and-network_policy_config">The <code>disabled</code> field is now required on the <code>addons_config</code> blocks for <code>http_load_balancing</code>, <code>horizontal_pod_autoscaling</code>, <code>istio_config</code>, <code>cloudrun_config</code> and <code>network_policy_config</code>.</h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>disabled</code> is now
+required on the different <code>google_container_cluster.addons_config</code> blocks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20daily_maintenance_window%20or%20recurring_window%20is%20now%20required%20on%20google_container_cluster.maintenance_policy"></a><h3 id="exactly-one-of-daily_maintenance_window-or-recurring_window-is-now-required-on-google_container_clustermaintenance_policy">Exactly one of <code>daily_maintenance_window</code> or <code>recurring_window</code> is now required on <code>google_container_cluster.maintenance_policy</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, exactly one of <code>daily_maintenance_window</code> or <code>recurring_window</code> is now required on the
+<code>maintenance_policy</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20http_load_balancing%2C%20horizontal_pod_autoscaling%20%2C%20network_policy_config%2C%20cloudrun_config%2C%20or%20istio_config%20is%20now%20required%20on%20google_container_cluster.addons_config"></a><h3 id="at-least-one-of-http_load_balancing-horizontal_pod_autoscaling-network_policy_config-cloudrun_config-or-istio_config-is-now-required-on-google_container_clusteraddons_config">At least one of <code>http_load_balancing</code>, <code>horizontal_pod_autoscaling</code> , <code>network_policy_config</code>, <code>cloudrun_config</code>, or <code>istio_config</code> is now required on <code>google_container_cluster.addons_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>http_load_balancing</code>,
+<code>horizontal_pod_autoscaling</code> , <code>network_policy_config</code>, <code>cloudrun_config</code>, or <code>istio_config</code> is now required on the
+<code>addons_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20username%2C%20password%20or%20client_certificate_config%20is%20now%20required%20on%20google_container_cluster.master_auth"></a><h3 id="at-least-one-of-username-password-or-client_certificate_config-is-now-required-on-google_container_clustermaster_auth">At least one of <code>username</code>, <code>password</code> or <code>client_certificate_config</code> is now required on <code>google_container_cluster.master_auth</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>username</code>, <code>password</code>
+or <code>client_certificate_config</code> is now required on the <code>master_auth</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/enabled%20is%20now%20required%20on%20block%20google_container_cluster.vertical_pod_autoscaling"></a><h3 id="enabled-is-now-required-on-block-google_container_clustervertical_pod_autoscaling"><code>enabled</code> is now required on block <code>google_container_cluster.vertical_pod_autoscaling</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>enabled</code> is now
+required on the <code>vertical_pod_autoscaling</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/enabled%20is%20now%20required%20on%20block%20google_container_cluster.network_policy"></a><h3 id="enabled-is-now-required-on-block-google_container_clusternetwork_policy"><code>enabled</code> is now required on block <code>google_container_cluster.network_policy</code></h3>
+
+<p>Previously the default value of <code>enabled</code> was <code>false</code>. In an attempt to avoid allowing empty blocks
+in config files, <code>enabled</code> is now required on the <code>network_policy</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/enable_private_endpoint%20is%20now%20required%20on%20block%20google_container_cluster.private_cluster_config"></a><h3 id="enable_private_endpoint-is-now-required-on-block-google_container_clusterprivate_cluster_config"><code>enable_private_endpoint</code> is now required on block <code>google_container_cluster.private_cluster_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>enable_private_endpoint</code> is now
+required on the <code>private_cluster_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/logging_service%20and%20monitoring_service%20defaults%20changed"></a><h3 id="logging_service-and-monitoring_service-defaults-changed"><code>logging_service</code> and <code>monitoring_service</code> defaults changed</h3>
+
+<p>GKE Stackdriver Monitoring (the GKE-specific Stackdriver experience) is now
+enabled at cluster creation by default, similar to the default in GKE <code>1.14</code>
+through other tools.</p>
+
+<p>Terraform will now detect changes out of band when the field(s) are not defined
+in config, attempting to return them to their new defaults, and will be clear
+about what values will be set when creating a cluster.</p>
+
+<p><code>terraform plan</code> will report changes upon upgrading if the field was previously
+unset. Applying this change will enable the new Stackdriver service without
+recreating clusters. Users who wish to use another value should record their
+intended value in config; the old default values can be added to a
+<code>google_container_cluster</code> resource config block to preserve them.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Old%20Defaults"></a><h4 id="old-defaults">Old Defaults</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="na">logging_service</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"logging.googleapis.com"</span><span class="w"></span>
+<span class="na">monitoring_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"monitoring.googleapis.com"</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Defaults"></a><h4 id="new-defaults">New Defaults</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="na">logging_service</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"logging.googleapis.com/kubernetes"</span><span class="w"></span>
+<span class="na">monitoring_service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"monitoring.googleapis.com/kubernetes"</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/zone%2C%20region%20and%20additional_zones%20are%20now%20removed"></a><h3 id="zone-region-and-additional_zones-are-now-removed"><code>zone</code>, <code>region</code> and <code>additional_zones</code> are now removed</h3>
+
+<p><code>zone</code> and <code>region</code> have been removed in favor of <code>location</code> and
+<code>additional_zones</code> has been removed in favor of <code>node_locations</code></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_container_node_pool"></a><h2 id="resource-google_container_node_pool">Resource: <code>google_container_node_pool</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/zone%20and%20region%20are%20now%20removed"></a><h3 id="zone-and-region-are-now-removed"><code>zone</code> and <code>region</code> are now removed</h3>
+
+<p><code>zone</code> and <code>region</code> have been removed in favor of <code>location</code></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_dataproc_autoscaling_policy"></a><h2 id="resource-google_dataproc_autoscaling_policy">Resource: <code>google_dataproc_autoscaling_policy</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20min_instances%2C%20max_instances%2C%20or%20weight%20is%20now%20required%20on%20google_dataproc_autoscaling_policy.secondary_worker_config"></a><h3 id="at-least-one-of-min_instances-max_instances-or-weight-is-now-required-on-google_dataproc_autoscaling_policysecondary_worker_config">At least one of <code>min_instances</code>, <code>max_instances</code>, or <code>weight</code> is now required on <code>google_dataproc_autoscaling_policy.secondary_worker_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>min_instances</code>,
+<code>max_instances</code>, or <code>weight</code> is now required on the <code>secondary_worker_config</code>
+block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_dataproc_cluster"></a><h2 id="resource-google_dataproc_cluster">Resource: <code>google_dataproc_cluster</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20staging_bucket%2C%20gce_cluster_config%2C%20master_config%2C%20worker_config%2C%20preemptible_worker_config%2C%20software_config%2C%20initialization_action%20or%20encryption_config%20is%20now%20required%20on%20google_dataproc_cluster.cluster_config"></a><h3 id="at-least-one-of-staging_bucket-gce_cluster_config-master_config-worker_config-preemptible_worker_config-software_config-initialization_action-or-encryption_config-is-now-required-on-google_dataproc_clustercluster_config">At least one of <code>staging_bucket</code>, <code>gce_cluster_config</code>, <code>master_config</code>, <code>worker_config</code>, <code>preemptible_worker_config</code>, <code>software_config</code>, <code>initialization_action</code> or <code>encryption_config</code> is now required on <code>google_dataproc_cluster.cluster_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>staging_bucket</code>,
+<code>gce_cluster_config</code>, <code>master_config</code>, <code>worker_config</code>, <code>preemptible_worker_config</code>, <code>software_config</code>,
+<code>initialization_action</code> or <code>encryption_config</code> is now required on the
+<code>cluster_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20image_version%2C%20override_properties%20or%20optional_components%20is%20now%20required%20on%20google_dataproc_cluster.cluster_config.software_config"></a><h3 id="at-least-one-of-image_version-override_properties-or-optional_components-is-now-required-on-google_dataproc_clustercluster_configsoftware_config">At least one of <code>image_version</code>, <code>override_properties</code> or <code>optional_components</code> is now required on <code>google_dataproc_cluster.cluster_config.software_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>image_version</code>,
+<code>override_properties</code> or <code>optional_components</code> is now required on the
+<code>cluster_config.software_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20num_instances%20or%20disk_config%20is%20now%20required%20on%20google_dataproc_cluster.cluster_config.preemptible_worker_config"></a><h3 id="at-least-one-of-num_instances-or-disk_config-is-now-required-on-google_dataproc_clustercluster_configpreemptible_worker_config">At least one of <code>num_instances</code> or <code>disk_config</code> is now required on <code>google_dataproc_cluster.cluster_config.preemptible_worker_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>num_instances</code>
+or <code>disk_config</code> is now required on the <code>cluster_config.preemptible_worker_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20zone%2C%20network%2C%20subnetwork%2C%20tags%2C%20service_account%2C%20service_account_scopes%2C%20internal_ip_only%20or%20metadata%20is%20now%20required%20on%20google_dataproc_cluster.cluster_config.gce_cluster_config"></a><h3 id="at-least-one-of-zone-network-subnetwork-tags-service_account-service_account_scopes-internal_ip_only-or-metadata-is-now-required-on-google_dataproc_clustercluster_configgce_cluster_config">At least one of <code>zone</code>, <code>network</code>, <code>subnetwork</code>, <code>tags</code>, <code>service_account</code>, <code>service_account_scopes</code>, <code>internal_ip_only</code> or <code>metadata</code> is now required on <code>google_dataproc_cluster.cluster_config.gce_cluster_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>zone</code>, <code>network</code>, <code>subnetwork</code>,
+<code>tags</code>, <code>service_account</code>, <code>service_account_scopes</code>, <code>internal_ip_only</code> or <code>metadata</code> is now required on the
+<code>gce_cluster_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20num_instances%2C%20image_uri%2C%20machine_type%2C%20min_cpu_platform%2C%20disk_config%2C%20or%20accelerators%20is%20now%20required%20on%20google_dataproc_cluster.cluster_config.master_config%20and%20google_dataproc_cluster.cluster_config.worker_config"></a><h3 id="at-least-one-of-num_instances-image_uri-machine_type-min_cpu_platform-disk_config-or-accelerators-is-now-required-on-google_dataproc_clustercluster_configmaster_config-and-google_dataproc_clustercluster_configworker_config">At least one of <code>num_instances</code>, <code>image_uri</code>, <code>machine_type</code>, <code>min_cpu_platform</code>, <code>disk_config</code>, or <code>accelerators</code> is now required on <code>google_dataproc_cluster.cluster_config.master_config</code> and <code>google_dataproc_cluster.cluster_config.worker_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>num_instances</code>, <code>image_uri</code>,
+<code>machine_type</code>, <code>min_cpu_platform</code>, <code>disk_config</code>, or <code>accelerators</code> is now required on the
+<code>cluster_config.master_config</code> and <code>cluster_config.worker_config</code> blocks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20num_local_ssds%2C%20boot_disk_size_gb%20or%20boot_disk_type%20is%20now%20required%20on%20google_dataproc_cluster.cluster_config.preemptible_worker_config.disk_config%2C%20google_dataproc_cluster.cluster_config.master_config.disk_config%20and%20google_dataproc_cluster.cluster_config.worker_config.disk_config"></a><h3 id="at-least-one-of-num_local_ssds-boot_disk_size_gb-or-boot_disk_type-is-now-required-on-google_dataproc_clustercluster_configpreemptible_worker_configdisk_config-google_dataproc_clustercluster_configmaster_configdisk_config-and-google_dataproc_clustercluster_configworker_configdisk_config">At least one of <code>num_local_ssds</code>, <code>boot_disk_size_gb</code> or <code>boot_disk_type</code> is now required on <code>google_dataproc_cluster.cluster_config.preemptible_worker_config.disk_config</code>, <code>google_dataproc_cluster.cluster_config.master_config.disk_config</code> and <code>google_dataproc_cluster.cluster_config.worker_config.disk_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>num_local_ssds</code>, <code>boot_disk_size_gb</code>
+or <code>boot_disk_type</code> is now required on the <code>cluster_config.preemptible_worker_config.disk_config</code>,
+<code>cluster_config.master_config.disk_config</code> and <code>cluster_config.worker_config.disk_config</code> blocks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/policy_uri%20is%20now%20required%20on%20google_dataproc_cluster.autoscaling_config%20block."></a><h3 id="policy_uri-is-now-required-on-google_dataproc_clusterautoscaling_config-block"><code>policy_uri</code> is now required on <code>google_dataproc_cluster.autoscaling_config</code> block.</h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>policy_uri</code> is now
+required on the <code>autoscaling_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_dataproc_job"></a><h2 id="resource-google_dataproc_job">Resource: <code>google_dataproc_job</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20query_file_uri%20or%20query_list%20is%20now%20required%20on%20hive_config%2C%20pig_config%2C%20and%20sparksql_config"></a><h3 id="at-least-one-of-query_file_uri-or-query_list-is-now-required-on-hive_config-pig_config-and-sparksql_config">At least one of <code>query_file_uri</code> or <code>query_list</code> is now required on <code>hive_config</code>, <code>pig_config</code>, and <code>sparksql_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of
+<code>query_file_uri</code> or <code>query_list</code> is now required on the <code>hive_config</code>, <code>pig_config</code>, and
+<code>sparksql_config</code> blocks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20main_class%20or%20main_jar_file_uri%20is%20now%20required%20on%20google_dataproc_job.spark_config%20and%20google_dataproc_job.hadoop_config"></a><h3 id="at-least-one-of-main_class-or-main_jar_file_uri-is-now-required-on-google_dataproc_jobspark_config-and-google_dataproc_jobhadoop_config">At least one of <code>main_class</code> or <code>main_jar_file_uri</code> is now required on <code>google_dataproc_job.spark_config</code> and <code>google_dataproc_job.hadoop_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of
+<code>main_class</code> or <code>main_jar_file_uri</code> is now required on the <code>spark_config</code>
+and <code>hadoop_config</code> blocks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/driver_log_levels%20is%20now%20required%20on%20logging_config%20blocks%20for%20pyspark_config%2C%20hadoop_config%2C%20spark_config%2C%20pig_config%2C%20and%20sparksql_config."></a><h3 id="driver_log_levels-is-now-required-on-logging_config-blocks-for-pyspark_config-hadoop_config-spark_config-pig_config-and-sparksql_config"><code>driver_log_levels</code> is now required on <code>logging_config</code> blocks for <code>pyspark_config</code>, <code>hadoop_config</code>, <code>spark_config</code>, <code>pig_config</code>, and <code>sparksql_config</code>.</h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>driver_log_levels</code> is now
+required on <code>pyspark_config</code>, <code>hadoop_config</code>, <code>spark_config</code>, <code>pig_config</code>, and
+<code>sparksql_config</code> blocks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/max_failures_per_hour%20is%20now%20required%20on%20block%20google_dataproc_job.scheduling"></a><h3 id="max_failures_per_hour-is-now-required-on-block-google_dataproc_jobscheduling"><code>max_failures_per_hour</code> is now required on block <code>google_dataproc_job.scheduling</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>max_failures_per_hour</code> is now
+required on the <code>scheduling</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_dns_managed_zone"></a><h2 id="resource-google_dns_managed_zone">Resource: <code>google_dns_managed_zone</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20kind%2C%20non_existence%2C%20state%2C%20%20or%20default_key_specs%20is%20now%20required%20on%20google_dns_managed_zone.dnssec_config"></a><h3 id="at-least-one-of-kind-non_existence-state-or-default_key_specs-is-now-required-on-google_dns_managed_zonednssec_config">At least one of <code>kind</code>, <code>non_existence</code>, <code>state</code>,  or <code>default_key_specs</code> is now required on <code>google_dns_managed_zone.dnssec_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of
+<code>kind</code>, <code>non_existence</code>, <code>state</code>,  or <code>default_key_specs</code> is now required on the
+<code>dnssec_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/target_network%20is%20now%20required%20on%20block%20google_dns_managed_zone.peering_config"></a><h3 id="target_network-is-now-required-on-block-google_dns_managed_zonepeering_config"><code>target_network</code> is now required on block <code>google_dns_managed_zone.peering_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>target_network</code> is now
+required on the <code>peering_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/network_url%20is%20now%20required%20on%20block%20google_dns_managed_zone.peering_config.target_network"></a><h3 id="network_url-is-now-required-on-block-google_dns_managed_zonepeering_configtarget_network"><code>network_url</code> is now required on block <code>google_dns_managed_zone.peering_config.target_network</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>network_url</code> is now
+required on the <code>peering_config.target_network</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/target_name_servers%20is%20now%20required%20on%20block%20google_dns_managed_zone.forwarding_config"></a><h3 id="target_name_servers-is-now-required-on-block-google_dns_managed_zoneforwarding_config"><code>target_name_servers</code> is now required on block <code>google_dns_managed_zone.forwarding_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>target_name_servers</code> is now
+required on the <code>forwarding_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ipv4_address%20is%20now%20required%20on%20block%20google_dns_managed_zone.forwarding_config.target_name_servers"></a><h3 id="ipv4_address-is-now-required-on-block-google_dns_managed_zoneforwarding_configtarget_name_servers"><code>ipv4_address</code> is now required on block <code>google_dns_managed_zone.forwarding_config.target_name_servers</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>ipv4_address</code> is now
+required on the <code>forwarding_config.target_name_servers</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/target_name_servers%20is%20now%20required%20on%20block%20google_dns_managed_zone.forwarding_config"></a><h3 id="target_name_servers-is-now-required-on-block-google_dns_managed_zoneforwarding_config-2"><code>target_name_servers</code> is now required on block <code>google_dns_managed_zone.forwarding_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>target_name_servers</code> is now
+required on the <code>forwarding_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/networks%20is%20now%20required%20on%20block%20google_dns_managed_zone.private_visibility_config"></a><h3 id="networks-is-now-required-on-block-google_dns_managed_zoneprivate_visibility_config"><code>networks</code> is now required on block <code>google_dns_managed_zone.private_visibility_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>networks</code> is now
+required on the <code>private_visibility_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/network_url%20is%20now%20required%20on%20block%20google_dns_managed_zone.private_visibility_config.networks"></a><h3 id="network_url-is-now-required-on-block-google_dns_managed_zoneprivate_visibility_confignetworks"><code>network_url</code> is now required on block <code>google_dns_managed_zone.private_visibility_config.networks</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>network_url</code> is now
+required on the <code>private_visibility_config.networks</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_dns_policy"></a><h2 id="resource-google_dns_policy">Resource: <code>google_dns_policy</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/network_url%20is%20now%20required%20on%20block%20google_dns_policy.networks"></a><h3 id="network_url-is-now-required-on-block-google_dns_policynetworks"><code>network_url</code> is now required on block <code>google_dns_policy.networks</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>network_url</code> is now
+required on the <code>networks</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/target_name_servers%20is%20now%20required%20on%20block%20google_dns_policy.alternative_name_server_config"></a><h3 id="target_name_servers-is-now-required-on-block-google_dns_policyalternative_name_server_config"><code>target_name_servers</code> is now required on block <code>google_dns_policy.alternative_name_server_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>target_name_servers</code> is now
+required on the <code>alternative_name_server_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ipv4_address%20is%20now%20required%20on%20block%20google_dns_policy.alternative_name_server_config.target_name_servers"></a><h3 id="ipv4_address-is-now-required-on-block-google_dns_policyalternative_name_server_configtarget_name_servers"><code>ipv4_address</code> is now required on block <code>google_dns_policy.alternative_name_server_config.target_name_servers</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>ipv4_address</code> is now
+required on the <code>alternative_name_server_config.target_name_servers</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_folder_organization_policy"></a><h2 id="resource-google_folder_organization_policy">Resource: <code>google_folder_organization_policy</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20allow%20or%20deny%20is%20now%20required%20on%20google_folder_organization_policy.list_policy"></a><h3 id="exactly-one-of-allow-or-deny-is-now-required-on-google_folder_organization_policylist_policy">Exactly one of <code>allow</code> or <code>deny</code> is now required on <code>google_folder_organization_policy.list_policy</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, exactly one of <code>allow</code> or <code>deny</code> is now
+required on the <code>list_policy</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20all%20or%20values%20is%20now%20required%20on%20google_folder_organization_policy.list_policy.allow%20and%20google_folder_organization_policy.list_policy.deny"></a><h3 id="exactly-one-of-all-or-values-is-now-required-on-google_folder_organization_policylist_policyallow-and-google_folder_organization_policylist_policydeny">Exactly one of <code>all</code> or <code>values</code> is now required on <code>google_folder_organization_policy.list_policy.allow</code> and <code>google_folder_organization_policy.list_policy.deny</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, exactly one of <code>all</code> or <code>values</code> is now
+required on the <code>list_policy.allow</code> and <code>list_policy.deny</code> blocks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_healthcare_hl7_v2_store"></a><h2 id="resource-google_healthcare_hl7_v2_store">Resource: <code>google_healthcare_hl7_v2_store</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20allow_null_header%20or%20segment_terminator%20is%20now%20required%20on%20google_healthcare_hl7_v2_store.parser_config"></a><h3 id="at-least-one-of-allow_null_header-or-segment_terminator-is-now-required-on-google_healthcare_hl7_v2_storeparser_config">At least one of <code>allow_null_header</code> or <code>segment_terminator</code> is now required on <code>google_healthcare_hl7_v2_store.parser_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>allow_null_header</code>
+or <code>segment_terminator</code> is now required on the <code>parser_config</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_logging_metric"></a><h2 id="resource-google_logging_metric">Resource: <code>google_logging_metric</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20linear_buckets%2C%20exponential_buckets%20or%20explicit_buckets%20is%20now%20required%20on%20google_logging_metric.bucket_options"></a><h3 id="at-least-one-of-linear_buckets-exponential_buckets-or-explicit_buckets-is-now-required-on-google_logging_metricbucket_options">At least one of <code>linear_buckets</code>, <code>exponential_buckets</code> or <code>explicit_buckets</code> is now required on <code>google_logging_metric.bucket_options</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>linear_buckets</code>,
+<code>exponential_buckets</code> or <code>explicit_buckets</code> is now required on the <code>bucket_options</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20num_finite_buckets%2C%20width%20or%20offset%20is%20now%20required%20on%20google_logging_metric.bucket_options.linear_buckets"></a><h3 id="at-least-one-of-num_finite_buckets-width-or-offset-is-now-required-on-google_logging_metricbucket_optionslinear_buckets">At least one of <code>num_finite_buckets</code>, <code>width</code> or <code>offset</code> is now required on <code>google_logging_metric.bucket_options.linear_buckets</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>num_finite_buckets</code>,
+<code>width</code> or <code>offset</code> is now required on the <code>bucket_options.linear_buckets</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20num_finite_buckets%2C%20growth_factor%20or%20scale%20is%20now%20required%20on%20google_logging_metric.bucket_options.exponential_buckets"></a><h3 id="at-least-one-of-num_finite_buckets-growth_factor-or-scale-is-now-required-on-google_logging_metricbucket_optionsexponential_buckets">At least one of <code>num_finite_buckets</code>, <code>growth_factor</code> or <code>scale</code> is now required on <code>google_logging_metric.bucket_options.exponential_buckets</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>num_finite_buckets</code>,
+<code>growth_factor</code> or <code>scale</code> is now required on the <code>bucket_options.exponential_buckets</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/bounds%20is%20now%20required%20on%20google_logging_metric.bucket_options.explicit_buckets"></a><h3 id="bounds-is-now-required-on-google_logging_metricbucket_optionsexplicit_buckets"><code>bounds</code> is now required on <code>google_logging_metric.bucket_options.explicit_buckets</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>bounds</code> is now required on the
+<code>bucket_options.explicit_buckets</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_mlengine_model"></a><h2 id="resource-google_mlengine_model">Resource: <code>google_mlengine_model</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/name%20is%20now%20required%20on%20google_mlengine_model.default_version"></a><h3 id="name-is-now-required-on-google_mlengine_modeldefault_version"><code>name</code> is now required on <code>google_mlengine_model.default_version</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>name</code> is now required on the
+<code>default_version</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_monitoring_alert_policy"></a><h2 id="resource-google_monitoring_alert_policy">Resource: <code>google_monitoring_alert_policy</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/labels%20is%20now%20removed"></a><h3 id="labels-is-now-removed"><code>labels</code> is now removed</h3>
+
+<p><code>labels</code> is removed as it was never used. See <code>user_labels</code> for the correct field.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20content%20or%20mime_type%20is%20now%20required%20on%20google_monitoring_alert_policy.documentation"></a><h3 id="at-least-one-of-content-or-mime_type-is-now-required-on-google_monitoring_alert_policydocumentation">At least one of <code>content</code> or <code>mime_type</code> is now required on <code>google_monitoring_alert_policy.documentation</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>content</code> or <code>mime_type</code>
+is now required on the <code>documentation</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_monitoring_uptime_check_config"></a><h2 id="resource-google_monitoring_uptime_check_config">Resource: <code>google_monitoring_uptime_check_config</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20resource_group%20or%20monitored_resource%20is%20now%20required%20on%20google_monitoring_uptime_check_config"></a><h3 id="exactly-one-of-resource_group-or-monitored_resource-is-now-required-on-google_monitoring_uptime_check_config">Exactly one of <code>resource_group</code> or <code>monitored_resource</code> is now required on <code>google_monitoring_uptime_check_config</code></h3>
+
+<p>In attempt to be more consistent with the API, exactly one of <code>resource_group</code> or <code>monitored_resource</code> is now required
+on <code>google_monitoring_uptime_check_config</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20http_check%20or%20tcp_check%20is%20now%20required%20on%20google_monitoring_uptime_check_config"></a><h3 id="exactly-one-of-http_check-or-tcp_check-is-now-required-on-google_monitoring_uptime_check_config">Exactly one of <code>http_check</code> or <code>tcp_check</code> is now required on <code>google_monitoring_uptime_check_config</code></h3>
+
+<p>In attempt to be more consistent with the API, exactly one of <code>http_check</code> or <code>tcp_check</code> is now required
+on <code>google_monitoring_uptime_check_config</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20auth_info%2C%20port%2C%20headers%2C%20path%2C%20use_ssl%2C%20or%20mask_headers%20is%20now%20required%20on%20google_monitoring_uptime_check_config.http_check"></a><h3 id="at-least-one-of-auth_info-port-headers-path-use_ssl-or-mask_headers-is-now-required-on-google_monitoring_uptime_check_confighttp_check">At least one of <code>auth_info</code>, <code>port</code>, <code>headers</code>, <code>path</code>, <code>use_ssl</code>, or <code>mask_headers</code> is now required on <code>google_monitoring_uptime_check_config.http_check</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>auth_info</code>,
+<code>port</code>, <code>headers</code>, <code>path</code>, <code>use_ssl</code>, or <code>mask_headers</code> is now required on the <code>http_check</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20resource_type%20or%20group_id%20is%20now%20required%20on%20google_monitoring_uptime_check_config.resource_group"></a><h3 id="at-least-one-of-resource_type-or-group_id-is-now-required-on-google_monitoring_uptime_check_configresource_group">At least one of <code>resource_type</code> or <code>group_id</code> is now required on <code>google_monitoring_uptime_check_config.resource_group</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>resource_type</code> or <code>group_id</code>
+is now required on the <code>resource_group</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/content%20is%20now%20required%20on%20block%20google_monitoring_uptime_check_config.content_matchers"></a><h3 id="content-is-now-required-on-block-google_monitoring_uptime_check_configcontent_matchers"><code>content</code> is now required on block <code>google_monitoring_uptime_check_config.content_matchers</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>content</code> is now
+required on the <code>content_matchers</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/username%20and%20password%20are%20now%20required%20on%20block%20google_monitoring_uptime_check_config.http_check.auth_info"></a><h3 id="username-and-password-are-now-required-on-block-google_monitoring_uptime_check_confighttp_checkauth_info"><code>username</code> and <code>password</code> are now required on block <code>google_monitoring_uptime_check_config.http_check.auth_info</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>username</code> and <code>password</code> are now
+required on the <code>http_check.auth_info</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/is_internal%20and%20internal_checker%20are%20now%20removed"></a><h3 id="is_internal-and-internal_checker-are-now-removed"><code>is_internal</code> and <code>internal_checker</code> are now removed</h3>
+
+<p><code>is_internal</code> and <code>internal_checker</code> never worked, and are now removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_organization_policy"></a><h2 id="resource-google_organization_policy">Resource: <code>google_organization_policy</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20allow%20or%20deny%20is%20now%20required%20on%20google_organization_policy.list_policy"></a><h3 id="exactly-one-of-allow-or-deny-is-now-required-on-google_organization_policylist_policy">Exactly one of <code>allow</code> or <code>deny</code> is now required on <code>google_organization_policy.list_policy</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, exactly one of <code>allow</code> or <code>deny</code> is now
+required on the <code>list_policy</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20all%20or%20values%20is%20now%20required%20on%20google_organization_policy.list_policy.allow%20and%20google_organization_policy.list_policy.deny"></a><h3 id="exactly-one-of-all-or-values-is-now-required-on-google_organization_policylist_policyallow-and-google_organization_policylist_policydeny">Exactly one of <code>all</code> or <code>values</code> is now required on <code>google_organization_policy.list_policy.allow</code> and <code>google_organization_policy.list_policy.deny</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, exactly one of <code>all</code> or <code>values</code> is now
+required on the <code>list_policy.allow</code> and <code>list_policy.deny</code> blocks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_project_iam_audit_config"></a><h2 id="resource-google_project_iam_audit_config">Resource: <code>google_project_iam_audit_config</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Audit%20configs%20are%20now%20authoritative%20on%20create"></a><h3 id="audit-configs-are-now-authoritative-on-create">Audit configs are now authoritative on create</h3>
+
+<p>Audit configs are now authoritative on create, rather than merging with existing configs on create.
+Writing an audit config resource will now overwrite any existing audit configs on the given project.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_project_organization_policy"></a><h2 id="resource-google_project_organization_policy">Resource: <code>google_project_organization_policy</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20allow%20or%20deny%20is%20now%20required%20on%20google_project_organization_policy.list_policy"></a><h3 id="exactly-one-of-allow-or-deny-is-now-required-on-google_project_organization_policylist_policy">Exactly one of <code>allow</code> or <code>deny</code> is now required on <code>google_project_organization_policy.list_policy</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, exactly one of <code>allow</code> or <code>deny</code> is now
+required on the <code>list_policy</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exactly%20one%20of%20all%20or%20values%20is%20now%20required%20on%20google_project_organization_policy.list_policy.allow%20and%20google_project_organization_policy.list_policy.deny"></a><h3 id="exactly-one-of-all-or-values-is-now-required-on-google_project_organization_policylist_policyallow-and-google_project_organization_policylist_policydeny">Exactly one of <code>all</code> or <code>values</code> is now required on <code>google_project_organization_policy.list_policy.allow</code> and <code>google_project_organization_policy.list_policy.deny</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, exactly one of <code>all</code> or <code>values</code> is now
+required on the <code>list_policy.allow</code> and <code>list_policy.deny</code> blocks.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_project_service"></a><h2 id="resource-google_project_service">Resource: <code>google_project_service</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/bigquery-json.googleapis.com%20service%20can%20no%20longer%20be%20specified"></a><h3 id="bigquery-jsongoogleapiscom-service-can-no-longer-be-specified"><code>bigquery-json.googleapis.com</code> service can no longer be specified</h3>
+
+<p><code>bigquery-json.googleapis.com</code> is being renamed to <code>bigquery.googleapis.com</code> in
+the upstream API. As a result, <code>bigquery-json.googleapis.com</code> has been
+disallowed. Instead, please use <code>bigquery.googleapis.com</code>. The provider will
+automatically convert between them as the upstream API migration continues.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_project_services"></a><h2 id="resource-google_project_services">Resource: <code>google_project_services</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/google_project_services%20has%20been%20removed%20from%20the%20provider"></a><h3 id="google_project_services-has-been-removed-from-the-provider"><code>google_project_services</code> has been removed from the provider</h3>
+
+<p>The <code>google_project_services</code> resource was authoritative over the list of GCP
+services enabled on a project, so that services not explicitly set would be
+removed by Terraform.</p>
+
+<p>However, this was dangerous to use in practice. Services have dependencies that
+are automatically enabled alongside them and GCP will add dependencies to
+services out of band, enabling them. If a user ran Terraform after this,
+Terraform would disable the service- and implicitly disable any service that
+relied on it.</p>
+
+<p>The <code>google_project_service</code> resource is a much better match for most users'
+intent, managing a single service at a time. Setting several
+<code>google_project_service</code> resources is an assertion that "these services are set
+on this project", while <code>google_project_services</code> was an assertion that "<strong>only</strong>
+these services are set on this project".</p>
+
+<p>Users should migrate to using <code>google_project_service</code> resources, or using the
+<a href="https://registry.terraform.io/modules/terraform-google-modules/project-factory/google/3.3.0/submodules/project_services"><code>"terraform-google-modules/project-factory/google//modules/project_services"</code></a>
+module for a similar interface to <code>google_project_services</code>.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Prior to <code>2.13.0</code>, each <code>google_project_service</code> sent separate API enablement requests. From <code>2.13.0</code> onwards, those requests are batched on write, and from <code>2.20.0</code> onwards, batched on read. It's recommended that you upgrade to <code>2.13.0+</code> before migrating if you encounter write quota issues or <code>2.20.0+</code> before migrating if you encounter read quota issues when you migrate off <code>google_project_services</code>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Old%20Config"></a><h4 id="old-config-9">Old Config</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_project_services"</span><span class="w"> </span><span class="nv">"project"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"your-project-id"</span><span class="w"></span>
+<span class="w">  </span><span class="na">services</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"iam.googleapis.com", "cloudresourcemanager.googleapis.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">disable_on_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Config%20%28module%29"></a><h4 id="new-config-module">New Config (module)</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">module</span><span class="w"> </span><span class="nv">"project_services"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-google-modules/project-factory/google//modules/project_services"</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3.3.0"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">project_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"your-project-id"</span><span class="w"></span>
+<span class="w">  </span><span class="na">activate_apis</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"iam.googleapis.com"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"cloudresourcemanager.googleapis.com"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">disable_services_on_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">disable_dependent_services</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Config%20%28google_project_service%29"></a><h4 id="new-config-google_project_service">New Config (google_project_service)</h4>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_project_service"</span><span class="w"> </span><span class="nv">"service"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">toset</span><span class="p">([</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"iam.googleapis.com"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"cloudresourcemanager.googleapis.com"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">])</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.key</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">project</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"your-project-id"</span><span class="w"></span>
+<span class="w">  </span><span class="na">disable_on_destroy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_pubsub_subscription"></a><h2 id="resource-google_pubsub_subscription">Resource: <code>google_pubsub_subscription</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/name%20must%20now%20be%20a%20short%20name"></a><h3 id="name-must-now-be-a-short-name"><code>name</code> must now be a short name</h3>
+
+<p><code>name</code> previously could have been specified by a long name (e.g. <code>projects/my-project/subscriptions/my-subscription</code>)
+or a shortname (e.g. <code>my-subscription</code>). <code>name</code> now must be the shortname.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/ttl%20is%20now%20required%20on%20google_pubsub_subscription.expiration_policy"></a><h3 id="ttl-is-now-required-on-google_pubsub_subscriptionexpiration_policy"><code>ttl</code> is now required on <code>google_pubsub_subscription.expiration_policy</code></h3>
+
+<p>Previously, an empty <code>expiration_policy</code> block would allow the resource to never expire. In an attempt to avoid
+allowing empty blocks in config files, <code>ttl</code> is now required on the <code>expiration_policy</code> block.  <code>ttl</code> should be set
+to <code>""</code> for the resource to never expire.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_security_scanner_scan_config"></a><h2 id="resource-google_security_scanner_scan_config">Resource: <code>google_security_scanner_scan_config</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20google_account%20or%20custom_account%20is%20now%20required%20on%20google_security_scanner_scan_config.authentication"></a><h3 id="at-least-one-of-google_account-or-custom_account-is-now-required-on-google_security_scanner_scan_configauthentication">At least one of <code>google_account</code> or <code>custom_account</code> is now required on <code>google_security_scanner_scan_config.authentication</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>google_account</code> or
+<code>custom_account</code> is now required on the <code>authentication</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_service_account_key"></a><h2 id="resource-google_service_account_key">Resource: <code>google_service_account_key</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/pgp_key%2C%20private_key_fingerprint%2C%20and%20private_key_encrypted%20are%20now%20removed"></a><h3 id="pgp_key-private_key_fingerprint-and-private_key_encrypted-are-now-removed"><code>pgp_key</code>, <code>private_key_fingerprint</code>, and <code>private_key_encrypted</code> are now removed</h3>
+
+<p><code>google_service_account_key</code> previously supported encrypting the private key with
+a supplied PGP key. This is <a href="https://www.terraform.io/docs/extend/best-practices/sensitive-state.html#don-39-t-encrypt-state">no longer supported</a>
+and has been removed as functionality. State should instead be treated as sensitive,
+and ideally encrypted using a remote state backend.</p>
+
+<p>This will require re-provisioning your service account key, unfortunately. There
+is no known alternative at this time.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_sql_database_instance"></a><h2 id="resource-google_sql_database_instance">Resource: <code>google_sql_database_instance</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20ca_certificate%2C%20client_certificate%2C%20client_key%2C%20connect_retry_interval%2C%20dump_file_path%2C%20failover_target%2C%20master_heartbeat_period%2C%20password%2C%20ssl_cipher%2C%20username%2C%20or%20verify_server_certificate%20is%20now%20required%20on%20google_sql_database_instance.settings.replica_configuration"></a><h3 id="at-least-one-of-ca_certificate-client_certificate-client_key-connect_retry_interval-dump_file_path-failover_target-master_heartbeat_period-password-ssl_cipher-username-or-verify_server_certificate-is-now-required-on-google_sql_database_instancesettingsreplica_configuration">At least one of <code>ca_certificate</code>, <code>client_certificate</code>, <code>client_key</code>, <code>connect_retry_interval</code>, <code>dump_file_path</code>, <code>failover_target</code>, <code>master_heartbeat_period</code>, <code>password</code>, <code>ssl_cipher</code>, <code>username</code>, or <code>verify_server_certificate</code> is now required on <code>google_sql_database_instance.settings.replica_configuration</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>ca_certificate</code>, <code>client_certificate</code>, <code>client_key</code>, <code>connect_retry_interval</code>,
+<code>dump_file_path</code>, <code>failover_target</code>, <code>master_heartbeat_period</code>, <code>password</code>, <code>ssl_cipher</code>, <code>username</code>, or <code>verify_server_certificate</code> is now required on the
+<code>settings.replica_configuration</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20cert%2C%20common_name%2C%20create_time%2C%20expiration_time%2C%20or%20sha1_fingerprint%20is%20now%20required%20on%20google_sql_database_instance.settings.server_ca_cert"></a><h3 id="at-least-one-of-cert-common_name-create_time-expiration_time-or-sha1_fingerprint-is-now-required-on-google_sql_database_instancesettingsserver_ca_cert">At least one of <code>cert</code>, <code>common_name</code>, <code>create_time</code>, <code>expiration_time</code>, or <code>sha1_fingerprint</code> is now required on <code>google_sql_database_instance.settings.server_ca_cert</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>cert</code>, <code>common_name</code>, <code>create_time</code>, <code>expiration_time</code>, or <code>sha1_fingerprint</code> is now required on the <code>settings.server_ca_cert</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20day%2C%20hour%2C%20or%20update_track%20is%20now%20required%20on%20google_sql_database_instance.settings.maintenance_window"></a><h3 id="at-least-one-of-day-hour-or-update_track-is-now-required-on-google_sql_database_instancesettingsmaintenance_window">At least one of <code>day</code>, <code>hour</code>, or <code>update_track</code> is now required on <code>google_sql_database_instance.settings.maintenance_window</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>day</code>, <code>hour</code>,
+or <code>update_track</code> is now required on the <code>settings.maintenance_window</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20binary_log_enabled%2C%20enabled%2C%20start_time%2C%20or%20location%20is%20now%20required%20on%20google_sql_database_instance.settings.backup_configuration"></a><h3 id="at-least-one-of-binary_log_enabled-enabled-start_time-or-location-is-now-required-on-google_sql_database_instancesettingsbackup_configuration">At least one of <code>binary_log_enabled</code>, <code>enabled</code>, <code>start_time</code>, or <code>location</code> is now required on <code>google_sql_database_instance.settings.backup_configuration</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>binary_log_enabled</code>, <code>enabled</code>, <code>start_time</code>, or <code>location</code> is now required on the
+<code>settings.backup_configuration</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20authorized_networks%2C%20ipv4_enabled%2C%20require_ssl%2C%20or%20private_network%20is%20now%20required%20on%20google_sql_database_instance.settings.ip_configuration"></a><h3 id="at-least-one-of-authorized_networks-ipv4_enabled-require_ssl-or-private_network-is-now-required-on-google_sql_database_instancesettingsip_configuration">At least one of <code>authorized_networks</code>, <code>ipv4_enabled</code>, <code>require_ssl</code>, or <code>private_network</code> is now required on <code>google_sql_database_instance.settings.ip_configuration</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>authorized_networks</code>, <code>ipv4_enabled</code>,
+<code>require_ssl</code>, and <code>private_network</code> is now required on the <code>settings.ip_configuration</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/name%20and%20value%20are%20now%20required%20on%20block%20google_sql_database_instance.settings.database_flags"></a><h3 id="name-and-value-are-now-required-on-block-google_sql_database_instancesettingsdatabase_flags"><code>name</code> and <code>value</code> are now required on block <code>google_sql_database_instance.settings.database_flags</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>name</code> and <code>value</code> are now required on the <code>settings.database_flags</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/value%20is%20now%20required%20on%20block%20google_sql_database_instance.settings.ip_configuration.authorized_networks"></a><h3 id="value-is-now-required-on-block-google_sql_database_instancesettingsip_configurationauthorized_networks"><code>value</code> is now required on block <code>google_sql_database_instance.settings.ip_configuration.authorized_networks</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>value</code> is now required on the <code>settings.ip_configuration.authorized_networks</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/zone%20is%20now%20required%20on%20block%20google_sql_database_instance.settings.location_preference"></a><h3 id="zone-is-now-required-on-block-google_sql_database_instancesettingslocation_preference"><code>zone</code> is now required on block <code>google_sql_database_instance.settings.location_preference</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>zone</code> is now
+required on the <code>settings.location_preference</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_storage_bucket"></a><h2 id="resource-google_storage_bucket">Resource: <code>google_storage_bucket</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/enabled%20is%20now%20required%20on%20block%20google_storage_bucket.versioning"></a><h3 id="enabled-is-now-required-on-block-google_storage_bucketversioning"><code>enabled</code> is now required on block <code>google_storage_bucket.versioning</code></h3>
+
+<p>Previously the default value of <code>enabled</code> was <code>false</code>. In an attempt to avoid allowing empty blocks
+in config files, <code>enabled</code> is now required on the <code>versioning</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20main_page_suffix%20or%20not_found_page%20is%20now%20required%20on%20google_storage_bucket.website"></a><h3 id="at-least-one-of-main_page_suffix-or-not_found_page-is-now-required-on-google_storage_bucketwebsite">At least one of <code>main_page_suffix</code> or <code>not_found_page</code> is now required on <code>google_storage_bucket.website</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>main_page_suffix</code> or
+<code>not_found_page</code> is now required on the <code>website</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20min_time_elapsed_since_last_modification%2C%20max_time_elapsed_since_last_modification%2C%20include_prefixes%2C%20or%20exclude_prefixes%20is%20now%20required%20on%20google_storage_transfer_job.transfer_spec.object_conditions"></a><h3 id="at-least-one-of-min_time_elapsed_since_last_modification-max_time_elapsed_since_last_modification-include_prefixes-or-exclude_prefixes-is-now-required-on-google_storage_transfer_jobtransfer_specobject_conditions">At least one of <code>min_time_elapsed_since_last_modification</code>, <code>max_time_elapsed_since_last_modification</code>, <code>include_prefixes</code>, or <code>exclude_prefixes</code> is now required on <code>google_storage_transfer_job.transfer_spec.object_conditions</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>min_time_elapsed_since_last_modification</code>,
+<code>max_time_elapsed_since_last_modification</code>, <code>include_prefixes</code>, or <code>exclude_prefixes</code> is now required on the <code>transfer_spec.object_conditions</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/is_live%20is%20now%20removed"></a><h3 id="is_live-is-now-removed"><code>is_live</code> is now removed</h3>
+
+<p>Please use <code>with_state</code> instead, as <code>is_live</code> is now removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_storage_transfer_job"></a><h2 id="resource-google_storage_transfer_job">Resource: <code>google_storage_transfer_job</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20overwrite_objects_already_existing_in_sink%2C%20delete_objects_unique_in_sink%2C%20or%20delete_objects_from_source_after_transfer%20is%20now%20required%20on%20google_storage_transfer_job.transfer_spec.transfer_options"></a><h3 id="at-least-one-of-overwrite_objects_already_existing_in_sink-delete_objects_unique_in_sink-or-delete_objects_from_source_after_transfer-is-now-required-on-google_storage_transfer_jobtransfer_spectransfer_options">At least one of <code>overwrite_objects_already_existing_in_sink</code>, <code>delete_objects_unique_in_sink</code>, or <code>delete_objects_from_source_after_transfer</code> is now required on <code>google_storage_transfer_job.transfer_spec.transfer_options</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>overwrite_objects_already_existing_in_sink</code>,
+<code>delete_objects_unique_in_sink</code>, or <code>delete_objects_from_source_after_transfer</code> is now required on the
+<code>transfer_spec.transfer_options</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/At%20least%20one%20of%20gcs_data_source%2C%20aws_s3_data_source%2C%20or%20http_data_source%20is%20now%20required%20on%20google_storage_transfer_job.transfer_spec"></a><h3 id="at-least-one-of-gcs_data_source-aws_s3_data_source-or-http_data_source-is-now-required-on-google_storage_transfer_jobtransfer_spec">At least one of <code>gcs_data_source</code>, <code>aws_s3_data_source</code>, or <code>http_data_source</code> is now required on <code>google_storage_transfer_job.transfer_spec</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, at least one of <code>gcs_data_source</code>, <code>aws_s3_data_source</code>,
+or <code>http_data_source</code> is now required on the <code>transfer_spec</code> block.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20google_tpu_node"></a><h2 id="resource-google_tpu_node">Resource: <code>google_tpu_node</code></h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/preemptible%20is%20now%20required%20on%20block%20google_tpu_node.scheduling_config"></a><h3 id="preemptible-is-now-required-on-block-google_tpu_nodescheduling_config"><code>preemptible</code> is now required on block <code>google_tpu_node.scheduling_config</code></h3>
+
+<p>In an attempt to avoid allowing empty blocks in config files, <code>preemptible</code> is now
+required on the <code>scheduling_config</code> block.</p>
+
+            
+        
+    </body></html>

@@ -1,0 +1,109 @@
+<html><!-- Online page at https://registry.terraform.io/providers/fastly/fastly/latest/docs/resources/tls_certificate --><head>
+                <title>tls_certificate</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="fastly_tls_certificate">fastly_tls_certificate</h1>
+
+<p>Uploads a custom TLS certificate to Fastly to be used to terminate TLS traffic.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Each TLS certificate <strong>must</strong> have its corresponding private key uploaded _prior_ to uploading the certificate. This can be achieved in Terraform using <a href="https://www.terraform.io/docs/configuration/meta-arguments/depends_on.html"><code>depends_on</code></a></p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>Basic usage:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"tls_private_key"</span><span class="w"> </span><span class="nv">"key"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">algorithm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"RSA"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"tls_self_signed_cert"</span><span class="w"> </span><span class="nv">"cert"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">key_algorithm</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">tls_private_key.key.algorithm</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_key_pem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">tls_private_key.key.private_key_pem</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">subject</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">common_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example.com"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">is_ca_certificate</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">validity_period_hours</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">360</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">allowed_uses</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"cert_signing"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"server_auth"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">dns_names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"example.com"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"fastly_tls_private_key"</span><span class="w"> </span><span class="nv">"key"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">key_pem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">tls_private_key.key.private_key_pem</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-demo"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"fastly_tls_certificate"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-demo"</span><span class="w"></span>
+<span class="w">  </span><span class="na">certificate_body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">tls_self_signed_cert.cert.cert_pem</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">fastly_tls_private_key.key</span><span class="p">]</span><span class="c1"> // The private key has to be present before the certificate can be uploaded</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Updating%20certificates"></a><h2 id="updating-certificates">Updating certificates</h2>
+
+<p>There are three scenarios for updating a certificate:</p>
+
+<ol>
+<li>The certificate is about to expire but the private key stays the same.</li>
+<li>The certificate is about to expire but the private key is changing.</li>
+<li>The domains on the certificate are changing.</li>
+</ol>
+
+<p>In the first scenario you only need to update the <code>certificate_body</code> attribute of the <code>fastly_tls_certificate</code> resource, while the other scenarios require a new private key (<code>fastly_tls_private_key</code>) and certificate (<code>fastly_tls_certificate</code>) to be generated.</p>
+
+<p>When updating both the <code>fastly_tls_private_key</code> and <code>fastly_tls_certificate</code> resources, they should be done in multiple plan/apply steps to avoid potential downtime. The new certificate and associated private key must first be created so they exist alongside the currently active resources. Once the new resources have been created, then the <code>fastly_tls_activation</code> can be updated to point to the new certificate. Finally, the original key/certificate resources can be deleted.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>A certificate can be imported using its Fastly certificate ID, e.g.</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform import fastly_tls_certificate.demo xxxxxxxxxxx
+</code></pre></div>
+
+<!-- schema generated by tfplugindocs -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Schema"></a><h2 id="schema">Schema</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Required"></a><h3 id="required">Required</h3>
+
+<ul>
+<li><code>certificate_body</code> (String) PEM-formatted certificate, optionally including any intermediary certificates.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Optional"></a><h3 id="optional">Optional</h3>
+
+<ul>
+<li><code>name</code> (String) Human-readable name used to identify the certificate. Defaults to the certificate's Common Name or first Subject Alternative Name entry.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Read-Only"></a><h3 id="read-only">Read-Only</h3>
+
+<ul>
+<li><code>created_at</code> (String) Timestamp (GMT) when the certificate was created.</li>
+<li><code>domains</code> (Set of String) All the domains (including wildcard domains) that are listed in the certificate's Subject Alternative Names (SAN) list.</li>
+<li><code>id</code> (String) The ID of this resource.</li>
+<li><code>issued_to</code> (String) The hostname for which a certificate was issued.</li>
+<li><code>issuer</code> (String) The certificate authority that issued the certificate.</li>
+<li><code>replace</code> (Boolean) A recommendation from Fastly indicating the key associated with this certificate is in need of rotation.</li>
+<li><code>serial_number</code> (String) A value assigned by the issuer that is unique to a certificate.</li>
+<li><code>signature_algorithm</code> (String) The algorithm used to sign the certificate.</li>
+<li><code>updated_at</code> (String) Timestamp (GMT) when the certificate was last updated.</li>
+</ul>
+
+            
+        
+    </body></html>

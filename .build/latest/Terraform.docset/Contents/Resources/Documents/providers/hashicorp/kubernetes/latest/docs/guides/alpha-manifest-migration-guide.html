@@ -1,0 +1,113 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/guides/alpha-manifest-migration-guide --><head>
+                <title>The kubernetes_manifest resource</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="the-kubernetes_manifest-resource">The kubernetes_manifest resource</h1>
+
+<p>Earlier this year we announced a new provider capable of managing any kind of Kubernetes resource, but more specifically Custom Resources via a manifest configuration that could be translated directly from Kubernetes YAML. This was released as the experimental <a href="https://github.com/hashicorp/terraform-provider-kubernetes-alpha">kubernetes-alpha</a> provider.</p>
+
+<p>The <code>kubernetes_manifest</code> resource in now available in the official provider for Kubernetes. This guide walks through the actions needed to adopt existing <code>kubernetes_manifest</code> resources into configurations that use the Kubernetes provider.</p>
+
+<p>Follow these steps to migrate your configuration and continue using the <code>kubernetes_manifest</code> resource with the Kubernetes provider.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%201%3A%20Provider%20configuration%20blocks"></a><h2 id="step-1-provider-configuration-blocks">Step 1: Provider configuration blocks</h2>
+
+<p>The provider configuration blocks for the <code>kubernetes-alpha</code> provider are no longer supported. To carry over the configuration, simply rename the provider block to "kubernetes".</p>
+
+<p>For example:</p>
+
+<pre><code>provider "kubernetes-alpha" {
+    config_path = "/my/kube/config"
+}
+</code></pre>
+
+<p>becomes</p>
+
+<pre><code>provider "kubernetes" {
+    config_path = "/my/kube/config"
+    experiments {
+        manifest_resource = true
+    }
+}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%202%3A%20Provider%20references%20on%20resources"></a><h2 id="step-2-provider-references-on-resources">Step 2: Provider references on resources</h2>
+
+<p>The provider references to <code>kubernetes-alpha</code> are no longer required. Simply remove the <code>provider = kubernetes-alpha</code> text from all <code>kubernetes_manifest</code> resources in your configuration.</p>
+
+<p>For example:</p>
+
+<pre><code>resource "kubernetes_manifest" "my-resource" {
+  provider = kubernetes-alpha
+  manifest = {....}
+}
+</code></pre>
+
+<p>becomes</p>
+
+<pre><code>resource "kubernetes_manifest" "my-resource" {
+  manifest = {....}
+}
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%203%3A%20Provider%20version%20constraints"></a><h2 id="step-3-provider-version-constraints">Step 3: Provider version constraints</h2>
+
+<p>If your configuration includes a <code>terraform</code> block which specifies required provider versions, you should remove any references to provider <code>kubernetes-alpha</code> from that block. At the same time, you should add a requirement for provider <code>kubernetes</code> version 2.4.0 and above.</p>
+
+<p>For example:</p>
+
+<pre><code>terraform {
+  required_providers {
+    kubernetes-alpha = {
+      source  = "hashicorp/kubernetes-alpha"
+      version = "0.5.0"
+    }
+    ...
+  }
+}
+</code></pre>
+
+<p>becomes:</p>
+
+<pre><code>terraform {
+  required_providers {
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "&gt;= 2.4"
+    }
+    ...
+  }
+}
+</code></pre>
+
+<p>If you made any changes to existing entries in the <code>required_providers</code> section, make sure to run <code>terraform init -upgrade</code> to let Terraform retrieve any required new provider versions.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Step%204%3A%20Replace%20providers%20in%20existing%20state"></a><h2 id="step-4-replace-providers-in-existing-state">Step 4: Replace providers in existing state</h2>
+
+<p>If your configuration was already in use with the <code>kubernetes_alpha</code> provider, you likely also have Terraform state generated from it.
+It is recommended to start fresh and re-apply configurations using the kubernetes provider from a clean slate.
+However, in case you find it necessary to preserve state, you can rename the provider associated with any <code>kubernetes_manifest</code> resources using the dedicated <code>replace-provider</code> command in Terraform.</p>
+
+<p>Run the following command in the directory where the <code>terraform.tfstate</code> file is:</p>
+
+<pre><code>terraform state replace-provider hashicorp/kubernetes-alpha hashicorp/kubernetes
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Mixing%20%27kubernetes_manifest%27%20with%20other%20%27kubernetes_%2A%27%20resources"></a><h2 id="mixing-kubernetes_manifest-with-other-kubernetes_-resources">Mixing 'kubernetes_manifest' with other 'kubernetes_*' resources</h2>
+
+<p>In case you plan on adding <code>kubernetes_manifest</code> resources to your existing configuration which contains other resources of the Kubernetes provider there are some important aspects to be aware of.</p>
+
+<p>If your present configuration for the Kubernetes provider also creates the Kubernetes cluster using Terraform resources in the same <code>apply</code> operation (against best-practice recommendations), this will no longer work when adding <code>kubernetes_manifest</code> resources. The reason behind this is that <code>kubernetes_manifest</code> require access to the API during planning, at which point the cluster resource would not have yet been created.</p>
+
+<p>As a solution, choose one of the following options:</p>
+
+<ul>
+<li>separate the cluster creation in a different <code>apply</code> operation.</li>
+<li>add a new <code>apply</code> operation only for the <code>kubernetes_manifest</code> resources.</li>
+</ul>
+
+            
+        
+    </body></html>

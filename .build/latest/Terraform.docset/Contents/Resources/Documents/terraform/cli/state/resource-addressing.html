@@ -1,0 +1,144 @@
+<html><!-- Online page at https://www.terraform.io/cli/state/resource-addressing --><head>
+                <title>Resource Address Reference</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-address-reference">Resource Address Reference</h1>
+
+<p>This topic provides reference information about resource addresses in Terraform. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Syntax"></a><h2 id="syntax">Syntax</h2>
+
+<p>A <em>resource address</em> is a string that identifies zero or more resource
+instances in your overall configuration.</p>
+
+<p>An address is made up of two parts:</p>
+
+<pre><code>[module path][resource spec]
+</code></pre>
+
+<p>In some contexts Terraform might allow for an incomplete resource address that
+only refers to a module as a whole, or that omits the index for a
+multi-instance resource. In those cases, the meaning depends on the context,
+so you'll need to refer to the documentation for the specific feature you
+are using which parses resource addresses.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Module%20path"></a><h2 id="module-path">Module path</h2>
+
+<p>A module path addresses a module within the tree of modules. It takes the form:</p>
+
+<pre><code>module.module_name[module index]
+</code></pre>
+
+<ul>
+<li><code>module</code> - Module keyword indicating a child module (non-root). Multiple <code>module</code>
+keywords in a path indicate nesting.</li>
+<li><code>module_name</code> - User-defined name of the module.</li>
+<li><code>[module index]</code> - (Optional) <a href="#index-values-for-modules-and-resources">Index</a>
+to select an instance from a module call that has multiple instances,
+surrounded by square bracket characters (<code>[</code> and <code>]</code>).</li>
+</ul>
+
+<p>An address without a resource spec, i.e. <code>module.foo</code> applies to every resource within
+the module if a single module, or all instances of a module if a module has multiple instances.
+To address all resources of a particular module instance, include the module index in the address,
+such as <code>module.foo[0]</code>.</p>
+
+<p>If the module path is omitted, the address applies to the root module.</p>
+
+<p>An example of the <code>module</code> keyword delineating between two modules that have multiple instances:</p>
+
+<pre><code>module.foo[0].module.bar["a"]
+</code></pre>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Module index only applies to modules in Terraform v0.13 or later. In earlier versions of Terraform, a module could not have multiple instances.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%20spec"></a><h2 id="resource-spec">Resource spec</h2>
+
+<p>A resource spec addresses a specific resource instance in the selected module.
+It has the following syntax:</p>
+
+<pre><code>resource_type.resource_name[instance index]
+</code></pre>
+
+<ul>
+<li><code>resource_type</code> - Type of the resource being addressed.</li>
+<li><code>resource_name</code> - User-defined name of the resource.</li>
+<li><code>[instance index]</code> - (Optional) <a href="#index-values-for-modules-and-resources">Index</a>
+to select an instance from a resource that has multiple instances,
+surrounded by square bracket characters (<code>[</code> and <code>]</code>).</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>In Terraform v0.12 and later, a resource spec without a module path prefix matches only resources in the root module. In earlier versions, a resource spec without a module path prefix would match resources with the same type and name in any descendant module.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Index%20values%20for%20Modules%20and%20Resources"></a><h2 id="index-values-for-modules-and-resources">Index values for Modules and Resources</h2>
+
+<p>The following specifications apply to index values on modules and resources with multiple instances:</p>
+
+<ul>
+<li><code>[N]</code> where <code>N</code> is a <code>0</code>-based numerical index into a resource with multiple
+instances specified by the <code>count</code> meta-argument. Omitting an index when
+addressing a resource where <code>count &gt; 1</code> means that the address references
+all instances.</li>
+<li><code>["INDEX"]</code> where <code>INDEX</code> is a alphanumerical key index into a resource with
+multiple instances specified by the <code>for_each</code> meta-argument.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Examples"></a><h2 id="examples">Examples</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/count%20Example"></a><h3 id="count-example">count Example</h3>
+
+<p>Given a Terraform config that includes:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+<span class="w">  </span><span class="na">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">4</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An address like this:</p>
+
+<pre><code>aws_instance.web[3]
+</code></pre>
+
+<p>Refers to only the last instance in the config, and an address like this:</p>
+
+<pre><code>aws_instance.web
+</code></pre>
+
+<p>Refers to all four "web" instances.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/for_each%20Example"></a><h3 id="for_each-example">for_each Example</h3>
+
+<p>Given a Terraform config that includes:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+<span class="w">  </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">tomap</span><span class="p">({</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"terraform"</span><span class="o">:</span><span class="w"> </span><span class="s2">"value1"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"resource"</span><span class="o">:</span><span class="w">  </span><span class="s2">"value2"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"indexing"</span><span class="o">:</span><span class="w">  </span><span class="s2">"value3"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"example"</span><span class="o">:</span><span class="w">   </span><span class="s2">"value4"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>An address like this:</p>
+
+<pre><code>aws_instance.web["example"]
+</code></pre>
+
+<p>Refers to only the "example" instance in the config, and resolves to "value4".</p>
+
+            
+        
+    </body></html>

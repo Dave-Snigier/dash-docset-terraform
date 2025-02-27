@@ -1,0 +1,489 @@
+<html><!-- Online page at https://registry.terraform.io/providers/Azure/azapi/latest/docs/guides/2 --><head>
+                <title>Azapi Provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="azapi-provider">Azapi Provider</h1>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Azapi%20Provider%20Version%20v2.0"></a><h2 id="azapi-provider-version-v20">Azapi Provider Version v2.0</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Considerations"></a><h3 id="considerations">Considerations</h3>
+
+<p>Version 2.0 of the Azapi Provider is a major release and includes breaking changes which are outlined in this document.</p>
+
+<p>When upgrading to version 2.0 of the Azure Provider, we recommend upgrading to the latest version of Terraform Core (<a href="https://www.terraform.io/downloads">which can be found here</a>).</p>
+
+<p>This guide will continue to receive updates as we incorporate feedback and continue to fix any issues during the Beta.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Pinning%20your%20Provider%20Version"></a><h3 id="pinning-your-provider-version">Pinning your Provider Version</h3>
+
+<p>We recommend pinning the version of each Provider you use in Terraform - you can do this using the <code>version</code> attribute within the <code>required_providers</code> block, either to a specific version of the Azapi Provider, like so:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azapi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"azure/azapi"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=1.15.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azapi"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>.. or to any 1.x release:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azapi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"azure/azapi"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.x"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"azapi"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>More information on <a href="https://www.terraform.io/language/providers/requirements#requiring-providers">how to pin the version of a Terraform Provider being used can be found on the Terraform Website</a>.</p>
+
+<hr/>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/What%27s%20available%20in%20Version%202.0%20of%20the%20Azapi%20Provider%3F"></a><h2 id="whats-available-in-version-20-of-the-azapi-provider">What's available in Version 2.0 of the Azapi Provider?</h2>
+
+<p>Below is an overview of the changes coming 2.0. Each topic is covered in more detail further down.</p>
+
+<ul>
+<li><a href="#dynamic-properties-support">Dynamic Properties Support</a></li>
+<li><a href="#provider-functions">Provider Functions</a></li>
+<li><a href="#customized-retriable-configuration">Cusomtized Retriable Configuration</a></li>
+<li><a href="#headers-and-query-parameters-support">Headers and Query Parameters Support</a></li>
+<li><a href="#replacement-triggers">Replacement Triggers</a></li>
+<li><a href="#jmespath-query-support">JMESPath Query Support</a></li>
+<li><a href="#preflight-validation">Preflight Validation</a></li>
+<li><a href="#breaking-changes">Breaking Changes</a></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Dynamic%20Properties%20Support"></a><h2 id="dynamic-properties-support">Dynamic Properties Support</h2>
+
+<p>Previously, AzAPI resource definitions required JSON encoding and decoding to handle the requst and response payloads. This was not perfect because plan output was not clear when sensivite data was involved, and Terraform native lifecycle management was not supported.</p>
+
+<p>The dynamic properties support makes it much easier to define resources and data sources in the AzAPI Provider. This feature is available for all resources and data sources in the AzAPI Provider.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"automationAccount"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Automation/automationAccounts@2023-11-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.resourceGroup.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-automation-account"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"westeurope"</span><span class="c1"></span>
+
+<span class="c1">  // it's not necessary to use `jsonencode` function to encode the HCL object to JSON, just use the HCL object directly</span>
+<span class="w">  </span><span class="nb">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">properties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">encryption</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">keySource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Automation"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="na">publicNetworkAccess</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">      </span><span class="nb">sku</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Basic"</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">response_export_values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"properties"</span><span class="p">]</span><span class="c1"></span>
+
+<span class="c1">  // native lifecycle management</span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">ignore_changes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="nv">body.properties.encryption.keySource</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"o1"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  // it's not necessary to use `jsondecode` function to decode the response</span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.automationAccount.output.properties.automationHybridServiceUrl</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>For more information, refer to <a href="https://techcommunity.microsoft.com/t5/azure-tools-blog/announcing-azapi-dynamic-properties/ba-p/4121855">this blogpost</a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20Functions"></a><h2 id="provider-functions">Provider Functions</h2>
+
+<p>With the addition of Provider Functions in Terraform 1.8, we've added a number of functions to the AzAPI Provider to make it easier to work with the Azure Resource IDs.</p>
+
+<ul>
+<li><strong>New Provider Function</strong>: build_resource_id</li>
+<li><strong>New Provider Function</strong>: parse_resource_id</li>
+<li><strong>New Provider Function</strong>: subscription_resource_id</li>
+<li><strong>New Provider Function</strong>: tenant_resource_id</li>
+<li><strong>New Provider Function</strong>: management_group_resource_id</li>
+<li><strong>New Provider Function</strong>: resource_group_resource_id</li>
+<li><strong>New Provider Function</strong>: extension_resource_id</li>
+</ul>
+
+<p><code>build_resource_id</code> - This function constructs an Azure resource ID given the parent ID, resource type, and resource name. It is useful for creating resource IDs for top-level and nested resources within a specific scope.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// it will output "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroup/providers/Microsoft.Network/virtualNetworks/myVNet"</span>
+<span class="kr">output</span><span class="w"> </span><span class="nv">"resource_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">provider</span><span class="p">::</span><span class="err">azapi</span><span class="p">::</span><span class="err">build_resource_id</span><span class="p">(</span><span class="s2">"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroup", "Microsoft.Network/virtualNetworks", "myVNet"</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><code>parse_resource_id</code> - This function takes an Azure resource ID and a resource type and parses the ID into its individual components such as subscription ID, resource group name, provider namespace, and other parts.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># it will output below object</span>
+<span class="c1"># {</span>
+<span class="c1">#   "id" = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroup/providers/Microsoft.Network/virtualNetworks/myVNet"</span>
+<span class="c1">#   "name" = "myVNet"</span>
+<span class="c1">#   "parent_id" = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroup"</span>
+<span class="c1">#   "parts" = tomap({</span>
+<span class="c1">#     "providers" = "Microsoft.Network"</span>
+<span class="c1">#     "resourceGroups" = "myResourceGroup"</span>
+<span class="c1">#     "subscriptions" = "00000000-0000-0000-0000-000000000000"</span>
+<span class="c1">#     "virtualNetworks" = "myVNet"</span>
+<span class="c1">#   })</span>
+<span class="c1">#   "provider_namespace" = "Microsoft.Network"</span>
+<span class="c1">#   "resource_group_name" = "myResourceGroup"</span>
+<span class="c1">#   "subscription_id" = "00000000-0000-0000-0000-000000000000"</span>
+<span class="c1">#   "type" = "Microsoft.Network/virtualNetworks"</span>
+<span class="c1"># }</span>
+<span class="kr">output</span><span class="w"> </span><span class="nv">"parsed_resource_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">provider</span><span class="p">::</span><span class="err">azapi</span><span class="p">::</span><span class="err">parse_resource_id</span><span class="p">(</span><span class="s2">"Microsoft.Network/virtualNetworks", "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroup/providers/Microsoft.Network/virtualNetworks/myVNet"</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><code>subscription_resource_id</code> - This function constructs an Azure subscription scope resource ID given the subscription ID, resource type, and resource names.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// it will output "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg1"</span>
+<span class="kr">output</span><span class="w"> </span><span class="nv">"subscription_resource_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">provider</span><span class="p">::</span><span class="err">azapi</span><span class="p">::</span><span class="err">subscription_resource_id</span><span class="p">(</span><span class="s2">"00000000-0000-0000-0000-000000000000", "Microsoft.Resources/resourceGroups", ["rg1"</span><span class="p">])</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><code>tenant_resource_id</code> - This function constructs an Azure tenant scope resource ID given the resource type and resource names.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// it will output "/providers/Microsoft.Billing/billingAccounts/ba1/billingProfiles/bp1"</span>
+<span class="kr">output</span><span class="w"> </span><span class="nv">"tenant_resource_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">provider</span><span class="p">::</span><span class="err">azapi</span><span class="p">::</span><span class="err">tenant_resource_id</span><span class="p">(</span><span class="s2">"Microsoft.Billing/billingAccounts/billingProfiles", ["ba1", "bp1"</span><span class="p">])</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><code>management_group_resource_id</code> - This function constructs an Azure management group scope resource ID given the management group name, resource type, and resource names.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// it will output "/providers/Microsoft.Management/managementGroups/mg1/providers/Microsoft.Billing/billingAccounts/ba1/billingProfiles/bp1"</span>
+<span class="kr">output</span><span class="w"> </span><span class="nv">"management_group_resource_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">provider</span><span class="p">::</span><span class="err">azapi</span><span class="p">::</span><span class="err">management_group_resource_id</span><span class="p">(</span><span class="s2">"mg1", "Microsoft.Billing/billingAccounts/billingProfiles", ["ba1", "bp1"</span><span class="p">])</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><code>resource_group_resource_id</code> - This function constructs an Azure resource group scope resource ID given the subscription ID, resource group name, resource type, and resource names.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// it will output "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg1/providers/Microsoft.Network/virtualNetworks/vnet1/subnets/subnet1"</span>
+<span class="kr">output</span><span class="w"> </span><span class="nv">"resource_group_resource_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">provider</span><span class="p">::</span><span class="err">azapi</span><span class="p">::</span><span class="err">resource_group_resource_id</span><span class="p">(</span><span class="s2">"00000000-0000-0000-0000-000000000000", "rg1", "Microsoft.Network/virtualNetworks/subnets", ["vnet1", "subnet1"</span><span class="p">])</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p><code>extension_resource_id</code> - This function constructs an Azure extension resource ID given the base resource ID, resource type, and additional resource names.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// it will output "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg1/providers/Microsoft.Network/virtualNetworks/vnet1/providers/Microsoft.Authorization/locks/mylock"</span>
+<span class="kr">output</span><span class="w"> </span><span class="nv">"extension_resource_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">provider</span><span class="p">::</span><span class="err">azapi</span><span class="p">::</span><span class="err">extension_resource_id</span><span class="p">(</span><span class="s2">"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg1/providers/Microsoft.Network/virtualNetworks/vnet1", "Microsoft.Authorization/locks", ["mylock"</span><span class="p">])</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Customized%20Retriable%20Configuration"></a><h2 id="customized-retriable-configuration">Customized Retriable Configuration</h2>
+
+<p>The AzAPI Provider now supports customized retriable configuration for Azure API requests. You can configure regular expression to match the error message and the retry policy.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Resources/resourceGroups@2024-03-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">retry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message_regex</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"ResourceGroupNotFound"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">interval_seconds</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="w"></span>
+<span class="w">    </span><span class="na">max_interval_seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">30</span><span class="w"></span>
+<span class="w">    </span><span class="na">multiplier</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">1.5</span><span class="w"></span>
+<span class="w">    </span><span class="na">randomization_factor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">0.5</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Headers%20and%20Query%20Parameters%20Support"></a><h2 id="headers-and-query-parameters-support">Headers and Query Parameters Support</h2>
+
+<p>The AzAPI Provider now supports headers and query parameters in the request. You can configure headers and query parameters in the resource and data source definitions.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"azapi_client_config"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"azapi_resource_list"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Authorization/policyDefinitions@2021-06-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/subscriptions/${data.azapi_client_config.current.subscription_id}"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">query_parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"$filter"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"policyType eq 'BuiltIn'"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">response_export_values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>It's also possible to configure headers and query parameters for CRUD operations.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Resources/resourceGroups@2021-04-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"westus"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">create_query_parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"query1"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"create-value"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">update_query_parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"query1"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"update-value"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">delete_query_parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"query1"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"delete-value"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">read_query_parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"query1"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"read-value"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">create_headers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"header1"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"create-value"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">update_headers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"header2"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"update-value"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">delete_headers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"header3"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"delete-value"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">read_headers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"header4"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"read-value"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Replacement%20Triggers"></a><h2 id="replacement-triggers">Replacement Triggers</h2>
+
+<p>Previously, it was difficult to replace a resource when the changes could not be updated in place. The AzAPI Provider now supports replacement triggers to help you manage these situations. And there are two types of replacement triggers: value based and reference based.</p>
+
+<ol>
+<li><strong>Value Based Replacement Triggers</strong>: <code>replace_triggers_external_values</code> - Will trigger a replace of the resource when the value changes and is not <code>null</code>.</li>
+</ol>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// e.g. to replace a resource when either the SKU or os_type attributes change:</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">var.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Network/publicIPAddresses@2023-11-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">properties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">sku</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.sku</span><span class="w"></span>
+<span class="w">      </span><span class="na">zones</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.zones</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">replace_triggers_external_values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="nv">var.sku</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nv">var.zones</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<ol>
+<li><strong>Reference Based Replacement Triggers</strong>: <code>replace_triggers_refs</code> - A list of paths in the current Terraform configuration. When the values at these paths change, the resource will be replaced.</li>
+</ol>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// e.g. to replace a resource when either the SKU or os_type attributes change:</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">var.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Network/publicIPAddresses@2023-11-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">properties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">sku</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.sku</span><span class="w"></span>
+<span class="w">      </span><span class="na">zones</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.zones</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">replace_triggers_refs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"properties.sku"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s2">"properties.zones"</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/JMESPath%20Query%20Support"></a><h2 id="jmespath-query-support">JMESPath Query Support</h2>
+
+<p>The AzAPI Provider now supports JMESPath queries for filtering and transforming the response data. You can use JMESPath queries in the <code>response_export_values</code> attribute to filter and transform the response data.</p>
+
+<p>The <code>response_export_values</code> attribute accepts a map where the key is the name for the result and the value is a JMESPath query string to filter the response. </p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.ContainerRegistry/registries@2020-11-01-preview"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">response_export_values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">login_server</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"properties.loginServer"</span><span class="w"></span>
+<span class="w">    </span><span class="na">quarantine_status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"properties.policies.quarantinePolicy.status"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// it will output below object</span>
+<span class="c1">// {</span>
+<span class="c1">//   "login_server" = "example.azurecr.io"</span>
+<span class="c1">//   "quarantine_status" = "Enabled" </span>
+<span class="c1">// }</span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"login_server"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  // it will output "example.azurecr.io"</span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azapi_resource.example.output.login_server</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"quarantine_status"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  // it will output "Enabled"</span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.azapi_resource.example.output.quarantine_status</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Preflight%20Validation"></a><h2 id="preflight-validation">Preflight Validation</h2>
+
+<p>Preflight validation is a new feature in the AzAPI Provider that helps ensure your configuration will deploy successfully. To enable preflight validation, set the <code>enable_preflight</code> attribute to <code>true</code> in the provider block.</p>
+
+<p>In the example below, the provider block is configured to enable preflight validation. The <code>azapi_resource</code> block defines a virtual network resource with an invalid address prefix. When you run <code>terraform plan</code>, the preflight validation will fail and display an error message.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azapi"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">enable_preflight</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"vnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Network/virtualNetworks@2024-01-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.resourceGroup.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-vnet"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"westus"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">properties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">addressSpace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">addressPrefixes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"10.0.0.0/160"</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When you run <code>terraform plan</code>, you will see the following error message:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="o">{</span>
+  <span class="s2">"code"</span>: <span class="s2">"InvalidAddressPrefixFormat"</span>,
+  <span class="s2">"target"</span>: <span class="s2">"/subscriptions/....../resourceGroups/olgdwamq/providers/Microsoft.Network/virtualNetworks/example-vnet"</span>,
+  <span class="s2">"message"</span>: <span class="s2">"Address prefix 10.0.0.0/160 of resource /subscriptions/....../resourceGroups/olgdwamq/providers/Microsoft.Network/virtualNetworks/example-vnet is not formatted correctly. It should follow CIDR notation, for example 10.0.0.0/24."</span>,
+  <span class="s2">"details"</span>: <span class="o">[]</span>
+<span class="o">}</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Breaking%20Changes"></a><h2 id="breaking-changes">Breaking Changes</h2>
+
+<ul>
+<li><p>Provider field <code>default_naming_prefix</code> and <code>default_naming_suffix</code> are removed. </p>
+
+<p>How to fix: <br/>
+Please remove the <code>default_naming_prefix</code> and <code>default_naming_suffix</code> fields from the provider block. You can specify the naming prefix and suffix in the resource's <code>name</code> field instead.</p></li>
+<li><p>Provider field <code>enable_hcl_output_for_data_source</code> is removed. The <code>output</code> field in the data source is always in HCL format.</p>
+
+<p>How to fix: <br/>
+Please remove the <code>enable_hcl_output_for_data_source</code> field from the provider block. Remove any <code>jsondecode</code> functions when using the <code>output</code> field in the data source.</p></li>
+<li><p>The <code>azapi_resource</code>'s <code>removing_special_chars</code> field is removed. Please specify the <code>name</code> field and remove the special characters in the <code>name</code> field instead.</p>
+
+<p>How to fix: <br/>
+Please remove the <code>removing_special_chars</code> field from the <code>azapi_resource</code> block and any special characters in the <code>name</code> field.</p></li>
+<li><p>The <code>ignore_body_changes</code> field is removed. </p>
+
+<p>How to fix: <br/>
+Please remove the <code>ignore_body_changes</code> field from the <code>azapi_resource</code> block. And use the <code>lifecycle.ignore_changes</code> to ignore some properties when comparing the resource with its current state.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"virtualNetwork"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Network/virtualNetworks@2022-07-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.resourceGroup.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">var.resource_name</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">var.location</span><span class="w"></span>
+<span class="w">  </span><span class="nb">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">properties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="nb">addressSpace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">addressPrefixes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">          </span><span class="s2">"10.0.0.0/16"</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+<span class="c1">  // the deprecated field</span>
+<span class="c1">  // ignore_body_changes = ["properties.subnets"]</span>
+
+<span class="c1">  // use the lifecycle block instead</span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">ignore_changes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">body.properties.subnets</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+<li><p>The <code>body</code> field now only accepts an HCL object.</p>
+
+<p>How to fix:
+Please remove the <code>jsonencode</code> function when using the <code>body</code> field in the resource block.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"subnet"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Network/virtualNetworks/subnets@2022-07-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.virtualNetwork.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">var.resource_name</span><span class="c1"></span>
+<span class="c1">  // it's not necessary to use `jsonencode` function to encode the HCL object to JSON, just use the HCL object directly</span>
+<span class="c1">  // body = jsonencode({</span>
+<span class="c1">  //  properties = {</span>
+<span class="c1">  //   addressPrefix = "10.0.2.0/24"</span>
+<span class="c1">  //  }</span>
+<span class="c1">  // })</span>
+<span class="c1">  // use the HCL object directly</span>
+<span class="w">  </span><span class="nb">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">properties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">addressPrefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.2.0/24"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+<li><p>The <code>output</code> field now only exports an HCL object.</p>
+
+<p>How to fix: <br/>
+Please remove the <code>jsondecode</code> function when using the <code>output</code> field in the resource block.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">output</span><span class="w"> </span><span class="nv">"login_server"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  // it's not necessary to use `jsondecode` function to decode the response</span>
+<span class="c1">  // value = jsondecode(azapi_resource.example.output).properties.loginServer</span>
+<span class="c1">  // use the HCL object directly</span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.example.output.properties.loginServer</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div></li>
+<li><p>The <code>use_msi</code> field now defaults to <code>false</code>.</p>
+
+<p>How to fix: <br/>
+Please set it to <code>true</code> explicitly if you want to authenticate using Managed Service Identity.</p></li>
+<li><p><code>azapi_resource</code>, <code>azapi_update_resource</code> resources and data sources' <code>output</code> field defaults to the readonly fields when the <code>response_export_values</code> is not specified. <br/>
+When run the <code>terraform plan</code> command, the output will show the computed field <code>output</code> has changed.</p>
+
+<p>How to fix:</p>
+
+<ol>
+<li>Run <code>terraform refresh</code> to update the state file.</li>
+<li>Specify the <code>disable_default_output = true</code> in the provider block to disable the default output.</li>
+</ol></li>
+<li><p><code>azapi_resource_list</code> data source's <code>output</code> field defaults to the response when the <code>response_export_values</code> is not specified.</p>
+
+<p>How to fix:</p>
+
+<ol>
+<li>Run <code>terraform refresh</code> to update the state file.</li>
+<li>Specify the <code>disable_default_output = true</code> in the provider block to disable the default output.</li>
+</ol></li>
+</ul>
+
+            
+        
+    </body></html>

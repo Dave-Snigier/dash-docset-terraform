@@ -1,0 +1,154 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/ecs_task_execution --><head>
+                <title>aws_ecs_task_execution</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="data-source-aws_ecs_task_execution">Data Source: aws_ecs_task_execution</h1>
+
+<p>Terraform data source for managing an AWS ECS (Elastic Container) Task Execution. This data source calls the <a href="https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_RunTask.html">RunTask</a> API, allowing execution of one-time tasks that don't fit a standard resource lifecycle. See the <a href="https://github.com/hashicorp/terraform-provider-aws/issues/1703">feature request issue</a> for additional context.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>NOTE on plan operations</em>
+    <p>This data source calls the <code>RunTask</code> API on every read operation, which means new task(s) may be created from a <code>terraform plan</code> command if all attributes are known. Placing this functionality behind a data source is an intentional trade off to enable use cases requiring a one-time task execution without relying on <a href="https://developer.hashicorp.com/terraform/language/resources/provisioners/syntax">provisioners</a>. Caution should be taken to ensure the data source is only executed once, or that the resulting tasks can safely run in parallel.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Basic%20Usage"></a><h3 id="basic-usage">Basic Usage</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_ecs_task_execution"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ecs_cluster.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">task_definition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ecs_task_definition.example.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">desired_count</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">  </span><span class="na">launch_type</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"FARGATE"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">network_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnets</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_subnet.example</span><span class="p">[</span><span class="err">*</span><span class="p">].</span><span class="err">id</span><span class="w"></span>
+<span class="w">    </span><span class="na">security_groups</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_security_group.example.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">assign_public_ip</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>cluster</code> - (Required) Short name or full Amazon Resource Name (ARN) of the cluster to run the task on.</li>
+<li><code>task_definition</code> - (Required) The <code>family</code> and <code>revision</code> (<code>family:revision</code>) or full ARN of the task definition to run. If a revision isn't specified, the latest <code>ACTIVE</code> revision is used.</li>
+</ul>
+
+<p>The following arguments are optional:</p>
+
+<ul>
+<li><code>capacity_provider_strategy</code> - (Optional) Set of capacity provider strategies to use for the cluster. See below.</li>
+<li><code>client_token</code> - (Optional) An identifier that you provide to ensure the idempotency of the request. It must be unique and is case sensitive. Up to 64 characters are allowed. The valid characters are characters in the range of 33-126, inclusive. For more information, see <a href="https://docs.aws.amazon.com/AmazonECS/latest/APIReference/ECS_Idempotency.html">Ensuring idempotency</a>.</li>
+<li><code>desired_count</code> - (Optional) Number of instantiations of the specified task to place on your cluster. You can specify up to 10 tasks for each call.</li>
+<li><code>enable_ecs_managed_tags</code> - (Optional) Specifies whether to enable Amazon ECS managed tags for the tasks within the service.</li>
+<li><code>enable_execute_command</code> - (Optional) Specifies whether to enable Amazon ECS Exec for the tasks within the service.</li>
+<li><code>group</code> - (Optional) Name of the task group to associate with the task. The default value is the family name of the task definition.</li>
+<li><code>launch_type</code> - (Optional) Launch type on which to run your service. Valid values are <code>EC2</code>, <code>FARGATE</code>, and <code>EXTERNAL</code>.</li>
+<li><code>network_configuration</code> - (Optional) Network configuration for the service. This parameter is required for task definitions that use the <code>awsvpc</code> network mode to receive their own Elastic Network Interface, and it is not supported for other network modes. See below.</li>
+<li><code>overrides</code> - (Optional) A list of container overrides that specify the name of a container in the specified task definition and the overrides it should receive.</li>
+<li><code>placement_constraints</code> - (Optional) An array of placement constraint objects to use for the task. You can specify up to 10 constraints for each task. See below.</li>
+<li><code>placement_strategy</code> - (Optional) The placement strategy objects to use for the task. You can specify a maximum of 5 strategy rules for each task. See below.</li>
+<li><code>platform_version</code> - (Optional) The platform version the task uses. A platform version is only specified for tasks hosted on Fargate. If one isn't specified, the <code>LATEST</code> platform version is used.</li>
+<li><code>propagate_tags</code> - (Optional) Specifies whether to propagate the tags from the task definition to the task. If no value is specified, the tags aren't propagated. An error will be received if you specify the <code>SERVICE</code> option when running a task. Valid values are <code>TASK_DEFINITION</code> or <code>NONE</code>.</li>
+<li><code>reference_id</code> - (Optional) The reference ID to use for the task.</li>
+<li><code>started_by</code> - (Optional) An optional tag specified when a task is started.</li>
+<li><code>tags</code> - (Optional) Key-value map of resource tags. If configured with a provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a> present, tags with matching keys will overwrite those defined at the provider-level.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/capacity_provider_strategy"></a><h3 id="capacity_provider_strategy">capacity_provider_strategy</h3>
+
+<ul>
+<li><code>capacity_provider</code> - (Required) Name of the capacity provider.</li>
+<li><code>base</code> - (Optional) The number of tasks, at a minimum, to run on the specified capacity provider. Only one capacity provider in a capacity provider strategy can have a base defined. Defaults to <code>0</code>.</li>
+<li><code>weight</code> - (Optional) The relative percentage of the total number of launched tasks that should use the specified capacity provider. The <code>weight</code> value is taken into consideration after the <code>base</code> count of tasks has been satisfied. Defaults to <code>0</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/network_configuration"></a><h3 id="network_configuration">network_configuration</h3>
+
+<ul>
+<li><code>subnets</code> - (Required) Subnets associated with the task or service.</li>
+<li><code>security_groups</code> - (Optional) Security groups associated with the task or service. If you do not specify a security group, the default security group for the VPC is used.</li>
+<li><code>assign_public_ip</code> - (Optional) Assign a public IP address to the ENI (Fargate launch type only). Valid values are <code>true</code> or <code>false</code>. Default <code>false</code>.</li>
+</ul>
+
+<p>For more information, see the <a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-networking.html">Task Networking</a> documentation.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/overrides"></a><h3 id="overrides">overrides</h3>
+
+<ul>
+<li><code>container_overrides</code> - (Optional) One or more container overrides that are sent to a task. See below.</li>
+<li><code>cpu</code> - (Optional) The CPU override for the task.</li>
+<li><code>execution_role_arn</code> - (Optional) Amazon Resource Name (ARN) of the task execution role override for the task.</li>
+<li><code>inference_accelerator_overrides</code> - (Optional) Elastic Inference accelerator override for the task. See below.</li>
+<li><code>memory</code> - (Optional) The memory override for the task.</li>
+<li><code>task_role_arn</code> - (Optional) Amazon Resource Name (ARN) of the role that containers in this task can assume.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/container_overrides"></a><h3 id="container_overrides">container_overrides</h3>
+
+<ul>
+<li><code>command</code> - (Optional) The command to send to the container that overrides the default command from the Docker image or the task definition.</li>
+<li><code>cpu</code> - (Optional) The number of cpu units reserved for the container, instead of the default value from the task definition.</li>
+<li><code>environment</code> - (Optional) The environment variables to send to the container. You can add new environment variables, which are added to the container at launch, or you can override the existing environment variables from the Docker image or the task definition. See below.</li>
+<li><code>memory</code> - (Optional) The hard limit (in MiB) of memory to present to the container, instead of the default value from the task definition. If your container attempts to exceed the memory specified here, the container is killed.</li>
+<li><code>memory_reservation</code> - (Optional) The soft limit (in MiB) of memory to reserve for the container, instead of the default value from the task definition.</li>
+<li><code>name</code> - (Optional) The name of the container that receives the override. This parameter is required if any override is specified.</li>
+<li><code>resource_requirements</code> - (Optional) The type and amount of a resource to assign to a container, instead of the default value from the task definition. The only supported resource is a GPU. See below.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/environment"></a><h3 id="environment">environment</h3>
+
+<ul>
+<li><code>key</code> - (Required) The name of the key-value pair. For environment variables, this is the name of the environment variable.</li>
+<li><code>value</code> - (Required) The value of the key-value pair. For environment variables, this is the value of the environment variable.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/resource_requirements"></a><h3 id="resource_requirements">resource_requirements</h3>
+
+<ul>
+<li><code>type</code> - (Required) The type of resource to assign to a container. Valid values are <code>GPU</code> or <code>InferenceAccelerator</code>.</li>
+<li><code>value</code> - (Required) The value for the specified resource type. If the <code>GPU</code> type is used, the value is the number of physical GPUs the Amazon ECS container agent reserves for the container. The number of GPUs that's reserved for all containers in a task can't exceed the number of available GPUs on the container instance that the task is launched on. If the <code>InferenceAccelerator</code> type is used, the value matches the <code>deviceName</code> for an InferenceAccelerator specified in a task definition.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/inference_accelerator_overrides"></a><h3 id="inference_accelerator_overrides">inference_accelerator_overrides</h3>
+
+<ul>
+<li><code>device_name</code> - (Optional) The Elastic Inference accelerator device name to override for the task. This parameter must match a deviceName specified in the task definition.</li>
+<li><code>device_type</code> - (Optional) The Elastic Inference accelerator type to use.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/placement_constraints"></a><h3 id="placement_constraints">placement_constraints</h3>
+
+<ul>
+<li><code>expression</code> - (Optional) A cluster query language expression to apply to the constraint. The expression can have a maximum length of 2000 characters. You can't specify an expression if the constraint type is <code>distinctInstance</code>.</li>
+<li><code>type</code> - (Optional) The type of constraint. Valid values are <code>distinctInstance</code> or <code>memberOf</code>. Use <code>distinctInstance</code> to ensure that each task in a particular group is running on a different container instance. Use <code>memberOf</code> to restrict the selection to a group of valid candidates.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/placement_strategy"></a><h3 id="placement_strategy">placement_strategy</h3>
+
+<ul>
+<li><code>field</code> - (Optional) The field to apply the placement strategy against.</li>
+<li><code>type</code> - (Optional) The type of placement strategy. Valid values are <code>random</code>, <code>spread</code>, and <code>binpack</code>.</li>
+</ul>
+
+<p>For more information, see the <a href="https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_PlacementStrategy.html">Placement Strategy</a> documentation.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This data source exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>task_arns</code> - A list of the provisioned task ARNs.</li>
+<li><code>id</code> - The unique identifier, which is a comma-delimited string joining the <code>cluster</code> and <code>task_definition</code> attributes.</li>
+</ul>
+
+            
+        
+    </body></html>

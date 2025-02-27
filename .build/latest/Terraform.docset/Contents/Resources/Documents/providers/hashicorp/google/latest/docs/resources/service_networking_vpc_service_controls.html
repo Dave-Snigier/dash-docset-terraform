@@ -1,0 +1,169 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/service_networking_vpc_service_controls --><head>
+                <title>google_service_networking_vpc_service_controls</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="google_service_networking_vpc_service_controls">google_service_networking_vpc_service_controls</h1>
+
+<p>Manages the VPC Service Controls configuration for a service
+networking connection</p>
+
+<p>When enabled, Google Cloud makes the following
+route configuration changes in the service producer VPC network:</p>
+
+<ul>
+<li>Removes the IPv4 default route (destination 0.0.0.0/0,
+next hop default internet gateway), Google Cloud then creates an
+IPv4 route for destination 199.36.153.4/30 using the default
+internet gateway next hop.</li>
+<li>Creates Cloud DNS managed private zones and authorizes those zones
+for the service producer VPC network. The zones include
+googleapis.com, gcr.io, pkg.dev, notebooks.cloud.google.com,
+kernels.googleusercontent.com, backupdr.cloud.google.com, and
+backupdr.googleusercontent.com as necessary domains or host names
+for Google APIs and services that are compatible with VPC Service
+Controls. Record data in the zones resolves all host names to
+199.36.153.4, 199.36.153.5, 199.36.153.6, and 199.36.153.7.</li>
+</ul>
+
+<p>When disabled, Google Cloud makes the following route configuration
+changes in the service producer VPC network:</p>
+
+<ul>
+<li>Restores a default route (destination 0.0.0.0/0, next hop default
+internet gateway)</li>
+<li>Deletes the Cloud DNS managed private zones that provided the host
+name overrides.</li>
+</ul>
+
+<p>To get more information about VPCServiceControls, see:</p>
+
+<ul>
+<li><a href="https://cloud.google.com/service-infrastructure/docs/service-networking/reference/rest/v1/services">API documentation</a></li>
+<li>How-to Guides
+<ul>
+<li><a href="https://cloud.google.com/sdk/gcloud/reference/services/vpc-peerings/enable-vpc-service-controls">Enable VPC Service Controls for service networking</a></li>
+<li><a href="https://cloud.google.com/vpc-service-controls/docs/private-connectivity">Private Google Access with VPC Service Controls</a></li>
+<li><a href="https://cloud.google.com/vpc-service-controls/docs/set-up-private-connectivity">Set up private connectivity to Google APIs and services</a></li>
+</ul></li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Destroying a <code>google_service_networking_vpc_service_controls</code> resource will remove it from state, but will not change the underlying VPC Service Controls configuration for the service producer network.</p>
+</aside>
+
+<div class="oics-button" style="float: right; margin: 0 0 -15px">
+  <a href="https://console.cloud.google.com/cloudshell/open?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fterraform-google-modules%2Fdocs-examples.git&amp;cloudshell_image=gcr.io%2Fcloudshell-images%2Fcloudshell%3Alatest&amp;cloudshell_print=.%2Fmotd&amp;cloudshell_tutorial=.%2Ftutorial.md&amp;cloudshell_working_dir=service_networking_vpc_service_controls_basic&amp;open_in_editor=main.tf" target="_blank">
+    <img alt="Open in Cloud Shell" src="//gstatic.com/cloudssh/images/open-btn.svg" style="max-height: 44px; margin: 32px auto; max-width: 100%;"/>
+  </a>
+</div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage%20-%20Service%20Networking%20Vpc%20Service%20Controls%20Basic"></a><h2 id="example-usage-service-networking-vpc-service-controls-basic">Example Usage - Service Networking Vpc Service Controls Basic</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Create a VPC</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-network"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create an IP address</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_global_address"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"psa-range"</span><span class="w"></span>
+<span class="w">  </span><span class="na">purpose</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"VPC_PEERING"</span><span class="w"></span>
+<span class="w">  </span><span class="na">address_type</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"INTERNAL"</span><span class="w"></span>
+<span class="w">  </span><span class="na">prefix_length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">16</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.default.id</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create a private connection</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_service_networking_connection"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.default.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">service</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="s2">"servicenetworking.googleapis.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">reserved_peering_ranges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_compute_global_address.default.name</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Enable VPC-SC on the producer network</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_service_networking_vpc_service_controls"</span><span class="w"> </span><span class="nv">"default"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.default.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">service</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"servicenetworking.googleapis.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">enabled</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_service_networking_connection.default</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>enabled</code> -
+(Required)
+Desired VPC Service Controls state service producer VPC network, as
+described at the top of this page.</p></li>
+<li><p><code>network</code> -
+(Required)
+The network that the consumer is using to connect with services.</p></li>
+<li><p><code>service</code> -
+(Required)
+The service that is managing peering connectivity for a service
+producer's organization. For Google services that support this
+functionality, this value is <code>servicenetworking.googleapis.com</code>.</p></li>
+</ul>
+
+<hr/>
+
+<ul>
+<li><code>project</code> -
+(Optional)
+The id of the Google Cloud project containing the consumer network.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to the arguments listed above, the following computed attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - an identifier for the resource with format <code>services/{{service}}/projects/{{project}}/networks/{{network}}</code></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p>This resource provides the following
+<a href="https://developer.hashicorp.com/terraform/plugin/sdkv2/resources/retries-and-customizable-timeouts">Timeouts</a> configuration options:</p>
+
+<ul>
+<li><code>create</code> - Default is 20 minutes.</li>
+<li><code>update</code> - Default is 20 minutes.</li>
+<li><code>delete</code> - Default is 20 minutes.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>VPCServiceControls can be imported using any of these accepted formats:</p>
+
+<ul>
+<li><code>services/{{service}}/projects/{{project}}/networks/{{network}}</code></li>
+<li><code>{{service}}/{{project}}/{{network}}</code></li>
+<li><code>{{service}}/{{network}}</code></li>
+</ul>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import VPCServiceControls using one of the formats above. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"services/{{service}}/projects/{{project}}/networks/{{network}}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_service_networking_vpc_service_controls.default</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When using the <a href="https://developer.hashicorp.com/terraform/cli/commands/import"><code>terraform import</code> command</a>, VPCServiceControls can be imported using one of the formats above. For example:</p>
+
+<pre><code>$ terraform import google_service_networking_vpc_service_controls.default services/{{service}}/projects/{{project}}/networks/{{network}}
+$ terraform import google_service_networking_vpc_service_controls.default {{service}}/{{project}}/{{network}}
+$ terraform import google_service_networking_vpc_service_controls.default {{service}}/{{network}}
+</code></pre>
+
+            
+        
+    </body></html>

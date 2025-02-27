@@ -1,0 +1,118 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/storage_notification --><head>
+                <title>google_storage_notification</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="google_storage_notification">google_storage_notification</h1>
+
+<p>Creates a new notification configuration on a specified bucket, establishing a flow of event notifications from GCS to a Cloud Pub/Sub topic.
+ For more information see
+<a href="https://cloud.google.com/storage/docs/pubsub-notifications">the official documentation</a>
+and
+<a href="https://cloud.google.com/storage/docs/json_api/v1/notifications">API</a>.</p>
+
+<p>In order to enable notifications, a special Google Cloud Storage service account unique to the project
+must exist and have the IAM permission "projects.topics.publish" for a Cloud Pub/Sub topic in the project.
+This service account is not created automatically when a project is created.
+To ensure the service account exists and obtain its email address for use in granting the correct IAM permission, use the
+<a href="../data-sources/storage_project_service_account.html"><code>google_storage_project_service_account</code></a>
+datasource's <code>email_address</code> value, and see below for an example of enabling notifications by granting the correct IAM permission.
+See <a href="https://cloud.google.com/storage/docs/gsutil/commands/notification">the notifications documentation</a> for more details.</p>
+
+<blockquote>
+  <p><strong>NOTE</strong>: This resource can affect your storage IAM policy. If you are using this in the same config as your storage IAM policy resources, consider
+  making this resource dependent on those IAM resources via <code>depends_on</code>. This will safeguard against errors due to IAM race conditions.</p>
+</blockquote>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"google_storage_notification"</span><span class="w"> </span><span class="nv">"notification"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">google_storage_bucket.bucket.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">payload_format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"JSON_API_V1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">topic</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">google_pubsub_topic.topic.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">event_types</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"OBJECT_FINALIZE", "OBJECT_METADATA_UPDATE"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="nb">custom_attributes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">new-attribute</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"new-attribute-value"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">google_pubsub_topic_iam_binding.binding</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Enable notifications by giving the correct IAM permission to the unique service account.</span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"google_storage_project_service_account"</span><span class="w"> </span><span class="nv">"gcs_account"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_pubsub_topic_iam_binding"</span><span class="w"> </span><span class="nv">"binding"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">topic</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">google_pubsub_topic.topic.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"roles/pubsub.publisher"</span><span class="w"></span>
+<span class="w">  </span><span class="na">members</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"serviceAccount:${data.google_storage_project_service_account.gcs_account.email_address}"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// End enabling notifications</span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_storage_bucket"</span><span class="w"> </span><span class="nv">"bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"default_bucket"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"US"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_pubsub_topic"</span><span class="w"> </span><span class="nv">"topic"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"default_topic"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>bucket</code> - (Required) The name of the bucket.</p></li>
+<li><p><code>payload_format</code> - (Required) The desired content of the Payload. One of <code>"JSON_API_V1"</code> or <code>"NONE"</code>.</p></li>
+<li><p><code>topic</code> - (Required) The Cloud PubSub topic to which this subscription publishes. Expects either the
+topic name, assumed to belong to the default GCP provider project, or the project-level name,
+i.e. <code>projects/my-gcp-project/topics/my-topic</code> or <code>my-topic</code>. If the project is not set in the provider,
+you will need to use the project-level name.</p></li>
+</ul>
+
+<hr/>
+
+<ul>
+<li><p><code>custom_attributes</code> - (Optional)  A set of key/value attribute pairs to attach to each Cloud PubSub message published for this notification subscription</p></li>
+<li><p><code>event_types</code> - (Optional) List of event type filters for this notification config. If not specified, Cloud Storage will send notifications for all event types. The valid types are: <code>"OBJECT_FINALIZE"</code>, <code>"OBJECT_METADATA_UPDATE"</code>, <code>"OBJECT_DELETE"</code>, <code>"OBJECT_ARCHIVE"</code></p></li>
+<li><p><code>object_name_prefix</code> - (Optional) Specifies a prefix path filter for this notification config. Cloud Storage will only send notifications for objects in this bucket whose names begin with the specified prefix.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attributes%20Reference"></a><h2 id="attributes-reference">Attributes Reference</h2>
+
+<p>In addition to the arguments listed above, the following computed attributes are
+exported:</p>
+
+<ul>
+<li><p><code>notification_id</code> - The ID of the created notification.</p></li>
+<li><p><code>self_link</code> - The URI of the created resource.</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>Storage notifications can be imported using any of these accepted formats:</p>
+
+<ul>
+<li><code>{{bucket_name}}/notificationConfigs/{{id}}</code></li>
+</ul>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import Storage notifications using one of the formats above. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"{{bucket_name}}/notificationConfigs/{{id}}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_storage_notification.default</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>When using the <a href="https://developer.hashicorp.com/terraform/cli/commands/import"><code>terraform import</code> command</a>, Storage notifications can be imported using one of the formats above. For example:</p>
+
+<pre><code>$ terraform import google_storage_notification.default {{bucket_name}}/notificationConfigs/{{id}}
+</code></pre>
+
+            
+        
+    </body></html>

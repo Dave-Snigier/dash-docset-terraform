@@ -1,0 +1,292 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/guides/troubleshooting --><head>
+                <title>How to troubleshoot your problem</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="how-to-troubleshoot-your-problem">How to troubleshoot your problem</h1>
+
+<p>If you have problems with code that uses Databricks Terraform provider, follow these steps to solve them:</p>
+
+<ul>
+<li>Check symptoms and solutions in the <a href="#typical-problems">Typical problems</a> section below.</li>
+<li>Upgrade the provider to the latest version. The bug might have already been fixed.</li>
+<li>In case of authentication problems, see the <a href="#data-resources-and-authentication-is-not-configured-errors">Data resources and Authentication is not configured errors</a> below.</li>
+<li>Collect debug information using the following command:</li>
+</ul>
+
+<div class="codehilite"><pre><span></span><code><span class="nv">TF_LOG</span><span class="o">=</span>DEBUG <span class="nv">DATABRICKS_DEBUG_TRUNCATE_BYTES</span><span class="o">=</span><span class="m">250000</span> terraform apply -no-color <span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span> <span class="p">|</span>tee tf-debug.log
+</code></pre></div>
+
+<ul>
+<li>Open a <a href="https://github.com/databricks/terraform-provider-databricks/issues/new/choose">new GitHub issue</a> providing all information described in the issue template - debug logs, your Terraform code, Terraform &amp; plugin versions, etc.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Plugin%20Framework%20Migration%20Problems"></a><h2 id="plugin-framework-migration-problems">Plugin Framework Migration Problems</h2>
+
+<p>The following resources and data sources have been migrated from sdkv2 to plugin framework。 If you encounter any problem with those, you can fallback to sdkv2 by setting the <code>USE_SDK_V2_RESOURCES</code> and <code>USE_SDK_V2_DATA_SOURCES</code> environment variables.</p>
+
+<p>Example: <code>export USE_SDK_V2_RESOURCES="databricks_library,databricks_quality_monitor"</code></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resources%20migrated"></a><h3 id="resources-migrated">Resources migrated</h3>
+
+<ul>
+<li>databricks_quality_monitor</li>
+<li><p>databricks_library</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20sources%20migrated"></a><h3 id="data-sources-migrated">Data sources migrated</h3></li>
+<li><p>databricks_volumes</p></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Typical%20problems"></a><h2 id="typical-problems">Typical problems</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20resources%20and%20Authentication%20is%20not%20configured%20errors"></a><h3 id="data-resources-and-authentication-is-not-configured-errors">Data resources and Authentication is not configured errors</h3>
+
+<p><em>In Terraform 0.13 and later</em>, data resources have the same dependency resolution behavior <a href="https://www.terraform.io/docs/language/resources/behavior.html#resource-dependencies">as defined for managed resources</a>. Most data resources make an API call to a workspace. If a workspace doesn't exist yet, <code>default auth: cannot configure default credentials</code> error is raised. To work around this issue and guarantee a proper lazy authentication with data resources, you should add <code>depends_on = [azurerm_databricks_workspace.this]</code> or <code>depends_on = [databricks_mws_workspaces.this]</code> to the body. This issue doesn't occur if a workspace is created <em>in one module</em> and resources <a href="guides/workspace-management.md">within the workspace</a> are created <em>in another</em>. We do not recommend using Terraform 0.12 and earlier if your usage involves data resources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Multiple%20Provider%20Configurations"></a><h3 id="multiple-provider-configurations">Multiple Provider Configurations</h3>
+
+<p>The most common reason for technical difficulties might be related to missing <code>alias</code> attribute in <code>provider "databricks" {}</code> blocks or <code>provider</code> attribute in <code>resource "databricks_..." {}</code> blocks when using multiple provider configurations. Please make sure to read <a href="https://www.terraform.io/docs/language/providers/configuration.html#alias-multiple-provider-configurations"><code>alias</code>: Multiple Provider Configurations</a> documentation article.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Error%20while%20installing%3A%20registry%20does%20not%20have%20a%20provider"></a><h3 id="error-while-installing-registry-does-not-have-a-provider">Error while installing: registry does not have a provider</h3>
+
+<div class="codehilite"><pre><span></span><code>Error <span class="k">while</span> installing hashicorp/databricks: provider registry
+registry.terraform.io does not have a provider named
+registry.terraform.io/hashicorp/databricks
+</code></pre></div>
+
+<p>If you notice the below error, it might be because <a href="https://www.terraform.io/docs/language/providers/requirements.html#requiring-providers">required_providers</a> block is not defined in <em>every module</em>that uses Databricks Terraform Provider. Create <code>versions.tf</code> file with the following contents:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># versions.tf</span>
+<span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">databricks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"databricks/databricks"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1.0.1"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>... and copy the file in every module in your codebase. We recommend skipping the <code>version</code> field for <code>versions.tf</code> file on the module level and keeping it only on the environment level.</p>
+
+<pre><code>├── environments
+│   ├── sandbox
+│   │   ├── README.md
+│   │   ├── main.tf
+│   │   └── versions.tf
+│   └── production
+│    ├── README.md
+│    ├── main.tf
+│    └── versions.tf
+└── modules
+ ├── first-module
+ │   ├── ...
+ │   └── versions.tf
+ └── second-module
+     ├── ...
+     └── versions.tf
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Error%3A%20Failed%20to%20install%20provider"></a><h3 id="error-failed-to-install-provider">Error: Failed to install provider</h3>
+
+<p>Running the <code>terraform init</code> command, you may see <code>Failed to install provider</code> error if you didn't check in <a href="https://www.terraform.io/language/files/dependency-lock#lock-file-location"><code>.terraform.lock.hcl</code></a> to the source code version control:</p>
+
+<div class="codehilite"><pre><span></span><code>Error: Failed to install provider
+
+Error <span class="k">while</span> installing databricks/databricks: v1.0.0: checksum list has no SHA-256 <span class="nb">hash</span> <span class="k">for</span> <span class="s2">"https://github.com/databricks/terraform-provider-databricks/releases/download/v1.0.0/terraform-provider-databricks_1.0.0_darwin_amd64.zip"</span>
+</code></pre></div>
+
+<p>You can fix it by following three simple steps:</p>
+
+<ul>
+<li>Replace <code>databrickslabs/databricks</code> with <code>databricks/databricks</code> in all your <code>.tf</code> files with the <code>python3 -c "$(curl -Ls https://dbricks.co/updtfns)"</code> command.</li>
+<li>Run the <code>terraform state replace-provider databrickslabs/databricks databricks/databricks</code> command and approve the changes. See <a href="https://www.terraform.io/cli/commands/state/replace-provider">Terraform CLI</a> docs for more information.</li>
+<li>Run <code>terraform init</code> to verify everything is working.</li>
+</ul>
+
+<p>The terraform apply command should work as expected now.</p>
+
+<p>Alternatively, you can find the hashes of the last 30 provider versions in <a href="https://github.com/databrickslabs/terraform-provider-databricks/blob/v0.6.2/scripts/versions-lock.hcl"><code>.terraform.lock.hcl</code></a>. As a temporary measure, you can lock on a prior version by following the following steps:</p>
+
+<ul>
+<li>Copy <a href="https://github.com/databrickslabs/terraform-provider-databricks/blob/v0.6.2/scripts/versions-lock.hcl"><code>versions-lock.hcl</code></a> to the root folder of your terraform project.</li>
+<li>Rename to <code>terraform.lock.hcl</code></li>
+<li>Run <code>terraform init</code> and verify the provider is installed.</li>
+<li>Commit the new <code>.terraform.lock.hcl</code> file to your source code repository.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Error%3A%20Failed%20to%20query%20available%20provider%20packages"></a><h3 id="error-failed-to-query-available-provider-packages">Error: Failed to query available provider packages</h3>
+
+<p>See the same steps as in <a href="#error-failed-to-install-provider">Error: Failed to install provider</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Error%3A%20Deployment%20name%20cannot%20be%20used%20until%20a%20deployment%20name%20prefix%20is%20defined"></a><h3 id="error-deployment-name-cannot-be-used-until-a-deployment-name-prefix-is-defined">Error: Deployment name cannot be used until a deployment name prefix is defined</h3>
+
+<p>You can get this error during provisioning of the Databricks workspace.  It arises when you're trying to set <code>deployment_name</code> with no deployment prefix on the Databricks side (you can't set it yourself).  The problem could be solved by one of the following methods:</p>
+
+<ol>
+<li><p>Contact your Databricks representatives, like Solutions Architect, Customer Success Engineer, Account Executive, or Partner Solutions Architect, to set a deployment prefix for your account.</p></li>
+<li><p>Comment out the <code>deployment_name</code> parameter to create a workspace with the default URL: <code>dbc-XXXXXX.cloud.databricks.com</code>.</p></li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Error%3A%20%27strconv.ParseInt%20parsing%20%22....%22%20value%20out%20of%20range%27%20or%20%22Attribute%20must%20be%20a%20whole%20number%2C%20got%20N.NNNNe%2BXX%22"></a><h3 id="error-strconvparseint-parsing-value-out-of-range-or-attribute-must-be-a-whole-number-got-nnnnnexx">Error: 'strconv.ParseInt parsing "...." value out of range' or "Attribute must be a whole number, got N.NNNNe+XX"</h3>
+
+<p>This kind of error happens when the 32-bit version of Databricks Terraform provider is used, usually on Microsoft Windows.  To fix the issue, you need to switch to use of the 64-bit versions of Terraform and Databricks Terraform provider.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Error%3A%20cannot%20create%20xxxx%3A%20HTTP%20method%20POST%20is%20not%20supported%20by%20this%20URL"></a><h3 id="error-cannot-create-xxxx-http-method-post-is-not-supported-by-this-url">Error: cannot create xxxx: HTTP method POST is not supported by this URL</h3>
+
+<p>This error may appear when creating Databricks users/groups/service principals on Databricks account level when no <code>account_id</code> is specified in the provider's configuration.  Make sure that <code>account_id</code> is set and has a correct value.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Error%3A%20oauth-m2m%3A%20oidc%3A%20parse%20.well-known%3A%20invalid%20character%20%27%3C%27%20looking%20for%20beginning%20of%20value"></a><h3 id="error-oauth-m2m-oidc-parse-well-known-invalid-character-looking-for-beginning-of-value">Error: oauth-m2m: oidc: parse .well-known: invalid character '&lt;' looking for beginning of value</h3>
+
+<p>This problem is similar to the previous item.  Ensure that <code>account_id</code> is specified in the provider configuration and it has a correct value.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Error%3A%20cannot%20create%20...%3A%20invalid%20character%20%27%3C%27%20looking%20for%20beginning%20of%20value"></a><h3 id="error-cannot-create-invalid-character-looking-for-beginning-of-value">Error: cannot create ...: invalid character '&lt;' looking for beginning of value</h3>
+
+<p>This error may appear when creating workspace-level objects, but the provider is configured to account-level.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Error%3A%20cannot%20...%3A%20unexpected%20error%20handling%20request%3A%20invalid%20character%20%27%3C%27%20for%20beginning%20of%20value"></a><h3 id="error-cannot-unexpected-error-handling-request-invalid-character-for-beginning-of-value">Error: cannot ...: unexpected error handling request: invalid character '&lt;' for beginning of value</h3>
+
+<p>If you see the following HTTP request when running Terraform in the debug mode:</p>
+
+<pre><code>GET /login.html?error=private-link-validation-error:NNNNNNNNNN
+</code></pre>
+
+<p>then it means that you're trying to access a workspace that uses private link with private access set to disabled, but you're trying to reach it via public endpoint.  Make sure that domain names resolution is configured correctly to resolve workspace URL to a private endpoint.  Also, this may happen when you’re accessing the internet via an HTTP proxy, so all traffic from Terraform is forwarded to the HTTP proxy, and routed via the public internet.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Error%3A%20....%3A%20Unauthorized%20access%20to%20Org%3A%20NNNNNNNNNN"></a><h3 id="error-unauthorized-access-to-org-nnnnnnnnnn">Error: ....: Unauthorized access to Org: NNNNNNNNNN</h3>
+
+<p>There are a few possible reasons for this error:</p>
+
+<ul>
+<li>You’re trying to access a Databricks workspace with a private link enabled and public network access set to disabled.  Typically this happens when a computer from which you’re running terraform apply or terraform plan doesn’t have domain name resolution configured correctly, and Terraform is reaching the workspace via a public IP address. Also, this may happen when you’re accessing the internet via an HTTP proxy, so all traffic from Terraform is forwarded to the proxy, and routed via the public internet.</li>
+<li>You have a Databricks workspace with IP Access Lists enabled and you’re trying to access from a computer that isn’t in the list of approved IP addresses.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Error%3A%20Provider%20registry.terraform.io/databricks/databricks%20v...%20does%20not%20have%20a%20package%20available%20for%20your%20current%20platform%2C%20windows_386"></a><h3 id="error-provider-registryterraformiodatabricksdatabricks-v-does-not-have-a-package-available-for-your-current-platform-windows_386">Error: Provider registry.terraform.io/databricks/databricks v... does not have a package available for your current platform, windows_386</h3>
+
+<p>This error happens when the 32-bit version of Databricks Terraform provider is used, usually on Microsoft Windows.  To fix the issue, you need to switch to the 64-bit versions of Terraform and Databricks Terraform provider.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Permanent%20configuration%20drifts%20with%20databricks_grants%20or%20databricks_permissions"></a><h3 id="permanent-configuration-drifts-with-databricks_grants-or-databricks_permissions">Permanent configuration drifts with <code>databricks_grants</code> or <code>databricks_permissions</code></h3>
+
+<p>For both resources, each single resource instance should manage all the grants/permissions for a given object. If multiple instances are set up against an object, they will keep overwriting one another, leading to permanent configuration drifts.</p>
+
+<p>To prevent that, you need to have only one resource instance per object, and inside that resource instance, use <a href="https://developer.hashicorp.com/terraform/language/expressions/dynamic-blocks">Dynamic Blocks</a> to specify the variable number of nested grant blocks.</p>
+
+<p>For example</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">locals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">groups</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"group1", "group2"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_grants"</span><span class="w"> </span><span class="nv">"catalog_grants"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">catalog</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_catalog.catalog_raw.name</span><span class="w"></span>
+
+<span class="w">  </span><span class="err">dynamic</span><span class="w"> </span><span class="s2">"grant"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">local.groups</span><span class="w"></span>
+<span class="w">    </span><span class="nb">content</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">principal</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">grant.value</span><span class="w"></span>
+<span class="w">      </span><span class="na">privileges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"ALL_PRIVILEGES"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>See <code>databricks_grant</code> for managing grants for a single principal.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Error%20updating%20UC%20catalog%20resources%20after%20a%20metastore_id%20change"></a><h3 id="error-updating-uc-catalog-resources-after-a-metastore_id-change">Error updating UC catalog resources after a metastore_id change</h3>
+
+<p>After changing the metastore assigned to a workspace, some resources may fail to update with the following error:</p>
+
+<pre><code>metastore_id must be empty or equal to the metastore id assigned to the workspace: &lt;metastore_id&gt;. 
+If the metastore assigned to the workspace has changed, the new metastore id must be explicitly set
+</code></pre>
+
+<p>To solve this error, the new Metastore ID must be set in the field <code>metastore_id</code> of the failing resources.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/More%20than%20one%20authorization%20method%20configured%20error"></a><h3 id="more-than-one-authorization-method-configured-error">More than one authorization method configured error</h3>
+
+<p>If you notice the below error:</p>
+
+<div class="codehilite"><pre><span></span><code>Error: validate: more than one authorization method configured
+</code></pre></div>
+
+<p>Ensure that you only have one authorization method set. All available authorization methods are documented <a href="https://registry.terraform.io/providers/databricks/databricks/latest/docs#auth_type">here</a>.</p>
+
+<p>If you want to enforce a specific authorization method, you can set the <code>auth_type</code> attribute in the provider block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # other configurations</span>
+<span class="w">  </span><span class="na">auth_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"pat"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The above would enforce the use of PAT authorization.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/oauth-m2m%3A%20oidc%3A%20databricks%20OAuth%20is%20not%20supported%20for%20this%20host."></a><h3 id="oauth-m2m-oidc-databricks-oauth-is-not-supported-for-this-host">oauth-m2m: oidc: databricks OAuth is not supported for this host.</h3>
+
+<p>There could be different reasons for this error:</p>
+
+<ul>
+<li>Old version of Terraform provider is used - there were <a href="https://github.com/databricks/terraform-provider-databricks/issues/3023">problems reported</a> with versions lower than 1.35.0, so try to upgrade your provider.</li>
+<li>You use multiple provider instances in your code and don't specify that specific instance in your resource or data source - in this case, Terraform will try to use "default instance" that could be initialized from the <code>DEFAULT</code> profile in your <code>~/.databrickscfg</code> file if you have it.  Check that correct provider instance is used everywhere.</li>
+<li>If you're using authentication data from <code>~/.databrickscfg</code> file, check that profile you're using has correct data - URL, client ID and secret.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider%20%22registry.terraform.io/databricks/databricks%22%20planned%20an%20invalid%20value%20for%20...%3A%20planned%20value%20...%20for%20a%20non-computed%20attribute."></a><h3 id="provider-registryterraformiodatabricksdatabricks-planned-an-invalid-value-for-planned-value-for-a-non-computed-attribute">Provider "registry.terraform.io/databricks/databricks" planned an invalid value for ...: planned value ... for a non-computed attribute.</h3>
+
+<p>Starting with version v1.51.0, the Terraform provider for Databricks supports <code>terraform</code> versions 1.1.5 and later. Older versions of <code>terraform</code>, such as v0.15.5, are known to erroneously generate this error. Check the version of <code>terraform</code> that you're using by running <code>terraform version</code> and upgrade it if necessary.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Error%3A%20cannot%20create%20....%3A%20invalid%20Databricks%20Account%20configuration"></a><h3 id="error-cannot-create-invalid-databricks-account-configuration">Error: cannot create ....: invalid Databricks Account configuration</h3>
+
+<p><code>....</code> is the descriptive name of a resource such as <code>access control rule set</code>. The error occurs when creating a workspace resource with a provider containing the <code>account_id</code> argument e.g.:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"databricks"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">host</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://&lt;workspace-hostname&gt;.cloud.databricks.com"</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="w">  </span><span class="na">client_secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="c1"></span>
+
+<span class="c1">  # This line is the problem</span>
+<span class="w">  </span><span class="na">account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"..."</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Remove the <code>account_id</code> argument from the workspace provider to resolve the error.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h3 id="timeouts">Timeouts</h3>
+
+<p>You may see several different kinds of timeout messages when using the Terraform Provider for Databricks. Here are the three main types of timeouts and how to address them:</p>
+
+<ol>
+<li>The <strong>resource timeout</strong> ensures that the context passed to the CRUD methods has a timeout set. The default resource timeout for most resources is 20m. If this timeout is exceeded, users will see a message like <code>context: deadline exceeded</code>. Resources must enable this timeout resource by resource by setting the <code>timeouts</code> block. Once present, users can modify this timeout as needed on a per-resource basis like so:</li>
+</ol>
+
+<pre><code>   resource "databricks_resource" "this" {
+     ...
+     timeouts {
+       create = "1h"
+       update = "1h"
+       delete = "1h"
+     }
+   }
+</code></pre>
+
+<p>You can request this feature for a specific resource by opening a GitHub issue. Please include the resource name and debug logs from the failed operation.</p>
+
+<ol>
+<li>The <strong>HTTP client timeout</strong> controls how long the underlying SDK's HTTP client waits for a response for a single API call. This is controlled with <code>http_timeout_seconds</code> in the provider configuration. If this timeout is exceeded, users see a message like <code>request timed out after 1m0s of inactivity</code>. Users can increase this timeout as needed, and it will apply to all API requests made by the TF provider.</li>
+</ol>
+
+<pre><code>   provider "databricks" {
+     ...
+     http_timeout_seconds = 120
+   }
+</code></pre>
+
+<ol>
+<li>The <strong>API proxy timeout</strong> is a server-side timeout that controls how long to wait for backend service to handle an API request. This timeout is configured by each API team at Databricks for their API endpoints. If this timeout is exceeded, users see a message like <code>The service at ... is taking too long to process your request. Please try again later or try a faster operation.</code>. Users cannot modify this timeout: it is configured by a Databricks team responsible for the backend service. If users see this error, they should reach out to Databricks support to investigate the issue.</li>
+</ol>
+
+            
+        
+    </body></html>

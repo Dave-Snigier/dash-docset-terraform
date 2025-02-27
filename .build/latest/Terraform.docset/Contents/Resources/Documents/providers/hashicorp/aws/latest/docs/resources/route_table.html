@@ -1,0 +1,198 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table --><head>
+                <title>aws_route_table</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_route_table">Resource: aws_route_table</h1>
+
+<p>Provides a resource to create a VPC routing table.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>NOTE on Route Tables and Routes</em>
+    <p>Terraform currently provides both a standalone <a href="route.html">Route resource</a> and a Route Table resource with routes defined in-line. At this time you cannot use a Route Table with in-line routes in conjunction with any Route resources. Doing so will cause a conflict of rule settings and will overwrite rules.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>NOTE on `gateway_id` and `nat_gateway_id`</em>
+    <p>The AWS API is very forgiving with these two attributes and the <code>aws_route_table</code> resource can be created with a NAT ID specified as a Gateway ID attribute. This _will_ lead to a permanent diff between your configuration and statefile, as the API returns the correct parameters in the returned route table. If you're experiencing constant diffs in your <code>aws_route_table</code> resources, the first thing to check is whether or not you're specifying a NAT ID instead of a Gateway ID, or vice-versa.</p>
+</aside>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>NOTE on `propagating_vgws` and the `aws_vpn_gateway_route_propagation` resource</em>
+    <p>If the <code>propagating_vgws</code> argument is present, it's not supported to _also_ define route propagations using <code>aws_vpn_gateway_route_propagation</code>, since this resource will delete any propagating gateways not explicitly listed in <code>propagating_vgws</code>. Omit this argument when defining route propagation using the separate resource.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Basic%20example"></a><h3 id="basic-example">Basic example</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route_table"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.example.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">route</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.1.0/24"</span><span class="w"></span>
+<span class="w">    </span><span class="na">gateway_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_internet_gateway.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">route</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">ipv6_cidr_block</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"::/0"</span><span class="w"></span>
+<span class="w">    </span><span class="na">egress_only_gateway_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_egress_only_internet_gateway.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>To subsequently remove all managed routes:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route_table"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.example.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">route</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Adopting%20an%20existing%20local%20route"></a><h3 id="adopting-an-existing-local-route">Adopting an existing local route</h3>
+
+<p>AWS creates certain routes that the AWS provider mostly ignores. You can manage them by importing or adopting them. See <a href="#import">Import</a> below for information on importing. This example shows adopting a route and then updating its target.</p>
+
+<p>First, adopt an existing AWS-created route:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.0.0/16"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route_table"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.test.id</span><span class="c1"></span>
+
+<span class="c1">  # since this is exactly the route AWS will create, the route will be adopted</span>
+<span class="w">  </span><span class="nb">route</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.0.0/16"</span><span class="w"></span>
+<span class="w">    </span><span class="na">gateway_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"local"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Next, update the target of the route:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.0.0/16"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_route_table"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.test.id</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">route</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">cidr_block</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.test.cidr_block</span><span class="w"></span>
+<span class="w">    </span><span class="na">network_interface_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_network_interface.test.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_subnet"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.1.0/24"</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.test.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_network_interface"</span><span class="w"> </span><span class="nv">"test"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_subnet.test.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The target could then be updated again back to <code>local</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>This resource supports the following arguments:</p>
+
+<ul>
+<li><code>vpc_id</code> - (Required) The VPC ID.</li>
+<li><code>route</code> - (Optional) A list of route objects. Their keys are documented below. This argument is processed in <a href="https://www.terraform.io/docs/configuration/attr-as-blocks.html">attribute-as-blocks mode</a>.
+This means that omitting this argument is interpreted as ignoring any existing routes. To remove all managed routes an empty list should be specified. See the example above.</li>
+<li><code>tags</code> - (Optional) A map of tags to assign to the resource. If configured with a provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a> present, tags with matching keys will overwrite those defined at the provider-level.</li>
+<li><code>propagating_vgws</code> - (Optional) A list of virtual gateways for propagation.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/route%20Argument%20Reference"></a><h3 id="route-argument-reference">route Argument Reference</h3>
+
+<p>This argument is processed in <a href="https://www.terraform.io/docs/configuration/attr-as-blocks.html">attribute-as-blocks mode</a>.</p>
+
+<p>One of the following destination arguments must be supplied:</p>
+
+<ul>
+<li><code>cidr_block</code> - (Required) The CIDR block of the route.</li>
+<li><code>ipv6_cidr_block</code> - (Optional) The Ipv6 CIDR block of the route.</li>
+<li><code>destination_prefix_list_id</code> - (Optional) The ID of a <a href="ec2_managed_prefix_list.html">managed prefix list</a> destination of the route.</li>
+</ul>
+
+<p>One of the following target arguments must be supplied:</p>
+
+<ul>
+<li><code>carrier_gateway_id</code> - (Optional) Identifier of a carrier gateway. This attribute can only be used when the VPC contains a subnet which is associated with a Wavelength Zone.</li>
+<li><code>core_network_arn</code> - (Optional) The Amazon Resource Name (ARN) of a core network.</li>
+<li><code>egress_only_gateway_id</code> - (Optional) Identifier of a VPC Egress Only Internet Gateway.</li>
+<li><code>gateway_id</code> - (Optional) Identifier of a VPC internet gateway, virtual private gateway, or <code>local</code>. <code>local</code> routes cannot be created but can be adopted or imported. See the <a href="#adopting-an-existing-local-route">example</a> above.</li>
+<li><code>local_gateway_id</code> - (Optional) Identifier of a Outpost local gateway.</li>
+<li><code>nat_gateway_id</code> - (Optional) Identifier of a VPC NAT gateway.</li>
+<li><code>network_interface_id</code> - (Optional) Identifier of an EC2 network interface.</li>
+<li><code>transit_gateway_id</code> - (Optional) Identifier of an EC2 Transit Gateway.</li>
+<li><code>vpc_endpoint_id</code> - (Optional) Identifier of a VPC Endpoint.</li>
+<li><code>vpc_peering_connection_id</code> - (Optional) Identifier of a VPC peering connection.</li>
+</ul>
+
+<p>Note that the default route, mapping the VPC's CIDR block to "local", is created implicitly and cannot be specified.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Only the target that is entered is exported as a readable attribute once the route resource is created.</p>
+</aside>
+
+<ul>
+<li><code>id</code> - The ID of the routing table.</li>
+<li><code>arn</code> - The ARN of the route table.</li>
+<li><code>owner_id</code> - The ID of the AWS account that owns the route table.</li>
+<li><code>tags_all</code> - A map of tags assigned to the resource, including those inherited from the provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p><a href="https://developer.hashicorp.com/terraform/language/resources/syntax#operation-timeouts">Configuration options</a>:</p>
+
+<ul>
+<li><code>create</code> - (Default <code>5m</code>)</li>
+<li><code>update</code> - (Default <code>2m</code>)</li>
+<li><code>delete</code> - (Default <code>5m</code>)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import Route Tables using the route table <code>id</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_route_table.public_rt</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"rtb-4e616f6d69"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import Route Tables using the route table <code>id</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_route_table.public_rt rtb-4e616f6d69
+</code></pre></div>
+
+            
+        
+    </body></html>

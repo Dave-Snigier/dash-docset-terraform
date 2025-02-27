@@ -1,0 +1,110 @@
+<html><!-- Online page at https://www.terraform.io/language/stacks/deploy/conditions --><head>
+                <title>Set conditions for deployment plans</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="set-conditions-for-deployment-plans">Set conditions for deployment plans</h1>
+
+<p>Orchestration rules allow you to automate aspects of your Stack deployments, such as auto-approving plans when those plans meet certain conditions. By setting orchestration rules, you can help streamline managing many deployments.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Create%20orchestration%20rules"></a><h2 id="create-orchestration-rules">Create orchestration rules</h2>
+
+<p>Add <code>orchestrate</code> blocks to define rules for handling deployment plans in your deployment configuration file (<code>tfdeploy.hcl</code>).</p>
+
+<p>The <code>orchestrate</code> block uses a <code>check</code> block to determine if a condition has passed or not, and every condition must pass for the <code>orchestrate</code> rule to take effect. For details on the syntax of an <code>orchestrate</code> block, refer to the <a href="../../../terraform/language/stacks/reference/tfdeploy.html">Deployment configuration file reference</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Orchestrate%20rule%20types"></a><h3 id="orchestrate-rule-types">Orchestrate rule types</h3>
+
+<p>There are two orchestration rule types to choose from:</p>
+
+<ol>
+<li>The <code>auto_approve</code> rule executes after a Stack creates a plan and automatically approves a plan if all checks pass.  </li>
+<li>The <code>replan</code> rule executes after a Stack applies a plan, automatically triggering a replan if all the checks pass.</li>
+</ol>
+
+<p>The <code>auto_approve</code> rule is helpful when you know you want a certain type of plan to go ahead without manual intervention. For example, Stacks have a default <code>auto_approve</code> rule named <code>empty_plan</code>, which automatically approves a plan if it has no changes. </p>
+
+<p>As another example, you could create a rule that automatically approves deployments if a component has not changed. </p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployments.tfdeploy.hcl</span>
+
+<span class="err">orchestrate</span><span class="w"> </span><span class="s2">"auto_approve" "no_pet_changes"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">check</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">        # Check that the pet component has no changes</span>
+<span class="w">        </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">context.plan.component_changes</span><span class="p">[</span><span class="s2">"component.pet"</span><span class="p">].</span><span class="na">total</span><span class="w"> </span><span class="o">=</span><span class="p">=</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">        </span><span class="na">reason</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Not automatically approved because changes proposed to pet component."</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The above <code>orchestrate</code> block automatically approves plans if they do not include any changes for the <code>pet</code> component. </p>
+
+<p>The <code>replan</code> rule is helpful when you need your Stack to perform another plan after it applies the last one. You could create a rule to automatically replan a deployment if the production deployment errors out.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployments.tfdeploy.hcl</span>
+
+<span class="err">orchestrate</span><span class="w"> </span><span class="s2">"replan" "replan_prod_for_errors"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">check</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">context.plan.deployment</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="nv">deployment.production</span><span class="w"></span>
+<span class="w">        </span><span class="na">reason</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Only automatically replan production deployments."</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">check</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">context.plan.applyable</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">        </span><span class="na">reason</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Only automatically replan plans that were not applyable."</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">check</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">context.plan.replans</span><span class="w"> </span><span class="err">&lt;</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">        </span><span class="na">reason</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Only automatically replan failed plans once."</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The above <code>orchestrate</code> block triggers a replan if the production deployment of a Stack errors out and if HCP Terraform hasn't already attempted to replan.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Leverage%20orchestration%20context"></a><h3 id="leverage-orchestration-context">Leverage orchestration context</h3>
+
+<p>The <code>orchestrate</code> block can use the <code>context</code> variable, which provides access to detailed information about the deployment plan, such as the number of changes, the specific components involved, and the deployment’s status.</p>
+
+<p>Use <code>context</code> to create more sophisticated checks and conditions. For example, you can automatically approve all planning operations.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployments.tfdeploy.hcl</span>
+
+<span class="err">orchestrate</span><span class="w"> </span><span class="s2">"auto_approve" "allow_plans"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">check</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">        # Check that the operation is a plan</span>
+<span class="w">        </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">context.operation</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="s2">"plan"</span><span class="w"></span>
+<span class="w">        </span><span class="na">reason</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Apply operations need manual approval."</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Another example of using <code>context</code> is automatically approving plans that do not remove resources in non-production deployments.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployments.tfdeploy.hcl</span>
+<span class="err">orchestrate</span><span class="w"> </span><span class="s2">"auto_approve" "safe_plans"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">    # Ensure that no resource is removed.</span>
+<span class="w">    </span><span class="nb">check</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">context.plan.changes.remove</span><span class="w"> </span><span class="p">==</span><span class="w"> </span><span class="m">0</span><span class="w"></span>
+<span class="w">        </span><span class="na">reason</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Plan is destroying ${context.plan.changes.remove} resources."</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">    # Ensure that the deployment is not your production environment. </span>
+<span class="w">    </span><span class="nb">check</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">condition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">context.plan.deployment</span><span class="w"> </span><span class="p">!=</span><span class="w"> </span><span class="nv">deployment.production</span><span class="w"></span>
+<span class="w">        </span><span class="na">reason</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Production plans are not eligible for auto_approve."</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>For more information on the information available in the context variable, refer to the <a href="../../../terraform/language/stacks/reference/tfdeploy.html">Deployment configuration file reference</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Next%20steps"></a><h2 id="next-steps">Next steps</h2>
+
+<p>With your Stack and deployment configurations complete, your Stack is ready to be deployed by HCP Terraform. To learn more about creating a Stack in HCP Terraform, refer to <a href="../../../terraform/cloud-docs/stacks/create.html">Create a Stack</a>.</p>
+
+            
+        
+    </body></html>

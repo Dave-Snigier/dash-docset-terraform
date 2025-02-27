@@ -1,0 +1,148 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mlflow_webhook --><head>
+                <title>databricks_mlflow_webhook</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_mlflow_webhook-resource">databricks_mlflow_webhook Resource</h1>
+
+<p>This resource allows you to create <a href="https://docs.databricks.com/applications/mlflow/model-registry-webhooks.html">MLflow Model Registry Webhooks</a> in Databricks.  Webhooks enable you to listen for Model Registry events so your integrations can automatically trigger actions. You can use webhooks to automate and integrate your machine learning pipeline with existing CI/CD tools and workflows. Webhooks allow trigger execution of a Databricks job or call a web service on specific event(s) that is generated in the MLflow Registry - stage transitioning, creation of registered model, creation of transition request, etc.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Triggering%20Databricks%20job"></a><h3 id="triggering-databricks-job">Triggering Databricks job</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_current_user"</span><span class="w"> </span><span class="nv">"me"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_spark_version"</span><span class="w"> </span><span class="nv">"latest"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_node_type"</span><span class="w"> </span><span class="nv">"smallest"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">local_disk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_notebook"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.databricks_current_user.me.home}/MLFlowWebhook"</span><span class="w"></span>
+<span class="w">  </span><span class="na">language</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PYTHON"</span><span class="w"></span>
+<span class="w">  </span><span class="na">content_base64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">base64encode</span><span class="p">(</span><span class="o">&lt;&lt;-</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="sh">    import json</span>
+
+<span class="sh">    event_message = dbutils.widgets.get("event_message")</span>
+<span class="sh">    event_message_dict = json.loads(event_message)</span>
+<span class="sh">    print(f"event data={event_message_dict}")</span>
+<span class="dl">    EOT</span>
+<span class="w">  </span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_job"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Terraform MLflowWebhook Demo (${data.databricks_current_user.me.alphanumeric})"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">task_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"task1"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">new_cluster</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">num_workers</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">      </span><span class="na">spark_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_spark_version.latest.id</span><span class="w"></span>
+<span class="w">      </span><span class="na">node_type_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_node_type.smallest.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">notebook_task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">notebook_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_notebook.this.path</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_token"</span><span class="w"> </span><span class="nv">"pat_for_webhook"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">comment</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"MLflow Webhook"</span><span class="w"></span>
+<span class="w">  </span><span class="na">lifetime_seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">86400000</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mlflow_webhook"</span><span class="w"> </span><span class="nv">"job"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">events</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"TRANSITION_REQUEST_CREATED"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Databricks Job webhook trigger"</span><span class="w"></span>
+<span class="w">  </span><span class="na">status</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"ACTIVE"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">job_spec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">job_id</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_job.this.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">workspace_url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_current_user.me.workspace_url</span><span class="w"></span>
+<span class="w">    </span><span class="na">access_token</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_token.pat_for_webhook.token_value</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/POSTing%20to%20URL"></a><h3 id="posting-to-url">POSTing to URL</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mlflow_webhook"</span><span class="w"> </span><span class="nv">"url"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">events</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"TRANSITION_REQUEST_CREATED"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"URL webhook trigger"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">http_url_spec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://my_cool_host/webhook"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>model_name</code> - (Optional) Name of MLflow model for which webhook will be created. If the model name is not specified, a registry-wide webhook is created that listens for the specified events across all versions of all registered models.</li>
+<li><code>description</code> - Optional description of the MLflow webhook.</li>
+<li><code>status</code> - Optional status of webhook. Possible values are <code>ACTIVE</code>, <code>TEST_MODE</code>, <code>DISABLED</code>. Default is <code>ACTIVE</code>.</li>
+<li><code>events</code> - (Required) The list of events that will trigger execution of Databricks job or POSTing to an URL, for example, <code>MODEL_VERSION_CREATED</code>, <code>MODEL_VERSION_TRANSITIONED_STAGE</code>, <code>TRANSITION_REQUEST_CREATED</code>, etc.  Refer to the <a href="https://docs.databricks.com/dev-tools/api/latest/mlflow.html#operation/create-registry-webhook">Webhooks API documentation</a> for a full list of supported events.</li>
+</ul>
+
+<p>Configuration must include one of <code>http_url_spec</code> or <code>job_spec</code> blocks, but not both.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/job_spec"></a><h3 id="job_spec">job_spec</h3>
+
+<ul>
+<li><code>access_token</code> - (Required, Sensitive) The personal access token used to authorize webhook's job runs.</li>
+<li><code>job_id</code> - (Required) ID of the Databricks job that the webhook runs.</li>
+<li><code>workspace_url</code> - (Optional) URL of the workspace containing the job that this webhook runs. If not specified, the job’s workspace URL is assumed to be the same as the workspace where the webhook is created.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/http_url_spec"></a><h3 id="http_url_spec">http_url_spec</h3>
+
+<ul>
+<li><code>url</code> - (Required) External HTTPS URL called on event trigger (by using a POST request). Structure of payload depends on the event type, refer to <a href="https://docs.databricks.com/applications/mlflow/model-registry-webhooks.html">documentation</a> for more details.</li>
+<li><code>authorization</code> - (Optional) Value of the authorization header that should be sent in the request sent by the wehbook.  It should be of the form <code>&lt;auth type&gt; &lt;credentials&gt;</code>, e.g. <code>Bearer &lt;access_token&gt;</code>. If set to an empty string, no authorization header will be included in the request.</li>
+<li><code>enable_ssl_verification</code> - (Optional) Enable/disable SSL certificate validation. Default is <code>true</code>. For self-signed certificates, this field must be <code>false</code> AND the destination server must disable certificate validation as well. For security purposes, it is encouraged to perform secret validation with the HMAC-encoded portion of the payload and acknowledge the risk associated with disabling hostname validation whereby it becomes more likely that requests can be maliciously routed to an unintended host.</li>
+<li><code>secret</code> - (Optional, Sensitive) Shared secret required for HMAC encoding payload. The HMAC-encoded payload will be sent in the header as <code>X-Databricks-Signature: encoded_payload</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - Unique ID of the MLflow Webhook.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Access%20Control"></a><h2 id="access-control">Access Control</h2>
+
+<ul>
+<li>MLflow webhooks could be configured only by workspace admins.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>danger</em>
+    <p>Importing this resource is not currently supported.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are often used in the same context:</p>
+
+<ul>
+<li><a href="../guides/workspace-management.md">End to end workspace management</a> guide.</li>
+<li><a href="directory.md">databricks_directory</a> to manage directories in <a href="https://docs.databricks.com/workspace/workspace-objects.html">Databricks Workpace</a>.</li>
+<li><a href="mlflow_experiment.md">databricks_mlflow_experiment</a> to manage <a href="https://docs.databricks.com/data/data-sources/mlflow-experiment.html">MLflow experiments</a> in Databricks.</li>
+<li><a href="mlflow_model.md">databricks_mlflow_model</a> to create <a href="https://docs.databricks.com/applications/mlflow/models.html">MLflow models</a> in Databricks.</li>
+<li><a href="notebook.md">databricks_notebook</a> to manage <a href="https://docs.databricks.com/notebooks/index.html">Databricks Notebooks</a>.</li>
+<li><a href="../data-sources/notebook.md">databricks_notebook</a> data to export a notebook from Databricks Workspace.</li>
+<li><a href="repo.md">databricks_repo</a> to manage <a href="https://docs.databricks.com/repos.html">Databricks Repos</a>.</li>
+</ul>
+
+            
+        
+    </body></html>

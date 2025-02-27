@@ -1,0 +1,88 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/hcp/latest/docs/guides/peering-aws --><head>
+                <title>Peer an AWS VPC to a HashiCorp Virtual Network (HVN)</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="peer-an-aws-vpc-to-a-hashicorp-virtual-network-hvn">Peer an AWS VPC to a HashiCorp Virtual Network (HVN)</h1>
+
+<p>In order to connect AWS workloads to an HCP Consul cluster, you must peer the VPC in which the workloads reside to the HVN in which the HCP cluster resides.
+This is accomplished by using the <code>hcp_aws_network_peering</code> resource to create a network peering between the HVN's VPC and your own VPC.
+The <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_peering_connection_accepter">aws_vpc_peering_connection_accepter</a> resource is useful for accepting the network peering that is initiated from the <code>hcp_aws_network_peering</code>.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The CIDR blocks of the HVN and the peer VPC cannot overlap.</p>
+</aside>
+
+<p>For a complete example of deploying Consul on HCP, check out the <a href="https://developer.hashicorp.com/consul/tutorials/cloud-production/terraform-hcp-consul-provider">Deploy HCP Consul with Terraform</a> guide.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1">// Create a HashiCorp Virtual Network (HVN).</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.hvn_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">cloud_provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"aws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"172.25.16.0/20"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Create an HCP Consul cluster within the HVN.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_consul_cluster"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.example.hvn_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.cluster_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">tier</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"development"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// If you have not already, create a VPC within your AWS account that will</span>
+<span class="c1">// contain the workloads you want to connect to your HCP Consul cluster.</span>
+<span class="c1">// Make sure the CIDR block of the peer VPC does not overlap with the CIDR</span>
+<span class="c1">// of the HVN.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"peer"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.220.0.0/16"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Create an HCP network peering to peer your HVN with your AWS VPC. </span>
+<span class="c1">// This resource initially returns in a Pending state, because its provider_peering_id is required to complete acceptance of the connection.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_aws_network_peering"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">peering_id</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">var.peer_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.example.hvn_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vpc_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.peer.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_account_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.peer.owner_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">peer_vpc_region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.region</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// This data source is the same as the resource above, but waits for the connection to be Active before returning.</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"hcp_aws_network_peering"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_id</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.example.hvn_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">peering_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_aws_network_peering.example.peering_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">wait_for_active_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Accept the VPC peering within your AWS account.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc_peering_connection_accepter"</span><span class="w"> </span><span class="nv">"peer"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_peering_connection_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_aws_network_peering.example.provider_peering_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_accept</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Create an HVN route that targets your HCP network peering and matches your AWS VPC's CIDR block.</span>
+<span class="c1">// The route depends on the data source, rather than the resource, to ensure the peering is in an Active state.</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"hcp_hvn_route"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_link</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">hcp_hvn.example.self_link</span><span class="w"></span>
+<span class="w">  </span><span class="na">hvn_route_id</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.route_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">destination_cidr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.peer.cidr_block</span><span class="w"></span>
+<span class="w">  </span><span class="na">target_link</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="nv">data.hcp_aws_network_peering.example.self_link</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Tutorials"></a><h2 id="tutorials">Tutorials</h2>
+
+<p>Refer to the following tutorials for additional usage examples:</p>
+
+<ul>
+<li><a href="https://developer.hashicorp.com/consul/tutorials/cloud-production/terraform-hcp-consul-provider">Deploy HCP Consul with Terraform</a></li>
+<li><a href="https://developer.hashicorp.com/vault/tutorials/cloud-ops/terraform-hcp-provider-vault">Deploy HCP Vault with Terraform</a></li>
+</ul>
+
+            
+        
+    </body></html>

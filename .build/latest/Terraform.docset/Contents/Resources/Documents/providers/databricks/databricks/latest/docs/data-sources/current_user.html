@@ -1,0 +1,92 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/data-sources/current_user --><head>
+                <title>databricks_current_user</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_current_user-data-source">databricks_current_user Data Source</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you have a fully automated setup with workspaces created by <a href="../resources/mws_workspaces.md">databricks_mws_workspaces</a> or <a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/databricks_workspace">azurerm_databricks_workspace</a>, please make sure to add <a href="../guides/troubleshooting.md#data-resources-and-authentication-is-not-configured-errors">depends_on attribute</a> in order to prevent _default auth: cannot configure default credentials_ errors.</p>
+</aside>
+
+<p>Retrieves information about <a href="../resources/user.md">databricks_user</a> or <a href="../resources/service_principal.md">databricks_service_principal</a>, that is calling Databricks REST API. Might be useful in applying the same Terraform by different users in the shared workspace for testing purposes.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>Create personalized <a href="../resources/job.md">databricks_job</a> and <a href="../resources/notebook.md">databricks_notebook</a>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_current_user"</span><span class="w"> </span><span class="nv">"me"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_spark_version"</span><span class="w"> </span><span class="nv">"latest"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_node_type"</span><span class="w"> </span><span class="nv">"smallest"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">local_disk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_notebook"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"${data.databricks_current_user.me.home}/Terraform"</span><span class="w"></span>
+<span class="w">  </span><span class="na">language</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PYTHON"</span><span class="w"></span>
+<span class="w">  </span><span class="na">content_base64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">base64encode</span><span class="p">(</span><span class="o">&lt;&lt;-</span><span class="dl">EOT</span><span class="sh"></span>
+<span class="sh">    # created from ${abspath(path.module)}</span>
+<span class="sh">    display(spark.range(10))</span>
+<span class="dl">    EOT</span>
+<span class="w">  </span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_job"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Terraform Demo (${data.databricks_current_user.me.alphanumeric})"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">task_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"task1"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">new_cluster</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">num_workers</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">      </span><span class="na">spark_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_spark_version.latest.id</span><span class="w"></span>
+<span class="w">      </span><span class="na">node_type_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_node_type.smallest.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">notebook_task</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">notebook_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_notebook.this.path</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"notebook_url"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_notebook.this.url</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"job_url"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_job.this.url</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Exported%20attributes"></a><h2 id="exported-attributes">Exported attributes</h2>
+
+<p>Data source exposes the following attributes:</p>
+
+<ul>
+<li><code>id</code> -  The id of the calling user.</li>
+<li><code>external_id</code> - ID of the user in an external identity provider.</li>
+<li><code>user_name</code> - Name of the <a href="../resources/user.md">user</a>, e.g. <code>mr.foo@example.com</code>. If the currently logged-in identity is a <a href="../resources/service_principal.md">service principal</a>, returns the application ID, e.g. <code>11111111-2222-3333-4444-555666777888</code></li>
+<li><code>home</code> - Home folder of the <a href="../resources/user.md">user</a>, e.g. <code>/Users/mr.foo@example.com</code>.</li>
+<li><code>repos</code> - Personal Repos location of the <a href="../resources/user.md">user</a>, e.g. <code>/Repos/mr.foo@example.com</code>.</li>
+<li><code>alphanumeric</code> - Alphanumeric representation of user local name. e.g. <code>mr_foo</code>.</li>
+<li><code>workspace_url</code> - URL of the current Databricks workspace.</li>
+<li><code>acl_principal_id</code> - identifier for use in <a href="../resources/access_control_rule_set.md">databricks_access_control_rule_set</a>, e.g. <code>users/mr.foo@example.com</code> if current user is user, or <code>servicePrincipals/00000000-0000-0000-0000-000000000000</code> if current user is service principal.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are used in the same context:</p>
+
+<ul>
+<li><a href="../guides/workspace-management.md">End to end workspace management</a> guide</li>
+<li><a href="../resources/directory.md">databricks_directory</a> to manage directories in <a href="https://docs.databricks.com/workspace/workspace-objects.html">Databricks Workpace</a>.</li>
+<li><a href="../resources/notebook.md">databricks_notebook</a> to manage <a href="https://docs.databricks.com/notebooks/index.html">Databricks Notebooks</a>.</li>
+<li><a href="../resources/repo.md">databricks_repo</a> to manage <a href="https://docs.databricks.com/repos.html">Databricks Repos</a>.</li>
+</ul>
+
+            
+        
+    </body></html>

@@ -1,0 +1,127 @@
+<html><!-- Online page at https://www.terraform.io/cli/commands/output --><head>
+                <title>terraform output command</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="terraform-output-command"><code>terraform output</code> command</h1>
+
+<p>The <code>terraform output</code> command extracts the value of an output variable from the state file.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Usage"></a><h2 id="usage">Usage</h2>
+
+<p>Usage: <code>terraform output [options] [NAME]</code></p>
+
+<p>With no additional arguments, <code>output</code> will display all the outputs for
+the root module. If an output <code>NAME</code> is specified, only the value of that
+output is printed.</p>
+
+<p>The command-line flags are all optional. The following flags are available:</p>
+
+<ul>
+<li><code>-json</code> - If specified, the outputs are formatted as a JSON object, with
+a key per output. If <code>NAME</code> is specified, only the output specified will be
+returned. This can be piped into tools such as <code>jq</code> for further processing.</li>
+<li><code>-raw</code> - If specified, Terraform will convert the specified output value to a
+string and print that string directly to the output, without any special
+formatting. This can be convenient when working with shell scripts, but
+it only supports string, number, and boolean values. Use <code>-json</code> instead
+for processing complex data types.</li>
+<li><code>-no-color</code> - If specified, output won't contain any color.</li>
+<li><code>-state=path</code> - Path to the state file. Defaults to "terraform.tfstate".
+Ignored when <a href="../../terraform/language/state/remote.html">remote state</a> is used.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>When using the <code>-json</code> or <code>-raw</code> command-line flags, Terraform displays <code>sensitive</code> values in plain text. For more information, refer to <a href="../../terraform/language/state/sensitive-data.html">Sensitive data in state</a>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Examples"></a><h2 id="examples">Examples</h2>
+
+<p>These examples assume the following Terraform output snippet.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">output</span><span class="w"> </span><span class="nv">"instance_ips"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_instance.web</span><span class="p">.</span><span class="err">*</span><span class="p">.</span><span class="err">public_ip</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"lb_address"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_alb.web.public_dns</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"password"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">sensitive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">var.secret_password</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>To list all outputs:</p>
+
+<pre><code>$ terraform output
+instance_ips = [
+  "54.43.114.12",
+  "52.122.13.4",
+  "52.4.116.53"
+]
+lb_address = "my-app-alb-1657023003.us-east-1.elb.amazonaws.com"
+password = &lt;sensitive&gt;
+</code></pre>
+
+<p>Note that Terraform does not redact <code>sensitive</code> values when you specify the output by name:</p>
+
+<pre><code>$ terraform output password
+password = notasecurepassword
+</code></pre>
+
+<p>However, Terraform completely omits any <code>ephemeral</code> values, even if you specify an output by name. Ephemeral values are never stored in state or included in Terraform plans. For more information, refer to <a href="../../terraform/language/state/sensitive-data.html">Sensitive data in state</a>.</p>
+
+<p>To query for the DNS address of the load balancer:</p>
+
+<pre><code>$ terraform output lb_address
+"my-app-alb-1657023003.us-east-1.elb.amazonaws.com"
+</code></pre>
+
+<p>To query for all instance IP addresses:</p>
+
+<pre><code>$ terraform output instance_ips
+instance_ips = [
+  "54.43.114.12",
+  "52.122.13.4",
+  "52.4.116.53"
+]
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Use%20in%20automation"></a><h2 id="use-in-automation">Use in automation</h2>
+
+<p>The <code>terraform output</code> command by default displays in a human-readable format,
+which can change over time to improve clarity.</p>
+
+<p>For scripting and automation, use <code>-json</code> to produce the stable JSON format.
+You can parse the output using a JSON command-line parser such as
+<a href="https://stedolan.github.io/jq/">jq</a>:</p>
+
+<pre><code>$ terraform output -json instance_ips | jq -r '.[0]'
+54.43.114.12
+</code></pre>
+
+<p>For the common case of directly using a string value in a shell script, you
+can use <code>-raw</code> instead, which will print the string directly with no extra
+escaping or whitespace.</p>
+
+<pre><code>$ terraform output -raw lb_address
+my-app-alb-1657023003.us-east-1.elb.amazonaws.com
+</code></pre>
+
+<p>The <code>-raw</code> option works only with values that Terraform can automatically
+convert to strings. Use <code>-json</code> instead, possibly combined with <code>jq</code>, to
+work with complex-typed values such as objects.</p>
+
+<p>Terraform strings are sequences of Unicode characters rather than raw bytes,
+so the <code>-raw</code> output will be UTF-8 encoded when it contains non-ASCII
+characters. If you need a different character encoding, use a separate command
+such as <code>iconv</code> to transcode Terraform's raw output.</p>
+
+            
+        
+    </body></html>

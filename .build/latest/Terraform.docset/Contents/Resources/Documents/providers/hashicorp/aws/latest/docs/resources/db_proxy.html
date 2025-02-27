@@ -1,0 +1,160 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_proxy --><head>
+                <title>aws_db_proxy</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_db_proxy">Resource: aws_db_proxy</h1>
+
+<p>Provides an RDS DB proxy resource. For additional information, see the <a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html">RDS User Guide</a>.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Not all Availability Zones (AZs) support DB proxies. Specifying <code>vpc_subnet_ids</code> for AZs that do not support proxies will not trigger an error as long as at least one <code>vpc_subnet_id</code> is valid. However, this will cause Terraform to continuously detect differences between the configuration and the actual infrastructure. Refer to the <a href="#unsupported-availability-zones">Unsupported Availability Zones</a> section below for potential workarounds.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Basic%20Usage"></a><h3 id="basic-usage">Basic Usage</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_db_proxy"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">debug_logging</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">  </span><span class="na">engine_family</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"MYSQL"</span><span class="w"></span>
+<span class="w">  </span><span class="na">idle_client_timeout</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="m">1800</span><span class="w"></span>
+<span class="w">  </span><span class="na">require_tls</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">role_arn</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.example.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_security_group_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_security_group.example.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_subnet_ids</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_subnet.example.id</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">auth</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">auth_scheme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SECRETS"</span><span class="w"></span>
+<span class="w">    </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">    </span><span class="na">iam_auth</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"DISABLED"</span><span class="w"></span>
+<span class="w">    </span><span class="na">secret_arn</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_secretsmanager_secret.example.arn</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">    </span><span class="na">Key</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"value"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Unsupported%20Availability%20Zones"></a><h3 id="unsupported-availability-zones">Unsupported Availability Zones</h3>
+
+<p>Terraform may report constant differences if you use <code>vpc_subnet_ids</code> that correspond to Availability Zones (AZs) that do not support a DB proxy. While this typically does not result in an error, AWS only returns <code>vpc_subnet_ids</code> for AZs that support DB proxies. As a result, Terraform detects a mismatch between your configuration and the actual infrastructure, leading it to report that changes are required. Below are some ways to avoid this issue.</p>
+
+<p>One solution is to exclude AZs that do not support DB proxies by using the <a href="../data-sources/availability_zones.html"><code>aws_availability_zones</code> data source</a>. The example below demonstrates how to configure this for the <code>us-east-1</code> region, excluding the <code>use1-az3</code> AZ. (Keep in mind that AZ names can vary between accounts, while AZ IDs remain consistent.) If the <code>us-east-1</code> region has six AZs in total and you aim to configure the maximum number of subnets, you would exclude one AZ and configure five subnets:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_availability_zones"</span><span class="w"> </span><span class="nv">"available"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">exclude_zone_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"use1-az3"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">state</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"available"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">filter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"opt-in-status"</span><span class="w"></span>
+<span class="w">    </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"opt-in-not-required"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_vpc"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.0/16"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_subnet"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">count</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="m">5</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr_block</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">aws_vpc.example.cidr_block</span><span class="p">,</span><span class="w"> </span><span class="m">8</span><span class="p">,</span><span class="w"> </span><span class="nv">count.index</span><span class="p">)</span><span class="w"></span>
+<span class="w">  </span><span class="na">availability_zone</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_availability_zones.available.names[count.index</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_vpc.example.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_db_proxy"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_subnet_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_subnet.example.id</span><span class="p">]</span><span class="c1"></span>
+
+<span class="c1">  # additional configuration...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Another approach is to use the <a href="https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle#ignore_changes"><code>lifecycle</code> <code>ignore_changes</code></a> meta-argument. With this method, Terraform will stop detecting differences for the <code>vpc_subnet_ids</code> argument. However, note that this approach disables Terraform's ability to track and manage updates to <code>vpc_subnet_ids</code>, so use it carefully to avoid unintended drift between your configuration and the actual infrastructure.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_db_proxy"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_subnet_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_subnet.example.id</span><span class="p">]</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">ignore_changes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nb">vpc_subnet_ids</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # additional configuration...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>This resource supports the following arguments:</p>
+
+<ul>
+<li><code>name</code> - (Required) The identifier for the proxy. This name must be unique for all proxies owned by your AWS account in the specified AWS Region. An identifier must begin with a letter and must contain only ASCII letters, digits, and hyphens; it can't end with a hyphen or contain two consecutive hyphens.</li>
+<li><code>auth</code> - (Required) Configuration block(s) with authorization mechanisms to connect to the associated instances or clusters. Described below.</li>
+<li><code>debug_logging</code> - (Optional) Whether the proxy includes detailed information about SQL statements in its logs. This information helps you to debug issues involving SQL behavior or the performance and scalability of the proxy connections. The debug information includes the text of SQL statements that you submit through the proxy. Thus, only enable this setting when needed for debugging, and only when you have security measures in place to safeguard any sensitive information that appears in the logs.</li>
+<li><code>engine_family</code> - (Required, Forces new resource) The kinds of databases that the proxy can connect to. This value determines which database network protocol the proxy recognizes when it interprets network traffic to and from the database. For Aurora MySQL, RDS for MariaDB, and RDS for MySQL databases, specify <code>MYSQL</code>. For Aurora PostgreSQL and RDS for PostgreSQL databases, specify <code>POSTGRESQL</code>. For RDS for Microsoft SQL Server, specify <code>SQLSERVER</code>. Valid values are <code>MYSQL</code>, <code>POSTGRESQL</code>, and <code>SQLSERVER</code>.</li>
+<li><code>idle_client_timeout</code> - (Optional) The number of seconds that a connection to the proxy can be inactive before the proxy disconnects it. You can set this value higher or lower than the connection timeout limit for the associated database.</li>
+<li><code>require_tls</code> - (Optional) A Boolean parameter that specifies whether Transport Layer Security (TLS) encryption is required for connections to the proxy. By enabling this setting, you can enforce encrypted TLS connections to the proxy.</li>
+<li><code>role_arn</code> - (Required) The Amazon Resource Name (ARN) of the IAM role that the proxy uses to access secrets in AWS Secrets Manager.</li>
+<li><code>vpc_security_group_ids</code> - (Optional) One or more VPC security group IDs to associate with the new proxy.</li>
+<li><code>vpc_subnet_ids</code> - (Required) One or more VPC subnet IDs to associate with the new proxy.</li>
+<li><code>tags</code> - (Optional) A mapping of tags to assign to the resource. If configured with a provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a> present, tags with matching keys will overwrite those defined at the provider-level.</li>
+</ul>
+
+<p><code>auth</code> blocks support the following:</p>
+
+<ul>
+<li><code>auth_scheme</code> - (Optional) The type of authentication that the proxy uses for connections from the proxy to the underlying database. One of <code>SECRETS</code>.</li>
+<li><code>client_password_auth_type</code> - (Optional) The type of authentication the proxy uses for connections from clients. Valid values are <code>MYSQL_CACHING_SHA2_PASSWORD</code>, <code>MYSQL_NATIVE_PASSWORD</code>, <code>POSTGRES_SCRAM_SHA_256</code>, <code>POSTGRES_MD5</code>, and <code>SQL_SERVER_AUTHENTICATION</code>.</li>
+<li><code>description</code> - (Optional) A user-specified description about the authentication used by a proxy to log in as a specific database user.</li>
+<li><code>iam_auth</code> - (Optional) Whether to require or disallow AWS Identity and Access Management (IAM) authentication for connections to the proxy. One of <code>DISABLED</code>, <code>REQUIRED</code>.</li>
+<li><code>secret_arn</code> - (Optional) The Amazon Resource Name (ARN) representing the secret that the proxy uses to authenticate to the RDS DB instance or Aurora DB cluster. These secrets are stored within Amazon Secrets Manager.</li>
+<li><code>username</code> - (Optional) The name of the database user to which the proxy connects.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>id</code> - The Amazon Resource Name (ARN) for the proxy.</li>
+<li><code>arn</code> - The Amazon Resource Name (ARN) for the proxy.</li>
+<li><code>endpoint</code> - The endpoint that you can use to connect to the proxy. You include the endpoint value in the connection string for a database client application.</li>
+<li><code>tags_all</code> - A map of tags assigned to the resource, including those inherited from the provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Timeouts"></a><h2 id="timeouts">Timeouts</h2>
+
+<p><a href="https://developer.hashicorp.com/terraform/language/resources/syntax#operation-timeouts">Configuration options</a>:</p>
+
+<ul>
+<li><code>create</code> - (Default <code>30m</code>)</li>
+<li><code>update</code> - (Default <code>30m</code>)</li>
+<li><code>delete</code> - (Default <code>60m</code>)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import DB proxies using the <code>name</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_db_proxy.example</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import DB proxies using the <code>name</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_db_proxy.example example
+</code></pre></div>
+
+            
+        
+    </body></html>

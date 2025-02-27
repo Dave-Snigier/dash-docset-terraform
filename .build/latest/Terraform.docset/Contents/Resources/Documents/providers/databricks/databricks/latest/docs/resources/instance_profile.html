@@ -1,0 +1,182 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/instance_profile --><head>
+                <title>databricks_instance_profile</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_instance_profile-resource">databricks_instance_profile Resource</h1>
+
+<p>This resource allows you to manage AWS EC2 instance profiles that users can launch <a href="cluster.md">databricks_cluster</a> and access data, like <a href="mount.md">databricks_mount</a>. The following example demonstrates how to create an instance profile and create a cluster with it. When creating a new <code>databricks_instance_profile</code>, Databricks validates that it has sufficient permissions to launch instances with the instance profile. This validation uses AWS dry-run mode for the <a href="https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_RunInstances.html">AWS EC2 RunInstances API</a>.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Please switch to <a href="storage_credential.md">databricks_storage_credential</a> with Unity Catalog to manage storage credentials, which provides a better and faster way for managing credential security.</p>
+</aside>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"crossaccount_role_name"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Role that you've specified on https://accounts.cloud.databricks.com/#aws"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"assume_role_for_ec2"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"sts:AssumeRole"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"ec2.amazonaws.com"</span><span class="p">]</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Service"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"role_for_s3_access"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"shared-ec2-role-for-s3"</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"Role for shared access"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.assume_role_for_ec2.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"pass_role_for_s3_access"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">effect</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow"</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"iam:PassRole"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">resources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_iam_role.role_for_s3_access.arn</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_policy"</span><span class="w"> </span><span class="nv">"pass_role_for_s3_access"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"shared-pass-role-for-s3-access"</span><span class="w"></span>
+<span class="w">  </span><span class="na">path</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"/"</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.pass_role_for_s3_access.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role_policy_attachment"</span><span class="w"> </span><span class="nv">"cross_account"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">policy_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_policy.pass_role_for_s3_access.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">var.crossaccount_role_name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_instance_profile"</span><span class="w"> </span><span class="nv">"shared"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"shared-instance-profile"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.role_for_s3_access.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_instance_profile"</span><span class="w"> </span><span class="nv">"shared"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_profile_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_instance_profile.shared.arn</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_spark_version"</span><span class="w"> </span><span class="nv">"latest"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_node_type"</span><span class="w"> </span><span class="nv">"smallest"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">local_disk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_cluster"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster_name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"Shared Autoscaling"</span><span class="w"></span>
+<span class="w">  </span><span class="na">spark_version</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_spark_version.latest.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">node_type_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_node_type.smallest.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">autotermination_minutes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">20</span><span class="w"></span>
+<span class="w">  </span><span class="nb">autoscale</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">min_workers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">    </span><span class="na">max_workers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">50</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">aws_attributes</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">instance_profile_arn</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_instance_profile.shared.id</span><span class="w"></span>
+<span class="w">    </span><span class="na">availability</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"SPOT"</span><span class="w"></span>
+<span class="w">    </span><span class="na">zone_id</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="w">    </span><span class="na">first_on_demand</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="w"></span>
+<span class="w">    </span><span class="na">spot_bid_price_percent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">100</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Usage%20with%20Cluster%20Policies"></a><h2 id="usage-with-cluster-policies">Usage with Cluster Policies</h2>
+
+<p>It is advised to keep all common configurations in <a href="cluster_policy.md">Cluster Policies</a> to maintain control of the environments launched, so <code>databricks_cluster</code> above could be replaced with <code>databricks_cluster_policy</code>:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_cluster_policy"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Policy with predefined instance profile"</span><span class="w"></span>
+<span class="w">  </span><span class="na">definition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nf">jsonencode</span><span class="p">({</span><span class="c1"></span>
+<span class="c1">    # most likely policy might have way more things init.</span>
+<span class="w">    </span><span class="s2">"aws_attributes.instance_profile_arn"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"type"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">"fixed"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"value"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="nv">databricks_instance_profile.shared.id</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">})</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Granting%20access%20to%20all%20users"></a><h2 id="granting-access-to-all-users">Granting access to all users</h2>
+
+<p>You can make instance profile available to all users by <a href="group_instance_profile.md">associating it</a> with the special group called <code>users</code> through <a href="../data-sources/group.md">databricks_group</a> data source.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_instance_profile"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_profile_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_instance_profile.shared.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"databricks_group"</span><span class="w"> </span><span class="nv">"users"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"users"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_group_instance_profile"</span><span class="w"> </span><span class="nv">"all"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">group_id</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="nv">data.databricks_group.users.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_profile_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks_instance_profile.this.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Usage%20with%20Databricks%20SQL%20serverless"></a><h2 id="usage-with-databricks-sql-serverless">Usage with Databricks SQL serverless</h2>
+
+<p>When the instance profile ARN and its associated IAM role ARN don't match and the instance profile is intended for use with Databricks SQL serverless, the <code>iam_role_arn</code> parameter can be specified.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_iam_policy_document"</span><span class="w"> </span><span class="nv">"sql_serverless_assume_role"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">statement</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"sts:AssumeRole"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="nb">principals</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"AWS"</span><span class="w"></span>
+<span class="w">      </span><span class="na">identifiers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"arn:aws:iam::790110701330:role/serverless-customer-resource-role"</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="nb">condition</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">test</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"StringEquals"</span><span class="w"></span>
+<span class="w">      </span><span class="na">variable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"sts:ExternalID"</span><span class="w"></span>
+<span class="w">      </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"databricks-serverless-&lt;YOUR_WORKSPACE_ID1&gt;"</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="s2">"databricks-serverless-&lt;YOUR_WORKSPACE_ID2&gt;"</span><span class="w"></span>
+<span class="w">      </span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_role"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-databricks-sql-serverless-role"</span><span class="w"></span>
+<span class="w">  </span><span class="na">assume_role_policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_iam_policy_document.sql_serverless_assume_role.json</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_iam_instance_profile"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-databricks-sql-serverless-instance-profile"</span><span class="w"></span>
+<span class="w">  </span><span class="na">role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.this.name</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_instance_profile"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_profile_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_instance_profile.this.arn</span><span class="w"></span>
+<span class="w">  </span><span class="na">iam_role_arn</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_iam_role.this.arn</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><code>instance_profile_arn</code> - (Required) <code>ARN</code> attribute of <code>aws_iam_instance_profile</code> output, the EC2 instance profile association to AWS IAM role. This ARN would be validated upon resource creation.</li>
+<li><code>iam_role_arn</code> - (Optional) The AWS IAM role ARN of the role associated with the instance profile. It must have the form <code>arn:aws:iam::&lt;account-id&gt;:role/&lt;name&gt;</code>. This field is required if your role name and instance profile name do not match and you want to use the instance profile with Databricks SQL Serverless.</li>
+<li><code>is_meta_instance_profile</code> - (Optional) Whether the instance profile is a meta instance profile. Used only in <a href="https://docs.databricks.com/security/credential-passthrough/iam-passthrough.html">IAM credential passthrough</a>.</li>
+<li><code>skip_validation</code> - (Optional) <strong>For advanced usage only.</strong> If validation fails with an error message that does not indicate an IAM related permission issue, (e.g. "Your requested instance type is not supported in your requested availability zone"), you can pass this flag to skip the validation and forcibly add the instance profile.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - ARN for EC2 Instance Profile, that is registered with Databricks.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>The resource instance profile can be imported using the ARN of it</p>
+
+<div class="codehilite"><pre><span></span><code>terraform import databricks_instance_profile.this &lt;instance-profile-arn&gt;
+</code></pre></div>
+
+            
+        
+    </body></html>

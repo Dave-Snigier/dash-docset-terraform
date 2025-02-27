@@ -1,0 +1,128 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/managed_service_identity --><head>
+                <title>Authenticating using Managed Identity</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="authenticating-using-managed-identity">Authenticating using Managed Identity</h1>
+
+<p>Terraform supports a number of different methods for authenticating to Azure:</p>
+
+<ul>
+<li><a href="azure_cli.html">Authenticating to Azure using the Azure CLI</a></li>
+<li>Authenticating to Azure using Managed Identity (covered in this guide)</li>
+<li><a href="service_principal_client_certificate.html">Authenticating to Azure using a Service Principal and a Client Certificate</a></li>
+<li><a href="service_principal_client_secret.html">Authenticating to Azure using a Service Principal and a Client Secret</a></li>
+<li><a href="service_principal_oidc.html">Authenticating to Azure using a Service Principal and OpenID Connect</a></li>
+</ul>
+
+<hr/>
+
+<p>We recommend using either a Service Principal or Managed Identity when running Terraform non-interactively (such as when running Terraform in a CI server) - and authenticating using the Azure CLI when running Terraform locally.</p>
+
+<p>Once you have configured a Service Principal as described in this guide, you should follow the <a href="service_principal_configuration.html">Configuring a Service Principal for managing Azure Active Directory</a> guide to grant the Service Principal necessary permissions to create and modify Azure Active Directory objects such as users and groups.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/What%20is%20a%20managed%20identity%3F"></a><h2 id="what-is-a-managed-identity">What is a managed identity?</h2>
+
+<p><a href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview">Managed identities</a> for Azure resources can be used to authenticate to Azure Active Directory. There are two types of managed identities: system-assigned and user-assigned. This article is based on system-assigned managed identities.</p>
+
+<p>Managed identities work in conjunction with Microsoft Graph, Azure AD, and the Azure Instance Metadata Service (IMDS). Azure resources that support managed identities expose an internal IMDS endpoint that the client can use to request an access token. No credentials are stored on the VM, and the only additional information needed to bootstrap the Terraform connection to Azure is the Tenant ID.</p>
+
+<p>Azure AD creates a tenant-wide security principal when you configure an Azure resource to use a system-assigned managed identity. The configuration process is described in more detail below.  The lifecycle of a system-assigned identity is tied to the resource it is enabled for: it is created when the resource is created and it is automatically removed when the resource is deleted.</p>
+
+<p>Not all Azure services support managed identities, and availability varies by region. Configuration details vary slightly among services. For more information, see <a href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/services-support-managed-identities">Services that support managed identities for Azure resources</a>.</p>
+
+<p>When using a managed identity, you can only manage resources in the tenant where the corresponding service principal is homed. If you need to manage multiple tenants from the same location, we suggest instead using Service Principal Authentication with a <a href="service_principal_client_certificate.html">client certificate</a> or <a href="service_principal_client_secret.html">client secret</a> so that you can specify different credentials for each tenant.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20a%20VM%20to%20use%20a%20system-assigned%20managed%20identity"></a><h2 id="configuring-a-vm-to-use-a-system-assigned-managed-identity">Configuring a VM to use a system-assigned managed identity</h2>
+
+<p>The (simplified) Terraform configuration below configures a Virtual Machine with a system-assigned identity, and then outputs the Object ID of the corresponding Service Principal:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"azurerm_subscription"</span><span class="w"> </span><span class="nv">"current"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_linux_virtual_machine"</span><span class="w"> </span><span class="nv">"management_host"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"management-vm"</span><span class="c1"></span>
+
+<span class="c1">  # ...</span>
+
+<span class="w">  </span><span class="nb">identity</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SystemAssigned"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"management_host_identity_object_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_linux_virtual_machine.management_host.identity.0.principal_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Refer to the <a href="https://www.terraform.io/docs/providers/azurerm/r/linux_virtual_machine.html">azurerm_linux_virtual_machine</a> and <a href="https://www.terraform.io/docs/providers/azurerm/r/windows_virtual_machine.html">azurerm_windows_virtual_machine</a> documentation for more information on how to use these resources to launch a new virtual machine.</p>
+
+<p>The implicitly created Service Principal should have the same or similar name as your virtual machine. At this point you will need to assign permissions to access Azure Active Directory to create and modify Azure Active Directory objects such as users and groups. See the <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/service_principal_configuration#method-1-api-roles-recommended-for-service-principals">Configuring a Service Principal for managing Azure Active Directory</a> guide for more information.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20a%20user-assigned%20identity"></a><h2 id="using-a-user-assigned-identity">Using a user-assigned identity</h2>
+
+<p>As an alternative to using a system-assigned managed identity, you can create a user-assigned identity that can be allocated to one or more resources such as virtual machines.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azurerm_user_assigned_identity"</span><span class="w"> </span><span class="nv">"terraform"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform"</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">output</span><span class="w"> </span><span class="nv">"terraform_identity_object_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azurerm_user_assigned_identity.terraform.principal_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Refer to the <a href="https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/user_assigned_identity">azurerm_user_assigned_identity</a> documentation for more information on how to configure this resource.</p>
+
+<p>The implicitly created Service Principal should have the same or similar name as the user assigned identity. At this point you will need to assign permissions to access Azure Active Directory to create and modify Azure Active Directory objects such as users and groups. See the <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/service_principal_configuration#method-1-api-roles-recommended-for-service-principals">Configuring a Service Principal for managing Azure Active Directory</a> guide for more information.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Configuring%20Managed%20Identity%20in%20Terraform"></a><h2 id="configuring-managed-identity-in-terraform">Configuring Managed Identity in Terraform</h2>
+
+<p>At this point we assume that managed identity is configured on the resource (e.g. virtual machine) being used, that permissions have been granted, and that you are running Terraform on that resource.</p>
+
+<p>Terraform can be configured to use managed identity for authentication in one of two ways: using Environment Variables or by defining the fields within the Provider block.</p>
+
+<p>You can configure Terraform to use Managed Identity by setting the Environment Variable <code>ARM_USE_MSI</code> to <code>true</code>; as shown below:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># sh</span>
+<span class="nb">export</span> <span class="nv">ARM_USE_MSI</span><span class="o">=</span><span class="nb">true</span> <span class="nv">ARM_TENANT_ID</span><span class="o">=</span><span class="m">00000000</span>-0000-0000-0000-000000000000
+
+<span class="c1"># PowerShell</span>
+<span class="nv">$env</span>:ARM_USE_MSI <span class="o">=</span> <span class="nb">true</span>
+<span class="nv">$env</span>:ARM_TENANT_ID <span class="o">=</span> <span class="m">00000000</span>-0000-0000-0000-000000000000
+</code></pre></div>
+
+<p>Note that when using managed identity for authentication, the tenant ID must also be specified.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Using a Custom MSI Endpoint?</em>
+    <p>In the unlikely event you're using a custom endpoint for Managed Identity - this can be configured using the <code>ARM_MSI_ENDPOINT</code> Environment Variable - however this shouldn't need to be configured in regular use.</p>
+</aside>
+
+<p>See the main provider documentation for more information on <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs#argument-reference">the fields supported in the Provider block</a>.</p>
+
+<p>At this point running either <code>terraform plan</code> or <code>terraform apply</code> should allow Terraform to run using Managed Identity.</p>
+
+<hr/>
+
+<p>It's also possible to enable Managed Identity within the Provider Block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azuread"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">use_msi</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">tenant_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"00000000-0000-0000-0000-000000000000"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Remember when using managed identity for authentication, the tenant ID must also be specified.</p>
+
+<p>See the main provider documentation for more information on <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs#argument-reference">the fields supported in the Provider block</a>.</p>
+
+<p>At this point running either <code>terraform plan</code> or <code>terraform apply</code> should allow Terraform to run using Managed Identity.</p>
+
+<p>Next you should follow the <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/service_principal_configuration">Configuring a Service Principal for managing Azure Active Directory</a> guide to grant the Service Principal necessary permissions to create and modify Azure Active Directory objects such as users and groups.</p>
+
+            
+        
+    </body></html>

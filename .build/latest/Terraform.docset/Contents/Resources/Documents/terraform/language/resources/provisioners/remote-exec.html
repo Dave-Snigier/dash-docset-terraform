@@ -1,0 +1,94 @@
+<html><!-- Online page at https://www.terraform.io/language/resources/provisioners/remote-exec --><head>
+                <title>remote-exec Provisioner</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="remote-exec-provisioner">remote-exec Provisioner</h1>
+
+<p>The <code>remote-exec</code> provisioner invokes a script on a remote resource after it
+is created. This can be used to run a configuration management tool, bootstrap
+into a cluster, etc. To invoke a local process, see the <code>local-exec</code>
+<a href="../../../terraform/language/resources/provisioners/local-exec.html">provisioner</a> instead. The <code>remote-exec</code>
+provisioner requires a <a href="../../../terraform/language/resources/provisioners/connection.html">connection</a>
+and supports both <code>ssh</code> and <code>winrm</code>.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Important</em>
+    <p>Use provisioners as a last resort. There are better alternatives for most situations. Refer to <a href="../../../terraform/language/resources/provisioners/syntax.html">Declaring Provisioners</a> for more details.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20usage"></a><h2 id="example-usage">Example usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+
+<span class="c1">  # Establishes connection to be used by all</span>
+<span class="c1">  # generic remote provisioners (i.e. file/remote-exec)</span>
+<span class="w">  </span><span class="nb">connection</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"ssh"</span><span class="w"></span>
+<span class="w">    </span><span class="na">user</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"root"</span><span class="w"></span>
+<span class="w">    </span><span class="na">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.root_password</span><span class="w"></span>
+<span class="w">    </span><span class="na">host</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="nv">self.public_ip</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"remote-exec"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">inline</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"puppet apply"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"consul join ${aws_instance.web.private_ip}"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are supported:</p>
+
+<ul>
+<li><p><code>inline</code> - This is a list of command strings. The provisioner uses a default
+shell unless you specify a shell as the first command (eg., <code>#!/bin/bash</code>). 
+You cannot provide this with <code>script</code> or <code>scripts</code>.</p></li>
+<li><p><code>script</code> - This is a path (relative or absolute) to a local script that will
+be copied to the remote resource and then executed. This cannot be provided
+with <code>inline</code> or <code>scripts</code>.</p></li>
+<li><p><code>scripts</code> - This is a list of paths (relative or absolute) to local scripts
+that will be copied to the remote resource and then executed. They are executed
+in the order they are provided. This cannot be provided with <code>inline</code> or <code>script</code>.</p></li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Since <code>inline</code> is implemented by concatenating commands into a script, <a href="../../../terraform/language/resources/provisioners/syntax.html#failure-behavior"><code>on_failure</code></a> applies only to the final command in the list. In particular, with <code>on_failure = fail</code> (the default behaviour) earlier commands will be allowed to fail, and later commands will also execute. If this behaviour is not desired, consider using <code>"set -o errexit"</code> as the first command.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Script%20Arguments"></a><h2 id="script-arguments">Script Arguments</h2>
+
+<p>You cannot pass any arguments to scripts using the <code>script</code> or
+<code>scripts</code> arguments to this provisioner. If you want to specify arguments,
+upload the script with the
+<a href="../../../terraform/language/resources/provisioners/file.html">file provisioner</a>
+and then use <code>inline</code> to call it. Example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ...</span>
+
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"file"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">source</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"script.sh"</span><span class="w"></span>
+<span class="w">    </span><span class="na">destination</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/tmp/script.sh"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="kr">provisioner</span><span class="w"> </span><span class="nv">"remote-exec"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">inline</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"chmod +x /tmp/script.sh"</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="s2">"/tmp/script.sh args"</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>

@@ -1,0 +1,332 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/awscc/latest/docs --><head>
+                <title>AWS Cloud Control Provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="aws-cloud-control-provider">AWS Cloud Control Provider</h1>
+
+<p>Use the Amazon Web Services (AWS) Cloud Control provider to interact with the many resources supported by AWS via the Cloud Control API. You must configure the provider with the proper credentials before you can use it.</p>
+
+<p>Use the navigation to the left to read about the available resources.</p>
+
+<p>To learn the basics of Terraform using this provider, follow the hands-on <a href="https://developer.hashicorp.com/terraform/tutorials/aws/aws-cloud-control">get started tutorials</a> on HashiCorp's Developer pages.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>The AWS Cloud Control provider requires the use of Terraform 1.0.7 or later.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Things%20to%20Know"></a><h3 id="things-to-know">Things to Know</h3>
+
+<p>The Cloud Control provider resources and data sources are fully generated based on CloudFormation schema sourced from the CloudFormation registry.</p>
+
+<p>The providers resources and data sources are refreshed weekly (both enhancements and net-new resources) based on available updates in the CloudFormation registry in us-east-1 at the time of generation. If no updates are found, no release will be made.</p>
+
+<p>Some resources generation may be suppressed, and therefore unavailable in the provider despite being supported by CloudFormation. This is typically due to the provider being unable to handle certain aspects of that specific CloudFormation schema's structure. This list is maintained <a href="https://github.com/hashicorp/terraform-provider-awscc/issues/156">here</a>, and efforts are made by the provider team to maximize the number of supported resources.</p>
+
+<p>The CloudFormation schema upon which this provider relies on does not expose attribute defaults to Terraform in a consistent way. This means that early versions of this provider would encounter drift unexpectedly when practioners did not set a value for an attribute which had an default undeclared in the CloudFormation schema. In order to present a better overall experience we marked all optional values with the <code>Computed</code> schema behavior. This reduced the incidence of unenexpected drift but comes at a cost in that we are no longer able to detect drift to these values if no value is set by the practioner. Additionally computed values in sets are particularly problematic in relation to drift detection, and resources featuring this type can continue to display issues with unexpected drift.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<p>Terraform 1.0.7 and later:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">awscc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/awscc"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Configure the AWS CC Provider</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"awscc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-2"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># Create a Log Group</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"awscc_logs_log_group"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">log_group_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Authentication"></a><h2 id="authentication">Authentication</h2>
+
+<p>The AWS CC Provider offers a flexible means of providing credentials for
+authentication. The following methods are supported, in this order, and
+explained below:</p>
+
+<ul>
+<li>Static credentials</li>
+<li>Environment variables</li>
+<li>Shared credentials/configuration file</li>
+<li>CodeBuild, ECS, and EKS Roles</li>
+<li>EC2 Instance Metadata Service (IMDS and IMDSv2)</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Static%20Credentials"></a><h3 id="static-credentials">Static Credentials</h3>
+
+<aside class="admonition danger">
+    <strong>danger</strong>
+    <em>Warning</em>
+    <p>Hard-coded credentials are not recommended in any Terraform configuration and risks secret leakage should this file ever be committed to a public version control system.</p>
+</aside>
+
+<p>Static credentials can be provided by adding an <code>access_key</code> and <code>secret_key</code>
+in-line in the AWS CC Provider block:</p>
+
+<p>Usage:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"awscc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">access_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"AKIAIOSFODNN7EXAMPLE"</span><span class="w"></span>
+<span class="w">  </span><span class="na">secret_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Environment%20Variables"></a><h3 id="environment-variables">Environment Variables</h3>
+
+<p>You can provide your credentials via the <code>AWS_ACCESS_KEY_ID</code> and
+<code>AWS_SECRET_ACCESS_KEY</code>, environment variables, representing your AWS
+Access Key and AWS Secret Key, respectively.  Note that setting your
+AWS credentials using either these (or legacy) environment variables
+will override the use of <code>AWS_SHARED_CREDENTIALS_FILE</code> and <code>AWS_PROFILE</code>.
+The <code>AWS_DEFAULT_REGION</code> and <code>AWS_SESSION_TOKEN</code> environment variables
+are also used, if applicable:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"awscc"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Usage:</p>
+
+<div class="codehilite"><pre><span></span><code>$ <span class="nb">export</span> <span class="nv">AWS_ACCESS_KEY_ID</span><span class="o">=</span><span class="s2">"AKIAIOSFODNN7EXAMPLE"</span>
+$ <span class="nb">export</span> <span class="nv">AWS_SECRET_ACCESS_KEY</span><span class="o">=</span><span class="s2">"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"</span>
+$ <span class="nb">export</span> <span class="nv">AWS_DEFAULT_REGION</span><span class="o">=</span><span class="s2">"us-west-2"</span>
+$ terraform plan
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Shared%20Configuration%20and%20Credentials%20Files"></a><h3 id="shared-configuration-and-credentials-files">Shared Configuration and Credentials Files</h3>
+
+<p>You can use <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html">AWS shared configuration or credentials files</a> to specify configuration and credentials.
+The default locations are <code>$HOME/.aws/config</code> and <code>$HOME/.aws/credentials</code> on Linux and macOS,
+or <code>"%USERPROFILE%\.aws\config"</code> and <code>"%USERPROFILE%\.aws\credentials"</code> on Windows.
+You can optionally specify a different location in the Terraform configuration by providing the <code>shared_config_files</code> and <code>shared_credentials_files</code> arguments
+or using the <code>AWS_SHARED_CONFIG_FILE</code> and <code>AWS_SHARED_CREDENTIALS_FILE</code> environment variables.
+This method also supports the <code>profile</code> configuration and corresponding <code>AWS_PROFILE</code> environment variable:</p>
+
+<p>Usage:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"awscc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-2"</span><span class="w"></span>
+<span class="w">  </span><span class="na">shared_config_files</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"/Users/tf_user/.aws/conf"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">shared_credentials_files</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"/Users/tf_user/.aws/creds"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">profile</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="s2">"customprofile"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Please note that the <a href="https://aws.amazon.com/sdk-for-go/">AWS Go SDK</a>, the underlying authentication handler used by the Terraform AWS CC Provider, does not support all AWS CLI features.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/CodeBuild%2C%20ECS%2C%20and%20EKS%20Roles"></a><h3 id="codebuild-ecs-and-eks-roles">CodeBuild, ECS, and EKS Roles</h3>
+
+<p>If you're running Terraform on CodeBuild or ECS and have configured an <a href="http://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html">IAM Task Role</a>, Terraform will use the container's Task Role. This support is based on the underlying <code>AWS_CONTAINER_CREDENTIALS_RELATIVE_URI</code> and <code>AWS_CONTAINER_CREDENTIALS_FULL_URI</code> environment variables being automatically set by those services or manually for advanced usage.</p>
+
+<p>If you're running Terraform on EKS and have configured <a href="https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html">IAM Roles for Service Accounts (IRSA)</a>, Terraform will use the pod's role. This support is based on the underlying <code>AWS_ROLE_ARN</code> and <code>AWS_WEB_IDENTITY_TOKEN_FILE</code> environment variables being automatically set by Kubernetes or manually for advanced usage.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Custom%20User-Agent%20Information"></a><h3 id="custom-user-agent-information">Custom User-Agent Information</h3>
+
+<p>By default, the underlying AWS client used by the Terraform AWS CC Provider creates requests with User-Agent headers including information about Terraform and AWS Go SDK versions.
+To provide additional information in the User-Agent headers, set the User-Agent product or comment information using the <code>user_agent</code> argument.
+For example,</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"awscc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">user_agent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">product_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-module"</span><span class="w"></span>
+<span class="w">      </span><span class="na">product_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">product_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"BuildID"</span><span class="w"></span>
+<span class="w">      </span><span class="na">product_version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"1234"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>will append <code>example-module/1.0 BuildID/1234</code> to the User-Agent.</p>
+
+<p>In addition, the <code>TF_APPEND_USER_AGENT</code> environment variable can be set and its value will be directly added to HTTP requests. e.g.</p>
+
+<div class="codehilite"><pre><span></span><code>$ <span class="nb">export</span> <span class="nv">TF_APPEND_USER_AGENT</span><span class="o">=</span><span class="s2">"JenkinsAgent/i-12345678 BuildID/1234 (Optional Extra Information)"</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/EC2%20Instance%20Metadata%20Service"></a><h3 id="ec2-instance-metadata-service">EC2 Instance Metadata Service</h3>
+
+<p>If you're running Terraform from an EC2 instance with IAM Instance Profile using IAM Role,
+Terraform will query <a href="http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html#instance-metadata-security-credentials">the metadata API</a> endpoint for credentials and region.</p>
+
+<p>This is a preferred approach over any other when running in EC2 as you can avoid
+hard coding credentials. Instead these are leased on-the-fly by Terraform
+which reduces the chance of leakage.</p>
+
+<p>You can provide the custom metadata API endpoint via the <code>AWS_METADATA_URL</code> variable
+which expects the endpoint URL, including the version, and defaults to <code>http://169.254.169.254:80/latest</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Assume%20Role"></a><h3 id="assume-role">Assume Role</h3>
+
+<p>If provided with a role ARN, Terraform will attempt to assume this role
+using the supplied credentials.</p>
+
+<p>Usage:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"awscc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">assume_role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">role_arn</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME"</span><span class="w"></span>
+<span class="w">    </span><span class="na">session_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"SESSION_NAME"</span><span class="w"></span>
+<span class="w">    </span><span class="na">external_id</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"EXTERNAL_ID"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<blockquote>
+  <p><strong>Hands-on:</strong> Try the <a href="https://developer.hashicorp.com/terraform/tutorials/aws/aws-assumerole">Use AssumeRole to Provision AWS Resources Across Accounts</a> tutorial on HashiCorp Developer page.</p>
+</blockquote>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Assume%20Role%20Using%20Web%20Identity"></a><h3 id="assume-role-using-web-identity">Assume Role Using Web Identity</h3>
+
+<p>If provided with a role ARN and a token from a web identity provider,
+the AWS CC Provider will attempt to assume this role using the supplied credentials.</p>
+
+<p>Usage:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"awscc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">assume_role_with_web_identity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">role_arn</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="s2">"arn:aws:iam::123456789012:role/ROLE_NAME"</span><span class="w"></span>
+<span class="w">    </span><span class="na">session_name</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">"SESSION_NAME"</span><span class="w"></span>
+<span class="w">    </span><span class="na">web_identity_token_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"/Users/tf_user/secrets/web-identity-token"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20an%20External%20Credentials%20Process"></a><h3 id="using-an-external-credentials-process">Using an External Credentials Process</h3>
+
+<p>To use an <a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html">external process to source credentials</a>,
+the process must be configured in a named profile, including the <code>default</code> profile.
+The profile is configured in a shared configuration file.</p>
+
+<p>For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"awscc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"customprofile"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<div class="codehilite"><pre><span></span><code><span class="k">[profile customprofile]</span><span class="w"></span>
+<span class="na">credential_process</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">custom-process --username jdoe</span><span class="w"></span>
+</code></pre></div>
+
+<!-- schema generated by tfplugindocs -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Schema"></a><h2 id="schema">Schema</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Optional"></a><h3 id="optional">Optional</h3>
+
+<ul>
+<li><code>access_key</code> (String) This is the AWS access key. It must be provided, but it can also be sourced from the <code>AWS_ACCESS_KEY_ID</code> environment variable, or via a shared credentials file if <code>profile</code> is specified.</li>
+<li><code>assume_role</code> (Attributes) An <code>assume_role</code> block (documented below). Only one <code>assume_role</code> block may be in the configuration. (see <a href="#nestedatt--assume_role">below for nested schema</a>)</li>
+<li><code>assume_role_with_web_identity</code> (Attributes) An <code>assume_role_with_web_identity</code> block (documented below). Only one <code>assume_role_with_web_identity</code> block may be in the configuration. (see <a href="#nestedatt--assume_role_with_web_identity">below for nested schema</a>)</li>
+<li><code>endpoints</code> (Attributes) An <code>endpoints</code> block (documented below). Only one <code>endpoints</code> block may be in the configuration. (see <a href="#nestedatt--endpoints">below for nested schema</a>)</li>
+<li><code>http_proxy</code> (String) URL of a proxy to use for HTTP requests when accessing the AWS API. Can also be set using the <code>HTTP_PROXY</code> or <code>http_proxy</code> environment variables.</li>
+<li><code>https_proxy</code> (String) URL of a proxy to use for HTTPS requests when accessing the AWS API. Can also be set using the <code>HTTPS_PROXY</code> or <code>https_proxy</code> environment variables.</li>
+<li><code>insecure</code> (Boolean) Explicitly allow the provider to perform "insecure" SSL requests. If not set, defaults to <code>false</code>.</li>
+<li><code>max_retries</code> (Number) The maximum number of times an AWS API request is retried on failure. If not set, defaults to 25.</li>
+<li><code>no_proxy</code> (String) Comma-separated list of hosts that should not use HTTP or HTTPS proxies. Can also be set using the <code>NO_PROXY</code> or <code>no_proxy</code> environment variables.</li>
+<li><code>profile</code> (String) This is the AWS profile name as set in the shared credentials file.</li>
+<li><code>region</code> (String) This is the AWS region. It must be provided, but it can also be sourced from the <code>AWS_DEFAULT_REGION</code> environment variables, via a shared config file, or from the EC2 Instance Metadata Service if used.</li>
+<li><code>role_arn</code> (String) Amazon Resource Name of the AWS CloudFormation service role that is used on your behalf to perform operations.</li>
+<li><code>secret_key</code> (String) This is the AWS secret key. It must be provided, but it can also be sourced from the <code>AWS_SECRET_ACCESS_KEY</code> environment variable, or via a shared credentials file if <code>profile</code> is specified.</li>
+<li><code>shared_config_files</code> (List of String) List of paths to shared config files. If not set, defaults to <code>~/.aws/config</code>.</li>
+<li><code>shared_credentials_files</code> (List of String) List of paths to shared credentials files. If not set, defaults to <code>~/.aws/credentials</code>.</li>
+<li><code>skip_medatadata_api_check</code> (Boolean, Deprecated) Skip the AWS Metadata API check. Useful for AWS API implementations that do not have a metadata API endpoint.  Setting to <code>true</code> prevents Terraform from authenticating via the Metadata API. You may need to use other authentication methods like static credentials, configuration variables, or environment variables.</li>
+<li><code>skip_metadata_api_check</code> (Boolean) Skip the AWS Metadata API check. Useful for AWS API implementations that do not have a metadata API endpoint.  Setting to <code>true</code> prevents Terraform from authenticating via the Metadata API. You may need to use other authentication methods like static credentials, configuration variables, or environment variables.</li>
+<li><code>token</code> (String) Session token for validating temporary credentials. Typically provided after successful identity federation or Multi-Factor Authentication (MFA) login. With MFA login, this is the session token provided afterward, not the 6 digit MFA code used to get temporary credentials.  It can also be sourced from the <code>AWS_SESSION_TOKEN</code> environment variable.</li>
+<li><code>user_agent</code> (Attributes List) Product details to append to User-Agent string in all AWS API calls. (see <a href="#nestedatt--user_agent">below for nested schema</a>)</li>
+</ul>
+
+<p><a id="nestedatt--assume_role"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Nested%20Schema%20for%20assume_role"></a><h3 id="nested-schema-for-assume_role">Nested Schema for <code>assume_role</code></h3>
+
+<p>Required:</p>
+
+<ul>
+<li><code>role_arn</code> (String) Amazon Resource Name (ARN) of the IAM Role to assume.</li>
+</ul>
+
+<p>Optional:</p>
+
+<ul>
+<li><code>duration</code> (String) The duration, between 15 minutes and 12 hours, of the role session. Valid time units are ns, us (or µs), ms, s, h, or m.</li>
+<li><code>external_id</code> (String) External identifier to use when assuming the role.</li>
+<li><code>policy</code> (String) IAM policy in JSON format to use as a session policy. The effective permissions for the session will be the intersection between this polcy and the role's policies.</li>
+<li><code>policy_arns</code> (List of String) Amazon Resource Names (ARNs) of IAM Policies to use as managed session policies. The effective permissions for the session will be the intersection between these polcy and the role's policies.</li>
+<li><code>session_name</code> (String) Session name to use when assuming the role.</li>
+<li><code>tags</code> (Map of String) Map of assume role session tags.</li>
+<li><code>transitive_tag_keys</code> (Set of String) Set of assume role session tag keys to pass to any subsequent sessions.</li>
+</ul>
+
+<p><a id="nestedatt--assume_role_with_web_identity"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Nested%20Schema%20for%20assume_role_with_web_identity"></a><h3 id="nested-schema-for-assume_role_with_web_identity">Nested Schema for <code>assume_role_with_web_identity</code></h3>
+
+<p>Required:</p>
+
+<ul>
+<li><code>role_arn</code> (String) Amazon Resource Name (ARN) of the IAM Role to assume. Can also be set with the environment variable <code>AWS_ROLE_ARN</code>.</li>
+</ul>
+
+<p>Optional:</p>
+
+<ul>
+<li><code>duration</code> (String) The duration, between 15 minutes and 12 hours, of the role session. Valid time units are ns, us (or µs), ms, s, h, or m.</li>
+<li><code>policy</code> (String) IAM policy in JSON format to use as a session policy. The effective permissions for the session will be the intersection between this polcy and the role's policies.</li>
+<li><code>policy_arns</code> (List of String) Amazon Resource Names (ARNs) of IAM Policies to use as managed session policies. The effective permissions for the session will be the intersection between these polcy and the role's policies.</li>
+<li><code>session_name</code> (String) Session name to use when assuming the role. Can also be set with the environment variable <code>AWS_ROLE_SESSION_NAME</code>.</li>
+<li><code>web_identity_token</code> (String) The value of a web identity token from an OpenID Connect (OIDC) or OAuth provider. One of <code>web_identity_token</code> or <code>web_identity_token_file</code> is required.</li>
+<li><code>web_identity_token_file</code> (String) File containing a web identity token from an OpenID Connect (OIDC) or OAuth provider. Can also be set with the  environment variable<code>AWS_WEB_IDENTITY_TOKEN_FILE</code>. One of <code>web_identity_token_file</code> or <code>web_identity_token</code> is required.</li>
+</ul>
+
+<p><a id="nestedatt--endpoints"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Nested%20Schema%20for%20endpoints"></a><h3 id="nested-schema-for-endpoints">Nested Schema for <code>endpoints</code></h3>
+
+<p>Optional:</p>
+
+<ul>
+<li><code>cloudcontrolapi</code> (String) Use this to override the default Cloud Control API service endpoint URL</li>
+<li><code>iam</code> (String) Use this to override the default IAM service endpoint URL</li>
+<li><code>sso</code> (String) Use this to override the default SSO service endpoint URL</li>
+<li><code>sts</code> (String) Use this to override the default STS service endpoint URL</li>
+</ul>
+
+<p><a id="nestedatt--user_agent"></a></p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Nested%20Schema%20for%20user_agent"></a><h3 id="nested-schema-for-user_agent">Nested Schema for <code>user_agent</code></h3>
+
+<p>Required:</p>
+
+<ul>
+<li><code>product_name</code> (String) Product name. At least one of <code>product_name</code> or <code>comment</code> must be set.</li>
+</ul>
+
+<p>Optional:</p>
+
+<ul>
+<li><code>comment</code> (String) User-Agent comment. At least one of <code>comment</code> or <code>product_name</code> must be set.</li>
+<li><code>product_version</code> (String) Product version. Optional, and should only be set when <code>product_name</code> is set.</li>
+</ul>
+
+            
+        
+    </body></html>

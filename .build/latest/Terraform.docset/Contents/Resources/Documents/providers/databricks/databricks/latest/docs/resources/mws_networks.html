@@ -1,0 +1,269 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_networks --><head>
+                <title>databricks_mws_networks</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_mws_networks-resource">databricks_mws_networks Resource</h1>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Databricks%20on%20AWS%20usage"></a><h2 id="databricks-on-aws-usage">Databricks on AWS usage</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Initialize provider with <code>alias = "mws"</code>, <code>host  = "https://accounts.cloud.databricks.com"</code> and use <code>provider = databricks.mws</code></p>
+</aside>
+
+<p>Use this resource to <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/customer-managed-vpc.html">configure VPC</a> &amp; subnets for new workspaces within AWS. It is essential to understand that this will require you to configure your provider separately for the multiple workspaces resources.</p>
+
+<ul>
+<li>Databricks must have access to at least two subnets for each workspace, with each subnet in a different Availability Zone. You cannot specify more than one Databricks workspace subnet per Availability Zone in the Create network configuration API call. You can have more than one subnet per Availability Zone as part of your network setup, but you can choose only one subnet per Availability Zone for the Databricks workspace.</li>
+<li>Databricks assigns two IP addresses per node, one for management traffic and one for Spark applications. The total number of instances for each subnet is equal to half of the available IP addresses.</li>
+<li>Each subnet must have a netmask between /17 and /25.</li>
+<li>Subnets must be private.</li>
+<li>Subnets must have outbound access to the public network using a <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/nat_gateway">aws_nat_gateway</a> and <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/internet_gateway">aws_internet_gateway</a>, or other similar customer-managed appliance infrastructure.</li>
+<li>The NAT gateway must be set up in its subnet (public_subnets in the example below) that routes quad-zero (0.0.0.0/0) traffic to an internet gateway or other customer-managed appliance infrastructure.</li>
+</ul>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The NAT gateway needs only one IP address per AZ. Hence, the public subnet only needs two IP addresses. In order to limit the number of IP addresses in the public subnet, you can specify a secondary CIDR block (cidr_block_public) using the argument secondary_cidr_blocks then pass it to the public_subnets argument. Please review the <a href="https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Subnets.html">IPv4 CIDR block association restrictions</a> when choosing the secondary cidr block.</p>
+</aside>
+
+<p>Please follow this <a href="../guides/aws-workspace.md">complete runnable example</a> with new VPC and new workspace setup. Please pay special attention to the fact that there you have two different instances of a databricks provider - one for deploying workspaces (with <code>host="https://accounts.cloud.databricks.com/"</code>) and another for the workspace you've created with <code>databricks_mws_workspaces</code> resource. If you want both creations of workspaces &amp; clusters within the same Terraform module (essentially the same directory), you should use the provider aliasing feature of Terraform. We strongly recommend having one terraform module to create workspace + PAT token and the rest in different modules.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Databricks%20on%20GCP%20usage"></a><h2 id="databricks-on-gcp-usage">Databricks on GCP usage</h2>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Initialize provider with <code>alias = "mws"</code>, <code>host  = "https://accounts.gcp.databricks.com"</code> and use <code>provider = databricks.mws</code></p>
+</aside>
+
+<p>Use this resource to <a href="https://docs.gcp.databricks.com/administration-guide/cloud-configurations/gcp/customer-managed-vpc.html">configure VPC</a> &amp; subnet for new workspaces within GCP. It is essential to understand that this will require you to configure your provider separately for the multiple workspaces resources.</p>
+
+<ul>
+<li>Databricks must have access to a subnet in the same region as the workspace, of which IP range will be used to allocate your workspace’s GKE cluster nodes.</li>
+<li>The subnet must have a netmask between /29 and /9.</li>
+<li>Databricks must have access to 2 secondary IP ranges, one between /21 to /9 for workspace’s GKE cluster pods, and one between /27 to /16 for workspace’s GKE cluster services.</li>
+<li>Subnet must have outbound access to the public network using a <a href="https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_router_nat">gcp_compute_router_nat</a> or other similar customer-managed appliance infrastructure.</li>
+</ul>
+
+<p>Please follow this <a href="../guides/gcp-workspace.md">complete runnable example</a> with new VPC and new workspace setup. Please pay special attention to the fact that there you have two different instances of a databricks provider - one for deploying workspaces (with <code>host="https://accounts.gcp.databricks.com/"</code>) and another for the workspace you've created with <code>databricks_mws_workspaces</code> resource. If you want both creations of workspaces &amp; clusters within the same Terraform module (essentially the same directory), you should use the provider aliasing feature of Terraform. We strongly recommend having one terraform module to create workspace + PAT token and the rest in different modules.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20a%20Databricks%20on%20AWS%20workspace"></a><h3 id="creating-a-databricks-on-aws-workspace">Creating a Databricks on AWS workspace</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Account Id that could be found in the top right corner of https://accounts.cloud.databricks.com/"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_availability_zones"</span><span class="w"> </span><span class="nv">"available"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">module</span><span class="w"> </span><span class="nv">"vpc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"terraform-aws-modules/vpc/aws"</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"2.70.0"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">name</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">local.prefix</span><span class="w"></span>
+<span class="w">  </span><span class="na">cidr</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">var.cidr_block</span><span class="w"></span>
+<span class="w">  </span><span class="na">secondary_cidr_blocks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">var.cidr_block_public</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">azs</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_availability_zones.available.names</span><span class="w"></span>
+<span class="w">  </span><span class="na">tags</span><span class="w">                  </span><span class="o">=</span><span class="w"> </span><span class="nv">var.tags</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">enable_dns_hostnames</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">enable_nat_gateway</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="na">create_igw</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">public_subnets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">var.cidr_block_public</span><span class="p">,</span><span class="w"> </span><span class="m">6</span><span class="p">,</span><span class="w"> </span><span class="m">0</span><span class="p">)]</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_subnets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">var.cidr_block</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">1</span><span class="p">),</span><span class="w"></span>
+<span class="w">  </span><span class="nf">cidrsubnet</span><span class="p">(</span><span class="nv">var.cidr_block</span><span class="p">,</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="m">2</span><span class="p">)]</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">default_security_group_egress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[{</span><span class="w"></span>
+<span class="w">    </span><span class="na">cidr_blocks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"0.0.0.0/0"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}]</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">default_security_group_ingress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[{</span><span class="w"></span>
+<span class="w">    </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow all internal TCP and UDP"</span><span class="w"></span>
+<span class="w">    </span><span class="na">self</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">  </span><span class="p">}]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_networks"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_group_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">module.vpc.default_security_group_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_ids</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.private_subnets</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.vpc_id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In order to create a VPC <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/privatelink.html">that leverages AWS PrivateLink</a> you would need to add the <code>vpc_endpoint_id</code> Attributes from <a href="mws_vpc_endpoint.md">mws_vpc_endpoint</a> resources into the <a href="mws_networks.md">databricks_mws_networks</a> resource. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_networks"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_name</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"${local.prefix}-network"</span><span class="w"></span>
+<span class="w">  </span><span class="na">security_group_ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">module.vpc.default_security_group_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="na">subnet_ids</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.private_subnets</span><span class="w"></span>
+<span class="w">  </span><span class="na">vpc_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">module.vpc.vpc_id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">vpc_endpoints</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">dataplane_relay</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">databricks_mws_vpc_endpoint.relay.vpc_endpoint_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">rest_api</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">databricks_mws_vpc_endpoint.workspace.vpc_endpoint_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">aws_vpc_endpoint.workspace</span><span class="p">,</span><span class="w"> </span><span class="nv">aws_vpc_endpoint.relay</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Creating%20a%20Databricks%20on%20GCP%20workspace"></a><h3 id="creating-a-databricks-on-gcp-workspace">Creating a Databricks on GCP workspace</h3>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Account Id that could be found in the top right corner of https://accounts.cloud.databricks.com/"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_network"</span><span class="w"> </span><span class="nv">"dbx_private_vpc"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">project</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">var.google_project</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="s2">"tf-network-${random_string.suffix.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">auto_create_subnetworks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_subnetwork"</span><span class="w"> </span><span class="nv">"network-with-private-secondary-ip-ranges"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="s2">"test-dbx-${random_string.suffix.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.0.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-central1"</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.dbx_private_vpc.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">secondary_ip_range</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">range_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"pods"</span><span class="w"></span>
+<span class="w">    </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.1.0.0/16"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">secondary_ip_range</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">range_name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"svc"</span><span class="w"></span>
+<span class="w">    </span><span class="na">ip_cidr_range</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10.2.0.0/20"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">private_ip_google_access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_router"</span><span class="w"> </span><span class="nv">"router"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-router-${random_string.suffix.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.network-with-private-secondary-ip-ranges.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.dbx_private_vpc.id</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"google_compute_router_nat"</span><span class="w"> </span><span class="nv">"nat"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">                               </span><span class="o">=</span><span class="w"> </span><span class="s2">"my-router-nat-${random_string.suffix.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="na">router</span><span class="w">                             </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_router.router.name</span><span class="w"></span>
+<span class="w">  </span><span class="na">region</span><span class="w">                             </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_router.router.region</span><span class="w"></span>
+<span class="w">  </span><span class="na">nat_ip_allocate_option</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"AUTO_ONLY"</span><span class="w"></span>
+<span class="w">  </span><span class="na">source_subnetwork_ip_ranges_to_nat</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ALL_SUBNETWORKS_ALL_IP_RANGES"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_networks"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"test-demo-${random_string.suffix.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">gcp_network_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network_project_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">var.google_project</span><span class="w"></span>
+<span class="w">    </span><span class="na">vpc_id</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.dbx_private_vpc.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnet_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.network_with_private_secondary_ip_ranges.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnet_region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.network_with_private_secondary_ip_ranges.region</span><span class="w"></span>
+<span class="w">    </span><span class="na">pod_ip_range_name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"pods"</span><span class="w"></span>
+<span class="w">    </span><span class="na">service_ip_range_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"svc"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>In order to create a VPC <a href="https://docs.gcp.databricks.com/administration-guide/cloud-configurations/gcp/private-service-connect.html">that leverages GCP Private Service Connect</a> you would need to add the <code>vpc_endpoint_id</code> Attributes from <a href="mws_vpc_endpoint.md">mws_vpc_endpoint</a> resources into the <a href="mws_networks.md">databricks_mws_networks</a> resource. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_networks"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">network_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"test-demo-${random_string.suffix.result}"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">gcp_network_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">network_project_id</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">var.google_project</span><span class="w"></span>
+<span class="w">    </span><span class="na">vpc_id</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_network.dbx_private_vpc.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnet_id</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.network_with_private_secondary_ip_ranges.name</span><span class="w"></span>
+<span class="w">    </span><span class="na">subnet_region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">google_compute_subnetwork.network_with_private_secondary_ip_ranges.region</span><span class="w"></span>
+<span class="w">    </span><span class="na">pod_ip_range_name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"pods"</span><span class="w"></span>
+<span class="w">    </span><span class="na">service_ip_range_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"svc"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">vpc_endpoints</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">dataplane_relay</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">databricks_mws_vpc_endpoint.relay.vpc_endpoint_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">    </span><span class="na">rest_api</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">databricks_mws_vpc_endpoint.workspace.vpc_endpoint_id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Modifying%20networks%20on%20running%20workspaces%20%28AWS%20only%29"></a><h2 id="modifying-networks-on-running-workspaces-aws-only">Modifying networks on running workspaces (AWS only)</h2>
+
+<p>Due to specifics of platform APIs, changing any attribute of network configuration would cause <code>databricks_mws_networks</code> to be re-created - deleted &amp; added again with special case for running workspaces. Once network configuration is attached to a running <a href="mws_workspaces.md">databricks_mws_workspaces</a>, you cannot delete it and <code>terraform apply</code> would result in <code>INVALID_STATE: Unable to delete, Network is being used by active workspace X</code> error. In order to modify any attributes of a network, you have to perform three different <code>terraform apply</code> steps:</p>
+
+<ol>
+<li>Create a new <code>databricks_mws_networks</code> resource.</li>
+<li>Update the <code>databricks_mws_workspaces</code> to point to the new <code>network_id</code>.</li>
+<li>Delete the old <code>databricks_mws_networks</code> resource.</li>
+</ol>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are available:</p>
+
+<ul>
+<li><code>account_id</code> - Account Id that could be found in the top right corner of <a href="https://accounts.cloud.databricks.com/">Accounts Console</a></li>
+<li><code>network_name</code> - name under which this network is registered</li>
+<li><code>vpc_id</code> - (AWS only) <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc">aws_vpc</a> id</li>
+<li><code>subnet_ids</code> - (AWS only) ids of <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/subnet">aws_subnet</a></li>
+<li><code>security_group_ids</code> - (AWS only) ids of <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group">aws_security_group</a></li>
+<li><code>vpc_endpoints</code> - (Optional) mapping of <a href="mws_vpc_endpoint.md">databricks_mws_vpc_endpoint</a> for PrivateLink or Private Service Connect connections</li>
+<li><code>gcp_network_info</code> - (GCP only) a block consists of Google Cloud specific information for this network, for example the VPC ID, subnet ID, and secondary IP ranges. It has the following fields:
+<ul>
+<li><code>network_project_id</code> - The Google Cloud project ID of the VPC network.</li>
+<li><code>vpc_id</code> - The ID of the VPC associated with this network. VPC IDs can be used in multiple network configurations.</li>
+<li><code>subnet_id</code> - The ID of the subnet associated with this network.</li>
+<li><code>subnet_region</code> - The Google Cloud region of the workspace data plane. For example, <code>us-east4</code>.</li>
+<li><code>pod_ip_range_name</code> - The name of the secondary IP range for pods. A Databricks-managed GKE cluster uses this IP range for its pods. This secondary IP range can only be used by one workspace.</li>
+<li><code>service_ip_range_name</code> - The name of the secondary IP range for services. A Databricks-managed GKE cluster uses this IP range for its services. This secondary IP range can only be used by one workspace.</li>
+</ul></li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - Canonical unique identifier for the mws networks.</li>
+<li><code>network_id</code> - (String) id of network to be used for <a href="mws_workspaces.md">databricks_mws_workspaces</a> resource.</li>
+<li><code>vpc_status</code> - (String) VPC attachment status</li>
+<li><code>workspace_id</code> - (Integer) id of associated workspace</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>This resource can be imported by Databricks account ID and network ID.</p>
+
+<div class="codehilite"><pre><span></span><code>terraform import databricks_mws_networks.this <span class="s1">'&lt;account_id&gt;/&lt;network_id&gt;'</span>
+</code></pre></div>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This resource does not support updates. If your configuration does not match the existing resource, the next <code>terraform apply</code> will cause the resource to be destroyed and recreated. After importing, verify that the configuration matches the existing resource by running <code>terraform plan</code>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are used in the same context:</p>
+
+<ul>
+<li><a href="../guides/aws-workspace.md">Provisioning Databricks on AWS</a> guide.</li>
+<li><a href="../guides/aws-private-link-workspace.md">Provisioning Databricks on AWS with Private Link</a> guide.</li>
+<li><a href="../guides/aws-e2-firewall-hub-and-spoke.md">Provisioning AWS Databricks workspaces with a Hub &amp; Spoke firewall for data exfiltration protection</a> guide.</li>
+<li><a href="../guides/gcp-workspace.md">Provisioning Databricks on GCP</a> guide.</li>
+<li><a href="../guides/gcp-private-service-connect-workspace.md">Provisioning Databricks workspaces on GCP with Private Service Connect</a> guide.</li>
+<li><a href="mws_vpc_endpoint.md">databricks_mws_vpc_endpoint</a> to register <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_endpoint">aws_vpc_endpoint</a> resources with Databricks such that they can be used as part of a <a href="mws_networks.md">databricks_mws_networks</a> configuration.</li>
+<li><a href="mws_private_access_settings.md">databricks_mws_private_access_settings</a> to create a Private Access Setting that can be used as part of a <a href="mws_workspaces.md">databricks_mws_workspaces</a> resource to create a <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/privatelink.html">Databricks Workspace that leverages AWS PrivateLink</a> or <a href="https://docs.gcp.databricks.com/administration-guide/cloud-configurations/gcp/private-service-connect.html">GCP Private Service Connect</a>.</li>
+<li><a href="mws_workspaces.md">databricks_mws_workspaces</a> to set up <a href="https://docs.databricks.com/getting-started/overview.html#e2-architecture-1">AWS and GCP workspaces</a>.</li>
+</ul>
+
+            
+        
+    </body></html>

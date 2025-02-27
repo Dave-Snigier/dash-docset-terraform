@@ -1,0 +1,204 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azurestack/latest/docs/guides/1 --><head>
+                <title>v1.0 of the Azure Stack Provider</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="v10-of-the-azure-stack-provider">v1.0 of the Azure Stack Provider</h1>
+
+<p>Terraform initially shipped support for the Azure Stack Provider back in June 2018.</p>
+
+<p>Version 1.0 of the azurestack Provider is a major release and as such includes some larger-scale changes which are outlined in this document.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Version 1.0 of the azurestack Provider supports Terraform 0.12 and later - Terraform 0.10 &amp; 0.11 are no longer supported with this release.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Pinning%20your%20Provider%20Version"></a><h3 id="pinning-your-provider-version">Pinning your Provider Version</h3>
+
+<p>We recommend pinning the version of each Provider you use in Terraform - you can do this using the <code>version</code> attribute in the <code>provider</code> block, either to a specific version of the azurestack Provider, like so:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azurestack"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=1.0.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>.. or to any 1.x release:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azurestack"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.x"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>More information on <a href="https://www.terraform.io/docs/configuration/providers.html#provider-versions">how to pin the version of a Terraform Provider being used can be found on the Terraform Website</a>.</p>
+
+<p>Once version 1.0 of the azurestack Provider is released - you can then upgrade to it by updating the version specified in the Provider block, like so:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azurestack"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"=1.0.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/What%27s%20available%20in%20Version%201.0%20of%20the%20azurestack%20Provider%3F"></a><h2 id="whats-available-in-version-10-of-the-azurestack-provider">What's available in Version 1.0 of the azurestack Provider?</h2>
+
+<p>At a high level, version 1.0 to includes the following changes:</p>
+
+<ul>
+<li><a href="#the-arm_endpoint-property-has-been-replaced-with-metadata_host">The <code>arm_endpoint</code> property was deprecated in favour of the <code>metadata_host</code> property</a>.</li>
+<li><a href="#changes-when-importing-existing-resources">Changes when importing existing resources</a> - when bringing Resources provisioned outside of Terraform under Terraform's control, these resources will now be required to be imported.</li>
+<li><a href="#custom-timeouts-for-resources">Custom Timeouts will be available on Resources</a> - this will allow you to specify a custom timeout for provisioning the resource in your Terraform Configuration <a href="https://www.terraform.io/docs/configuration/resources.html#operation-timeouts">using the <code>timeouts</code> block</a>.</li>
+<li><a href="#new-resources-for-virtual-machines-and-virtual-machine-scale-sets">New resources for Virtual Machines and Virtual Machine Scale Sets</a>.</li>
+<li><a href="#removal-of-deprecated-fields-data-sources-and-resources">Removing Fields, Data Sources and Resources which have been deprecated</a>.</li>
+</ul>
+
+<p>Each of these topics is covered in more detail below.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/The%20arm_endpoint%20property%20has%20been%20replaced%20with%20metadata_host"></a><h2 id="the-arm_endpoint-property-has-been-replaced-with-metadata_host">The <code>arm_endpoint</code> property has been replaced with <code>metadata_host</code></h2>
+
+<p>The be more descriptive and better align with the AzureRM provider and the provider block property <code>arm_endpoint</code> has been deprecated in favour of the <code>metadata_host</code> property which expects a FQDN hostname instead of a URI. For instance if you were setting it in the provider block previously:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azurestack"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.x"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">arm_endpoint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://management.region.mystack.ca"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>It woud now have to be:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azurestack"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.x"</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">metadata_host</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"management.region.mystack.ca"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Alternatively, if it was being set via environment variables:</p>
+
+<pre><code>export ARM_ARM_ENDPOINT="management.region.mystack.ca"
+</code></pre>
+
+<p>it would now be</p>
+
+<pre><code>export ARM_METADATA_HOST="management.region.mystack.ca"
+</code></pre>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Changes%20when%20Importing%20Existing%20Resources"></a><h2 id="changes-when-importing-existing-resources">Changes when Importing Existing Resources</h2>
+
+<p>Terraform allows for existing resources which have been created outside of Terraform to be Imported into Terraform's State. Once a resource is imported into the state, it's possible for Terraform to track changes and manage this resource. The Azure Stack Provider allows Importing existing resources into the state (using <code>terraform import</code>) for (almost) every resource.</p>
+
+<p>Version 2.0 of the Azure Stack Provider aims to solve an issue where it's possible to unintentionally import resources into the state by running <code>terraform apply</code>. To explain this further, the majority of Azure's APIs are Upserts - which means that a resource will be updated if it exists, otherwise it'll be created.</p>
+
+<p>Where the unique identifier for (most) Azure resources is the <code>name</code> (rather than for example an <code>aws_instance</code> where AWS will generate a different unique identifier) - it's possible that users may have unintentionally imported existing resources into Terraform (and made changes to the resource) when running <code>terraform apply</code> when using the same unique identifier as an existing resource.</p>
+
+<p>Whilst this may allow resources to work in some cases, it leads to hard-to-diagnose bugs in others (which could have been caught during <code>terraform plan</code>).</p>
+
+<p>In order to match the behaviour of other Terraform Providers version 2.0 of the azurestack Provider will require that existing resources are imported into the state prior to use. This means that Terraform will be checking for the presence of an existing resource prior to creating it - and will return an error similar to below:</p>
+
+<pre><code>A resource with the ID /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/group1 already exists - to be managed via Terraform this resource needs to be imported into the State. Please see the resource documentation for `azurestack_resource_group` for more information.
+</code></pre>
+
+<p>Information on how to import a given Resource can be found in the documentation for that Resource - for example here's how to <a href="../resources/resource_group.html#import">here's how to import a Resource Group in Terraform</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Custom%20Timeouts%20for%20Resources"></a><h2 id="custom-timeouts-for-resources">Custom Timeouts for Resources</h2>
+
+<p>Resources can optionally support a <code>timeouts</code> block - which allows users to specify a Custom Timeout for resource creation/deletion as part of the Terraform Configuration.</p>
+
+<p>Prior to version 2.0 the Azure Stack Provider has a default value set for resource timeouts for an hour - which cannot be overridden. This works for the most-part but there are certain scenarios where it'd be helpful to override this.</p>
+
+<p>This is useful for resources which can take a long time to delete - for example deleting the <code>azurestack_resource_group</code> resource will delete any resources within it, which can take time. Within Terraform your Terraform Configuration this could be represented like so:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azurestack_resource_group"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-resource-group"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"loc1"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">timeouts</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">create</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"10m"</span><span class="w"></span>
+<span class="w">    </span><span class="na">delete</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"30m"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>We intend to support the <code>timeouts</code> block in version 1.0 of the Azure Stack Provider - which will allow timeouts to be specified on resources (as shown above). <a href="https://github.com/terraform-providers/terraform-provider-azurestack/issues/171">This feature request is being tracked here</a> and will form part of the 2.0 release of the azurestack Provider.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20Resources%20for%20Virtual%20Machines%20and%20Virtual%20Machine%20Scale%20Sets"></a><h2 id="new-resources-for-virtual-machines-and-virtual-machine-scale-sets">New Resources for Virtual Machines and Virtual Machine Scale Sets</h2>
+
+<p>We originally shipped support for the <code>azurestack_virtual_machine</code> and <code>azurestack_virtual_machine_scale_set</code> resources back in March 2016.</p>
+
+<p>Over time new features have been added to these resources by Azure, such as Managed Disks and Managed Service Identity which these resources support. Since these resources first launched Azure's also changed the behaviour of some fields, so that it's now possible to update them where this wasn't previously possible - for example the Custom Data for a Virtual Machine.</p>
+
+<p>We've spent some time thinking about how we can accommodate these changes and about how we can improve the user experience of both resources.
+In particular we've wanted to be able to give better validation during <code>terraform plan</code>, rather than bailing out with an Azure API error during <code>terraform apply</code>, however this isn't possible with the current resource structure since they're very generic. The validation requirements also vary substantially based on the fields provided, for example the <code>name</code> field for a Virtual Machine can be up to 63 characters for a Linux Virtual Machine but only allows 15 characters for a Windows Virtual Machine.</p>
+
+<p>As such after spending some time reading through bug reports and thinking/prototyping some potential solutions to this - we believe the best path forward here is to split these resources out, so that we would have:</p>
+
+<ul>
+<li>a Linux Virtual Machine Resource (<code>azurestack_linux_virtual_machine</code>)</li>
+<li>a Windows Virtual Machine Resource ( <code>azurestack_windows_virtual_machine</code>)</li>
+<li>a Linux Virtual Machine Scale Set Resource (<code>azurestack_linux_virtual_machine_scale_set</code>)</li>
+<li>a Windows Virtual Machine Scale Set Resource ( <code>azurestack_windows_virtual_machine_scale_set</code>)</li>
+</ul>
+
+<p>Whilst we're aware that this isn't ideal since users will eventually have to update their code/import an existing resource - we believe this approach gives us a good footing for the future. In particular this allows us to re-consider  the schema design so that we can both support these new use-cases, fix some bugs and improve the user experience with these resources.</p>
+
+<p>The existing <code>azurestack_virtual_machine</code> and <code>azurestack_virtual_machine_scale_set</code> resources would continue to be available throughout the <code>v1.x</code> releases - but over time these will be deprecated in favour of the new resources and removed in <code>v2.x</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Removal%20of%20Deprecated%20Fields%2C%20Data%20Sources%20and%20Resources"></a><h2 id="removal-of-deprecated-fields-data-sources-and-resources">Removal of Deprecated Fields, Data Sources and Resources</h2>
+
+<p>The Azure Stack Provider was first launched in June 2018 - over the years the Provider has accumulated fields which have been deprecated (either by Azure because they're no longer used or because we've created an external resource to use instead).</p>
+
+<p>Since version 1.0 is a major version - we intend to take this opportunity to remove deprecated Fields, Resources and Data Sources.</p>
+
+<p>Below we'll cover each of the Data Sources and Resources which will be affected by the 1.0 upgrade.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>This guide is a Work In Progress and as such Fields, Resources and Data Sources may be added to this guide until version 2.0 of the azurestack Provider is released.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azurestack_%2A"></a><h3 id="resource-azurestack_">Resource: <code>azurestack_*</code></h3>
+
+<p>All tags properties are no longer computed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azurestack_network_interface"></a><h3 id="resource-azurestack_network_interface">Resource: <code>azurestack_network_interface</code></h3>
+
+<p>The <code>application_security_group_ids</code> and <code>enable_accelerated_networking</code> fields have been removed as they are not supported by Azure Stack.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azurestack_managed_disk"></a><h3 id="resource-azurestack_managed_disk">Resource: <code>azurestack_managed_disk</code></h3>
+
+<p>The <code>zones</code> field has been removed as it is not supported by Azure Stack.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azurestack_subnet"></a><h3 id="resource-azurestack_subnet">Resource: <code>azurestack_subnet</code></h3>
+
+<p>The <code>ip_configurations</code> field has been removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azurestack_managed_disk"></a><h3 id="resource-azurestack_managed_disk-2">Resource: <code>azurestack_managed_disk</code></h3>
+
+<p>The <code>zones</code> property has been removed as it is no longer supported by Azure Stack.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azurestack_network_interface"></a><h3 id="resource-azurestack_network_interface-2">Resource: <code>azurestack_network_interface</code></h3>
+
+<p>The <code>load_balancer_backend_address_pools_ids</code>, <code>load_balancer_inbound_nat_rules_ids</code>, <code>internal_fqdn</code>,  and <code>internal_dns_name_label</code> properties have been removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azurestack_storage_blob"></a><h3 id="resource-azurestack_storage_blob">Resource: <code>azurestack_storage_blob</code></h3>
+
+<p>The <code>resource_group_name</code> property has been removed in favour of the <code>azurestack_storage_account_id</code> property.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azurestack_storage_container"></a><h3 id="resource-azurestack_storage_container">Resource: <code>azurestack_storage_container</code></h3>
+
+<p>The <code>resource_group_name</code> property has been removed in favour of the <code>azurestack_storage_account_id</code> property.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azurestack_virtual_network_gateway_connection"></a><h3 id="resource-azurestack_virtual_network_gateway_connection">Resource: <code>azurestack_virtual_network_gateway_connection</code></h3>
+
+<p>The <code>type</code> property no longer supports <code>Vnet2Vnet</code>.</p>
+
+<hr/>
+
+<p>We've spent the past few months laying the groundwork for these changes - and whilst we appreciate that your Terraform Configurations may require code changes to upgrade to 1.0 - we take Semantic Versioning seriously and so try our best to limit these changes to major versions.</p>
+
+            
+        
+    </body></html>

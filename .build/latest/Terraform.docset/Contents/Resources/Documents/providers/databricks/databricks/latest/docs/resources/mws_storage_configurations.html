@@ -1,0 +1,95 @@
+<html><!-- Online page at https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/mws_storage_configurations --><head>
+                <title>databricks_mws_storage_configurations</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="databricks_mws_storage_configurations-resource">databricks_mws_storage_configurations Resource</h1>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>Initialize provider with <code>alias = "mws"</code>, <code>host  = "https://accounts.cloud.databricks.com"</code> and use <code>provider = databricks.mws</code></p>
+</aside>
+
+<p>This resource to configure root bucket new workspaces within AWS.</p>
+
+<p>It is important to understand that this will require you to configure your provider separately for the multiple workspaces resources. This will point to <a href="https://accounts.cloud.databricks.com">https://accounts.cloud.databricks.com</a> for the HOST and it will use basic auth as that is the only authentication method available for multiple workspaces api.</p>
+
+<p>Please follow this <a href="../guides/aws-workspace.md">complete runnable example</a> with new VPC and new workspace setup. Please pay special attention to the fact that there you have two different instances of a databricks provider - one for deploying workspaces (with <code>host="https://accounts.cloud.databricks.com/"</code>) and another for the workspace you've created with databricks_mws_workspaces resource. If you want both creation of workspaces &amp; clusters within workspace within the same terraform module (essentially same directory), you should use the provider aliasing feature of Terraform. We strongly recommend having one terraform module for creation of workspace + PAT token and the rest in different modules.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"databricks_account_id"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Account Id that could be found in the top right corner of https://accounts.cloud.databricks.com/"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket"</span><span class="w"> </span><span class="nv">"root_storage_bucket"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-rootbucket"</span><span class="w"></span>
+<span class="w">  </span><span class="na">acl</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"private"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_s3_bucket_versioning"</span><span class="w"> </span><span class="nv">"root_versioning"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.root_storage_bucket.id</span><span class="w"></span>
+<span class="w">  </span><span class="nb">versioning_configuration</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Disabled"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"databricks_mws_storage_configurations"</span><span class="w"> </span><span class="nv">"this"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">                   </span><span class="o">=</span><span class="w"> </span><span class="nv">databricks.mws</span><span class="w"></span>
+<span class="w">  </span><span class="na">account_id</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="nv">var.databricks_account_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">storage_configuration_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"${var.prefix}-storage"</span><span class="w"></span>
+<span class="w">  </span><span class="na">bucket_name</span><span class="w">                </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_s3_bucket.root_storage_bucket.bucket</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>bucket_name</code> - name of AWS S3 bucket</li>
+<li><code>account_id</code> - Account Id that could be found in the top right corner of <a href="https://accounts.cloud.databricks.com/">Accounts Console</a></li>
+<li><code>storage_configuration_name</code> - name under which this storage configuration is stored</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>In addition to all arguments above, the following attributes are exported:</p>
+
+<ul>
+<li><code>id</code> - Canonical unique identifier for the mws storage configurations.</li>
+<li><code>storage_configuration_id</code> - (String) id of storage config to be used for <code>databricks_mws_workspace</code> resource.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>This resource can be imported by Databricks account ID and storage configuration ID.</p>
+
+<div class="codehilite"><pre><span></span><code>terraform import databricks_mws_storage_configurations.this <span class="s1">'&lt;account_id&gt;/&lt;storage_configuration_id&gt;'</span>
+</code></pre></div>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>This resource does not support updates. If your configuration does not match the existing resource, the next <code>terraform apply</code> will cause the resource to be destroyed and recreated. After importing, verify that the configuration matches the existing resource by running <code>terraform plan</code>.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Related%20Resources"></a><h2 id="related-resources">Related Resources</h2>
+
+<p>The following resources are used in the same context:</p>
+
+<ul>
+<li><a href="../guides/aws-workspace.md">Provisioning Databricks on AWS</a> guide.</li>
+<li><a href="../guides/aws-private-link-workspace.md">Provisioning Databricks on AWS with Private Link</a> guide.</li>
+<li><a href="mws_credentials.md">databricks_mws_credentials</a> to configure the cross-account role for creation of new workspaces within AWS.</li>
+<li><a href="mws_customer_managed_keys.md">databricks_mws_customer_managed_keys</a> to configure KMS keys for new workspaces within AWS.</li>
+<li><a href="mws_log_delivery.md">databricks_mws_log_delivery</a> to configure delivery of <a href="https://docs.databricks.com/administration-guide/account-settings/billable-usage-delivery.html">billable usage logs</a> and <a href="https://docs.databricks.com/administration-guide/account-settings/audit-logs.html">audit logs</a>.</li>
+<li><a href="mws_networks.md">databricks_mws_networks</a> to <a href="https://docs.databricks.com/administration-guide/cloud-configurations/aws/customer-managed-vpc.html">configure VPC</a> &amp; subnets for new workspaces within AWS.</li>
+<li><a href="mws_workspaces.md">databricks_mws_workspaces</a> to set up <a href="https://docs.databricks.com/getting-started/overview.html#e2-architecture-1">AWS and GCP workspaces</a>.</li>
+</ul>
+
+            
+        
+    </body></html>

@@ -1,0 +1,163 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ecs_task_set --><head>
+                <title>aws_ecs_task_set</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="resource-aws_ecs_task_set">Resource: aws_ecs_task_set</h1>
+
+<p>Provides an ECS task set - effectively a task that is expected to run until an error occurs or a user terminates it (typically a webserver or a database).</p>
+
+<p>See <a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/deployment-type-external.html">ECS Task Set section in AWS developer guide</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ecs_task_set"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">service</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ecs_service.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">cluster</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ecs_cluster.example.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">task_definition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ecs_task_definition.example.arn</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">load_balancer</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">target_group_arn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_lb_target_group.example.arn</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"mongo"</span><span class="w"></span>
+<span class="w">    </span><span class="na">container_port</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="m">8080</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Ignoring%20Changes%20to%20Scale"></a><h3 id="ignoring-changes-to-scale">Ignoring Changes to Scale</h3>
+
+<p>You can utilize the generic Terraform resource <a href="https://www.terraform.io/docs/configuration/meta-arguments/lifecycle.html">lifecycle configuration block</a> with <code>ignore_changes</code> to create an ECS service with an initial count of running instances, then ignore any changes to that count caused externally (e.g. Application Autoscaling).</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_ecs_task_set"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1">  # ... other configurations ...</span>
+
+<span class="c1">  # Example: Run 50% of the servcie's desired count</span>
+<span class="w">  </span><span class="nb">scale</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">50.0</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="c1"></span>
+
+<span class="c1">  # Optional: Allow external changes without Terraform plan difference</span>
+<span class="w">  </span><span class="nb">lifecycle</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">ignore_changes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"scale"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Argument%20Reference"></a><h2 id="argument-reference">Argument Reference</h2>
+
+<p>The following arguments are required:</p>
+
+<ul>
+<li><code>service</code> - (Required) The short name or ARN of the ECS service.</li>
+<li><code>cluster</code> - (Required) The short name or ARN of the cluster that hosts the service to create the task set in.</li>
+<li><code>task_definition</code> - (Required) The family and revision (<code>family:revision</code>) or full ARN of the task definition that you want to run in your service.</li>
+</ul>
+
+<p>The following arguments are optional:</p>
+
+<ul>
+<li><code>capacity_provider_strategy</code> - (Optional) The capacity provider strategy to use for the service. Can be one or more.  <a href="#capacity_provider_strategy">Defined below</a>.</li>
+<li><code>external_id</code> - (Optional) The external ID associated with the task set.</li>
+<li><code>force_delete</code> - (Optional) Whether to allow deleting the task set without waiting for scaling down to 0. You can force a task set to delete even if it's in the process of scaling a resource. Normally, Terraform drains all the tasks before deleting the task set. This bypasses that behavior and potentially leaves resources dangling.</li>
+<li><code>launch_type</code> - (Optional) The launch type on which to run your service. The valid values are <code>EC2</code>, <code>FARGATE</code>, and <code>EXTERNAL</code>. Defaults to <code>EC2</code>.</li>
+<li><code>load_balancer</code> - (Optional) Details on load balancers that are used with a task set. <a href="#load_balancer">Detailed below</a>.</li>
+<li><code>platform_version</code> - (Optional) The platform version on which to run your service. Only applicable for <code>launch_type</code> set to <code>FARGATE</code>. Defaults to <code>LATEST</code>. More information about Fargate platform versions can be found in the <a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/platform_versions.html">AWS ECS User Guide</a>.</li>
+<li><code>network_configuration</code> - (Optional) The network configuration for the service. This parameter is required for task definitions that use the <code>awsvpc</code> network mode to receive their own Elastic Network Interface, and it is not supported for other network modes. <a href="#network_configuration">Detailed below</a>.</li>
+<li><code>scale</code> - (Optional) A floating-point percentage of the desired number of tasks to place and keep running in the task set. <a href="#scale">Detailed below</a>.</li>
+<li><code>service_registries</code> - (Optional) The service discovery registries for the service. The maximum number of <code>service_registries</code> blocks is <code>1</code>. <a href="#service_registries">Detailed below</a>.</li>
+<li><code>tags</code> - (Optional) A map of tags to assign to the file system. If configured with a provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a> present, tags with matching keys will overwrite those defined at the provider-level. If you have set <code>copy_tags_to_backups</code> to true, and you specify one or more tags, no existing file system tags are copied from the file system to the backup.</li>
+<li><code>wait_until_stable</code> - (Optional) Whether <code>terraform</code> should wait until the task set has reached <code>STEADY_STATE</code>.</li>
+<li><code>wait_until_stable_timeout</code> - (Optional) Wait timeout for task set to reach <code>STEADY_STATE</code>. Valid time units include <code>ns</code>, <code>us</code> (or <code>µs</code>), <code>ms</code>, <code>s</code>, <code>m</code>, and <code>h</code>. Default <code>10m</code>.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/capacity_provider_strategy"></a><h2 id="capacity_provider_strategy">capacity_provider_strategy</h2>
+
+<p>The <code>capacity_provider_strategy</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>capacity_provider</code> - (Required) The short name or full Amazon Resource Name (ARN) of the capacity provider.</li>
+<li><code>weight</code> - (Required) The relative percentage of the total number of launched tasks that should use the specified capacity provider.</li>
+<li><code>base</code> - (Optional) The number of tasks, at a minimum, to run on the specified capacity provider. Only one capacity provider in a capacity provider strategy can have a base defined.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/load_balancer"></a><h2 id="load_balancer">load_balancer</h2>
+
+<p>The <code>load_balancer</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>container_name</code> - (Required) The name of the container to associate with the load balancer (as it appears in a container definition).</li>
+<li><code>load_balancer_name</code> - (Optional, Required for ELB Classic) The name of the ELB (Classic) to associate with the service.</li>
+<li><code>target_group_arn</code> - (Optional, Required for ALB/NLB) The ARN of the Load Balancer target group to associate with the service.</li>
+<li><code>container_port</code> - (Optional) The port on the container to associate with the load balancer. Defaults to <code>0</code> if not specified.</li>
+</ul>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Specifying multiple <code>load_balancer</code> configurations is still not supported by AWS for ECS task set.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/network_configuration"></a><h2 id="network_configuration">network_configuration</h2>
+
+<p>The <code>network_configuration</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>subnets</code> - (Required) The subnets associated with the task or service. Maximum of 16.</li>
+<li><code>security_groups</code> - (Optional) The security groups associated with the task or service. If you do not specify a security group, the default security group for the VPC is used. Maximum of 5.</li>
+<li><code>assign_public_ip</code> - (Optional) Whether to assign a public IP address to the ENI (<code>FARGATE</code> launch type only). Valid values are <code>true</code> or <code>false</code>. Default <code>false</code>.</li>
+</ul>
+
+<p>For more information, see <a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-networking.html">Task Networking</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/scale"></a><h2 id="scale">scale</h2>
+
+<p>The <code>scale</code> configuration block supports the following:</p>
+
+<ul>
+<li><code>unit</code> - (Optional) The unit of measure for the scale value. Default: <code>PERCENT</code>.</li>
+<li><code>value</code> - (Optional) The value, specified as a percent total of a service's <code>desiredCount</code>, to scale the task set. Defaults to <code>0</code> if not specified. Accepted values are numbers between 0.0 and 100.0.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/service_registries"></a><h2 id="service_registries">service_registries</h2>
+
+<p><code>service_registries</code> support the following:</p>
+
+<ul>
+<li><code>registry_arn</code> - (Required) The ARN of the Service Registry. The currently supported service registry is Amazon Route 53 Auto Naming Service(<a href="../resources/service_discovery_service.html"><code>aws_service_discovery_service</code> resource</a>). For more information, see <a href="https://docs.aws.amazon.com/Route53/latest/APIReference/API_autonaming_Service.html">Service</a>.</li>
+<li><code>port</code> - (Optional) The port value used if your Service Discovery service specified an SRV record.</li>
+<li><code>container_port</code> - (Optional) The port value, already specified in the task definition, to be used for your service discovery service.</li>
+<li><code>container_name</code> - (Optional) The container name value, already specified in the task definition, to be used for your service discovery service.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Attribute%20Reference"></a><h2 id="attribute-reference">Attribute Reference</h2>
+
+<p>This resource exports the following attributes in addition to the arguments above:</p>
+
+<ul>
+<li><code>id</code> - The <code>task_set_id</code>, <code>service</code> and <code>cluster</code> separated by commas (<code>,</code>).</li>
+<li><code>arn</code> - The Amazon Resource Name (ARN) that identifies the task set.</li>
+<li><code>stability_status</code> - The stability status. This indicates whether the task set has reached a steady state.</li>
+<li><code>status</code> - The status of the task set.</li>
+<li><code>tags_all</code> - A map of tags assigned to the resource, including those inherited from the provider <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs#default_tags-configuration-block"><code>default_tags</code> configuration block</a>.</li>
+<li><code>task_set_id</code> - The ID of the task set.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Import"></a><h2 id="import">Import</h2>
+
+<p>In Terraform v1.5.0 and later, use an <a href="https://developer.hashicorp.com/terraform/language/import"><code>import</code> block</a> to import ECS Task Sets using the <code>task_set_id</code>, <code>service</code>, and <code>cluster</code> separated by commas (<code>,</code>). For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">import</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws_ecs_task_set.example</span><span class="w"></span>
+<span class="w">  </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"ecs-svc/7177320696926227436,arn:aws:ecs:us-west-2:123456789101:service/example/example-1234567890,arn:aws:ecs:us-west-2:123456789101:cluster/example"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Using <code>terraform import</code>, import ECS Task Sets using the <code>task_set_id</code>, <code>service</code>, and <code>cluster</code> separated by commas (<code>,</code>). For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="gp">% </span>terraform import aws_ecs_task_set.example ecs-svc/7177320696926227436,arn:aws:ecs:us-west-2:123456789101:service/example/example-1234567890,arn:aws:ecs:us-west-2:123456789101:cluster/example
+</code></pre></div>
+
+            
+        
+    </body></html>

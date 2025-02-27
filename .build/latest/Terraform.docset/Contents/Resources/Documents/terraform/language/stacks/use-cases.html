@@ -1,0 +1,245 @@
+<html><!-- Online page at https://www.terraform.io/language/stacks/use-cases --><head>
+                <title>Use Cases</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="use-cases">Use Cases</h1>
+
+<p>Stacks provide a way to define, organize, and reuse components and then deploy the infrastructure those components describe consistently across different deployments. </p>
+
+<p>Stacks are ideal for the following situations:</p>
+
+<ul>
+<li>Managing infrastructure with a common lifecycle, such as a microservices architecture where HCP Terraform needs to deploy multiple services together. </li>
+<li>Repeating infrastructure across different environments, regions, or accounts that require consistent and synchronized deployments.</li>
+<li>Tightly orchestrating infrastructure changes across different environments. Stacks help you manage your dependencies and ensure Terraform creates resources in the correct order.</li>
+</ul>
+
+<p>Stacks can simplify the complexity of wrangling the infrastructure in these scenarios, ensuring that your configurations remains organized, maintainable, and scalable.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Manage%20deployment%20dependencies"></a><h2 id="manage-deployment-dependencies">Manage deployment dependencies</h2>
+
+<p>Stacks allow you to manage dependencies within complex infrastructure deployments automatically. If your infrastructure has interdependencies between components, HCP Terraform recognizes if a Stack component requires attributes that are not yet available and defers planning those changes until it can apply them.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Hands-on</em>
+    <p>: Go through our tutorial on <a href="../../terraform/tutorials/cloud/stacks-eks-deferred.html">Managing Kubernetes workloads using Stacks</a> for examples of Stacks that manage deployment dependencies.</p>
+</aside>
+
+<p>For example, when managing Kubernetes workloads that use custom resources, you cannot provision a custom resource definition (CRD) API and the resources that use those APIs in a single step. In these scenarios, HCP Terraform first needs to deploy your CRD and then deploy the resources that require your CRD in a second plan and apply. When you deploy this setup with HCP Terraform workspaces, you manage multiple workspaces to accomplish this workflow, which can get complicated.</p>
+
+<p>When you use a Stack, HCP Terraform recognizes the dependency between components, automatically deferring the component's plan and apply steps until it can complete them successfully. Learn more about how Stacks plan <a href="../../terraform/cloud-docs/stacks/deploy/plans.html#deferred-changes">deferred changes</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deploy%20to%20multiple%20environments"></a><h2 id="deploy-to-multiple-environments">Deploy to multiple environments</h2>
+
+<p>Managing infrastructure across multiple environments can be challenging, especially when you want to ensure that each environment remains consistent. For example, if you manage infrastructure for multiple environments, such as development, staging, and production. Each environment needs to be isolated, but they all mirror each other’s configuration.</p>
+
+<p>Stacks allow you to define deployments for each environment within a single configuration, making it easier to maintain uniformity and make updates across all your environments.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployments.tfdeploy.hcl</span>
+
+<span class="err">deployment</span><span class="w"> </span><span class="s2">"production"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws_region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-1"</span><span class="w"></span>
+<span class="w">        </span><span class="na">instance_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">        </span><span class="na">role_arn</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;YOUR_ROLE_ARN&gt;"</span><span class="w"></span>
+<span class="w">        </span><span class="na">identity_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">identity_token.aws.jwt</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">deployment</span><span class="w"> </span><span class="s2">"development"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws_region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="w">        </span><span class="na">instance_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">        </span><span class="na">role_arn</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;YOUR_ROLE_ARN&gt;"</span><span class="w"></span>
+<span class="w">        </span><span class="na">identity_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">identity_token.aws.jwt</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Stacks also simplify adding and removing environments. You can add a <code>deployment</code> block to create a new environment using the same Stack configuration and infrastructure components.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployments.tfdeploy.hcl</span>
+
+<span class="err">deployment</span><span class="w"> </span><span class="s2">"production"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws_region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-1"</span><span class="w"></span>
+<span class="w">        </span><span class="na">instance_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">        </span><span class="na">role_arn</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;YOUR_ROLE_ARN&gt;"</span><span class="w"></span>
+<span class="w">        </span><span class="na">identity_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">identity_token.aws.jwt</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">deployment</span><span class="w"> </span><span class="s2">"development"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws_region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="w">        </span><span class="na">instance_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">        </span><span class="na">role_arn</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;YOUR_ROLE_ARN&gt;"</span><span class="w"></span>
+<span class="w">        </span><span class="na">identity_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">identity_token.aws.jwt</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">deployment</span><span class="w"> </span><span class="s2">"staging"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws_region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="w">        </span><span class="na">instance_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">        </span><span class="na">role_arn</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;YOUR_ROLE_ARN&gt;"</span><span class="w"></span>
+<span class="w">        </span><span class="na">identity_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">identity_token.aws.jwt</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>By default, HCP Terraform notices that you changed your configuration and will create a new plan for your new deployment.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deploy%20across%20regions"></a><h2 id="deploy-across-regions">Deploy across regions</h2>
+
+<p>For global applications, deploying infrastructure across multiple cloud regions is often necessary to ensure low latency and high availability. Stacks enable you to manage cross-region deployments with a unified configuration, ensuring that HCP Terraform sets up each region consistently while allowing for region-specific customization. </p>
+
+<p>For example, if you want to deploy the same environment to two different regions, you could set up your deployments to be region-specific.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployments.tfdeploy.hcl</span>
+
+<span class="err">identity_token</span><span class="w"> </span><span class="s2">"aws_west"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">audience</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"aws.workload.identity.west"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">identity_token</span><span class="w"> </span><span class="s2">"aws_east"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">audience</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"aws.workload.identity.east"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">deployment</span><span class="w"> </span><span class="s2">"us_dev_east"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws_region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="w">        </span><span class="na">instance_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">        </span><span class="na">role_arn</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;YOUR_ROLE_ARN&gt;"</span><span class="w"></span>
+<span class="w">        </span><span class="na">identity_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">identity_token.aws_east.jwt</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">deployment</span><span class="w"> </span><span class="s2">"us_dev_west"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws_region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-west-1"</span><span class="w"></span>
+<span class="w">        </span><span class="na">instance_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">2</span><span class="w"></span>
+<span class="w">        </span><span class="na">role_arn</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;YOUR_ROLE_ARN&gt;"</span><span class="w"></span>
+<span class="w">        </span><span class="na">identity_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">identity_token.aws_west.jwt</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Stacks support using the <a href="../../terraform/language/meta-arguments/for_each.html"><code>for_each</code> meta argument</a> in both <code>provider</code> and <code>component</code> blocks. You can use this support to streamline infrastructure deployment in repeating regions. For example, you could set up a variable to expect a set of regions.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># variables.tfstack.hcl</span>
+
+<span class="c1"># The regions variable is where we specify each region we want to deploy this </span>
+<span class="c1"># Stack's infrastructure within. </span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"regions"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">set</span><span class="p">(</span><span class="kt">string</span><span class="p">)</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1"># The identity_token and role_arn are for configuring this Stack to</span>
+<span class="c1"># authenticate with AWS using OIDC.</span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"identity_token"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="w">    </span><span class="na">ephemeral</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"role_arn"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">string</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Then, set up your provider configuration to iterate through the <code>var.regions</code> variable to configure a version of that provider for each region.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># providers.tfstack.hcl</span>
+
+<span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">aws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/aws"</span><span class="w"></span>
+<span class="w">        </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 5.7.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">random</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/random"</span><span class="w"></span>
+<span class="w">        </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 3.5.1"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+
+<span class="kr">provider</span><span class="w"> </span><span class="nc">"aws"</span><span class="w"> </span><span class="nv">"configurations"</span><span class="w"> </span><span class="p">{</span><span class="c1"></span>
+<span class="c1"># This provider configuration iterates through and creates a configuration</span>
+<span class="c1"># for each region.</span>
+<span class="w">    </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.regions</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+
+<span class="w">        </span><span class="nb">assume_role_with_web_identity</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">role_arn</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">var.role_arn</span><span class="w"></span>
+<span class="w">        </span><span class="na">web_identity_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.identity_token</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Each of your Stack’s deployments uses a separate AWS provider configuration for each region you defined in the <code>regions</code> variable. This means that in your configuration, you refer to the AWS provider for the <code>us-east-1</code> region as <code>provider.aws.configurations["us-east-1"]</code>.</p>
+
+<p>You can keep Stack components dynamic by using the <code>for_each</code> meta-argument to deploy a <code>component</code>’s Terraform module in each region.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># components.tfstack.hcl</span>
+
+<span class="err">component</span><span class="w"> </span><span class="s2">"s3"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">for_each</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.regions</span><span class="w"></span>
+
+<span class="w">    </span><span class="na">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"./s3"</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">each.value</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="nb">providers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="nv">provider.aws.configurations[each.value</span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="na">random</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">provider.random.this</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>The components in this example use the <code>for_each</code> meta-argument to deploy their Terraform module in the region for the current deployment. Notice how the component configures the AWS provider to use the correct provider for the given region with <code>provider.aws.configurations[each.value]</code>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Deploy%20across%20accounts"></a><h2 id="deploy-across-accounts">Deploy across accounts</h2>
+
+<p>Stacks can also be helpful when managing infrastructure across different cloud provider accounts, ensuring that each account's infrastructure is consistent but isolated.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployments.tfdeploy.hcl</span>
+
+<span class="err">identity_token</span><span class="w"> </span><span class="s2">"aws_prod"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">audience</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"aws.prod.workload.identity"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">identity_token</span><span class="w"> </span><span class="s2">"aws_dev"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">     </span><span class="na">audience</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"aws.dev.workload.identity"</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">deployment</span><span class="w"> </span><span class="s2">"development"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">aws_region</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">"us-east-1"</span><span class="w"></span>
+<span class="w">        </span><span class="na">role_arn</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;development AWS account IAM role ARN&gt;"</span><span class="w"></span>
+<span class="w">        </span><span class="na">identity_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">identity_token.aws_dev.jwt</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="err">deployment</span><span class="w"> </span><span class="s2">"production"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">regions</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"us-east-1", "us-west-1"</span><span class="p">]</span><span class="w"></span>
+<span class="w">        </span><span class="na">role_arn</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;production AWS account IAM role ARN&gt;"</span><span class="w"></span>
+<span class="w">        </span><span class="na">identity_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">identity_token.aws_prod.jwt</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Stacks enable you to define and deploy shared infrastructure components across different accounts, maintaining consistency while adhering to security and organizational boundaries.</p>
+
+            
+        
+    </body></html>

@@ -1,0 +1,529 @@
+<html><!-- Online page at https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/microsoft-graph --><head>
+                <title>AzureAD v2.0 and Microsoft Graph</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="azuread-v20-and-microsoft-graph">AzureAD v2.0 and Microsoft Graph</h1>
+
+<p>From version 2.0 the AzureAD provider exclusively uses <a href="https://docs.microsoft.com/en-us/graph/overview">Microsoft Graph</a> to connect to Azure Active Directory and has ceased to support using the <a href="https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-graph-api">Azure Active Directory Graph API</a>.</p>
+
+<p>Due to differences between the two APIs, some schema deprecations have already been introduced prior to v2.0 and several fields have been renamed, removed or otherwise changed in v2.0. Please consult the following guide to determine any configuration changes you will need to make in order to upgrade to version 2.0.</p>
+
+<p>We take semantic versioning very seriously which is why these changes have been introduced in a new major version of the provider. You can read up the background behind the API migration and proposed development path in <a href="https://github.com/hashicorp/terraform-provider-azuread/issues/323">this GitHub issue</a>, and follow along with the work being done for v2.0 in the <a href="https://github.com/hashicorp/terraform-provider-azuread/milestone/16">GitHub milestone</a></p>
+
+<p>In version 1.5.0 or later of the AzureAD provider, limited beta support for Microsoft Graph can be enabled. See <a href="#beta-support-for-microsoft-graph-in-v150">Beta support for Microsoft Graph</a> for more details.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Pinning%20your%20provider%20version"></a><h2 id="pinning-your-provider-version">Pinning your provider version</h2>
+
+<p>We recommend pinning the version of each provider you use in Terraform. You can do this using the <code>version</code> attribute in the <code>required_providers</code> block of your <code>terraform</code> configuration block.</p>
+
+<p>To pin to a specific version of the AzureAD provider:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azuread</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azuread"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"= 1.5.1"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>To pin to any 1.5 release:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="nb">terraform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">required_providers</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">azuread</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">source</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"hashicorp/azuread"</span><span class="w"></span>
+<span class="w">      </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.5.0"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Older versions of Terraform (0.12.x) can pin the provider version using the <code>version</code> attribute within the <code>provider</code> block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azuread"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"~&gt; 1.5.0"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>This will enable you to upgrade to version 2.0 at your convenience, by simply advancing the desired target version in your configuration. See the <a href="https://learn.hashicorp.com/tutorials/terraform/provider-versioning">Lock and Upgrade Provider Versions</a> guide on HashiCorp Learn for more details.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Authentication%20and%20National%20Clouds"></a><h2 id="authentication-and-national-clouds">Authentication and National Clouds</h2>
+
+<p>Existing authentication methods will continue to work unchanged, whether you authenticate with a service principal (<a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/service_principal_client_certificate">client certificate</a> or <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/service_principal_client_secret">client secret</a>), <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/managed_service_identity">managed identity</a>, or using <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/azure_cli">Azure CLI</a>.</p>
+
+<p>However, you may need to assign new API permissions depending on your configuration and authentication scenario.</p>
+
+<p>The default Azure public cloud, which was previously specified as <code>public</code>, has been renamed to <code>global</code>. Existing environment names will continue to work in version 2.0.</p>
+
+<p>For users connecting to national clouds (e.g. germany, china and usgovernment), these are all supported using the existing provider configuration property <code>environment</code>, or the environment variable <code>ARM_ENVIRONMENT</code>. The <code>usgovernment</code> environment has been split into two environments <code>usgovernmentl4</code> and <code>usgovernmentl5</code> - see <a href="https://developer.microsoft.com/en-us/office/blogs/new-microsoft-graph-endpoints-in-us-government-cloud/">this post</a> for more information. Specifying the <code>usgovernment</code> environment will use the <code>usgovernmentl4</code> cloud.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Additional%20option%20for%20Client%20Certificate%20authentication"></a><h3 id="additional-option-for-client-certificate-authentication">Additional option for Client Certificate authentication</h3>
+
+<p>If you are using Client Certificate authentication, it's now possible to specify the certificate bundle data as an inline variable, in addition to the pre-existing method of specifying the filesystem path for a <code>.pfx</code> file. This may be useful when running Terraform in a non-interactive context, such as CI/CD pipelines.</p>
+
+<p>For more information, consult the <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/service_principal_client_certificate">Client Certificate Authentication Guide</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20API%20permissions"></a><h2 id="new-api-permissions">New API permissions</h2>
+
+<p>Microsoft Graph is a different web service to Azure Active Directory Graph, and as such if you are authenticating using a service principal, you may need to assign new permissions to <a href="https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/service_principal_configuration">your authenticated principal</a>.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>If you have assigned API permissions specific to the Azure Directory Graph API, you can safely un-assign these permissions after upgrading to version 2.0.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Assigning%20directory%20roles"></a><h3 id="assigning-directory-roles">Assigning directory roles</h3>
+
+<p>If you are using directory roles to assign effective permissions to your authenticated principal, you may not necessarily need to assign new API permissions.</p>
+
+<p>Whilst assigning directory roles is the recommended approach for user principals, if you are authenticating using a service principal, we recommend assigning permissions using app roles as detailed below. Note that this differs from our advice for earlier (v0.x and v1.x) releases, where we recommend the use of directory roles for service principals due to bugs previously encountered with Azure Active Directory Graph that do not occur with Microsoft Graph.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Assigning%20new%20API%20permissions%20for%20a%20service%20principal"></a><h3 id="assigning-new-api-permissions-for-a-service-principal">Assigning new API permissions for a service principal</h3>
+
+<p>To assign permissions to your Application for use with Service Principal authentication, navigate to the <a href="https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/Overview"><strong>Azure Active Directory</strong> overview</a> within the <a href="https://portal.azure.com/">Azure Portal</a> and select the <a href="https://portal.azure.com#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RegisteredApps"><strong>App Registrations</strong> blade</a>. Locate your registered application and click on its display name to manage it.</p>
+
+<p>Go to the API Permissions pane for the Application and click the "Add a permission" button. In the pane that opens, select <strong>Microsoft Graph</strong>.</p>
+
+<p>Choose "Application Permissions" for the permission type, and check the permissions you would like to assign. The permissions you need will depend on which directory objects you wish to manage with Terraform. The following table show the required permissions for some common resources:</p>
+
+<table>
+<thead>
+<tr>
+  <th>Resource(s)</th>
+  <th>Role Name(s)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>data.azuread_application</code><br/><code>data.azuread_service_principal</code></td>
+  <td>Application.Read.All</td>
+</tr>
+<tr>
+  <td><code>data.azuread_domains</code></td>
+  <td>Domain.Read.All</td>
+</tr>
+<tr>
+  <td><code>data.azuread_group</code><br/><code>data.azuread_groups</code></td>
+  <td>Group.Read.All</td>
+</tr>
+<tr>
+  <td><code>data.azuread_user</code><br/><code>data.azuread_users</code></td>
+  <td>User.Read.All</td>
+</tr>
+<tr>
+  <td><code>azuread_application</code><br/><code>azuread_application_certificate</code><br/><code>azuread_application_password</code><br/><code>azuread_service_principal</code><br/><code>azuread_service_principal_certificate</code><br/><code>azuread_service_principal_password</code></td>
+  <td>Application.ReadWrite.All</td>
+</tr>
+<tr>
+  <td><code>azuread_group</code><br/><code>azuread_group_member</code></td>
+  <td>Group.ReadWrite.All</td>
+</tr>
+<tr>
+  <td><code>azuread_user</code></td>
+  <td>User.ReadWrite.All</td>
+</tr>
+</tbody>
+</table>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Permissions for other resources</em>
+    <p>If the resource you are using is not shown in the above table, consult the documentation page for the resource for a guide to the required permissions.</p>
+</aside>
+
+<p>Depending on the configuration of your AAD tenant, you may also need to grant the Directory.Read.All and/or Directory.ReadWrite.All roles.</p>
+
+<p>After assigning permissions, you will need to grant consent for the service principal to utilise them. The easiest way to do this is by clicking the Grant Admin Consent button in the same API Permissions pane, which will create the necessary app role assignments for the Service Principal.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20API%20Constraints"></a><h2 id="new-api-constraints">New API Constraints</h2>
+
+<p>Due to differences between the Azure Active Directory Graph API and the Microsoft Graph API, you may encounter some constraints after upgrading. These are due to implementation changes within Azure, and are outside the control of the provider, but where known these are detailed here for your convenience.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20requirements%20for%20groups"></a><h3 id="new-requirements-for-groups">New requirements for groups</h3>
+
+<p>Microsoft 365 groups are required to have at least one owner that is a user principal, i.e. not a service principal. When creating or managing Microsoft 365 groups, you should explicitly assign at least one user to be an owner of the group in your Terraform configuration. Note that whilst this requirement officially pertains to Microsoft 365 groups, you may encounter this constraint with newly created "traditional" security groups, such as the type supported by the AzureAD provider prior to version 2.0.</p>
+
+<p>When executing Terraform with a user principal, we recommend assigning the directory role <code>Groups Administrator</code> or a role with the same effective permissions, when managing groups using the AzureAD provider.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20required%20fields"></a><h2 id="new-required-fields">New required fields</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_group"></a><h3 id="resource-azuread_group">Resource: <code>azuread_group</code></h3>
+
+<p>The <code>mail_enabled</code> and <code>security_enabled</code> fields are no longer read-only, and at least one of these fields must be set to <code>true</code> in order to create a new group.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Removal%20of%20deprecated%20fields"></a><h2 id="removal-of-deprecated-fields">Removal of deprecated fields</h2>
+
+<p>The following attributes/properties were deprecated in the AzureAD provider, and have now been removed in version 2.0.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>Compatibility Note</em>
+    <p>You will need to update your Terraform configuration in the latest v1.x release to use the new fields, prior to upgrading to 2.0.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Provider"></a><h3 id="provider">Provider</h3>
+
+<p>The deprecated field <code>metadata_host</code> is no longer used and has been removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20source%3A%20azuread_application"></a><h3 id="data-source-azuread_application">Data source: <code>azuread_application</code></h3>
+
+<p>The deprecated field <code>name</code> has been replaced by the <code>display_name</code> field and has been removed.</p>
+
+<p>The deprecated field <code>is_enabled</code> in the <code>app_roles</code> block has been replaced by the <code>enabled</code> field and has been removed.</p>
+
+<p>The deprecated field <code>available_to_other_tenants</code> has been replaced by the <code>sign_in_audience</code> field and has been removed.</p>
+
+<p>The deprecated field <code>homepage</code> has been replaced by the <code>homepage_url</code> field in the <code>web</code> block and has been removed.</p>
+
+<p>The deprecated field <code>logout_url</code> has been replaced by the <code>logout_url</code> field in the <code>web</code> block and has been removed.</p>
+
+<p>The deprecated field <code>oauth2_allow_implicit_flow</code> has been replaced by the <code>access_token_issuance_enabled</code> field in the <code>implicit_grant</code> block and has been removed.</p>
+
+<p>The deprecated <code>oauth2_permissions</code> block has been replaced by the <code>oauth2_permission_scopes</code> block within the <code>api</code> block and has been removed.</p>
+
+<p>The deprecated field <code>reply_urls</code> has been replaced by the <code>redirect_uris</code> field in the <code>web</code> block and has been removed.</p>
+
+<p>The legacy <code>type</code> field is deprecated and has been removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20source%3A%20azuread_group"></a><h3 id="data-source-azuread_group">Data source: <code>azuread_group</code></h3>
+
+<p>The deprecated field <code>name</code> has been replaced by the <code>display_name</code> field and has been removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20source%3A%20azuread_groups"></a><h3 id="data-source-azuread_groups">Data source: <code>azuread_groups</code></h3>
+
+<p>The deprecated field <code>names</code> has been replaced by the <code>display_names</code> field and has been removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20source%3A%20azuread_user"></a><h3 id="data-source-azuread_user">Data source: <code>azuread_user</code></h3>
+
+<p>The deprecated field <code>immutable_id</code> has been replaced by the <code>onpremises_immutable_id</code> field and has been removed.</p>
+
+<p>The deprecated field <code>physical_delivery_office_name</code> has been replaced by the <code>office_location</code> field and has been removed.</p>
+
+<p>The deprecated field <code>mobile</code> has been replaced by the <code>mobile_phone</code> field and has been removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20source%3A%20azuread_users"></a><h3 id="data-source-azuread_users">Data source: <code>azuread_users</code></h3>
+
+<p>The deprecated field <code>immutable_id</code> in the <code>users</code> block has been replaced by the <code>onpremises_immutable_id</code> field and has been removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_application"></a><h3 id="resource-azuread_application">Resource: <code>azuread_application</code></h3>
+
+<p>The deprecated field <code>name</code> has been replaced by the <code>display_name</code> field and has been removed.</p>
+
+<p>The deprecated field <code>is_enabled</code> in the <code>app_role</code> block has been replaced by the <code>enabled</code> field and has been removed.</p>
+
+<p>The deprecated field <code>available_to_other_tenants</code> has been replaced by the <code>sign_in_audience</code> field and has been removed.</p>
+
+<p>The deprecated field <code>homepage</code> has been replaced by the <code>homepage_url</code> field in the <code>web</code> block and has been removed.</p>
+
+<p>The deprecated field <code>logout_url</code> has been replaced by the <code>logout_url</code> field in the <code>web</code> block and has been removed.</p>
+
+<p>The deprecated field <code>oauth2_allow_implicit_flow</code> has been replaced by the <code>access_token_issuance_enabled</code> field in the <code>implicit_grant</code> block and has been removed.</p>
+
+<p>The deprecated field <code>is_enabled</code> in the <code>app_role</code> block has been replaced by the <code>enabled</code> field and has been removed.</p>
+
+<p>The deprecated <code>oauth2_permissions</code> block has been replaced by the <code>oauth2_permission_scope</code> block within the <code>api</code> block and has been removed.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>In the new <code>oauth2_permission_scope</code> block, the <code>is_enabled</code> field has been renamed to <code>enabled</code> and the <code>id</code> field is now <strong>required</strong>. See the <a href="#new-required-uuid-fields">New required UUID fields</a> section below for more information.</p>
+</aside>
+
+<p>The deprecated field <code>public_client</code> has been replaced by the <code>fallback_public_client_enabled</code> field. The new <code>public_client</code> block now contains settings for public client applications.</p>
+
+<p>The deprecated field <code>reply_urls</code> has been replaced by the <code>redirect_uris</code> field in the <code>web</code> block and has been removed.</p>
+
+<p>The legacy <code>type</code> field is deprecated and has been removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_application_app_role"></a><h3 id="resource-azuread_application_app_role">Resource: <code>azuread_application_app_role</code></h3>
+
+<p>This resource has been removed in version 2.0 of the provider. Limitations of the <code>azuread_application</code> resource, that previously necessitated use of this resource, have been resolved in version 2.0. See <a href="https://github.com/hashicorp/terraform-provider-azuread/pull/465">this pull request</a> for more information about this change.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resources%3A%20azuread_application_oauth2_permission%20and%20azuread_application_oauth2_permission_scope"></a><h3 id="resources-azuread_application_oauth2_permission-and-azuread_application_oauth2_permission_scope">Resources: <code>azuread_application_oauth2_permission</code> and <code>azuread_application_oauth2_permission_scope</code></h3>
+
+<p>In version 1.5.0 of the provider, the <code>azuread_application_oauth2_permission</code> resource was deprecated and replaced by the <code>azuread_application_oauth2_permission_scope</code> resource.</p>
+
+<p>However, in version 2.0 of the provider, both of these resources have been removed. Limitations of the <code>azuread_application</code> resource, that previously necessitated use of these resources, have been resolved in version 2.0. See <a href="https://github.com/hashicorp/terraform-provider-azuread/pull/465">this pull request</a> for more information about this change.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_application_password"></a><h3 id="resource-azuread_application_password">Resource: <code>azuread_application_password</code></h3>
+
+<p>The deprecated field <code>description</code> has been replaced by the <code>display_name</code> field and has been removed.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The following also applies when the Microsoft Graph beta is enabled in version 1.5 or later</p>
+</aside>
+
+<p>The <code>azuread_application_password</code> resource no longer supports importing.</p>
+
+<p>The <code>key_id</code> field has become read-only as Azure Active Directory no longer allows user-specified key IDs for passwords.</p>
+
+<p>The <code>value</code> field has become read-only as Azure Active Directory no longer accepts user-supplied password values. Passwords are instead auto-generated by Azure and exported with the <code>value</code> attribute by the resource.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Removal of `key_id` and `value`</em>
+    <p>Note that whilst these properties must be removed from any existing <code>azuread_application_password</code> resource configurations, doing so will not remove the password value from your application.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_group"></a><h3 id="resource-azuread_group-2">Resource: <code>azuread_group</code></h3>
+
+<p>The deprecated field <code>name</code> has been replaced by the <code>display_name</code> field and has been removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_service_principal_password"></a><h3 id="resource-azuread_service_principal_password">Resource: <code>azuread_service_principal_password</code></h3>
+
+<p>The deprecated field <code>description</code> has been replaced by the <code>display_name</code> field and has been removed.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The following also applies when the Microsoft Graph beta is enabled in version 1.5 or later</p>
+</aside>
+
+<p>The <code>azuread_service_principal_password</code> resource no longer supports importing.</p>
+
+<p>The <code>key_id</code> field has become read-only as Azure Active Directory no longer allows user-specified key IDs for passwords.</p>
+
+<p>The <code>value</code> field has become read-only as Azure Active Directory no longer accepts user-supplied password values. Passwords are instead auto-generated by Azure and exported with the <code>value</code> attribute by the resource.</p>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>Removal of `key_id` and `value`</em>
+    <p>Note that whilst these properties must be removed from any existing <code>azuread_service_principal_password</code> resource configurations, doing so will not remove the password value from your service principal.</p>
+</aside>
+
+<aside class="admonition note">
+    <strong>note</strong>
+    <em>note</em>
+    <p>The following also applies when the Microsoft Graph beta is enabled in version 1.5 through 1.6.0, and in versions 2.0.0 through 2.13.0 of the provider, but not in version 2.14.0 or later.</p>
+</aside>
+
+<p>The <code>display_name</code>, <code>start_date</code> and <code>end_date</code> fields are no longer respected by the API and have been made read-only. Accordingly the <code>end_date_relative</code> field has been removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_user"></a><h3 id="resource-azuread_user">Resource: <code>azuread_user</code></h3>
+
+<p>The deprecated field <code>immutable_id</code> has been replaced by the <code>onpremises_immutable_id</code> field and has been removed.</p>
+
+<p>The deprecated field <code>physical_delivery_office_name</code> has been replaced by the <code>office_location</code> field and has been removed.</p>
+
+<p>The deprecated field <code>mobile</code> has been replaced by the <code>mobile_phone</code> field and has been removed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/New%20required%20UUID%20fields"></a><h2 id="new-required-uuid-fields">New required UUID fields</h2>
+
+<p>Several fields that were previously optional or read-only are now required in version 2.0. Currently, these fields are optionally (or always) autogenerated by the provider, as not all users need to be able to set these fields to specific values.</p>
+
+<p>In v2.0, you can achieve the same behaviour by using the <a href="https://registry.terraform.io/providers/hashicorp/random/latest/docs">Random provider</a>, for example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"random_uuid"</span><span class="w"> </span><span class="nv">"example_role_id"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azuread_application"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">app_role</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">random_uuid.example_role_id.result</span><span class="c1"></span>
+<span class="c1">    # additional properties...</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Requiring these properties will enable more predictable and less disruptive management of app roles and OAuth 2.0 permission scopes such that existing roles/scopes will not be disabled or overwritten to accommodate changes in an application's configuration.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_application"></a><h3 id="resource-azuread_application-2">Resource: <code>azuread_application</code></h3>
+
+<p>The <code>id</code> field in the <code>app_role</code> block was previously currently Computed (read-only) but is now Required.</p>
+
+<p>The <code>id</code> field in the deprecated <code>oauth2_permissions</code> block was previously Computed (read-only) but its replacement field <code>id</code> in the <code>oauth2_permission_scope</code> block is Required.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Computed%20fields%20and%20other%20breaking%20changes"></a><h2 id="computed-fields-and-other-breaking-changes">Computed fields and other breaking changes</h2>
+
+<p>In previous version of the provider, many fields were introduced as Optional + Computed fields. This meant that omitting such fields would cause Terraform to ignore them and not attempt to manage them. However, this approach has many side effects including the inability to unset or clear these fields, and sometimes being forced to accept an undesired default value.</p>
+
+<p>To resolve these issues, many of these fields are no longer Computed in version 2.0 of the provider. This means that Terraform will manage these fields and if you do not specify their values in your configuration, they will be unset or set to their default or zero values. In some cases it's appropriate for a field to be Computed, particularly where it helps prevent disruption to services or users.</p>
+
+<p>Additionally, some fields have been updated in ways that may break existing configurations, for example changing their type.</p>
+
+<p>Accordingly, in version 2.0 of the provider the following fields have changed.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20source%3A%20azuread_application"></a><h3 id="data-source-azuread_application-2">Data source: <code>azuread_application</code></h3>
+
+<p>The <code>display_name</code> property is now matched case-insensitively which mirrors the behaviour of Azure Active Directory.</p>
+
+<p>The <code>group_membership_claims</code> property was previously a single string value but has been changed to a list of strings. In some cases this may cause the following error to appear when running <code>terraform plan</code> or <code>terraform refresh</code> after upgrading:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="go">Error: .group_membership_claims: missing expected [</span>
+</code></pre></div>
+
+<p>If you encounter this error, you will need to perform <em>one</em> of the following workarounds:</p>
+
+<ul>
+<li>Run <code>terraform state rm data.azuread_application.example</code> to remove the data source(s) from your state file.</li>
+<li>Comment out the data source(s) in your configuration, then upgrade the provider version, run <code>terraform refresh</code>, and lastly uncomment the data source(s).</li>
+<li>Manually edit your state file to change the attribute <code>"group_membership_claims": ""</code> to <code>"group_membership_claims": []</code> (not recommended unless you are confident and the other two options are infeasible).</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_application"></a><h3 id="resource-azuread_application-3">Resource: <code>azuread_application</code></h3>
+
+<p>The <code>app_role</code> block is no longer Computed, omitting this block will cause Terraform to remove any app roles published by an application.</p>
+
+<p>The <code>value</code> field in the <code>app_role</code> block is no longer Computed, omitting this field will cause Terraform to clear this field for an app role.</p>
+
+<p>The <code>fallback_public_client_enabled</code> field is no longer Computed, omitting this field will cause Terraform to default this value to <code>false</code>.</p>
+
+<p>The <code>group_membership_claims</code> property was previously a single string value but has been changed to a list of strings. If this property is present in your configuration, you will need to update it. For example:</p>
+
+<p><em>From:</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="na">group_membership_claims</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"All"</span><span class="w"></span>
+</code></pre></div>
+
+<p><em>To:</em></p>
+
+<div class="codehilite"><pre><span></span><code><span class="na">group_membership_claims</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"All"</span><span class="p">]</span><span class="w"></span>
+</code></pre></div>
+
+<p>Note the square brackets to denote a list for the value. This change means that you can now specify multiple claims for this property.</p>
+
+<p>The <code>identifier_uris</code> field was previously a List type field and is now a Set type field. This is due to API ordering and means you can no longer reference this field and index it sequentially without first converting it to a list. Additional, this field is no longer Computed, so omitting this field will cause Terraform to remove any identifier URIs configured for an application.</p>
+
+<p>The <code>oauth2_permission_scope</code> block is no longer Computed, omitting this block will cause Terraform to remove any OAuth2 permission scopes published by an application.</p>
+
+<p>The <code>owners</code> field is no longer Computed, omitting this field will cause Terraform to remove any owners for an application. It's recommended to specify the object ID of the authenticated principal running Terraform, to ensure sufficient permissions that the application can be subsequently updated.</p>
+
+<p>The <code>sign_in_audience</code> field is no longer Computed, omitting this field will cause Terraform to default this value to <code>AzureADMyOrg</code>.</p>
+
+<p>The <code>web</code> block is no longer Computed, omitting this field will cause Terraform to remove all field values contained in this block, including the <code>homepage_url</code>, <code>logout_url</code>, <code>redirect_uris</code> and <code>access_token_issuance_enabled</code> fields.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Resource%3A%20azuread_user"></a><h2 id="resource-azuread_user-2">Resource: <code>azuread_user</code></h2>
+
+<p>The <code>password</code> field is now Optional + Computed, which makes it possible to import existing users without forcibly resetting their password.</p>
+
+<p>The <code>city</code> field is no longer Computed, omitting this field will cause Terraform to remove this value for a user.</p>
+
+<p>The <code>company_name</code> field is no longer Computed, omitting this field will cause Terraform to remove this value for a user.</p>
+
+<p>The <code>country</code> field is no longer Computed, omitting this field will cause Terraform to remove this value for a user.</p>
+
+<p>The <code>department</code> field is no longer Computed, omitting this field will cause Terraform to remove this value for a user.</p>
+
+<p>The <code>given_name</code> field is no longer Computed, omitting this field will cause Terraform to remove this value for a user.</p>
+
+<p>The <code>job_title</code> field is no longer Computed, omitting this field will cause Terraform to remove this value for a user.</p>
+
+<p>The <code>mobile_phone</code> field is no longer Computed, omitting this field will cause Terraform to remove this value for a user.</p>
+
+<p>The <code>office_location</code> field is no longer Computed, omitting this field will cause Terraform to remove this value for a user.</p>
+
+<p>The <code>postal_code</code> field is no longer Computed, omitting this field will cause Terraform to remove this value for a user.</p>
+
+<p>The <code>state</code> field is no longer Computed, omitting this field will cause Terraform to remove this value for a user.</p>
+
+<p>The <code>street_address</code> field is no longer Computed, omitting this field will cause Terraform to remove this value for a user.</p>
+
+<p>The <code>surname</code> field is no longer Computed, omitting this field will cause Terraform to remove this value for a user.</p>
+
+<p>The <code>usage_location</code> field is no longer Computed, omitting this field will cause Terraform to remove this value for a user.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Avoiding%20diffs%20for%20already-published%20applications"></a><h3 id="avoiding-diffs-for-already-published-applications">Avoiding diffs for already-published applications</h3>
+
+<p>In order to determine the assigned value of a given UUID-type property where you had previously not defined one, you can use the <code>terraform state show</code> command to inspect your existing application(s), and then add the current value to your configuration.</p>
+
+<div class="codehilite"><pre><span></span><code>$ terraform state show azuread_application.example
+
+<span class="c1"># azuread_application.example:</span>
+resource <span class="s2">"azuread_application"</span> <span class="s2">"example"</span> <span class="o">{</span>
+    <span class="nv">app_role</span>           <span class="o">=</span> <span class="o">[</span>
+        <span class="o">{</span>
+            <span class="nv">allowed_member_types</span> <span class="o">=</span> <span class="o">[</span>
+                <span class="s2">"User"</span>,
+            <span class="o">]</span>
+            <span class="nv">description</span>          <span class="o">=</span> <span class="s2">"Just an example"</span>
+            <span class="nv">display_name</span>         <span class="o">=</span> <span class="s2">"Example Role"</span>
+            <span class="nv">id</span>                   <span class="o">=</span> <span class="s2">"3dbd749f-c2ba-4796-0d33-273878f8a31b"</span>
+            <span class="nv">is_enabled</span>           <span class="o">=</span> <span class="nb">true</span>
+            <span class="nv">value</span>                <span class="o">=</span> <span class="s2">""</span>
+        <span class="o">}</span>,
+    <span class="o">]</span>
+    <span class="nv">application_id</span>     <span class="o">=</span> <span class="s2">"cd986e6e-5a90-42f0-8c01-82f0da5b286c"</span>
+    <span class="nv">display_name</span>       <span class="o">=</span> <span class="s2">"example-app"</span>
+    <span class="nv">id</span>                 <span class="o">=</span> <span class="s2">"61a9d04a-6694-497a-afe8-6303aa3435df"</span>
+    <span class="nv">oauth2_permissions</span> <span class="o">=</span> <span class="o">[</span>
+        <span class="o">{</span>
+            <span class="nv">admin_consent_description</span>  <span class="o">=</span> <span class="s2">"Allow the application to access example-app on behalf of the signed-in user."</span>
+            <span class="nv">admin_consent_display_name</span> <span class="o">=</span> <span class="s2">"Access example-app"</span>
+            <span class="nv">id</span>                         <span class="o">=</span> <span class="s2">"c32d857d-02d9-4887-af7a-cb1f1fd61b9a"</span>
+            <span class="nv">is_enabled</span>                 <span class="o">=</span> <span class="nb">true</span>
+            <span class="nb">type</span>                       <span class="o">=</span> <span class="s2">"User"</span>
+            <span class="nv">user_consent_description</span>   <span class="o">=</span> <span class="s2">"Allow the application to access example-app on your behalf."</span>
+            <span class="nv">user_consent_display_name</span>  <span class="o">=</span> <span class="s2">"Access example-app"</span>
+            <span class="nv">value</span>                      <span class="o">=</span> <span class="s2">"user_impersonation"</span>
+        <span class="o">}</span>,
+    <span class="o">]</span>
+    <span class="nv">object_id</span>          <span class="o">=</span> <span class="s2">"61a9d04a-6694-497a-afe8-6303aa3435df"</span>
+<span class="o">}</span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Behaviour%20change%3A%20default%20user_impersonation%20scope%20for%20applications"></a><h2 id="behaviour-change-default-user_impersonation-scope-for-applications">Behaviour change: default <code>user_impersonation</code> scope for applications</h2>
+
+<p>With AzureAD v1.x using Azure Active Directory Graph (or using the beta support for Microsoft Graph), newly created applications are assigned a default <code>user_impersonation</code> scope which enables users to sign in to your application.</p>
+
+<p>With AzureAD v2.0 and later using Microsoft Graph, this default scope is <strong>not</strong> automatically granted to your application, and you will need to specify it in your configuration. The following example can be used to replicate the earlier behaviour.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"random_uuid"</span><span class="w"> </span><span class="nv">"example_app_user_impersonation_scope"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"azuread_application"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"example-app"</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">api</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">oauth2_permission_scope</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">admin_consent_description</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow the application to access example-app on behalf of the signed-in user."</span><span class="w"></span>
+<span class="w">      </span><span class="na">admin_consent_display_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Access example-app"</span><span class="w"></span>
+<span class="w">      </span><span class="na">id</span><span class="w">                         </span><span class="o">=</span><span class="w"> </span><span class="nv">random_uuid.example_app_user_impersonation_scope.result</span><span class="w"></span>
+<span class="w">      </span><span class="na">enabled</span><span class="w">                    </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="w">      </span><span class="na">type</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="s2">"User"</span><span class="w"></span>
+<span class="w">      </span><span class="na">user_consent_description</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"Allow the application to access example-app on your behalf."</span><span class="w"></span>
+<span class="w">      </span><span class="na">user_consent_display_name</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"Access example-app"</span><span class="w"></span>
+<span class="w">      </span><span class="na">value</span><span class="w">                      </span><span class="o">=</span><span class="w"> </span><span class="s2">"user_impersonation"</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Beta%20support%20for%20Microsoft%20Graph%20in%20v1.5.0"></a><h2 id="beta-support-for-microsoft-graph-in-v150">Beta support for Microsoft Graph in v1.5.0</h2>
+
+<p>In version 1.5.0 or later of the AzureAD provider, beta support for Microsoft Graph can be enabled in the provider block.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p>Please note that whilst we do not recommend using this feature in production during the beta phase, you can use this feature flag to determine any configuration changes that you may need to make in advance of the v2.0 release.</p>
+</aside>
+
+<p>With this feature enabled, most requests will be sent to Microsoft Graph, however for compatibility some requests may still be sent to Azure Active Directory Graph. You should therefore ensure your authenticated principal is assigned the required permissions for both APIs.</p>
+
+<p>To enable this support, set the following in your provider block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">provider</span><span class="w"> </span><span class="nv">"azuread"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">use_microsoft_graph</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Alternatively, you can enable the beta by setting the following environment variable to any non-empty value:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># sh</span>
+<span class="nb">export</span> <span class="nv">AAD_USE_MICROSOFT_GRAPH</span><span class="o">=</span><span class="m">1</span>
+
+<span class="c1"># PowerShell</span>
+<span class="nv">$env</span>:AAD_USE_MICROSOFT_GRAPH <span class="o">=</span> <span class="m">1</span>
+</code></pre></div>
+
+<p>We appreciate any feedback you might have whilst using beta support for Microsoft Graph. Bug reports and feature requests can be logged on our <a href="https://github.com/hashicorp/terraform-provider-azuread/issues">GitHub issue tracker</a>, and you can also check out the <a href="https://github.com/hashicorp/terraform-provider-azuread/blob/main/README.md">project README</a> for information on how to get in touch with the maintainers. If you encounter an issue that has already been reported, please upvote it and comment to add any additional context you might have.</p>
+
+            
+        
+    </body></html>

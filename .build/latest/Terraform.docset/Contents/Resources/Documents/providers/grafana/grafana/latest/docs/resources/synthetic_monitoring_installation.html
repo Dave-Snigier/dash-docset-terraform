@@ -1,0 +1,118 @@
+<html><!-- Online page at https://registry.terraform.io/providers/grafana/grafana/latest/docs/resources/synthetic_monitoring_installation --><head>
+                <title>grafana_synthetic_monitoring_installation</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="grafana_synthetic_monitoring_installation-resource">grafana_synthetic_monitoring_installation (Resource)</h1>
+
+<p>Sets up Synthetic Monitoring on a Grafana cloud stack and generates a token. 
+Once a Grafana Cloud stack is created, a user can either use this resource or go into the UI to install synthetic monitoring.
+This resource cannot be imported but it can be used on an existing Synthetic Monitoring installation without issues.</p>
+
+<p><strong>Note that this resource must be used on a provider configured with Grafana Cloud credentials.</strong></p>
+
+<ul>
+<li><a href="https://grafana.com/docs/grafana-cloud/testing/synthetic-monitoring/set-up/">Official documentation</a></li>
+<li><a href="https://github.com/grafana/synthetic-monitoring-api-go-client/blob/main/docs/API.md#apiv1registerinstall">API documentation</a></li>
+</ul>
+
+<p>Required access policy scopes:</p>
+
+<ul>
+<li>stacks:read</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example%20Usage"></a><h2 id="example-usage">Example Usage</h2>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">variable</span><span class="w"> </span><span class="nv">"cloud_access_policy_token"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"Cloud Access Policy token for Grafana Cloud with the following scopes: accesspolicies:read|write|delete, stacks:read|write|delete"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"stack_slug"</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="kr">variable</span><span class="w"> </span><span class="nv">"cloud_region"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"prod-us-east-0"</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Step 1: Create a stack</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"grafana"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="s2">"cloud"</span><span class="w"></span>
+<span class="w">  </span><span class="na">cloud_access_policy_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.cloud_access_policy_token</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"grafana_cloud_stack"</span><span class="w"> </span><span class="nv">"sm_stack"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">grafana.cloud</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">name</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">var.stack_slug</span><span class="w"></span>
+<span class="w">  </span><span class="na">slug</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="nv">var.stack_slug</span><span class="w"></span>
+<span class="w">  </span><span class="na">region_slug</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.cloud_region</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+<span class="c1">// Step 2: Install Synthetic Monitoring on the stack</span>
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"grafana_cloud_access_policy"</span><span class="w"> </span><span class="nv">"sm_metrics_publish"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">grafana.cloud</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">var.cloud_region</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"metric-publisher-for-sm"</span><span class="w"></span>
+<span class="w">  </span><span class="na">scopes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"metrics:write", "stacks:read", "logs:write", "traces:write"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="nb">realm</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">type</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="s2">"stack"</span><span class="w"></span>
+<span class="w">    </span><span class="na">identifier</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">grafana_cloud_stack.sm_stack.id</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"grafana_cloud_access_policy_token"</span><span class="w"> </span><span class="nv">"sm_metrics_publish"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">grafana.cloud</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">region</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">var.cloud_region</span><span class="w"></span>
+<span class="w">  </span><span class="na">access_policy_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">grafana_cloud_access_policy.sm_metrics_publish.policy_id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="s2">"metric-publisher-for-sm"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">resource</span><span class="w"> </span><span class="nc">"grafana_synthetic_monitoring_installation"</span><span class="w"> </span><span class="nv">"sm_stack"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">grafana.cloud</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">stack_id</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="nv">grafana_cloud_stack.sm_stack.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">metrics_publisher_key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">grafana_cloud_access_policy_token.sm_metrics_publish.token</span><span class="w"></span>
+<span class="p">}</span><span class="c1"></span>
+
+
+<span class="c1">// Step 3: Interact with Synthetic Monitoring</span>
+<span class="kr">provider</span><span class="w"> </span><span class="nv">"grafana"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">alias</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="s2">"sm"</span><span class="w"></span>
+<span class="w">  </span><span class="na">sm_access_token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">grafana_synthetic_monitoring_installation.sm_stack.sm_access_token</span><span class="w"></span>
+<span class="w">  </span><span class="na">sm_url</span><span class="w">          </span><span class="o">=</span><span class="w"> </span><span class="nv">grafana_synthetic_monitoring_installation.sm_stack.stack_sm_api_url</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kr">data</span><span class="w"> </span><span class="nc">"grafana_synthetic_monitoring_probes"</span><span class="w"> </span><span class="nv">"main"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="nv">grafana.sm</span><span class="w"></span>
+<span class="w">  </span><span class="na">depends_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">grafana_synthetic_monitoring_installation.sm_stack</span><span class="p">]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<!-- schema generated by tfplugindocs -->
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Schema"></a><h2 id="schema">Schema</h2>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Required"></a><h3 id="required">Required</h3>
+
+<ul>
+<li><code>metrics_publisher_key</code> (String, Sensitive) The <a href="https://grafana.com/docs/grafana-cloud/account-management/authentication-and-permissions/access-policies/">Grafana Cloud access policy</a> with the following scopes: <code>stacks:read</code>, <code>metrics:write</code>, <code>logs:write</code>, <code>traces:write</code>. This is used to publish metrics and logs to Grafana Cloud stack.</li>
+<li><code>stack_id</code> (String) The ID or slug of the stack to install SM on.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Optional"></a><h3 id="optional">Optional</h3>
+
+<ul>
+<li><code>stack_sm_api_url</code> (String) The URL of the SM API to install SM on. This depends on the stack region, find the list of API URLs here: https://grafana.com/docs/grafana-cloud/testing/synthetic-monitoring/set-up/set-up-private-probes/#probe-api-server-url. A static mapping exists in the provider but it may not contain all the regions. If it does contain the stack's region, this field is computed automatically and readable.</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Read-Only"></a><h3 id="read-only">Read-Only</h3>
+
+<ul>
+<li><code>id</code> (String) The ID of this resource.</li>
+<li><code>sm_access_token</code> (String) Generated token to access the SM API.</li>
+</ul>
+
+            
+        
+    </body></html>

@@ -1,0 +1,267 @@
+<html><!-- Online page at https://www.terraform.io/language/data-sources --><head>
+                <title>Data Sources</title>
+                <meta charset="utf-8"/>
+                <link href="../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <h1 id="data-sources">Data Sources</h1>
+
+<p><em>Data sources</em> allow Terraform to use information defined outside of Terraform,
+defined by another separate Terraform configuration, or modified by functions.</p>
+
+<blockquote>
+  <p><strong>Hands-on:</strong> Try the <a href="../../terraform/tutorials/configuration-language/data-sources.html">Query Data Sources</a> tutorial.</p>
+</blockquote>
+
+<p>Each <a href="../../terraform/language/providers.html">provider</a> may offer data sources
+alongside its set of <a href="../../terraform/language/resources.html">resource</a>
+types.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Using%20Data%20Sources"></a><h2 id="using-data-sources">Using Data Sources</h2>
+
+<p>A data source is accessed via a special kind of resource known as a
+<em>data resource</em>, declared using a <code>data</code> block:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_ami"</span><span class="w"> </span><span class="nv">"example"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">most_recent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">owners</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"self"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="nb">tags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">Name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"app-server"</span><span class="w"></span>
+<span class="w">    </span><span class="na">Tested</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"true"</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>A <code>data</code> block requests that Terraform read from a given data source ("aws_ami")
+and export the result under the given local name ("example"). The name is used
+to refer to this resource from elsewhere in the same Terraform module, but has
+no significance outside of the scope of a module.</p>
+
+<p>The data source and name together serve as an identifier for a given
+resource and so must be unique within a module.</p>
+
+<p>Within the block body (between <code>{</code> and <code>}</code>) are query constraints defined by
+the data source. Most arguments in this section depend on the
+data source, and indeed in this example <code>most_recent</code>, <code>owners</code> and <code>tags</code> are
+all arguments defined specifically for <a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/ami">the <code>aws_ami</code> data source</a>.</p>
+
+<p>When distinguishing from data resources, the primary kind of resource (as declared
+by a <code>resource</code> block) is known as a <em>managed resource</em>. Both kinds of resources
+take arguments and export attributes for use in configuration, but while
+managed resources cause Terraform to create, update, and delete infrastructure
+objects, data resources cause Terraform only to <em>read</em> objects. For brevity,
+managed resources are often referred to just as "resources" when the meaning
+is clear from context.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%20Arguments"></a><h2 id="data-source-arguments">Data Source Arguments</h2>
+
+<p>Each data resource is associated with a single data source, which determines
+the kind of object (or objects) it reads and what query constraint arguments
+are available.</p>
+
+<p>Each data source in turn belongs to a <a href="../../terraform/language/providers.html">provider</a>,
+which is a plugin for Terraform that offers a collection of resource types and
+data sources that most often belong to a single cloud or on-premises
+infrastructure platform.</p>
+
+<p>Most of the items within the body of a <code>data</code> block are defined by and
+specific to the selected data source, and these arguments can make full
+use of <a href="../../terraform/language/expressions.html">expressions</a> and other dynamic
+Terraform language features.</p>
+
+<p>However, there are some "meta-arguments" that are defined by Terraform itself
+and apply across all data sources. These arguments often have additional
+restrictions on what language features can be used with them, and are described
+in more detail in the following sections.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Resource%20Behavior"></a><h2 id="data-resource-behavior">Data Resource Behavior</h2>
+
+<p>Terraform reads data resources during the planning phase when possible, but
+announces in the plan when it must defer reading resources until the apply
+phase to preserve the order of operations. Terraform defers reading data
+resources in the following situations:</p>
+
+<ul>
+<li>At least one of the given arguments is a managed resource attribute or
+other value that Terraform cannot predict until the apply step.</li>
+<li>The data resource depends directly on a managed resource that itself has
+planned changes in the current plan.</li>
+<li>The data resource has
+<a href="#custom-condition-checks">custom conditions</a>
+and it depends directly or indirectly on a managed resource that itself
+has planned changes in the current plan.</li>
+</ul>
+
+<p>Refer to <a href="#data-resource-dependencies">Data Resource Dependencies</a> for details
+on what it means for a data resource to depend on other objects. Any resulting
+attribute of such a data resource will be unknown during planning, so it cannot
+be used in situations where values must be fully known.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Local-only%20Data%20Sources"></a><h2 id="local-only-data-sources">Local-only Data Sources</h2>
+
+<p>While many data sources correspond to an infrastructure object type that
+is accessed via a remote network API, some specialized data sources operate
+only within Terraform itself, calculating some results and exposing them
+for use elsewhere.</p>
+
+<p>For example, local-only data sources exist for
+<a href="https://registry.terraform.io/providers/hashicorp/template/latest/docs/data-sources/file">rendering templates</a>,
+<a href="https://registry.terraform.io/providers/hashicorp/local/latest/docs/data-sources/file">reading local files</a>, and
+<a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document">rendering AWS IAM policies</a>.</p>
+
+<p>The behavior of local-only data sources is the same as all other data
+sources, but their result data exists only temporarily during a Terraform
+operation, and is re-calculated each time a new plan is created.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Resource%20Dependencies"></a><h2 id="data-resource-dependencies">Data Resource Dependencies</h2>
+
+<p>Data resources have the same dependency resolution behavior
+<a href="../../terraform/language/resources/behavior.html#resource-dependencies">as defined for managed resources</a>.
+Setting the <code>depends_on</code> meta-argument within <code>data</code> blocks defers reading of
+the data source until after all changes to the dependencies have been applied.</p>
+
+<p>In order to ensure that data sources are accessing the most up to date
+information possible in a wide variety of use cases, arguments directly
+referencing managed resources are treated the same as if the resource was
+listed in <code>depends_on</code>. This behavior can be avoided when desired by indirectly
+referencing the managed resource values through a <code>local</code> value, unless the
+data resource itself has
+<a href="#custom-condition-checks">custom conditions</a>.</p>
+
+<aside class="admonition warning">
+    <strong>warning</strong>
+    <em>warning</em>
+    <p><strong>In Terraform 0.12 and earlier</strong>, due to the data resource behavior of deferring the read until the apply phase when depending on values that are not yet known, using <code>depends_on</code> with <code>data</code> resources will force the read to always be deferred to the apply phase, and therefore a configuration that uses <code>depends_on</code> with a <code>data</code> resource can never converge. Due to this behavior, we do not recommend using <code>depends_on</code> with data resources.</p>
+</aside>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Custom%20Condition%20Checks"></a><h2 id="custom-condition-checks">Custom Condition Checks</h2>
+
+<p>You can use <code>precondition</code> and <code>postcondition</code> blocks to specify assumptions and guarantees about how the data source operates. The following examples creates a postcondition that checks whether the AMI has the correct tags.</p>
+
+<pre><code>data "aws_ami" "example" {
+  id = var.aws_ami_id
+
+  lifecycle {
+    # The AMI ID must refer to an existing AMI that has the tag "nomad-server".
+    postcondition {
+      condition     = self.tags["Component"] == "nomad-server"
+      error_message = "tags[\"Component\"] must be \"nomad-server\"."
+    }
+  }
+}
+</code></pre>
+
+<p>Custom conditions can help capture assumptions, helping future maintainers understand the configuration design and intent. They also return useful information about errors earlier and in context, helping consumers more easily diagnose issues in their configurations.</p>
+
+<p>Refer to <a href="../../terraform/language/expressions/custom-conditions.html#preconditions-and-postconditions">Custom Condition Checks</a> for more details.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Multiple%20Resource%20Instances"></a><h2 id="multiple-resource-instances">Multiple Resource Instances</h2>
+
+<p>Data resources support <a href="../../terraform/language/meta-arguments/count.html"><code>count</code></a>
+and <a href="../../terraform/language/meta-arguments/for_each.html"><code>for_each</code></a>
+meta-arguments as defined for managed resources, with the same syntax and behavior.</p>
+
+<p>As with managed resources, when <code>count</code> or <code>for_each</code> is present it is important to
+distinguish the resource itself from the multiple resource <em>instances</em> it
+creates. Each instance will separately read from its data source with its
+own variant of the constraint arguments, producing an indexed result.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Selecting%20a%20Non-default%20Provider%20Configuration"></a><h2 id="selecting-a-non-default-provider-configuration">Selecting a Non-default Provider Configuration</h2>
+
+<p>Data resources support <a href="../../terraform/language/meta-arguments/resource-provider.html">the <code>provider</code> meta-argument</a>
+as defined for managed resources, with the same syntax and behavior.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Lifecycle%20Customizations"></a><h2 id="lifecycle-customizations">Lifecycle Customizations</h2>
+
+<p>Data resources do not have any customization settings available
+for their lifecycle. Only the <code>precondition</code> and <code>postcondition</code>
+blocks are allowed in the data resource <code>lifecycle</code> block.</p>
+
+<p>Refer to <a href="#custom-condition-checks">Custom Condition Checks</a> for more details.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Example"></a><h2 id="example">Example</h2>
+
+<p>A data source configuration looks like the following:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="c1"># Find the latest available AMI that is tagged with Component = web</span>
+<span class="kr">data</span><span class="w"> </span><span class="nc">"aws_ami"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="nb">filter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"state"</span><span class="w"></span>
+<span class="w">    </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"available"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="nb">filter</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">name</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="s2">"tag:Component"</span><span class="w"></span>
+<span class="w">    </span><span class="na">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"web"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">  </span><span class="na">most_recent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">true</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Description"></a><h2 id="description">Description</h2>
+
+<p>The <code>data</code> block creates a data instance of the given <em>type</em> (first
+block label) and <em>name</em> (second block label). The combination of the type
+and name must be unique.</p>
+
+<p>Within the block (the <code>{ }</code>) is configuration for the data instance. The
+configuration is dependent on the type; as with
+<a href="../../terraform/language/resources.html">resources</a>, each provider on the
+<a href="https://registry.terraform.io/browse/providers">Terraform Registry</a> has its own
+documentation for configuring and using the data types it provides.</p>
+
+<p>Each data instance will export one or more attributes, which can be
+used in other resources as reference expressions of the form
+<code>data.&lt;TYPE&gt;.&lt;NAME&gt;.&lt;ATTRIBUTE&gt;</code>. For example:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"aws_instance"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">ami</span><span class="w">           </span><span class="o">=</span><span class="w"> </span><span class="nv">data.aws_ami.web.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">instance_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"t1.micro"</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Meta-Arguments"></a><h2 id="meta-arguments">Meta-Arguments</h2>
+
+<p>As data sources are essentially a read only subset of resources, they also
+support the same <a href="../../terraform/language/resources/syntax.html#meta-arguments">meta-arguments</a> of resources
+with the exception of the
+<a href="../../terraform/language/meta-arguments/lifecycle.html"><code>lifecycle</code> configuration block</a>.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Non-Default%20Provider%20Configurations"></a><h3 id="non-default-provider-configurations">Non-Default Provider Configurations</h3>
+
+<p>Similarly to <a href="../../terraform/language/resources.html">resources</a>, when
+a module has multiple configurations for the same provider you can specify which
+configuration to use with the <code>provider</code> meta-argument:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">data</span><span class="w"> </span><span class="nc">"aws_ami"</span><span class="w"> </span><span class="nv">"web"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">provider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">aws.west</span><span class="c1"></span>
+
+<span class="c1">  # ...</span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>See
+<a href="../../terraform/language/meta-arguments/resource-provider.html">The Resource <code>provider</code> Meta-Argument</a>
+for more information.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Data%20Source%20Lifecycle"></a><h2 id="data-source-lifecycle">Data Source Lifecycle</h2>
+
+<p>If the arguments of a data instance contain no references to computed values,
+such as attributes of resources that have not yet been created, then the
+data instance will be read and its state updated during Terraform's "refresh"
+phase, which by default runs prior to creating a plan. This ensures that the
+retrieved data is available for use during planning and the diff will show
+the real values obtained.</p>
+
+<p>Data instance arguments may refer to computed values, in which case the
+attributes of the instance itself cannot be resolved until all of its
+arguments are defined. In this case, refreshing the data instance will be
+deferred until the "apply" phase, and all interpolations of the data instance
+attributes will show as "computed" in the plan since the values are not yet
+known.</p>
+
+            
+        
+    </body></html>

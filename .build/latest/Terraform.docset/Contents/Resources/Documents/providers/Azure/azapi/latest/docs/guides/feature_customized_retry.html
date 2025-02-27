@@ -1,0 +1,65 @@
+<html><!-- Online page at https://registry.terraform.io/providers/Azure/azapi/latest/docs/guides/feature_customized_retry --><head>
+                <title>Feature: Customized Retry Configuration</title>
+                <meta charset="utf-8"/>
+                <link href="../../../../../../style.css" rel="stylesheet"/>
+            </head>
+            <body>
+                <p>The AzAPI provider can digest the intermittent API errors and retry the requests based on the customized retry configuration. This feature is useful when you need to handle the API errors gracefully and improve the reliability of the Terraform deployments.</p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Prerequisites"></a><h2 id="prerequisites">Prerequisites</h2>
+
+<ul>
+<li><a href="https://registry.terraform.io/providers/azure/azapi">Terraform AzAPI provider</a> version 2.1.0 or later</li>
+</ul>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Customized%20Retry%20for%20Resource%20Creation"></a><h2 id="customized-retry-for-resource-creation">Customized Retry for Resource Creation</h2>
+
+<p>The virtual network link resource may not be available immediately after the virtual network is created. In this case, you can configure the customized retry configuration to handle the <code>ResourceNotFound</code> error and retry the request.</p>
+
+<p>For example, the following configuration will create a virtual network link to the private DNS zone and retry the request when the <code>ResourceNotFound</code> error occurs:</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"privateDnsZoneLinkBlob"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.privateDnsZoneBlob.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"blob"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"global"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">properties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="na">registrationEnabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="no">false</span><span class="w"></span>
+<span class="w">      </span><span class="na">resolutionPolicy</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="s2">"Default"</span><span class="w"></span>
+<span class="w">      </span><span class="nb">virtualNetwork</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.virtualNetwork.id</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="na">locks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="nv">azapi_resource.virtualNetwork.id</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="nb">retry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message_regex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"ResourceNotFound"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+<p>Above configuration is only used for demonstration purposes. From the <code>2.0.1</code> version, the AzAPI provider will automatically retry the GET requests when the <code>ResourceNotFound</code> error occurs after the resource creation. </p>
+
+<a class="dashAnchor" name="//apple_ref/cpp/Section/Customized%20Retry%20for%20Resource%20Deletion"></a><h2 id="customized-retry-for-resource-deletion">Customized Retry for Resource Deletion</h2>
+
+<p>The private DNS zone may not be deleted immediately after the nested virtual network link is deleted. In this case, you can configure the customized retry configuration to handle the <code>CannotDeleteResource</code> error and retry the request.</p>
+
+<div class="codehilite"><pre><span></span><code><span class="kr">resource</span><span class="w"> </span><span class="nc">"azapi_resource"</span><span class="w"> </span><span class="nv">"privateDnsZoneQueue"</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="na">type</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"Microsoft.Network/privateDnsZones@2018-09-01"</span><span class="w"></span>
+<span class="w">  </span><span class="na">parent_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">azapi_resource.resourceGroup.id</span><span class="w"></span>
+<span class="w">  </span><span class="na">name</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="s2">"privatelink.queue.core.windows.net"</span><span class="w"></span>
+<span class="w">  </span><span class="na">location</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="s2">"global"</span><span class="w"></span>
+<span class="w">  </span><span class="nb">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nb">properties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="nb">retry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="na">error_message_regex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"CannotDeleteResource"</span><span class="p">]</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</code></pre></div>
+
+            
+        
+    </body></html>
